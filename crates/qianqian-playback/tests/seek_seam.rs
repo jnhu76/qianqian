@@ -114,12 +114,12 @@ fn registered_runtime(
     output: OutputBehavior,
     witnesses: &Witnesses,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
+) -> common::EpisodeFixture {
     let consumed = witnesses.consumed.clone();
     let consumed_values = witnesses.consumed_values.clone();
     let device_tail = witnesses.device_tail.clone();
     let tail_probe = witnesses.tail_probe.clone();
-    let mut runtime = QianqianApp::new();
+    let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), witnesses.tail_probe.clone());
 
     runtime
         .register_component({
@@ -178,7 +178,9 @@ fn activate(runtime: &mut QianqianApp) {
 /// The standard episode: an 8-second position-tagged source played out
 /// by a slow mock consumer (so a seek fired in the first second is
 /// decisively mid-stream), with the standard witness set.
-fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
+fn episode(
+    seeks: Vec<ProviderSeekOutcome>,
+) -> (Witnesses, PlaybackSessionHandle, common::EpisodeFixture) {
     episode_with_freeze(seeks, &ProducerFreezeWitness::default())
 }
 
@@ -189,7 +191,7 @@ fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle
 fn episode_with_freeze(
     seeks: Vec<ProviderSeekOutcome>,
     freeze: &ProducerFreezeWitness,
-) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
+) -> (Witnesses, PlaybackSessionHandle, common::EpisodeFixture) {
     let witnesses = Witnesses {
         consumed: Arc::new(AtomicUsize::new(0)),
         consumed_values: Arc::new(Mutex::new(Vec::new())),

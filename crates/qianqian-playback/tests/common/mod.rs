@@ -88,6 +88,96 @@ use qianqian_audio_api::ports::{
     SeekParkRelease, TailProbeOutcome,
 };
 
+/// Test-owned root, not a change to QianqianApp's explicit-dispose contract.
+/// Installed before activation. A failed test unholds its own observation
+/// before invoking the real inverse chain (worker stop/join -> gate release
+/// -> output stop/join). Normal dispose retains the test's intended schedule.
+pub struct EpisodeFixture {
+    app: qianqian_app::QianqianApp,
+    probe: TailProbe,
+    disposed: bool,
+    pub cleanup_quiet: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl EpisodeFixture {
+    pub fn new(app: qianqian_app::QianqianApp, probe: TailProbe) -> Self {
+        Self {
+            app,
+            probe,
+            disposed: false,
+            cleanup_quiet: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    pub fn dispose(&mut self) -> qianqian_app::DisposeOutcome {
+        let outcome = self.app.dispose();
+        self.disposed = true;
+        self.cleanup_quiet
+            .store(outcome.snapshot.quiet, std::sync::atomic::Ordering::SeqCst);
+        outcome
+    }
+}
+
+impl std::ops::Deref for EpisodeFixture {
+    type Target = qianqian_app::QianqianApp;
+    fn deref(&self) -> &Self::Target {
+        &self.app
+    }
+}
+
+impl std::ops::DerefMut for EpisodeFixture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.app
+    }
+}
+
+impl Drop for EpisodeFixture {
+    fn drop(&mut self) {
+        if !self.disposed {
+            self.probe.unhold();
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.dispose()));
+            match result {
+                Ok(outcome) => eprintln!(
+                    "episode fixture cleanup: dispose_quiet={}",
+                    outcome.snapshot.quiet
+                ),
+                Err(_) => {
+                    eprintln!("episode fixture cleanup panicked; original assertion preserved")
+                }
+            }
+        }
+    }
+}
+
+/// Per-output observation, on the actual test stream's lifecycle path.
+/// Entry into stop_and_join follows Session's real release_pause_gate by
+/// program order. The gate clone permits timeout rescue, never a PASS.
+#[derive(Clone, Default)]
+pub struct StreamLifecycle {
+    stop_entered: Arc<(Mutex<Option<RenderGate>>, Condvar)>,
+    joined: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl StreamLifecycle {
+    pub fn wait_stop_entered(&self, limit: Duration) -> Option<RenderGate> {
+        let state = self
+            .stop_entered
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let (state, _) = self
+            .stop_entered
+            .1
+            .wait_timeout_while(state, limit, |s| s.is_none())
+            .unwrap_or_else(|e| e.into_inner());
+        state.clone()
+    }
+
+    pub fn joined(&self) -> bool {
+        self.joined.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
     sample_rate: 44100,
     channels: 2,
@@ -487,6 +577,7 @@ pub struct TestOutput {
     /// The caller owns the flag so the test can pin the engagement
     /// precondition of the never-activated oracle.
     pub open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
+    pub lifecycle: StreamLifecycle,
 }
 
 impl TestOutput {
@@ -521,6 +612,7 @@ impl TestOutput {
             device_tail,
             tail_probe: TailProbe::default(),
             open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            lifecycle: StreamLifecycle::default(),
         }
     }
 
@@ -577,6 +669,7 @@ impl TestOutput {
             device_tail,
             tail_probe,
             open_abort_engaged,
+            lifecycle: StreamLifecycle::default(),
         }
     }
 }
@@ -782,7 +875,7 @@ impl AudioOutput for TestOutput {
                 } = request;
                 let thread = spawn_test_leg(
                     input.clone(),
-                    gate,
+                    gate.clone(),
                     drain,
                     position,
                     pace,
@@ -795,6 +888,8 @@ impl AudioOutput for TestOutput {
                 Ok(Box::new(TestStream {
                     input,
                     thread: Some(thread),
+                    gate,
+                    lifecycle: self.lifecycle.clone(),
                 }))
             }
         }
@@ -951,6 +1046,8 @@ fn consume_loop(
 struct TestStream {
     input: Arc<dyn RenderPcmInput>,
     thread: Option<std::thread::JoinHandle<()>>,
+    gate: RenderGate,
+    lifecycle: StreamLifecycle,
 }
 
 impl RenderStream for TestStream {
@@ -959,9 +1056,22 @@ impl RenderStream for TestStream {
     }
 
     fn stop_and_join(mut self: Box<Self>) {
+        {
+            let mut entered = self
+                .lifecycle
+                .stop_entered
+                .0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            *entered = Some(self.gate.clone());
+            self.lifecycle.stop_entered.1.notify_all();
+        }
         self.input.stop();
         if let Some(handle) = self.thread.take() {
-            let _ = handle.join();
+            let clean = handle.join().is_ok();
+            self.lifecycle
+                .joined
+                .store(clean, std::sync::atomic::Ordering::SeqCst);
         }
     }
 }

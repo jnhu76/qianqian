@@ -70,7 +70,7 @@ fn registered_runtime(
     device_tail: DeviceTail,
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
+) -> common::EpisodeFixture {
     registered_runtime_with_decode(
         EofWitnessedDecode::new(TestDecode::new(source)),
         output,
@@ -95,8 +95,28 @@ fn registered_runtime_with_decode(
     device_tail: DeviceTail,
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
-    let mut runtime = QianqianApp::new();
+) -> common::EpisodeFixture {
+    registered_runtime_with_decode_and_lifecycle(
+        decode,
+        output,
+        consumed,
+        device_tail,
+        tail_probe,
+        handle,
+        common::StreamLifecycle::default(),
+    )
+}
+
+fn registered_runtime_with_decode_and_lifecycle(
+    decode: EofWitnessedDecode,
+    output: OutputBehavior,
+    consumed: Arc<AtomicUsize>,
+    device_tail: DeviceTail,
+    tail_probe: TailProbe,
+    handle: PlaybackSessionHandle,
+    lifecycle: common::StreamLifecycle,
+) -> common::EpisodeFixture {
+    let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), tail_probe.clone());
 
     runtime
         .register_component({
@@ -123,6 +143,7 @@ fn registered_runtime_with_decode(
                         device_tail.clone(),
                     );
                     service.tail_probe = tail_probe.clone();
+                    service.lifecycle = lifecycle.clone();
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -858,7 +879,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
         handle.request_pause();
         assert!(handle.observe().pause_requested);
 
-        let mut runtime = QianqianApp::new();
+        let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), tail_probe.clone());
         runtime
             .register_component({
                 qianqian_composition::ComponentSpec::new("test_decode_plugin")
@@ -992,3 +1013,69 @@ fn assert_no_leg_threads() {
 
 #[cfg(not(target_os = "linux"))]
 fn assert_no_leg_threads() {}
+
+/// Test-owned root failure: use the real Session inverses, not ordinary
+/// Drop(app), and observe actual output join plus quiet K0 discharge.
+#[test]
+fn fixture_assertions_dispose_real_legs_even_with_a_held_probe() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), || {
+        for held in [false, true] {
+            let probe = TailProbe::default();
+            let handle = PlaybackSessionHandle::new();
+            let stream = common::StreamLifecycle::default();
+            let cleanup = std::cell::RefCell::new(None);
+            let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut runtime = registered_runtime_with_decode_and_lifecycle(
+                    EofWitnessedDecode::new(TestDecode::new(endless_audio(1))),
+                    OutputBehavior::Consume,
+                    Arc::new(AtomicUsize::new(0)),
+                    DeviceTail::default(),
+                    probe.clone(),
+                    handle.clone(),
+                    stream.clone(),
+                );
+                *cleanup.borrow_mut() = Some(runtime.cleanup_quiet.clone());
+                activate(&mut runtime);
+                if held {
+                    probe.arm();
+                }
+                handle.request_pause();
+                if held {
+                    assert!(
+                        probe.wait_held_within(Duration::from_secs(5)),
+                        "real held TailProbe premise"
+                    );
+                } else {
+                    wait_established(&handle);
+                }
+                panic!("original session fixture assertion");
+            }))
+            .expect_err("assertion must propagate");
+            assert_eq!(
+                panic.downcast_ref::<&str>(),
+                Some(&"original session fixture assertion")
+            );
+            // Rescue only if the fixture owner itself is broken. This
+            // cannot make either disposal or actual-join oracle pass.
+            if !stream.joined() {
+                probe.unhold();
+                handle.request_stop();
+                assert!(
+                    wait_until(Duration::from_secs(5), || handle
+                        .observe()
+                        .terminal_outcome
+                        .is_some()),
+                    "failed cleanup rescue must settle"
+                );
+                assert_no_leg_threads();
+            }
+            assert!(cleanup.borrow().as_ref().unwrap().load(Ordering::SeqCst));
+            assert!(
+                stream.joined(),
+                "output join must actually return, not detach"
+            );
+            assert_no_leg_threads();
+        }
+    });
+}
