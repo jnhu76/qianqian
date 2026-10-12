@@ -1,15 +1,15 @@
 diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
 --- a/crates/qianqian-playback/src/session.rs
 +++ b/crates/qianqian-playback/src/session.rs
-@@ -316,7 +316,6 @@
-                                 // commit decision routes the release.
-                                 remainder = None;
-                                 edge.invalidate();
+@@ -691,7 +691,6 @@
+                                 // as post-cut observation.
+                                 // RefusedUnchanged never reaches this.
+                                 observation.invalidate();
 -                                completion.seek_landing_published(landing);
                                  // The cut is irrevocable from here: the old
                                  // staging is discarded and the edge purged.
                                  // The wait and the decision are therefore
-@@ -357,6 +356,7 @@
+@@ -730,6 +729,7 @@
                                          }
                                      }
                                  }
