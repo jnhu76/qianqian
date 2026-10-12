@@ -1438,11 +1438,80 @@ pub(crate) mod test_sync {
 
     impl Drop for Fence {
         fn drop(&mut self) {
-            registry()
-                .lock()
-                .expect("fence registry lock")
-                .armed
-                .retain(|armed| armed.id != self.id);
+            // Non-panicking by contract: this drop also runs during
+            // unwinding (through the RAII owner below), and a panic here
+            // would abort the process instead of letting the original
+            // assertion failure propagate.
+            if let Ok(mut registry) = registry().lock() {
+                registry.armed.retain(|armed| armed.id != self.id);
+            }
+        }
+    }
+
+    /// The RAII owner of one fenced request: the fence AND the request
+    /// thread. The explicit flow is `wait_parked` → (drive the window) →
+    /// `release` → `join`; whatever has not happened when the owner drops
+    /// — an assertion panic anywhere in between included — happens here,
+    /// in that order: the fence drop first (its release sender
+    /// disconnecting ends the parked receive), then the join. Neither
+    /// step panics, so the ORIGINAL failure is the one that propagates.
+    ///
+    /// Drop covers panic/unwind hygiene. It is not an unconditional
+    /// bounded join: nothing in a test can force-terminate a genuinely
+    /// hung thread, and this owner does not pretend to. The request path
+    /// under test must — and does — stay non-blocking: H1/H2 are lock
+    /// handoffs, the fence park is the only wait, and it always ends.
+    pub(crate) struct FencedRequest {
+        fence: Option<Fence>,
+        requester: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl FencedRequest {
+        /// Arm the fence for `completion` and spawn the real request into
+        /// it. Arming precedes the spawn, so the request cannot pass the
+        /// window before the fence is in place.
+        pub(crate) fn spawn(completion: &SessionCompletion, target: Duration) -> FencedRequest {
+            let fence = arm(completion);
+            let completion = completion.clone();
+            let requester = std::thread::spawn(move || completion.request_seek(target));
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
+        /// Block until the owned request has sampled the edge terminal
+        /// Open and parked at the fence, before the second hold.
+        pub(crate) fn wait_parked(&self) {
+            self.fence
+                .as_ref()
+                .expect("the fenced request was already released")
+                .wait_parked();
+        }
+
+        /// Release the parked request into the second hold.
+        pub(crate) fn release(&mut self) {
+            if let Some(fence) = self.fence.take() {
+                fence.release();
+            }
+        }
+
+        /// Join the owned request thread.
+        pub(crate) fn join(&mut self) {
+            if let Some(requester) = self.requester.take() {
+                requester.join().expect("the fenced request returned");
+            }
+        }
+    }
+
+    impl Drop for FencedRequest {
+        fn drop(&mut self) {
+            if let Some(fence) = self.fence.take() {
+                drop(fence);
+            }
+            if let Some(requester) = self.requester.take() {
+                let _ = requester.join();
+            }
         }
     }
 
@@ -1723,12 +1792,8 @@ pub(crate) mod tests {
             let edge = Arc::new(PcmEdge::new(2, 8));
             completion.bind_stop_target(edge.clone());
 
-            let fence = test_sync::arm(&completion);
-            let requester = {
-                let completion = completion.clone();
-                std::thread::spawn(move || completion.request_seek(Duration::from_secs(1)))
-            };
-            fence.wait_parked();
+            let mut request = test_sync::FencedRequest::spawn(&completion, Duration::from_secs(1));
+            request.wait_parked();
             assert_eq!(
                 edge.terminal(),
                 EdgeTerminal::Open,
@@ -1754,8 +1819,8 @@ pub(crate) mod tests {
             );
             assert!(!state.slot_in_flight, "second hold unmasked: slot");
 
-            fence.release();
-            requester.join().expect("the fenced request returned");
+            request.release();
+            request.join();
 
             assert!(
                 !completion.seek_in_flight(),
@@ -1794,20 +1859,16 @@ pub(crate) mod tests {
             let edge = Arc::new(PcmEdge::new(2, 8));
             completion.bind_stop_target(edge.clone());
 
-            let fence = test_sync::arm(&completion);
-            let requester = {
-                let completion = completion.clone();
-                std::thread::spawn(move || completion.request_seek(Duration::from_secs(1)))
-            };
-            fence.wait_parked();
+            let mut request = test_sync::FencedRequest::spawn(&completion, Duration::from_secs(1));
+            request.wait_parked();
             assert_eq!(edge.terminal(), EdgeTerminal::Open);
             let state = test_sync::second_hold_state(&completion);
             assert!(!state.worker_gone && !state.outcome_set && !state.stop_requested);
             assert!(!state.teardown_released && !state.activation_failure_set);
             assert!(!state.slot_in_flight);
 
-            fence.release();
-            requester.join().expect("the fenced request returned");
+            request.release();
+            request.join();
 
             assert!(
                 completion.seek_in_flight(),
@@ -1830,6 +1891,56 @@ pub(crate) mod tests {
             assert_eq!(consume_release(&completion.render_gate()), None);
             assert_eq!(completion.seek_protocol_state(), (false, false, None));
         });
+    }
+
+    /// Executable cleanup witness for the failure-path contract: a body
+    /// that panics BEFORE its explicit release must still have its
+    /// request released AND joined by the RAII owner, with the original
+    /// panic preserved. The panic is caught on this test's own thread, so
+    /// the payload is observable only after the owner's drop has run to
+    /// completion — fence first, then join — which makes the receive
+    /// ordering itself the join witness; a cleanup that blocked would
+    /// leave the payload unobserved and fail here rather than pass
+    /// silently. No watchdog wraps this test on purpose: the cleanup join
+    /// is unbounded by construction (no test can force-terminate a hung
+    /// thread), and the request path itself stays non-blocking — H1/H2
+    /// are lock handoffs and the fence park always ends.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_witness_body_panicking_before_release_still_releases_and_joins() {
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8));
+        completion.bind_stop_target(edge.clone());
+
+        let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let request = test_sync::FencedRequest::spawn(&completion, Duration::from_secs(1));
+            request.wait_parked();
+            panic!("deliberate early witness failure");
+        }));
+        let message = payload.err().and_then(|payload| {
+            payload
+                .downcast_ref::<&str>()
+                .map(|message| (*message).to_owned())
+        });
+        assert_eq!(
+            message.as_deref(),
+            Some("deliberate early witness failure"),
+            "the original panic must survive the owner's non-panicking drop"
+        );
+        assert!(
+            completion.seek_in_flight(),
+            "the owner's drop must release the request: the released request \
+             passed the fence and planted after the panic began"
+        );
+        // Hygiene: no worker exists in this fixture, so the accepted
+        // record is resolved through the no-commit route.
+        completion.release_seek_without_commit();
+        assert!(!completion.seek_in_flight());
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted)
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
     }
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level

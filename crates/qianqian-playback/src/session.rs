@@ -1177,12 +1177,11 @@ mod seek_record_tests {
             let edge = Arc::new(PcmEdge::new(2, 8));
             completion.bind_stop_target(edge.clone());
 
-            let fence = crate::completion::test_sync::arm(&completion);
-            let requester = {
-                let completion = completion.clone();
-                std::thread::spawn(move || completion.request_seek(Duration::from_secs(1)))
-            };
-            fence.wait_parked();
+            let mut request = crate::completion::test_sync::FencedRequest::spawn(
+                &completion,
+                Duration::from_secs(1),
+            );
+            request.wait_parked();
             assert_eq!(edge.terminal(), crate::edge::EdgeTerminal::Open);
 
             // The real worker against an immediate-EOF provider: its exit
@@ -1217,8 +1216,8 @@ mod seek_record_tests {
             );
             assert!(!state.slot_in_flight, "second hold unmasked: slot");
 
-            fence.release();
-            requester.join().expect("the fenced request returned");
+            request.release();
+            request.join();
 
             assert!(
                 !completion.seek_in_flight(),
