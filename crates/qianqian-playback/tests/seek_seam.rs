@@ -109,7 +109,7 @@ struct Witnesses {
     post_seek_read: Arc<AtomicUsize>,
     controlled_eof: bool,
     eof_allowed: Arc<std::sync::atomic::AtomicBool>,
-    committed_offsets: Arc<Mutex<Vec<(Option<u64>, usize)>>>,
+    committed_offsets: common::CommittedOffsets,
 }
 
 /// Observe the real worker's first decoder read after each seek. For

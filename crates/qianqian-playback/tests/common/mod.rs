@@ -540,6 +540,8 @@ pub enum OutputBehavior {
     OpenTimeoutAbort,
 }
 
+pub type CommittedOffsets = Arc<Mutex<Vec<(Option<u64>, usize)>>>;
+
 pub struct TestOutput {
     pub behavior: OutputBehavior,
     /// Test-local mechanism evidence: how many reads returned frames.
@@ -580,7 +582,7 @@ pub struct TestOutput {
     pub lifecycle: StreamLifecycle,
     /// On-leg commit receipt paired with the next submission index. This
     /// test observation is not a new product acknowledgement or authority.
-    pub committed_offsets: Arc<Mutex<Vec<(Option<u64>, usize)>>>,
+    pub committed_offsets: CommittedOffsets,
 }
 
 impl TestOutput {
