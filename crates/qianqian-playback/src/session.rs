@@ -1162,6 +1162,115 @@ mod seek_record_tests {
             }
         });
     }
+
+    /// The same straddle window as the completion-level witness, driven
+    /// through the REAL decode worker: the request is parked at the fence
+    /// while `decode_worker` runs to its EOF exit, so the publish of
+    /// `worker_gone` and the stranded-seek cleanup are the production
+    /// funnel's own, never a test's direct calls. `worker_gone` is the
+    /// sole failing second-hold predicate; the oracle is the rejection
+    /// plus a real render leg whose drain still settles `Completed`.
+    #[test]
+    fn a_seek_straddling_the_real_worker_exit_funnel_is_never_accepted() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(2, 8));
+            completion.bind_stop_target(edge.clone());
+
+            let mut request = crate::completion::test_sync::FencedRequest::spawn(
+                &completion,
+                Duration::from_secs(1),
+            );
+            request.wait_parked();
+            assert_eq!(edge.terminal(), crate::edge::EdgeTerminal::Open);
+
+            // The real worker against an immediate-EOF provider: its exit
+            // funnel (worker_exited + abort_stranded_seek) runs to
+            // completion while the request is parked inside the window.
+            let seeks = Arc::new(AtomicUsize::new(0));
+            let invalidations = Arc::new(AtomicUsize::new(0));
+            decode_worker(
+                Box::new(Provider {
+                    seeks: seeks.clone(),
+                    ending: false,
+                }),
+                edge.clone(),
+                completion.clone(),
+                STAGING_FRAMES,
+                Processing(invalidations.clone()),
+                ObservationTap::new(crate::test_common::TEST_FORMAT, STAGING_FRAMES),
+            );
+
+            let state = crate::completion::test_sync::second_hold_state(&completion);
+            assert!(
+                state.worker_gone,
+                "the real exit funnel published worker_gone"
+            );
+            assert_eq!(state.worker_terminal, Some(crate::edge::EdgeTerminal::Eof));
+            assert!(!state.outcome_set, "second hold unmasked: outcome");
+            assert!(!state.stop_requested, "second hold unmasked: stop intent");
+            assert!(!state.teardown_released, "second hold unmasked: teardown");
+            assert!(
+                !state.activation_failure_set,
+                "second hold unmasked: activation failure"
+            );
+            assert!(!state.slot_in_flight, "second hold unmasked: slot");
+
+            request.release();
+            request.join();
+
+            assert!(
+                !completion.seek_in_flight(),
+                "a request straddling the real worker exit must be rejected, not \
+                 planted: an accepted record whose only resolver is gone has no \
+                 commit path (ADR-PBK-002:1501)"
+            );
+            assert_eq!(completion.take_seek_command(), None);
+            assert_eq!(
+                seeks.load(Ordering::SeqCst),
+                0,
+                "the gone worker executed no provider seek"
+            );
+            assert_eq!(completion.seek_protocol_state(), (false, false, None));
+
+            // The refusal left the episode able to settle: a real render
+            // leg passes the gate (nothing is routed, so the steady path
+            // proceeds without visiting the park slice), drains the
+            // closed edge, and the decisive set completes the episode.
+            let output = {
+                let gate = completion.render_gate();
+                let position = completion.position_evidence();
+                let edge = edge.clone();
+                let drain = completion.drain_signal();
+                std::thread::spawn(move || {
+                    let mut release = None;
+                    gate.park_loop_top(|slice| match slice {
+                        GateSlice::TailProbe => TailProbeOutcome::Quiesced,
+                        GateSlice::SeekRelease(payload) => {
+                            if let SeekParkRelease::Committed { landing } = payload {
+                                position.rebase(landing);
+                            }
+                            release = Some(payload);
+                            TailProbeOutcome::Pending
+                        }
+                    });
+                    let pull = edge.read_frames(&mut [0.0; 2]);
+                    drain.complete(match pull {
+                        PcmPull::Stopped => DrainVerdict::Aborted,
+                        PcmPull::Eof => DrainVerdict::Drained,
+                        other => panic!("unexpected post-exit data: {other:?}"),
+                    });
+                    release
+                })
+            };
+            let release = output.join().expect("the render leg exited");
+            assert_eq!(release, None, "the rejected request routed no seek release");
+            assert_eq!(
+                completion.observe_snapshot().terminal_outcome,
+                Some(crate::EpisodeTerminalOutcome::Completed)
+            );
+        });
+    }
 }
 
 /// Observation seam oracles (#187 O1): the REAL decode worker, with a
