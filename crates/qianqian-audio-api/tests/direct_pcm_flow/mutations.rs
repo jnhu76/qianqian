@@ -319,8 +319,7 @@ impl PcmStage for PartiallyLeakingCopyStage {
         self.quanta_seen.set(seen);
         if seen == self.copy_quantum {
             let frozen = block.freeze();
-            let copied: &'static [Sample] =
-                Box::leak(frozen.payload().to_vec().into_boxed_slice());
+            let copied: &'static [Sample] = Box::leak(frozen.payload().to_vec().into_boxed_slice());
             PcmView::new(self.format, copied).expect("the copied payload is whole frames")
         } else {
             block.freeze()

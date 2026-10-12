@@ -109,8 +109,7 @@ impl DestructorGate {
         let deadline = std::time::Instant::now() + limit;
         let mut state = self.state.lock().expect("destructor gate lock");
         while !state.entered {
-            let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now())
-            else {
+            let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now()) else {
                 return false;
             };
             let (guard, timeout) = self

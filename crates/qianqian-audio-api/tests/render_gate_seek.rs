@@ -364,9 +364,9 @@ fn a_committed_release_rebases_a_pause_parked_leg_while_still_parked() {
     // must reach the leg MID-PARK: the leg consumes it and KEEPS
     // PARKING.
     gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(5) });
-    if !wait_until(Duration::from_secs(5), || rebased_while_parked
-        .load(Ordering::SeqCst))
-    {
+    if !wait_until(Duration::from_secs(5), || {
+        rebased_while_parked.load(Ordering::SeqCst)
+    }) {
         fail_premise_releasing_pause_leg(
             &gate,
             leg,
