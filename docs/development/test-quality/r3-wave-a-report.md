@@ -256,6 +256,67 @@ recv）已足以建立确定性判别，**不引入 Loom/Shuttle/新依赖**（�
           (iii) 不在本 PR 修改 lefthook/CI 配置(超 Wave A 范围,
               需 owner 决策, 例如门禁日志留存)。
 
+### 3.2 Owner 登记与残余风险裁决(2026-10-12)
+
+Owner 复核裁定: 本事件暴露的是**测试执行器(执行 agent)的证据缺陷**,
+与测试本身的可靠性是两个独立验证对象(新治理原则, 由 owner 提出:
+
+> 测试是否可靠, 与 AI Agent 是否可靠地执行、保存和报告测试,
+> 是两个独立的验证对象。
+
+)。Owner 已在 GitHub 登记: PR #254(失败证据缺失与合并阻塞)、
+Issue #253(Wave A 验证异常记录)。事件状态(owner 口径):
+
+```text
+FIRST_RUN       = FAILED        (gate rust-test exit 101, 89.59s, @5d0f77a)
+FIRST_RUN_LOG   = LOST          → 正式标定: EVIDENCE_LOST(不可恢复)
+SECOND_RUN      = PASSED        (不构成对 FIRST_RUN 的解释)
+ROOT_CAUSE      = UNDETERMINED
+CONFIRMED_FLAKE = NO            ("测试 flaky"与"日志管道失败"均未确立;
+                                 注: "输出管道中断"这一早期表述已被 §3.1 撤回)
+MERGE_GATE      = HOLD          (GitHub 登记, owner 权威)
+```
+
+**Failure Evidence Contract(owner 强制, 本执行者即刻生效、不可跳过)**:
+任何测试/门禁失败, 先保存完整日志、命令、SHA、环境与退出码, 取证归档
+完成后才允许重跑; 重跑必须生成新文件, 不得覆盖第一次 RED; 日志丢失即
+标定 EVIDENCE_LOST, 不得宣布"已修复/transient"。先完整记录, 再提取
+摘要; 永远不能以 grep 输出代替原始执行证据。
+
+**首次契约合规执行**(补齐当前 HEAD 的归档证据):
+
+```text
+HEAD = 2062f8ea80c165b187bb6bfd45470747c742f108
+LOG  = ../qianqian-wave-a-evidence/prepush-20261012T044622Z-2062f8ea80c1.log
+SHA256(log) = 8dfe76e176d6469b648ae48ba8fa239cf8e0161a3013b637cdc66f1085d24b53
+EXIT = 0 (7/7 GREEN; 摘要提取发生在存档之后; 唯一 grep 命中为
+         `within_reports_the_body_panic_not_a_timeout - should panic ... ok`
+         —— should-panic 测试名, 良性)
+META = 同目录 .meta 文件(HEAD/EXIT/LOG/DATE_UTC/RUSTC/KERNEL)
+```
+
+**残余风险裁决(owner 委托本执行者裁定)**:
+
+```text
+ADJUDICATION = ACCEPT_RESIDUAL_RISK_WITH_PERMANENT_REGISTRATION
+SCOPE        = 仅针对"FIRST_RUN 证据丢失"这一历史缺口; 不预支未来 RED
+RATIONALE    = (1) 归因路径已因 EVIDENCE_LOST 构造性关闭, 无限 HOLD 把
+                 一条日志教训变成永久阻塞债, 交换比不当;
+             (2) H1/H3 结论的验收基础从来不是门禁绿, 而是登记位点的
+                 突变 falsifier 与合法/非法分析(owner 已裁定修复成果
+                 不必推翻);
+             (3) 时间线证据指向套件末段/cargo 退出路径, 而 H1/H3 所在的
+                 headless lib 块仅 0.38s 且位于前中段, 该失败牵连本 PR
+                 改动的概率低(证据性, 非硬结论);
+             (4) 可逆: 若未来契约合规的 RED 捕获到可匹配签名, 本 PR
+                 可重开修订——merge 始终由 owner 把握, 本执行者不 merge。
+CONDITION    = 残余风险登记永久保留于本节; 该 101 的调查移交后续 wave
+               (末段/seek_seam/pause_seam 邻域, 或 WSL2 cargo 退出异常),
+               任一未来 RED 的完整日志须按 Contract 归档并回溯比对。
+HOLD 处置    = 本裁决建议 HOLD 改为 REVIEW_WITH_REGISTERED_GAP; GitHub
+               上的登记状态以 owner 更新为准。
+```
+
 ## 4. 清理与 join 验证
 
 - H3 两条线程均 `join().unwrap()`；seal 经 5s `recv_timeout` watchdog，
@@ -296,3 +357,7 @@ scratch      (qianqian-wavea-mut): 每个突变 git checkout -- 还原, 最终�
    本报告的 GREEN 门禁行不得读作"该事件已由复跑解释或清洗"。
    执行者流程错误(输出截断)是身份丢失的直接原因, 已在 §3.1 撤回
    原错误归因并登记流程修正。
+7. §3.2: FIRST_RUN_LOG=LOST 已正式标定 EVIDENCE_LOST; MERGE_GATE=HOLD
+   由 owner 登记于 GitHub(PR #254 / Issue #253); 执行者残余风险裁决为
+   ACCEPT_RESIDUAL_RISK_WITH_PERMANENT_REGISTRATION, HOLD 的实际解除
+   以 owner 更新 GitHub 登记为准。
