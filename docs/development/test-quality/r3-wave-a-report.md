@@ -211,11 +211,50 @@ recv）已足以建立确定性判别，**不引入 Loom/Shuttle/新依赖**（�
 | 全套(回归) | `cargo test -p qianqian-headless --lib` @cc6d9fe | 356/356 GREEN |
 | 全仓(回归) | `cargo test --workspace` @e5f7cb1(final HEAD) | 857/857 GREEN(1:45.60) |
 | 本地门禁 | `lefthook run pre-push --all-files` @e5f7cb1 | 7/7 GREEN(commit-convention/vocabulary/plugin-boundary/fmt/clippy/rust-test/docs-verify+VitePress build, 104.04s; website 依赖按 AGENTS.md 一次性 `npm ci`) |
+| 本地门禁 | 同上 @5d0f77a(final HEAD) | 7/7 GREEN(105.75s; rust-test 计 857/857) |
 | 突变负控 | scratch worktree, §1.4/§2.4 | 6 突变, 预测=实际 |
 
 注：早期一次直接二进制循环误选了 CLI 主程序（usage 退出误计 RED），
 已废弃该测量并以 cargo `Executable` 行定位 unittest 二进制重测；
 上述数字均为修正后测量。
+
+### 3.1 未解释的门禁失败记录（一次 `rust-test` exit 101, 身份已丢失）
+
+```text
+事件    = 2026-10-12, HEAD 5d0f77a, `lefthook run pre-push --all-files`:
+          rust-test(`cargo test --workspace`) exit 101, 时长 89.59s;
+          docs-verify 因 piped 首红即停被跳过(其 "broken pipe" 是 lefthook
+          对被跳过命令的提示语, 不是输出管道故障)。
+错误归因撤回 = 执行者最初将该失败称为 "broken output pipe (transient)"
+          —— 这是无证据断言: "transient"未被证明, 且失败身份因执行者把
+          门禁输出管道接到 `tail -10` 而被销毁。一次随后的 GREEN 复跑
+          不能解释一次 RED; 该失败按未分类事实登记如下。
+时长证据 = 89.59s ≈ 绿跑全量块和 89.36s ⇒ fail-fast 下失败目标位于套件
+          末段(seek_seam 之后至 cargo 退出之间); 但 qianqian-playback lib
+          单测块本身 64s 且含实时 pacing 测试, 时长可漂移, 该窗口是
+          证据性的, 不是硬边界。
+猎捕记录 = 以下全部为全量日志(/tmp/wshunt-*, /tmp/wsload-*, /tmp/*-loop-*):
+          6 次 `cargo test --workspace` 全量 GREEN(857/857 ×6);
+          1 次 20 核 CPU 超订阅(20 空转进程)全量: 套件 857/857 GREEN,
+            但 cargo 在全部目标完成后 ~20 分钟不退出, 人工移除负载后
+            立即返回 —— 伪影嫌疑(负载法自身干扰), 未分类;
+          末段 6 二进制(seek_seam/session_activation/stop_seam/
+            teardown_gate_precondition/test_oracles/volume_seam) ×30 全绿;
+          qianqian_playback lib 单测二进制 ×5 全绿。
+分类     = UNCLASSIFIED — 未复现, 身份丢失, 三个假设并存:
+          (a) 末段某时序敏感测试的罕见 flaky(未复现, ~7,000 次额外
+              测试执行 0 失败);
+          (b) WSL2 上 cargo 在套件完成后的退出异常(有 (a) 负载停滞
+              旁证, 但停滞≠101 崩溃);
+          (c) 一次性宿主环境压力。
+          本事件不构成对 H1/H3 修复正确性的支持或反对证据;
+          按 concurrency-test-design 纪律不以复跑清洗红跑。
+债务     = (i) 该失败的分类悬置, 交 review/owner 裁决(末段与 seek_seam/
+              pause_seam 邻域恰是 Wave B/C 候选区, 或需独立调查);
+          (ii) 流程修正(已执行): 门禁/测试输出必须全量落盘
+              (`> gate.log 2>&1`), 禁止 tail 截断; 红跑必须先取证后复跑;
+          (iii) 不在本 PR 修改 lefthook/CI 配置(超 Wave A 范围,
+              需 owner 决策, 例如门禁日志留存)。
 
 ## 4. 清理与 join 验证
 
@@ -253,3 +292,7 @@ scratch      (qianqian-wavea-mut): 每个突变 git checkout -- 还原, 最终�
 5. 测量边界: 所有调度敏感计数(200/200, 199/200, 1/200)是**本机 WSL2
    单宿主**测量; 值判别的确定性主张来自 §2.3 的 happens-before 论证,
    重复次数只是对该论证的经验一致性检查, 不是全调度枚举。
+6. §3.1 的未解释门禁 rust-test exit 101(身份丢失)悬置为 UNCLASSIFIED;
+   本报告的 GREEN 门禁行不得读作"该事件已由复跑解释或清洗"。
+   执行者流程错误(输出截断)是身份丢失的直接原因, 已在 §3.1 撤回
+   原错误归因并登记流程修正。
