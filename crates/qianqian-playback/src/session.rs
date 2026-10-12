@@ -1235,24 +1235,18 @@ mod seek_record_tests {
             assert_eq!(completion.seek_protocol_state(), (false, false, None));
 
             // The refusal left the episode able to settle: a real render
-            // leg passes the gate, drains the closed edge, and the
-            // decisive set completes the episode.
-            let (parked_tx, parked_rx) = std::sync::mpsc::sync_channel(1);
+            // leg passes the gate (nothing is routed, so the steady path
+            // proceeds without visiting the park slice), drains the
+            // closed edge, and the decisive set completes the episode.
             let output = {
                 let gate = completion.render_gate();
                 let position = completion.position_evidence();
                 let edge = edge.clone();
                 let drain = completion.drain_signal();
                 std::thread::spawn(move || {
-                    let mut parked_tx = Some(parked_tx);
                     let mut release = None;
                     gate.park_loop_top(|slice| match slice {
-                        GateSlice::TailProbe => {
-                            if let Some(tx) = parked_tx.take() {
-                                tx.send(()).unwrap();
-                            }
-                            TailProbeOutcome::Quiesced
-                        }
+                        GateSlice::TailProbe => TailProbeOutcome::Quiesced,
                         GateSlice::SeekRelease(payload) => {
                             if let SeekParkRelease::Committed { landing } = payload {
                                 position.rebase(landing);
@@ -1270,7 +1264,6 @@ mod seek_record_tests {
                     release
                 })
             };
-            parked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             let release = output.join().expect("the render leg exited");
             assert_eq!(release, None, "the rejected request routed no seek release");
             assert_eq!(
