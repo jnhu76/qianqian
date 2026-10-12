@@ -242,10 +242,16 @@ fn preseal_failure_preserves_natural_completed_and_runtime_failed() {
             assert_eq!(exit, std::process::ExitCode::from(1));
             assert_eq!(handle.wait_terminal(), terminal);
             assert!(disposed.get());
-            assert_eq!(
-                handle.observe().failure_diagnostic.is_some(),
-                terminal == EpisodeTerminalOutcome::Failed
-            );
+            // D14.2 truth-class boundary (PlaybackSessionObservation):
+            // Completed/Stopped observations never carry a failure
+            // diagnostic, while a Failed observation may or may not
+            // publish one — presence is presentation, not semantics, so
+            // it is not pinned here. The diagnostic-to-report rendering
+            // oracle is owned by
+            // final_owner_reports_preserve_terminal_and_distinct_failure_domains.
+            if terminal == EpisodeTerminalOutcome::Completed {
+                assert!(handle.observe().failure_diagnostic.is_none());
+            }
         }
     }
 }
