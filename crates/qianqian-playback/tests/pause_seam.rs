@@ -15,11 +15,16 @@
 
 mod common;
 
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
+use qianqian_audio_api::ports::{
+    DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmFormat,
+    ProviderSeekOutcome,
+};
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, playback_session_spec,
@@ -66,17 +71,40 @@ fn registered_runtime(
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
 ) -> QianqianApp {
+    registered_runtime_with_decode(
+        EofWitnessedDecode::new(TestDecode::new(source)),
+        output,
+        consumed,
+        device_tail,
+        tail_probe,
+        handle,
+    )
+}
+
+/// [`registered_runtime`] with the caller owning the decode double: the
+/// runtime captures clones of `decode` (every clone sharing its EOF
+/// witness), while the test may keep `decode.eof.clone()` to prove the
+/// decode-EOF premise through the real `read_frames` path before it
+/// issues a stop. Live on every platform via [`registered_runtime`];
+/// only the latch's `returned()` reader is Linux-scoped (the post-EOF
+/// stop test), which is where the dead-code allowance lives.
+fn registered_runtime_with_decode(
+    decode: EofWitnessedDecode,
+    output: OutputBehavior,
+    consumed: Arc<AtomicUsize>,
+    device_tail: DeviceTail,
+    tail_probe: TailProbe,
+    handle: PlaybackSessionHandle,
+) -> QianqianApp {
     let mut runtime = QianqianApp::new();
 
     runtime
         .register_component({
-            let behavior = source;
             qianqian_composition::ComponentSpec::new("test_decode_plugin")
                 .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestDecode::new(behavior);
                     ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
-                        std::rc::Rc::new(service),
+                        std::rc::Rc::new(decode.clone()),
                     )
                     .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
@@ -111,6 +139,94 @@ fn registered_runtime(
         ))
         .expect("session registers");
     runtime
+}
+
+/// Decode-side EOF witness: latched at the single point where a REAL
+/// production decode worker's `read_frames` call returns
+/// `Ok(DecodeOutcome::Eof)` — decode-seam mechanism evidence, not a
+/// Fact and not a projection. The provider's clones share the latch
+/// while the test keeps one handle, the same provider-clones-share
+/// shape as the fixture's `ProducerFreezeWitness`; the test only polls
+/// it, so it can never block the worker it observes.
+#[derive(Clone, Default)]
+struct EofWitness {
+    latched: Arc<AtomicBool>,
+}
+
+impl EofWitness {
+    /// Has a `read_frames` call returned EOF yet? (Polled only by the
+    /// Linux-scoped post-EOF stop test; off Linux nothing reads it.)
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn returned(&self) -> bool {
+        self.latched.load(Ordering::SeqCst)
+    }
+
+    fn latch(&self) {
+        self.latched.store(true, Ordering::SeqCst);
+    }
+}
+
+/// The pause-seam decode double: every behavior delegates to the shared
+/// fixture `TestDecode`, plus the EOF witness above. Local to this
+/// binary because the shared `TestDecode` cannot grow a field without
+/// breaking other binaries' struct-literal constructions of it, and no
+/// other binary needs the witness.
+#[derive(Clone)]
+struct EofWitnessedDecode {
+    inner: TestDecode,
+    eof: EofWitness,
+}
+
+impl EofWitnessedDecode {
+    fn new(inner: TestDecode) -> Self {
+        Self {
+            inner,
+            eof: EofWitness::default(),
+        }
+    }
+}
+
+impl PcmDecode for EofWitnessedDecode {
+    fn open_media(&self, path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
+        let inner = self.inner.open_media(path)?;
+        Ok(Box::new(EofWitnessedStream {
+            inner,
+            eof: self.eof.clone(),
+        }))
+    }
+}
+
+/// The endpoint wrapper: the latch lives exactly on the `Eof` return
+/// the production worker drives — the boundary a witnessing test
+/// observes, deliberately BEFORE the worker's own `edge.close_eof()`
+/// (which stays invisible to the test; see the Linux thread-gone
+/// premise in `stop_from_parked_after_eof_still_completes` for how that
+/// seam is closed).
+struct EofWitnessedStream {
+    inner: Box<dyn DecodedPcmStream>,
+    eof: EofWitness,
+}
+
+impl DecodedPcmStream for EofWitnessedStream {
+    fn format(&self) -> PcmFormat {
+        self.inner.format()
+    }
+
+    fn source_duration(&self) -> Option<Duration> {
+        self.inner.source_duration()
+    }
+
+    fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+        let outcome = self.inner.read_frames(dst)?;
+        if matches!(outcome, DecodeOutcome::Eof) {
+            self.eof.latch();
+        }
+        Ok(outcome)
+    }
+
+    fn seek(&mut self, target: Duration) -> ProviderSeekOutcome {
+        self.inner.seek(target)
+    }
 }
 
 fn activate(runtime: &mut QianqianApp) {
@@ -369,7 +485,34 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
 /// Stop from a parked post-EOF episode: the gate must NOT force-abort —
 /// the tail plays out and drains, settling the SAME Completed fact as
 /// today's stop-after-EOF (no Failed{device} fabrication).
+///
+/// The post-EOF premise is PROVEN, never assumed (no sleep, source
+/// shortness, or timing stands for synchronization): `wait_established`
+/// only proves the leg is parked — its establishment needs the leg's
+/// own first park slice and says nothing about worker progress — so the
+/// test additionally proves (1) the PRODUCTION worker's `read_frames`
+/// returned Eof (decode-seam evidence, polled without blocking the
+/// worker), and (2) that the worker's OS thread is fully gone: thread
+/// exit is program-ordered after the worker's `edge.close_eof()` and
+/// `worker_exited` publication (the session's single exit funnel),
+/// which closes the one seam where the stop's own `edge.stop()` could
+/// still win the edge's first-wins terminal race and legally relabel
+/// the episode `Stopped`.
+///
+/// Platform scope (honest NOT_RUN, not a debt hidden behind a runnable
+/// assertion): no portable observation of the post-`close_eof` commit
+/// exists — the edge is crate-private by design and the ports seam
+/// (`RenderPcmInput`) exposes no terminal query — so the test runs on
+/// Linux only, where the thread-gone witness proves the premise. On
+/// other targets this property is NOT_RUN here, never reported as
+/// passing; giving it a portable witness would need a production-side
+/// test seam (a product API decision outside this pilot). The sibling
+/// negative control below stays cross-platform: its oracle needs no
+/// EOF premise, since without worker-terminal EOF evidence `Stopped`
+/// is structurally the only reachable outcome in every legal
+/// interleaving.
 #[test]
+#[cfg(target_os = "linux")]
 fn stop_from_parked_after_eof_still_completes() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
@@ -378,8 +521,10 @@ fn stop_from_parked_after_eof_still_completes() {
         let handle = PlaybackSessionHandle::new();
         handle.request_pause();
 
-        let mut runtime = registered_runtime(
-            SourceBehavior::EofAfter(64),
+        let decode = EofWitnessedDecode::new(TestDecode::new(SourceBehavior::EofAfter(64)));
+        let eof = decode.eof.clone();
+        let mut runtime = registered_runtime_with_decode(
+            decode,
             OutputBehavior::Consume,
             consumed,
             device_tail,
@@ -389,6 +534,21 @@ fn stop_from_parked_after_eof_still_completes() {
         activate(&mut runtime);
         wait_established(&handle);
 
+        // Premise: decode EOF happened through the real read_frames
+        // call the production worker drives — `EofAfter(64)` alone
+        // would only make that probable, not proven.
+        assert!(
+            wait_until(Duration::from_secs(5), || eof.returned()),
+            "decode never reached EOF through the real read_frames path"
+        );
+        // Premise: the worker is fully gone, so its close_eof and
+        // worker_exited(Eof) both happened before the stop below
+        // issues edge.stop().
+        assert!(
+            common::named_thread_gone_within("qianqian-decode", Duration::from_secs(5)),
+            "the decode worker never exited after EOF"
+        );
+
         handle.request_stop();
         assert_eq!(
             handle.wait_terminal(),
@@ -397,6 +557,52 @@ fn stop_from_parked_after_eof_still_completes() {
         );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
+    });
+}
+
+/// Negative control for the post-EOF oracle above: stop from an
+/// established pause whose decode NEVER EOFs (one paced frame per
+/// 50ms, forever) must settle `Stopped`. `Completed` is structurally
+/// unreachable in this shape — it requires worker-terminal EOF
+/// evidence the resolver never receives — so this pins that the target
+/// test's `Completed` assertion rests on the EOF premise rather than
+/// accepting any stopped-from-paused shape.
+#[test]
+fn stop_from_parked_without_eof_settles_stopped() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail = DeviceTail::default();
+        let handle = PlaybackSessionHandle::new();
+        handle.request_pause();
+
+        let mut runtime = registered_runtime(
+            SourceBehavior::Paced {
+                after: 0,
+                delay: Duration::from_millis(50),
+            },
+            OutputBehavior::Consume,
+            consumed,
+            device_tail,
+            TailProbe::default(),
+            handle.clone(),
+        );
+        activate(&mut runtime);
+        wait_established(&handle);
+
+        // No EOF premise here: the stop is free to race the worker,
+        // and every legal interleaving settles Stopped.
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Stopped,
+            "stop from a parked episode whose decode never EOF'd must \
+             settle Stopped, never Completed"
+        );
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
     });
 }
 

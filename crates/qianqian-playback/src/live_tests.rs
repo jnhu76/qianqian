@@ -18,7 +18,6 @@
 //! is asserted everywhere by the reference length itself.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use qianqian_audio_api::ports::ProviderSeekOutcome;
@@ -1141,11 +1140,57 @@ fn a_new_episode_starts_fresh_after_a_live_updated_episode() {
     });
 }
 
-/// A processing failure DURING an accepted transition (the failure is
-/// injected into the old side, so it fires after acceptance while the
-/// crossfade is running) settles through the ordinary D11 `Failed`
+/// A processing failure DURING an accepted transition — injected into
+/// the OLD side so it can only fire after acceptance, while the
+/// crossfade is running — settles through the ordinary D11 `Failed`
 /// route with a truthful processing-origin diagnostic — never a decode
 /// label, never a resurrected continuation.
+///
+/// The oracle must prove the failure rode the TRANSITION-OWNED path;
+/// a pre-pickup steady failure would produce the same terminal and the
+/// same diagnostic and prove nothing (the R0B-05 vacuity). Three
+/// structural tools:
+///
+/// - **Transition-only failure gate**: the injected processor reads the
+///   engine's own monotonic event log (the same tap the engine records
+///   into, on the same worker thread, so program order suffices) on
+///   every stage call and fails ONLY while a transition is in flight
+///   (`TransitionStarted` recorded, `TransitionCompleted` not). A
+///   pre-pickup steady-state failure is structurally unexpressible:
+///   before acceptance the gate cannot fire, so a green run proves the
+///   failure fired INSIDE the transition.
+///
+/// - **Constructive hold** (replacing any position polling, which
+///   never bounds worker progress): the pause command is routed BEFORE
+///   the composition is revised, so the render leg parks at its first
+///   loop-top gate before consuming anything. The decode worker then
+///   fills the whole edge (8 × 1024 = 8192 frames), stages the 9th
+///   block (`processed == 9 * STAGING_FRAMES`) and blocks in the
+///   full-edge write (`PcmEdge::wait_for_space`). At the witnessed
+///   hold — `paused()` ∧ `buffered == EDGE_CAPACITY_FRAMES` ∧
+///   `processed == 9 * STAGING_FRAMES` — the worker is constructively
+///   parked mid-write: it cannot reach the loop-top `poll_update` (the
+///   only take point of the pending slot), and it sits 352800 − 9216
+///   frames short of EOF (pull decode, no read-ahead), so "the update
+///   landed before EOF" and "the pending update stays alive" are
+///   constructive conclusions, not timing luck.
+///
+/// - **Release under witness**: `request_update` is submitted while
+///   held — the slot must keep it, because the blocked worker cannot
+///   take it — and `request_resume` then releases the leg; the
+///   worker's FIRST reachable `poll_update` accepts the update,
+///   records `TransitionStarted`, and the very next old-side stage
+///   fails.
+///
+/// Path discipline — each legal alternative to the tested path is
+/// pinned: a pre-pickup steady failure cannot express itself (the
+/// gate); a lost pickup leaves the slot occupied after terminal
+/// (asserted empty); a refused update would record `UpdateRefused`
+/// (asserted absent); EOF before the update is constructively excluded
+/// (the hold). The held window is panic-guarded — `catch_unwind` →
+/// `dispose()` → `resume_unwind` — so a shape regression fails fast
+/// instead of leaking the parked leg and the blocked worker into the
+/// 90 s watchdog (`QianqianApp` has no `Drop` teardown of its own).
 #[test]
 fn a_failure_during_a_transition_settles_failed_through_d11() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -1201,19 +1246,29 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             })
             .expect("output registers");
 
-        // The engine's INITIAL side is a deliberate processor that
-        // fails once the transition begins (armed by the flag below).
+        // The engine's INITIAL side is a deliberate processor gated on
+        // the engine's own event log: it reads the same monotonic tap
+        // the engine records into (the pickup ran earlier on this same
+        // worker thread, so program order suffices) and fails ONLY
+        // while a transition is in flight. Before any acceptance the
+        // gate cannot fire — a pre-pickup steady failure is structurally
+        // unexpressible.
         let tap = LiveTap::disarmed();
         let control = handle.completion.processing();
-        let fail_after_transition = Arc::new(AtomicUsize::new(0));
-        let fail_counter = fail_after_transition.clone();
         let control_for_engine = control.clone();
         let tap_for_engine = tap.clone();
+        let tap_for_gate = tap.clone();
         let build_engine = move |format: &qianqian_audio_api::ports::PcmFormat| {
             let initial_side = EpisodeProcessing::test_driven(
-                Box::new(move |block: &mut [f32]| {
-                    if fail_counter.load(Ordering::SeqCst) > 0 {
-                        let _ = block;
+                Box::new(move |_block: &mut [f32]| {
+                    let events = tap_for_gate.events();
+                    let started = events
+                        .iter()
+                        .any(|e| matches!(e, LiveEvent::TransitionStarted { .. }));
+                    let completed = events
+                        .iter()
+                        .any(|e| matches!(e, LiveEvent::TransitionCompleted { .. }));
+                    if started && !completed {
                         return Err("live transition-side failure".to_owned());
                     }
                     Ok(())
@@ -1236,6 +1291,13 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
                 build_engine,
             ))
             .expect("session registers");
+        // Shape A — route the pause BEFORE the composition is revised:
+        // the gate is already parked when the render leg spawns, so the
+        // leg parks at its first loop-top check having consumed NOTHING.
+        // The consumed-frame count is thereby fixed at zero and the hold
+        // geometry below (a full edge plus exactly nine staged blocks)
+        // is deterministic, not a racing observation.
+        handle.request_pause();
         runtime
             .revise_desired(vec![
                 crate::processing_support::desired("decode", "test_decode_plugin"),
@@ -1244,20 +1306,52 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             ])
             .expect("composition is legal");
 
-        wait_until(Duration::from_secs(5), || {
-            handle
-                .observe()
-                .position
-                .is_some_and(|p| p >= HALF_A_SECOND / 4)
-        })
-        .then_some(())
-        .expect("never started");
-        // Arm the failure and request the update: the acceptance
-        // succeeds (the update is valid), the transition starts, and
-        // the OLD side then fails inside its crossfade stage.
-        fail_after_transition.store(1, Ordering::SeqCst);
         let harness = LiveHarness { control, tap };
-        harness.request_update(preset_config(EqPreset::Rock));
+        let rock = preset_config(EqPreset::Rock);
+        // The held window is panic-guarded: an assertion failing here
+        // (a shape regression) must not leak the parked leg and the
+        // worker blocked in the full-edge write into the watchdog —
+        // dispose unwinds the composition LIFO (stop edge, join worker)
+        // first, then the panic propagates.
+        let held = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            assert!(
+                wait_until(Duration::from_secs(5), || handle.observe().paused()),
+                "the pre-routed pause never parked the leg"
+            );
+            // The constructive hold: the leg is parked (no consumer),
+            // so the worker fills the edge with 8 staging blocks and
+            // blocks writing the 9th — `poll_update`, the pending
+            // slot's only take point, is unreachable, and the worker
+            // sits 352800 − 9216 frames short of EOF (pull decode, no
+            // read-ahead).
+            assert!(
+                wait_until(Duration::from_secs(5), || {
+                    handle.completion.buffered_frames() == Some(EDGE_CAPACITY_FRAMES)
+                        && harness.processed_frames() == 9 * STAGING_FRAMES
+                }),
+                "the held geometry never established: a full edge with \
+                 exactly 9 staged blocks (edge {}, processed {})",
+                handle.completion.buffered_frames().unwrap_or(0),
+                harness.processed_frames(),
+            );
+            // Submit the update while held: the blocked worker cannot
+            // take it, so the slot must still hold it.
+            harness.request_update(rock);
+            assert_eq!(
+                harness.pending().as_ref(),
+                Some(&rock),
+                "while the worker is blocked in the full-edge write, the \
+                 pending slot must keep the update (poll_update — the \
+                 only take point — is unreachable)"
+            );
+            // Release: the worker's first reachable poll_update accepts
+            // the update and the very next old-side stage fails.
+            handle.request_resume();
+        }));
+        if let Err(payload) = held {
+            let _ = runtime.dispose();
+            std::panic::resume_unwind(payload);
+        }
 
         assert_eq!(
             handle.wait_terminal(),
@@ -1270,9 +1364,37 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             .failure_diagnostic
             .expect("a failed episode carries its diagnostic");
         assert!(
-            diagnostic.contains("live transition-side failure"),
+            diagnostic.contains("processing: live transition-side failure"),
             "the diagnostic stays truthful about the processing origin: \
                  {diagnostic}"
+        );
+        // The event union proves the transition-owned path: exactly one
+        // transition started, it never settled, the update was never
+        // refused — and the pickup TOOK the pending update (a lost
+        // pickup would leave the slot occupied after terminal).
+        let events = harness.events();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e, LiveEvent::TransitionStarted { .. }))
+                .count(),
+            1,
+            "exactly one transition started"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, LiveEvent::TransitionCompleted { .. })),
+            "the failure fired inside the transition, before any settle"
+        );
+        assert!(
+            !events.iter().any(|e| matches!(e, LiveEvent::UpdateRefused)),
+            "the update was accepted, never refused at the pickup"
+        );
+        assert!(
+            harness.pending().is_none(),
+            "the pickup took the pending update — a lost pickup would \
+             leave the slot occupied after terminal"
         );
         let _ = runtime.dispose();
     });
