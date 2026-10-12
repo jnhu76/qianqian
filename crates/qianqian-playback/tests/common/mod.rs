@@ -578,6 +578,9 @@ pub struct TestOutput {
     /// precondition of the never-activated oracle.
     pub open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
     pub lifecycle: StreamLifecycle,
+    /// On-leg commit receipt paired with the next submission index. This
+    /// test observation is not a new product acknowledgement or authority.
+    pub committed_offsets: Arc<Mutex<Vec<(Option<u64>, usize)>>>,
 }
 
 impl TestOutput {
@@ -613,6 +616,7 @@ impl TestOutput {
             tail_probe: TailProbe::default(),
             open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lifecycle: StreamLifecycle::default(),
+            committed_offsets: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -670,6 +674,7 @@ impl TestOutput {
             tail_probe,
             open_abort_engaged,
             lifecycle: StreamLifecycle::default(),
+            committed_offsets: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -773,6 +778,7 @@ fn spawn_test_leg(
     let consumed_values_ch1 = output.consumed_values_ch1.clone();
     let device_tail = output.device_tail.clone();
     let tail_probe = output.tail_probe.clone();
+    let committed_offsets = output.committed_offsets.clone();
     std::thread::Builder::new()
         .name("qianqian-test-render".into())
         .spawn(move || {
@@ -789,6 +795,7 @@ fn spawn_test_leg(
                         consumed: &consumed,
                         consumed_values: &consumed_values,
                         consumed_values_ch1: &consumed_values_ch1,
+                        committed_offsets: &committed_offsets,
                     },
                 )
             }))
@@ -905,6 +912,7 @@ struct MockDevice<'a> {
     consumed: &'a std::sync::atomic::AtomicUsize,
     consumed_values: &'a Mutex<Vec<f32>>,
     consumed_values_ch1: &'a Mutex<Vec<f32>>,
+    committed_offsets: &'a Mutex<Vec<(Option<u64>, usize)>>,
 }
 
 /// The mock stand-in for the leg's `publish_consumed` helper (wasapi.rs):
@@ -990,6 +998,15 @@ fn consume_loop(
                             // an unknown one neither resurrects publication nor
                             // un-withdraws the cell.
                             position.rebase(if publishing { landing } else { None });
+                            // Same leg owns receipt and every submission;
+                            // record AFTER applying rebase, before any future
+                            // submission. This also witnesses live withdrawal.
+                            let next = device.consumed_values.lock().unwrap().len();
+                            device
+                                .committed_offsets
+                                .lock()
+                                .unwrap()
+                                .push((landing, next));
                         }
                         SeekParkRelease::Aborted => {}
                     }
