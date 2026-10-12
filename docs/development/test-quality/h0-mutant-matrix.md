@@ -14,7 +14,7 @@ washed; it is diagnosed and recorded.
 
 | ID | Group | Mutation (exact) | Expected signature | Observed | Verdict |
 |---|---|---|---|---|---|
-| M-P106a | R3B-P1-06 | delete `‖ guard.teardown_released` from the SECOND hold only | new case RED | `ok` — property GREEN | **SURVIVES (classified)**: masked by the first hold's twin conjunct. The two holds are a redundant sample pair for this condition; single-site deletion is property-equivalent. Recorded as redundancy evidence; not a repair gap. Run `20261012T135034-570017-23909`. |
+| M-P106a | R3B-P1-06 | delete `‖ guard.teardown_released` from the SECOND hold only | new case RED | `ok` — property GREEN | **SURVIVES (classified per the round-1 adversarial review)**: unobserved by any existing test — all current tests are sequential, so the first hold's twin conjunct rejects before the second hold is reached. This is NOT "property-equivalent": the two holds are deliberately NOT one atomic predicate (the state lock drops between them — first hold ends completion.rs:699, second acquires :722), so a concurrent `release_pause_gate` landing in that straddle window IS behaviorally distinguishable and the mutant would plant where production rejects. Killing M-P106a would take a teardown twin of the worker-gone straddle fence, which no current test has; recorded as an observation, not a repair gap of this campaign. Run `20261012T135034-570017-23909`. |
 | M-P106b | R3B-P1-06 | delete the conjunct from BOTH holds | new case RED on `seek_in_flight()` | RED at completion.rs:2130 (the new case's assert), `0 passed; 1 failed` | **KILLED** — `20261012T135134-570685-13005` |
 | M-P201@base | R3B-P1-03 | delete `request_resume()` in `s0_a_paused_episodes_quiesced_park_commits_the_cut` at `daad414` | forever-park (suite hang) | test running >60s at external `timeout 90` kill, rc=124 | **HANG WITNESSED** (the defect) — `20261012T134908-568785-27163` |
 | M-P201@HEAD | R3B-P1-03 | same mutant at the fixed HEAD | named bounded RED | `operation exceeded 10s` (watchdog, common/mod.rs:1033), FAILED in 10.00s | **FAILURE-BOUNDED** — `20261012T140447-572905-25150`. The watchdog is the failure bound, NOT a correctness oracle; the semantic oracles are untouched. |
@@ -24,7 +24,8 @@ washed; it is diagnosed and recorded.
 Correction note (kept per the failure-evidence contract): the FIRST pre-registration of the
 R3B-P1-06 falsifier was single-site (M-P106a) and it SURVIVED. Per that contract the
 preserved log was diagnosed before any rerun; classification: oracle/premise mismatch
-(redundant twin conjunct), not a production defect. The pre-registration was then widened to
+(masking by the twin conjunct for every EXISTING sequential test — see the corrected
+M-P106a classification above: not property-equivalence), not a production defect. The pre-registration was then widened to
 both holds (M-P106b) and killed. Both runs are retained.
 
 ## Structural hygiene groups (R3A-A1/A2/A3/A6, R3A-P2, R3B-P1-05)

@@ -67,9 +67,13 @@ Statuses used: `FIXED_AND_FALSIFIED`, `FIXED_HYGIENE_VERIFIED`,
 - **Repair.** One `release_pause_gate()` negative case beside the five existing classes.
 - **Falsifier (pre-registered).** Delete `|| guard.teardown_released` → the new case must go
   RED on its registered semantic assertion (`seek_in_flight()` true).
-  - M-P106a (second hold only): **SURVIVES** — masked by the first hold's twin conjunct.
-    This is recorded evidence that the two holds are a redundant sample pair for this
-    condition; single-site deletion is property-equivalent.
+  - M-P106a (second hold only): **SURVIVES** — masked by the first hold's twin conjunct
+    for every EXISTING test. This is NOT property-equivalence (round-1 adversarial
+    review correction): the two holds are deliberately not one atomic predicate — the
+    state lock drops between them (completion.rs :699 → :722), so a concurrent
+    `release_pause_gate` in that straddle window is behaviorally distinguishable, and
+    killing M-P106a would take a teardown twin of the worker-gone straddle fence. No
+    current test has one; recorded as an observation, not a repair gap.
   - M-P106b (both holds): **KILLED** — RED at the new case (`20261012T135134-570685-13005`).
 - **Disposition.** `FIXED_AND_FALSIFIED`.
 

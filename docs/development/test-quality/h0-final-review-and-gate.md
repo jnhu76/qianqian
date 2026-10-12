@@ -37,6 +37,30 @@ reasons.
 
 ## Fresh-context independent reviews (G4)
 
-Round 1 (adversarial oracle/causal + architecture/scope/evidence): **PENDING** — this
-section is updated in a documentation-only commit after each review round; blockers, if any,
-land as separate commits with revalidated lanes.
+### Round 1 (both reviewers ran against HEAD `cb18af5`; read-only, fresh context)
+
+- **(a) Adversarial oracle/causal reviewer: APPROVE** — no BLOCKER/MAJOR. Independent
+  re-runs of the focused suites matched every documented count. Two MINOR findings, both
+  documentation-only, both FIXED in this commit: (1) the M-P106a classification was
+  overstated as "property-equivalent" — the two request_seek holds are not one atomic
+  predicate (lock dropped between them), so single-site deletion is only
+  *unobserved-by-existing-sequential-tests*, distinguishable by a concurrent
+  `release_pause_gate` in the straddle window (wording corrected in h0-mutant-matrix.md,
+  h0-property-graph.md, h0-lessons-learned.md); (2) an explicit on-the-record sentence that
+  all new 5s/10s bounded waits are machine-speed failure bounds, never semantic oracles.
+- **(b) Architecture/scope/evidence reviewer: APPROVE** — no BLOCKER/MAJOR. Scope verified
+  test/docs-only (15 files; completion.rs hunks inside the tests module); no public API; no
+  H1/H-D/R-M items touched; independent suite re-runs reproduced all documented counts;
+  disposition counts consistent (2/13/2/1=18); frozen #258 baseline untouched. Four MINOR
+  findings, all documentation-only, all FIXED in this commit: PR-body commit count
+  (11, not 12); GitHub CI outcomes folded into the evidence index; the M2 first-attempt
+  invalid run narrated (cargo argv error, retained); the run/commit subject relation
+  (test-then-commit + header-rewrite SHA mapping) stated explicitly.
+
+Round-1 blocker fix commits: NONE required (no blocker; the six MINOR corrections above land
+in this documentation-only commit and the PR-body correction).
+
+### Round 2
+
+PENDING — re-run of both fresh-context reviewers over the final HEAD including this commit;
+results recorded here before the PR leaves DRAFT.

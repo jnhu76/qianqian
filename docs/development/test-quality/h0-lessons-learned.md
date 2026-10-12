@@ -33,9 +33,15 @@ Non-authoritative campaign document (#260 §3). Each lesson is evidence-backed b
 - **Evidence.** M-P106a survives (`20261012T135034-570017-23909`); M-P106b (both holds)
   kills (`20261012T135134-570685-13005`). Diagnosis came from the preserved log, before any
   rerun, per the failure-evidence contract.
-- **Reusable review rule.** When a conjunct appears at more than one sample point, a
-  single-site deletion mutant is property-equivalent BY CONSTRUCTION; pre-register the
-  both-site deletion (or explicitly record the redundancy as the finding).
+- **Reusable review rule.** When a conjunct appears at more than one sample point,
+  single-site deletion is masked FOR EVERY EXISTING TEST whose executions keep the
+  sample points ordered — pre-register the both-site deletion, or explicitly record the
+  masking as a finding. But do NOT call the single-site mutant "property-equivalent":
+  if the sample points are not one atomic predicate (locks dropped between them, as in
+  request_seek's two holds), a concurrent writer in the inter-sample window can
+  distinguish them — the mutant is only unobserved-by-current-tests, and killing it
+  needs a twin that straddles the window (round-1 adversarial correction of this very
+  document's first wording).
 - **Where not to generalize.** Redundant sampling is not automatically a defect; here it is
   the documented cheap-filter/atomic-decision design. Do not "fix" redundancy by deleting a
   hold — that is production semantics.
@@ -88,7 +94,11 @@ Non-authoritative campaign document (#260 §3). Each lesson is evidence-backed b
 - **Where not to generalize.** Do not convert deterministic single-threaded tests into
   thread-DAGs to make them "hygienic"; the discipline applies only where legs exist. A
   watchdog (`within`) bounds failure reporting — it must never be claimed as the correctness
-  oracle (R3B-P1-03's oracles stayed semantic).
+  oracle (R3B-P1-03's oracles stayed semantic). The same holds for every bounded wait this
+  campaign added (5s join bounds, 10s `wait_entered_bounded`, the 10s watchdog): they are
+  machine-speed FAILURE bounds that turn a hang into a named RED — they are not semantic
+  oracles, and a red they produce must be diagnosed as "bounded wait expired", never read as
+  the property being false (round-1 adversarial review, on-the-record).
 
 ## 6. Watchdogs, RAII guards and scope-limited mechanisms: state what each can and cannot do
 
