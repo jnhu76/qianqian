@@ -190,9 +190,10 @@ fn honest_path_observes_reused_storage_without_intermediates() {
     // The storage-identity witness must cover EVERY block: a
     // last-block-only sample cannot see substitution in earlier quanta
     // (the partial-copy twin in mutations.rs exists precisely to keep
-    // this oracle honest). An actual copy lands in different storage
-    // and is visible by address; a legitimate reborrow of the flow's
-    // arena keeps the flow's address. The witness is O(1) and
+    // this oracle honest). Returned-storage substitution changes the
+    // observed address; a legitimate reborrow keeps the arena address.
+    // This cannot exclude a scratch copy copied back into that arena.
+    // The witness is O(1) and
     // allocation-free by construction (the steady-state zero-
     // allocation oracle shares this binary).
     let witness = fixture.sink.borrow().storage_identity_witness();
