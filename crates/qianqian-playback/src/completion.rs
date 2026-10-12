@@ -673,6 +673,11 @@ impl SessionCompletion {
     /// Recording still serializes with worker-gone publication: a plant
     /// before it is found by exit cleanup; a request after it is rejected.
     /// That cleanup guarantee does not make every plant Accepted.
+    ///
+    /// The straddle window between the Open sample and the second hold is
+    /// witnessed deterministically by the D14.5 C2 straddle tests through
+    /// the test-only fence below: `worker_gone` is the sole failed
+    /// second-hold predicate there, so the rejection is attributable to it.
     pub(crate) fn request_seek(&self, target: Duration) {
         // First hold: cheap reject against the command state and worker
         // liveness. The edge is reached only after this lock is dropped
@@ -698,6 +703,15 @@ impl SessionCompletion {
         if edge.terminal() != crate::edge::EdgeTerminal::Open {
             return; // data plane not Open (includes the post-EOF drain window)
         }
+        // Test-only suspension point in the straddle window documented
+        // above (Open sampled, second hold not yet taken). No lock can
+        // construct this window — the worker-gone publication that must
+        // land inside it needs the very mutex the second hold takes — so
+        // the witness tests park the real request here. The call site and
+        // the fence itself exist only in this crate's non-loom test
+        // builds; production compiles neither.
+        #[cfg(all(test, not(loom)))]
+        test_sync::pause_between_open_sample_and_second_hold(self);
         // The atomic internal-record unit (see the refinement above). Lock order:
         // completion state → seek slot → gate intent, each nested only
         // in that direction (the routers' established
@@ -1340,6 +1354,158 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
     None
 }
 
+/// The test-only fence for the seek straddle window (D14.5 C2).
+///
+/// `request_seek` samples the edge terminal and then re-validates under
+/// the completion lock; the straddle window is that interval, and its
+/// guard is the second hold's `worker_gone` conjunct. No lock-holding
+/// fixture can populate the window — the publication that must land
+/// inside it needs the very mutex whose acquisition ends it — so the
+/// witness tests park the real request here instead of forging state.
+///
+/// Compiled only for this crate's own non-loom test builds, and inert
+/// unless armed for one specific completion: every other request (and
+/// every production build, which contains neither the call site nor this
+/// module) passes through untouched.
+#[cfg(all(test, not(loom)))]
+pub(crate) mod test_sync {
+    use super::SessionCompletion;
+    use crate::edge::EdgeTerminal;
+    use std::sync::{Arc, Barrier, Mutex, OnceLock};
+
+    /// The parked request's admission read-out: exactly the fields the
+    /// second hold's guard evaluates, sampled under the completion lock
+    /// (the slot under its own, in the production lock order). The
+    /// witness tests assert on these individually so that the sole
+    /// failing predicate is checkable evidence.
+    pub(crate) struct SecondHoldState {
+        pub(crate) outcome_set: bool,
+        pub(crate) stop_requested: bool,
+        pub(crate) teardown_released: bool,
+        pub(crate) activation_failure_set: bool,
+        pub(crate) worker_gone: bool,
+        pub(crate) worker_terminal: Option<EdgeTerminal>,
+        pub(crate) slot_in_flight: bool,
+    }
+
+    struct Armed {
+        id: u64,
+        target: usize,
+        arrived: Arc<Barrier>,
+        released: Arc<Barrier>,
+    }
+
+    #[derive(Default)]
+    struct Registry {
+        next_id: u64,
+        armed: Vec<Armed>,
+    }
+
+    fn registry() -> &'static Mutex<Registry> {
+        static REGISTRY: OnceLock<Mutex<Registry>> = OnceLock::new();
+        REGISTRY.get_or_init(|| Mutex::new(Registry::default()))
+    }
+
+    /// One armed fence. The request and the test rendezvous on its
+    /// barriers; dropping the handle disarms the fence even on panic
+    /// unwind, so a failing assertion cannot poison a parallel test.
+    pub(crate) struct Fence {
+        id: u64,
+        arrived: Arc<Barrier>,
+        released: Arc<Barrier>,
+    }
+
+    impl Fence {
+        /// Block until the fenced request has sampled the edge terminal
+        /// Open and parked. Returns only with the request visibly at the
+        /// fence, before the second hold.
+        pub(crate) fn wait_parked(&self) {
+            self.arrived.wait();
+        }
+
+        /// Release the parked request into the second hold.
+        pub(crate) fn release(self) {
+            self.released.wait();
+        }
+    }
+
+    impl Drop for Fence {
+        fn drop(&mut self) {
+            registry()
+                .lock()
+                .expect("fence registry lock")
+                .armed
+                .retain(|armed| armed.id != self.id);
+        }
+    }
+
+    /// Arm the fence for exactly this completion's next `request_seek`
+    /// that gets past its Open sample. Other completions pass through.
+    pub(crate) fn arm(completion: &SessionCompletion) -> Fence {
+        let arrived = Arc::new(Barrier::new(2));
+        let released = Arc::new(Barrier::new(2));
+        let target = Arc::as_ptr(&completion.state) as usize;
+        let mut registry = registry().lock().expect("fence registry lock");
+        assert!(
+            registry.armed.iter().all(|armed| armed.target != target),
+            "a fence is already armed for this completion"
+        );
+        registry.next_id += 1;
+        let id = registry.next_id;
+        registry.armed.push(Armed {
+            id,
+            target,
+            arrived: arrived.clone(),
+            released: released.clone(),
+        });
+        Fence {
+            id,
+            arrived,
+            released,
+        }
+    }
+
+    /// The recorded suspension point. Inert unless a fence is armed for
+    /// this exact completion, and never called with any lock held: the
+    /// publications that must land inside the window have to be able to
+    /// run while the request parks here.
+    pub(super) fn pause_between_open_sample_and_second_hold(completion: &SessionCompletion) {
+        let (arrived, released) = {
+            let registry = registry().lock().expect("fence registry lock");
+            let target = Arc::as_ptr(&completion.state) as usize;
+            match registry.armed.iter().find(|armed| armed.target == target) {
+                Some(armed) => (armed.arrived.clone(), armed.released.clone()),
+                None => return,
+            }
+        };
+        arrived.wait();
+        released.wait();
+    }
+
+    /// Read the second-hold admission state, exactly as its guard will
+    /// read it. The witness tests sample this while the request is still
+    /// parked and no other writer exists, so the sample is what the
+    /// request's own hold sees.
+    pub(crate) fn second_hold_state(completion: &SessionCompletion) -> SecondHoldState {
+        let guard = completion.state.state.lock().expect("completion lock");
+        let slot_in_flight = completion
+            .state
+            .seek_slot
+            .lock()
+            .expect("seek slot lock")
+            .in_flight;
+        SecondHoldState {
+            outcome_set: guard.outcome.is_some(),
+            stop_requested: guard.stop_requested,
+            teardown_released: guard.teardown_released,
+            activation_failure_set: guard.activation_failure.is_some(),
+            worker_gone: guard.worker_gone,
+            worker_terminal: guard.worker_terminal,
+            slot_in_flight,
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -1522,6 +1688,138 @@ pub(crate) mod tests {
             completion.observe_snapshot().terminal_outcome,
             Some(EpisodeTerminalOutcome::Failed)
         );
+    }
+
+    /// D14.5 C2's straddle window, constructed deterministically: the
+    /// request's Open sample has returned, the worker's exit funnel runs
+    /// to completion, and only then does the request's second hold
+    /// execute. The fence parks the real request inside the window; the
+    /// funnel is driven by its exact production call sequence
+    /// (session.rs:921-922 — `worker_exited` then `abort_stranded_seek`),
+    /// and the companion session oracle re-runs the window through the
+    /// REAL decode worker's funnel.
+    ///
+    /// Oracle (ADR-PBK-002:1501): a request the worker-gone publication
+    /// straddled must return rejected — no accepted record may exist
+    /// whose only resolver is gone. The second-hold read-out witnesses
+    /// that `worker_gone` is the SOLE failing predicate there, so
+    /// deleting its check fails this test for the property (a planted,
+    /// never-resolvable record), never for a masked condition.
+    #[cfg(not(loom))]
+    #[test]
+    fn an_open_sampled_seek_straddling_the_worker_exit_is_never_accepted() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(2, 8));
+            completion.bind_stop_target(edge.clone());
+
+            let fence = test_sync::arm(&completion);
+            let requester = {
+                let completion = completion.clone();
+                std::thread::spawn(move || completion.request_seek(Duration::from_secs(1)))
+            };
+            fence.wait_parked();
+            assert_eq!(
+                edge.terminal(),
+                EdgeTerminal::Open,
+                "the fenced request samples Open before the worker exit"
+            );
+
+            edge.close_eof();
+            completion.worker_exited(edge.terminal());
+            completion.abort_stranded_seek();
+
+            // Sampled under the completion lock while the request is still
+            // parked: no writer exists between this sample and the
+            // request's own second hold.
+            let state = test_sync::second_hold_state(&completion);
+            assert!(state.worker_gone, "the exit funnel published worker_gone");
+            assert_eq!(state.worker_terminal, Some(EdgeTerminal::Eof));
+            assert!(!state.outcome_set, "second hold unmasked: outcome");
+            assert!(!state.stop_requested, "second hold unmasked: stop intent");
+            assert!(!state.teardown_released, "second hold unmasked: teardown");
+            assert!(
+                !state.activation_failure_set,
+                "second hold unmasked: activation failure"
+            );
+            assert!(!state.slot_in_flight, "second hold unmasked: slot");
+
+            fence.release();
+            requester.join().expect("the fenced request returned");
+
+            assert!(
+                !completion.seek_in_flight(),
+                "a request the worker-gone publication straddled must be rejected, \
+                 not planted: an accepted record whose only resolver is gone has no \
+                 commit path (ADR-PBK-002:1501)"
+            );
+            assert_eq!(
+                completion.take_seek_command(),
+                None,
+                "no command may be routed to a gone worker"
+            );
+            assert!(
+                !completion.seek_release_pending(),
+                "the rejection routed no seek release"
+            );
+            // The refusal left the episode able to settle: the worker's
+            // terminal plus the drain verdict is the decisive set.
+            completion.drain_signal().complete(DrainVerdict::Drained);
+            assert_eq!(
+                completion.observe_snapshot().terminal_outcome,
+                Some(EpisodeTerminalOutcome::Completed)
+            );
+        });
+    }
+
+    /// The fence's transparency control: with the worker alive and the
+    /// edge Open, the same arm/park/release cycle must not change the
+    /// ordinary acceptance — the witness above fails because of the
+    /// worker exit, not because the fence itself rejects.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_fence_parked_seek_with_a_live_worker_is_still_accepted() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(2, 8));
+            completion.bind_stop_target(edge.clone());
+
+            let fence = test_sync::arm(&completion);
+            let requester = {
+                let completion = completion.clone();
+                std::thread::spawn(move || completion.request_seek(Duration::from_secs(1)))
+            };
+            fence.wait_parked();
+            assert_eq!(edge.terminal(), EdgeTerminal::Open);
+            let state = test_sync::second_hold_state(&completion);
+            assert!(!state.worker_gone && !state.outcome_set && !state.stop_requested);
+            assert!(!state.teardown_released && !state.activation_failure_set);
+            assert!(!state.slot_in_flight);
+
+            fence.release();
+            requester.join().expect("the fenced request returned");
+
+            assert!(
+                completion.seek_in_flight(),
+                "the fence alone must not reject a live-worker request"
+            );
+            assert_eq!(
+                completion.take_seek_command(),
+                Some(Duration::from_secs(1)),
+                "the accepted request is the one the worker would resolve"
+            );
+            // Hygiene: no worker exists in this fixture, so the accepted
+            // record is resolved through the no-commit route, leaving no
+            // routed hold behind.
+            completion.release_seek_without_commit();
+            assert!(!completion.seek_in_flight());
+            assert_eq!(
+                consume_release(&completion.render_gate()),
+                Some(SeekParkRelease::Aborted)
+            );
+            assert_eq!(consume_release(&completion.render_gate()), None);
+            assert_eq!(completion.seek_protocol_state(), (false, false, None));
+        });
     }
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
