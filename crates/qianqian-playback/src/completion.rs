@@ -2080,9 +2080,12 @@ pub(crate) mod tests {
 
     /// Every frozen acceptance condition fails closed: no data plane,
     /// a non-Open edge (EOF drain window, failed edge), recorded stop
-    /// intent, and a settled episode each leave the slot unoccupied —
-    /// and a PAUSED episode is seekable (positive control: pause intent
-    /// is not an acceptance condition).
+    /// intent, the teardown release, and a settled episode each leave
+    /// the slot unoccupied — and a PAUSED episode is seekable (positive
+    /// control: pause intent is not an acceptance condition). The
+    /// teardown-release case drives the real `release_pause_gate`, so
+    /// the second hold's `teardown_released` conjunct has its own
+    /// oracle (the conjunct-deletion mutant must turn this case RED).
     #[cfg(not(loom))]
     #[test]
     fn seek_acceptance_fails_closed_on_every_frozen_condition() {
@@ -2113,6 +2116,19 @@ pub(crate) mod tests {
         completion.request_stop();
         completion.request_seek(Duration::from_secs(1));
         assert!(!completion.seek_in_flight());
+
+        // The teardown release: `release_pause_gate` (the session's
+        // teardown inverse) sets `teardown_released` and wakes both park
+        // attributions; a seek after it must fail closed at the second
+        // hold.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.release_pause_gate();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            !completion.seek_in_flight(),
+            "a seek after the teardown release must never plant"
+        );
 
         // A settled episode: decode failure settles synchronously, and
         // the terminal Fact freezes the command surface.
