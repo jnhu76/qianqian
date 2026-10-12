@@ -153,9 +153,9 @@ fn a_seek_release_landing_before_the_park_is_consumed_at_the_gate() {
 /// is NAMED in the failure instead of being dropped quietly. The panic
 /// carries the collection evidence, so a red run distinguishes
 /// "premise unmet" from "leg stuck after release".
-fn fail_premise_releasing_leg(
+fn fail_premise_releasing_leg<T>(
     gate: &RenderGate,
-    leg: std::thread::JoinHandle<(Arc<Mutex<Option<SeekParkRelease>>>, usize)>,
+    leg: std::thread::JoinHandle<T>,
     premise: &str,
 ) -> ! {
     gate.release_seek_hold(SeekParkRelease::Aborted);
@@ -504,7 +504,9 @@ fn a_failed_tail_observation_exits_the_seek_park_reported_and_settled() {
     let parked = Arc::new(AtomicBool::new(false));
     let parked_clone = parked.clone();
     let (tx, rx) = std::sync::mpsc::channel();
-    {
+    // The witness leg's handle is RETAINED: a premise failure must
+    // release and collect the leg (RELEASE != JOIN), never detach it.
+    let leg = {
         let gate = gate.clone();
         std::thread::spawn(move || {
             let captured: Arc<Mutex<Option<SeekParkRelease>>> = Arc::new(Mutex::new(None));
@@ -520,15 +522,19 @@ fn a_failed_tail_observation_exits_the_seek_park_reported_and_settled() {
                 }
             });
             let _ = tx.send((captured, outcome));
-        });
+        })
+    };
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_leg(&gate, leg, "the leg never parked under the routed hold");
     }
-    assert!(
-        wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
-        "the leg never parked under the routed hold"
-    );
-    let (captured, outcome) = rx
-        .recv_timeout(Duration::from_secs(5))
-        .expect("the park must end on the failed observation, with no release routed");
+    let received = rx.recv_timeout(Duration::from_secs(5)).ok();
+    let Some((captured, outcome)) = received else {
+        fail_premise_releasing_leg(
+            &gate,
+            leg,
+            "the park never ended on the failed observation within 5s (no release routed)",
+        );
+    };
     assert_eq!(
         outcome,
         ParkOutcome::TailProbeFailed,
