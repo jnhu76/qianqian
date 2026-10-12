@@ -634,3 +634,173 @@ fn assertions_before_and_after_park_release_and_join_the_owned_leg() {
         }
     }
 }
+
+/// Ordinary local resource: release a callback rendezvous before GateLeg
+/// collects it on unwind (declare this owner AFTER the leg owner).
+struct ProbeRelease(std::sync::mpsc::Sender<()>);
+
+impl Drop for ProbeRelease {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
+}
+
+/// A release can race an in-flight Pending or Quiesced observation.
+/// Pin callback entry -> route release -> return observation -> actual join.
+/// One probe is legal; a new probe at the exit is not. No sleep premise.
+#[test]
+fn release_during_an_in_flight_observation_starts_no_new_probe() {
+    for quiesced in [false, true] {
+        let gate = RenderGate::new();
+        gate.set_seek_hold(true);
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let writer = calls.clone();
+        let leg_gate = gate.clone();
+        let leg = GateLeg::new(
+            &gate,
+            std::thread::spawn(move || {
+                gate_probe(&leg_gate, || {
+                    if writer.fetch_add(1, Ordering::SeqCst) == 0 {
+                        let _ = entered_tx.send(());
+                        release_rx
+                            .recv_timeout(Duration::from_secs(5))
+                            .expect("test releases the held probe");
+                    }
+                    quiesced
+                })
+            }),
+        );
+        let release = ProbeRelease(release_tx);
+        entered_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("actual in-flight TailProbe");
+        gate.release_seek_hold(SeekParkRelease::Aborted);
+        drop(release);
+        let payloads = leg.join("in-flight observation after release");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "release allows the current observation, never a new one"
+        );
+        assert_eq!(*payloads.lock().unwrap(), vec![SeekParkRelease::Aborted]);
+    }
+}
+
+/// Cover all payload classes at the real pre-arrival, seek-exit and
+/// mid-pause delivery outlets. Receipt alone is not cardinality: check
+/// the whole delivery sequence after releasing both holds and joining.
+#[test]
+fn every_release_shape_is_delivered_once_at_each_gate_outlet() {
+    for paused in [false, true] {
+        for before_arrival in [false, true] {
+            for payload in [
+                SeekParkRelease::Aborted,
+                SeekParkRelease::Committed { landing: None },
+                SeekParkRelease::Committed { landing: Some(37) },
+            ] {
+                let gate = RenderGate::new();
+                gate.set_paused(paused);
+                gate.set_seek_hold(true);
+                if before_arrival {
+                    gate.release_seek_hold(payload);
+                }
+                let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+                let (received_tx, received_rx) = std::sync::mpsc::channel();
+                let captured = Arc::new(Mutex::new(Vec::new()));
+                let writer = captured.clone();
+                let leg_gate = gate.clone();
+                let leg = GateLeg::new(
+                    &gate,
+                    std::thread::spawn(move || {
+                        leg_gate.park_loop_top(|slice| match slice {
+                            GateSlice::TailProbe => {
+                                let _ = entered_tx.send(());
+                                TailProbeOutcome::Quiesced
+                            }
+                            GateSlice::SeekRelease(p) => {
+                                writer.lock().unwrap().push(p);
+                                let _ = received_tx.send(());
+                                TailProbeOutcome::Pending
+                            }
+                        });
+                    }),
+                );
+                if !before_arrival {
+                    entered_rx
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("real park before release");
+                    gate.release_seek_hold(payload);
+                }
+                received_rx
+                    .recv_timeout(Duration::from_secs(5))
+                    .expect("actual release callback");
+                gate.set_paused(false);
+                leg.join("all release shapes");
+                assert_eq!(
+                    *captured.lock().unwrap(),
+                    vec![payload],
+                    "paused={paused}, before_arrival={before_arrival}"
+                );
+                assert!(
+                    gate_probe(&gate, || panic!("no hold remains"))
+                        .lock()
+                        .unwrap()
+                        .is_empty()
+                );
+            }
+        }
+    }
+}
+
+/// The pause failure exit's pending-payload arm is distinct from the
+/// usual mid-park arm: route while TailProbe is held, then return Failed.
+#[test]
+fn a_release_routed_inside_a_failed_pause_probe_is_delivered_at_exit() {
+    for payload in [
+        SeekParkRelease::Committed { landing: None },
+        SeekParkRelease::Committed { landing: Some(37) },
+    ] {
+        let gate = RenderGate::new();
+        gate.set_paused(true);
+        gate.set_seek_hold(true);
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let leg_gate = gate.clone();
+        let leg = GateLeg::new(
+            &gate,
+            std::thread::spawn(move || {
+                let mut captured = Vec::new();
+                let outcome = leg_gate.park_loop_top(|slice| match slice {
+                    GateSlice::TailProbe => {
+                        let _ = entered_tx.send(());
+                        release_rx
+                            .recv_timeout(Duration::from_secs(5))
+                            .expect("test releases failed probe");
+                        TailProbeOutcome::Failed
+                    }
+                    GateSlice::SeekRelease(p) => {
+                        captured.push(p);
+                        TailProbeOutcome::Pending
+                    }
+                });
+                (outcome, captured)
+            }),
+        );
+        let release = ProbeRelease(release_tx);
+        entered_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("real pause probe before failure");
+        gate.release_seek_hold(payload);
+        drop(release);
+        let (outcome, captured) = leg.join("failure exit consumes pending payload");
+        assert_eq!(outcome, ParkOutcome::TailProbeFailed);
+        assert_eq!(
+            captured,
+            vec![payload],
+            "the failure exit must deliver exactly once"
+        );
+        gate.close_and_release();
+    }
+}
