@@ -1,5 +1,7 @@
 # R-H H0 consolidated remediation — lessons learned
 
+> 历史执行记录：本文记录原 PR #261 的 `b002a69` 阶段；本轮当前结果、18 项处置、公开日志包及 review 边界见 [对抗性修复记录](h0-adversarial-remediation.zh.md)。旧 APPROVE / 债务 / NOT_RUN 不代表新 HEAD 状态。
+
 Non-authoritative campaign document (#260 §3). Each lesson is evidence-backed by a run in
 `h0-execution-evidence-index.md`; each states where it should NOT be generalized.
 

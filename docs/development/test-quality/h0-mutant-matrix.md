@@ -1,5 +1,7 @@
 # R-H H0 consolidated remediation — mutant matrix
 
+> 历史执行记录：本文记录原 PR #261 的 `b002a69` 阶段；本轮当前结果、18 项处置、公开日志包及 review 边界见 [对抗性修复记录](h0-adversarial-remediation.zh.md)。旧 APPROVE / 债务 / NOT_RUN 不代表新 HEAD 状态。
+
 Subject: `daad414` → branch `test/h0-consolidated-remediation`. All mutants ran in isolated
 disposable worktrees (`/home/hoo/Source/qianqian-h0-probe`, `/home/hoo/Source/qianqian-h0-mutant`);
 every restore verified (`git checkout -- .` + byte-identity where claimed). Full unfiltered logs

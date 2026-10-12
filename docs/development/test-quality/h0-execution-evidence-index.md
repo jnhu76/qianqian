@@ -1,5 +1,7 @@
 # R-H H0 consolidated remediation — execution evidence index
 
+> 历史执行记录：本文记录原 PR #261 的 `b002a69` 阶段；本轮当前结果、18 项处置、公开日志包及 review 边界见 [对抗性修复记录](h0-adversarial-remediation.zh.md)。旧 APPROVE / 债务 / NOT_RUN 不代表新 HEAD 状态。
+
 Every run below is an immutable RUN_ID directory under
 `/home/hoo/Source/qianqian-h0-evidence/runs/<RUN_ID>/` with `metadata.json`
 (label, exact argv, cwd, subject sha, start/end UTC, rc, unfiltered log path,

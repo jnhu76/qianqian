@@ -1,5 +1,7 @@
 # R-H H0 consolidated remediation — property graph and decision tables
 
+> 历史执行记录：本文记录原 PR #261 的 `b002a69` 阶段；本轮当前结果、18 项处置、公开日志包及 review 边界见 [对抗性修复记录](h0-adversarial-remediation.zh.md)。旧 APPROVE / 债务 / NOT_RUN 不代表新 HEAD 状态。
+
 Campaign: #260 (ONE_PR_MULTIPLE_COMMITS) · Subject: `daad414582b2a31eddc4a5b3fdb85bcce4bd60b0`
 … → see `h0-before-after-ledger.csv` (18 rows), `h0-mutant-matrix.md`,
 `h0-execution-evidence-index.md`, `h0-lessons-learned.md`.

@@ -1,5 +1,7 @@
 # R-H H0 consolidated remediation — final review and merge gate
 
+> 历史执行记录：本文记录原 PR #261 的 `b002a69` 阶段；本轮当前结果、18 项处置、公开日志包及 review 边界见 [对抗性修复记录](h0-adversarial-remediation.zh.md)。旧 APPROVE / 债务 / NOT_RUN 不代表新 HEAD 状态。
+
 Status at PR open: **DRAFT — not merge-ready by construction** (#260 G4: two fresh-context
 independent reviews required; PR stays DRAFT until the owner's Ready decision; no self-merge).
 
