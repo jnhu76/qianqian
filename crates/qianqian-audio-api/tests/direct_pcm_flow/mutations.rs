@@ -12,7 +12,9 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use super::harness::{PcmFormat, PcmView, PcmViewMut, Sample, TransferError, deterministic_sample};
-use super::participants::{ParticipantRole, PcmSink, PcmSource, PcmStage, VerifyingSink};
+use super::participants::{
+    ParticipantRole, PcmSink, PcmSource, PcmStage, StorageIdentityWitness, VerifyingSink,
+};
 
 // ---------------------------------------------------------------------------
 // The lookup seam and the anti-shape flow (per-quantum participant lookup)
@@ -250,6 +252,10 @@ impl PcmSink for ReplayingSink {
     fn observed_storage_addr(&self) -> Option<usize> {
         self.inner.observed_storage_addr()
     }
+
+    fn storage_identity_witness(&self) -> StorageIdentityWitness {
+        self.inner.storage_identity_witness()
+    }
 }
 
 /// A same-interface adversarial twin: implements the exact [`PcmStage`]
@@ -278,6 +284,47 @@ impl PcmStage for LeakingCopyStage {
         let frozen = block.freeze();
         let copied: &'static [Sample] = Box::leak(frozen.payload().to_vec().into_boxed_slice());
         PcmView::new(self.format, copied).expect("the copied payload is whole frames")
+    }
+}
+
+/// A same-interface adversarial twin that substitutes storage on
+/// EXACTLY ONE chosen mid-stream quantum — the partial-copy shape a
+/// last-block-only sample cannot see (the chosen quantum is followed
+/// by honest ones, so the final block would satisfy the old oracle).
+/// The substituted quantum's payload is copied into freshly leaked
+/// storage and handed onward; every other quantum passes through
+/// untouched. Values stay oracle-correct throughout, so only the
+/// all-blocks storage-identity witness catches it. The leak is
+/// intentional and test-only; this twin runs a handful of quanta and
+/// never becomes a production helper.
+pub struct PartiallyLeakingCopyStage {
+    format: PcmFormat,
+    copy_quantum: usize,
+    quanta_seen: Cell<usize>,
+}
+
+impl PartiallyLeakingCopyStage {
+    pub fn new(format: PcmFormat, copy_quantum: usize) -> Self {
+        Self {
+            format,
+            copy_quantum,
+            quanta_seen: Cell::new(0),
+        }
+    }
+}
+
+impl PcmStage for PartiallyLeakingCopyStage {
+    fn process<'block>(&mut self, block: PcmViewMut<'block>) -> PcmView<'block> {
+        let seen = self.quanta_seen.get() + 1;
+        self.quanta_seen.set(seen);
+        if seen == self.copy_quantum {
+            let frozen = block.freeze();
+            let copied: &'static [Sample] =
+                Box::leak(frozen.payload().to_vec().into_boxed_slice());
+            PcmView::new(self.format, copied).expect("the copied payload is whole frames")
+        } else {
+            block.freeze()
+        }
     }
 }
 
@@ -354,7 +401,8 @@ mod kill_tests {
 
     use super::{
         DirectoryLookupFlow, FormatSwappingSource, FrameDroppingStage, FramePermutingStage,
-        HiddenLookupStage, LeakingCopyStage, ParticipantDirectory, ReplayingSink,
+        HiddenLookupStage, LeakingCopyStage, PartiallyLeakingCopyStage, ParticipantDirectory,
+        ReplayingSink,
     };
     use crate::composition::{
         CompositionFixture, compose_prebound_flow, directory_lookup_assembler_component,
@@ -640,6 +688,54 @@ mod kill_tests {
         assert!(
             allocated >= 4,
             "storage substitution allocates per quantum: {allocated} allocations for 4 quanta"
+        );
+    }
+
+    /// The partial-copy shape: storage is substituted on ONE mid-stream
+    /// quantum only, so the honest final block would satisfy a
+    /// last-block-only sample (the pre-repair oracle's blind spot). The
+    /// all-blocks storage-identity witness fires on the copied quantum's
+    /// substituted address — an actual copy is visible BY ADDRESS, which
+    /// is exactly what distinguishes it from a legitimate reborrow of
+    /// the flow's arena (same address). Intentional test-only leak — a
+    /// handful of quanta.
+    #[test]
+    fn partial_middle_block_storage_substitution_is_killed_by_storage_identity() {
+        let format = stereo();
+        let mut fixture = compose_prebound_flow(
+            Rc::new(RefCell::new(StreamingSource::new(format))),
+            Rc::new(RefCell::new(PartiallyLeakingCopyStage::new(format, 2))),
+            Rc::new(RefCell::new(VerifyingSink::new(format))),
+            format,
+            4,
+        );
+        run_stream(&mut fixture, 12, 4)
+            .expect("substituted values are still oracle-correct in stream order");
+        let witness = fixture.sink.borrow().storage_identity_witness();
+        assert_eq!(
+            witness.blocks_consumed, 3,
+            "the witness covers every quantum: {witness:?}"
+        );
+        let flow_storage = fixture.flow.block_storage_addr();
+        // Control: quantum 1 is honest, so the first-block address is
+        // the flow's arena.
+        assert_eq!(
+            witness.first_block_storage_addr,
+            Some(flow_storage),
+            "control: the first block is honest"
+        );
+        // Control: the final block is honest, so the old last-block-only
+        // sample would have passed this twin.
+        assert_eq!(
+            fixture.sink.borrow().observed_storage_addr(),
+            Some(flow_storage),
+            "control: the final block alone would satisfy the old oracle"
+        );
+        // The strengthened all-blocks oracle fires on the copied quantum.
+        assert!(
+            witness.later_block_on_different_storage,
+            "quantum 2's payload was copied into substituted storage: the \
+             all-blocks identity oracle must catch it"
         );
     }
 

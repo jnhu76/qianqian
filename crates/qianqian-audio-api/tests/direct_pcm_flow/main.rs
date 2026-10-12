@@ -156,15 +156,29 @@ fn transforming_stage_value_flows_through_the_middle_participant() {
 fn honest_path_observes_reused_storage_without_intermediates() {
     let mut fixture = identity_fixture_with_block(8);
     run_stream(&mut fixture, 64, 8).expect("the stream verifies in order");
-    let observed = fixture
-        .sink
-        .borrow()
-        .observed_storage_addr()
-        .expect("the sink observed storage");
+    // The storage-identity witness must cover EVERY block: a
+    // last-block-only sample cannot see substitution in earlier quanta
+    // (the partial-copy twin in mutations.rs exists precisely to keep
+    // this oracle honest). An actual copy lands in different storage
+    // and is visible by address; a legitimate reborrow of the flow's
+    // arena keeps the flow's address. The witness is O(1) and
+    // allocation-free by construction (the steady-state zero-
+    // allocation oracle shares this binary).
+    let witness = fixture.sink.borrow().storage_identity_witness();
     assert_eq!(
-        observed,
-        fixture.flow.block_storage_addr(),
-        "the sink must observe the flow's own reusable block storage"
+        witness.blocks_consumed, 8,
+        "the witness covers every quantum: {witness:?}"
+    );
+    let flow_storage = fixture.flow.block_storage_addr();
+    assert_eq!(
+        witness.first_block_storage_addr,
+        Some(flow_storage),
+        "the first quantum observed the flow's own reusable block storage"
+    );
+    assert!(
+        !witness.later_block_on_different_storage,
+        "EVERY block must observe the flow's own reusable block storage: \
+         a per-quantum substitution would have flipped the mismatch flag"
     );
 }
 
