@@ -1592,21 +1592,36 @@ pub(crate) mod tests {
     use qianqian_audio_api::ports::{GateSlice, RenderGate, TailProbeOutcome};
 
     /// Drive the unified loop-top gate and capture any routed release
-    /// payload the leg consumes. The tail probe never quiesces, so a
-    /// routed hold would park this call — tests that use this helper
+    /// payload the leg consumes. An unexpected tail probe reports failure and
+    /// rejects the fixture after its synchronous exit; tests using this helper
     /// drive consumption shapes only (payload routed before arrival, or
     /// nothing routed).
     #[cfg(not(loom))]
     fn consume_release(gate: &RenderGate) -> Option<SeekParkRelease> {
-        let captured = std::cell::Cell::new(None);
+        let mut captured = Vec::new();
+        let mut unexpected_park = false;
         gate.park_loop_top(|slice| match slice {
-            GateSlice::TailProbe => TailProbeOutcome::Pending,
+            GateSlice::TailProbe => {
+                // Consumption-only fixtures must not park. A real failed
+                // observation ends either park instead of stranding the
+                // synchronous probe behind a missing fixture resume.
+                unexpected_park = true;
+                TailProbeOutcome::Failed
+            }
             GateSlice::SeekRelease(release) => {
-                captured.set(Some(release));
+                captured.push(release);
                 TailProbeOutcome::Pending
             }
         });
-        captured.into_inner()
+        if unexpected_park {
+            gate.close_and_release();
+            panic!("consumption-only probe unexpectedly parked");
+        }
+        assert!(
+            captured.len() <= 1,
+            "duplicate release callback: {captured:?}"
+        );
+        captured.pop()
     }
 
     /// S6-F01: one consumer can hold a fetched chunk while the ring is
@@ -2083,9 +2098,8 @@ pub(crate) mod tests {
     /// intent, the teardown release, and a settled episode each leave
     /// the slot unoccupied — and a PAUSED episode is seekable (positive
     /// control: pause intent is not an acceptance condition). The
-    /// teardown-release case drives the real `release_pause_gate`, so
-    /// the second hold's `teardown_released` conjunct has its own
-    /// oracle (the conjunct-deletion mutant must turn this case RED).
+    /// sequential teardown case covers H1; the straddling test below
+    /// isolates H2 after H1 passed and the edge was sampled Open.
     #[cfg(not(loom))]
     #[test]
     fn seek_acceptance_fails_closed_on_every_frozen_condition() {
@@ -2119,8 +2133,7 @@ pub(crate) mod tests {
 
         // The teardown release: `release_pause_gate` (the session's
         // teardown inverse) sets `teardown_released` and wakes both park
-        // attributions; a seek after it must fail closed at the second
-        // hold.
+        // attributions; a seek after it must fail closed at H1.
         let completion = SessionCompletion::new();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
         completion.release_pause_gate();
@@ -2152,6 +2165,53 @@ pub(crate) mod tests {
             "a paused episode is seekable — pause intent is not an \
              acceptance condition"
         );
+    }
+
+    /// H1 -> real Open sample -> existing per-instance fence -> teardown
+    /// -> H2. Every other rejecting predicate remains false at H2, so a
+    /// single H2 teardown-conjunct deletion must plant and fail this oracle.
+    #[test]
+    #[cfg(not(loom))]
+    fn teardown_between_seek_admission_holds_rejects_the_plant() {
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8));
+        completion.bind_stop_target(edge.clone());
+        let mut request = test_sync::FencedRequest::spawn(&completion, Duration::from_secs(1));
+        request.wait_parked();
+        completion.release_pause_gate();
+        let state = test_sync::second_hold_state(&completion);
+        assert!(state.teardown_released);
+        assert!(!state.outcome_set && !state.stop_requested && !state.activation_failure_set);
+        assert!(!state.worker_gone && !state.slot_in_flight);
+        assert_eq!(edge.terminal(), EdgeTerminal::Open);
+        request.release();
+        request.join();
+        assert!(
+            !completion.seek_in_flight(),
+            "H2 must reject teardown recorded after H1"
+        );
+        assert_eq!(completion.take_seek_command(), None);
+    }
+
+    #[test]
+    #[cfg(not(loom))]
+    fn consumption_only_probe_rejects_either_park_without_stranding() {
+        for paused in [false, true] {
+            let gate = RenderGate::new();
+            gate.set_paused(paused);
+            gate.set_seek_hold(!paused);
+            let panic =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume_release(&gate)))
+                    .expect_err("routed hold is an invalid consumption fixture");
+            assert_eq!(
+                panic.downcast_ref::<&str>(),
+                Some(&"consumption-only probe unexpectedly parked")
+            );
+            assert_eq!(
+                gate.park_loop_top(|_| panic!("closed probe must be inert")),
+                qianqian_audio_api::ports::ParkOutcome::Proceeded
+            );
+        }
     }
 
     /// The commit boundary is a conjunction, evaluated in ONE atomic
@@ -2692,17 +2752,18 @@ pub(crate) mod tests {
             "precondition: cycle 1 commits on its own evidence"
         );
 
-        // The leg consumes the committed release payload, publishes its
-        // disengagement, and only then does the protocol resolve and the
-        // slot free — the production order (session.rs frees the slot
+        // The seek park publishes disengagement BEFORE taking its release
+        // payload (ports.rs::seek_park). Both precede slot-free, while the
+        // callback application stays on the same leg before future reads.
+        // The worker frees the slot
         // only after seek_release_pending() clears, never with an
         // unconsumed Committed payload still routed).
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekDisengaged));
         assert_eq!(
             consume_release(&completion.render_gate()),
             Some(SeekParkRelease::Committed { landing: Some(42) }),
         );
         assert_eq!(consume_release(&completion.render_gate()), None);
-        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekDisengaged));
         completion.clear_seek_in_flight();
 
         // Cycle 2: acceptance resets the per-cycle operation evidence,
@@ -2752,9 +2813,9 @@ pub(crate) mod tests {
     #[cfg(not(loom))]
     fn s0_a_paused_episodes_quiesced_park_commits_the_cut() {
         // The body drives the real park_loop_top through consume_release
-        // (its tail probe is always-Pending), so a regression that keeps
-        // the pause routed would park it FOREVER — this module has no
-        // other watchdog. The shared within(10s) bounds FAILURE
+        // (its tail probe rejects an unexpected park), so a missing
+        // fixture resume is rejected without stranding work. The outer
+        // shared within(10s) remains a bound on FAILURE
         // reporting only: it is not a correctness oracle, and the
         // semantic oracles below are untouched.
         crate::test_common::within(Duration::from_secs(10), || {
