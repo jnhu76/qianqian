@@ -51,6 +51,19 @@ fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
     }
 }
 
+/// Join a RELEASED leg with a bounded exit witness: release != join —
+/// even a correctly released leg (the pause release happened before
+/// this call on every path that uses it) may still be executing, and a
+/// leg that has not finished within the bound is NAMED in the failure
+/// instead of hanging the suite forever.
+fn join_released_leg(leg: std::thread::JoinHandle<()>, what: &str) {
+    let exited = wait_until(Duration::from_secs(5), || leg.is_finished());
+    if !exited {
+        panic!("released leg never exited within 5s: {what}");
+    }
+    leg.join().expect("released leg joins cleanly after exit")
+}
+
 #[derive(Clone, Default)]
 struct Events {
     seen: Arc<Mutex<Vec<GateEvent>>>,
@@ -140,7 +153,7 @@ fn a_park_publishes_engagement_quiescence_and_disengagement_then_returns() {
         events.snapshot()
     );
     gate.set_paused(false);
-    leg.join().expect("the parked leg must return");
+    join_released_leg(leg, "the parked leg after its release");
 
     let seen = events.snapshot();
     let engaged = seen.iter().filter(|e| **e == GateEvent::Engaged).count();
@@ -184,7 +197,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
         events.snapshot()
     );
     gate.set_paused(false);
-    leg.join().expect("leg 1 joins");
+    join_released_leg(leg, "leg 1 joins");
 
     // Engagement 2: the tail becomes quiescent again in this cycle. The
     // gate must RE-OBSERVE it (per-engagement reset, not a stuck latch):
@@ -226,7 +239,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
         "exactly two engagements: {seen_final:?}"
     );
     gate.set_paused(false);
-    leg.join().expect("leg 2 joins");
+    join_released_leg(leg, "leg 2 joins");
 
     // A final engagement whose tail NEVER goes quiescent must stay
     // engaged without a third TailQuiesced — the stale-latch direction
@@ -261,7 +274,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
          quiescence: {seen_after:?}"
     );
     gate.set_paused(false);
-    leg.join().expect("leg 3 joins");
+    join_released_leg(leg, "leg 3 joins");
 }
 
 /// The open-abort lifetime (D14.7 corrective-2): once a gate is closed,
