@@ -412,8 +412,17 @@ fn a_new_hold_drops_a_stale_unconsumed_release() {
     // nobody takes the payload.
     gate.set_seek_hold(true);
     gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(9) });
+    assert!(
+        gate.seek_release_pending(),
+        "real stale payload exists before the new hold"
+    );
     // Cycle 2: a new hold must not inherit cycle 1's payload.
     gate.set_seek_hold(true);
+    // Observe before release(Aborted) can overwrite and hide the debris.
+    assert!(
+        !gate.seek_release_pending(),
+        "a new hold must clear the stale payload at this boundary"
+    );
     let parked = Arc::new(AtomicBool::new(false));
     let parked_clone = parked.clone();
     let leg_gate = gate.clone();
