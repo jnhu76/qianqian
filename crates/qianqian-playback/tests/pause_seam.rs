@@ -381,8 +381,15 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
         let consumed = Arc::new(AtomicUsize::new(0));
         let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
+        // The premise "still playing at the stop" must not rest on the
+        // source's length against decode/render scheduling: a finite
+        // source could drain toward EOF while a slow machine establishes
+        // the pause, and an EOF-completed settle would false-RED the
+        // Stopped oracle below. `endless_audio` keeps the episode
+        // unsettled until the stop, structurally (Paced never returns
+        // Eof), so the shape under test is the only reachable one.
         let mut runtime = registered_runtime(
-            seconds_of_audio(30),
+            endless_audio(30),
             OutputBehavior::Consume,
             consumed,
             device_tail,
