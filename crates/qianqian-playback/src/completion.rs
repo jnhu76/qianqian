@@ -2676,8 +2676,16 @@ pub(crate) mod tests {
             "precondition: cycle 1 commits on its own evidence"
         );
 
-        // The leg leaves the park (release consumed; SeekDisengaged
-        // published on the leg's thread before the slot can free).
+        // The leg consumes the committed release payload, publishes its
+        // disengagement, and only then does the protocol resolve and the
+        // slot free — the production order (session.rs frees the slot
+        // only after seek_release_pending() clears, never with an
+        // unconsumed Committed payload still routed).
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(42) }),
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekDisengaged));
         completion.clear_seek_in_flight();
 
