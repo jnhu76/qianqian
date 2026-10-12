@@ -44,7 +44,9 @@ use mutations::{
     SplitPublication, StaleAcquisition, WeakHandlesReader,
 };
 use publication::{PublishedViews, Reader, ViewState};
-use resources::{DestructorGate, EventLog, ResourceEvent, TrackedResource, new_event_log};
+use resources::{
+    DestructorGate, EventLog, GateReleaseGuard, ResourceEvent, TrackedResource, new_event_log,
+};
 use view::RealtimeView;
 
 /// Builds one immutable view with freshly tracked resources.
@@ -895,8 +897,18 @@ fn blocking_destruction_does_not_hold_the_publication_lock() {
     });
 
     // Deterministic: wait until the resource destructor has entered and is
-    // blocked inside `Drop` before allowing any acquire probe.
-    destructor_gate.wait_entered();
+    // blocked inside `Drop` before allowing any acquire probe. Bounded:
+    // a mechanism regression that never drops the view is a NAMED
+    // premise failure, not an unbounded wait.
+    assert!(
+        destructor_gate.wait_entered_bounded(std::time::Duration::from_secs(10)),
+        "the destructor never entered its Drop within 10s — the reclaimable \
+         view was never physically released"
+    );
+    // Release even on failure paths (RELEASE != JOIN): without this
+    // guard, any later assert's unwind strands the control thread
+    // blocked inside `enter_and_wait` until process exit.
+    let _release_on_unwind = GateReleaseGuard::new(destructor_gate.clone());
 
     // While the destructor remains blocked, another reader must be able to
     // acquire the current view: physical destruction must not hold the

@@ -100,13 +100,29 @@ impl DestructorGate {
         }
     }
 
-    /// Called by the test: block until the destructor has entered and is
-    /// waiting inside `Drop`.
-    pub fn wait_entered(&self) {
+    /// Called by the test: bounded wait until the destructor has entered
+    /// and is waiting inside `Drop`. `false` means the destructor never
+    /// entered within the limit — a NAMED premise failure, not an
+    /// unbounded wait (a mechanism regression that never drops the view
+    /// must fail the test, not hang it).
+    pub fn wait_entered_bounded(&self, limit: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + limit;
         let mut state = self.state.lock().expect("destructor gate lock");
         while !state.entered {
-            state = self.changed.wait(state).expect("destructor gate wait");
+            let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now())
+            else {
+                return false;
+            };
+            let (guard, timeout) = self
+                .changed
+                .wait_timeout(state, remaining)
+                .expect("destructor gate wait");
+            state = guard;
+            if timeout.timed_out() && !state.entered {
+                return false;
+            }
         }
+        true
     }
 
     /// Called by the test: release a blocked destructor.
@@ -114,6 +130,45 @@ impl DestructorGate {
         let mut state = self.state.lock().expect("destructor gate lock");
         state.release = true;
         self.changed.notify_all();
+    }
+}
+
+impl Drop for DestructorGate {
+    fn drop(&mut self) {
+        // Non-panicking by contract: a gate dropped during unwind must
+        // not panic in Drop. Scope note (documented limitation, not a
+        // claim): a destructor blocked in `enter_and_wait` holds its own
+        // Arc clone, so THIS Drop cannot fire while it waits — release-
+        // on-unwind for that case is the caller's `GateReleaseGuard`.
+        // This Drop covers gates whose last handle drops while a
+        // destructor is about to wait or waiting on a gate it does not
+        // own a clone of.
+        if let Ok(mut state) = self.state.lock() {
+            state.release = true;
+        }
+        self.changed.notify_all();
+    }
+}
+
+/// RAII release for a [`DestructorGate`]: the guard releases the gate on
+/// drop, including unwind. RELEASE != JOIN for the blocking-destructor
+/// oracle: a test that fails while a destructor is blocked inside
+/// `enter_and_wait` must release it, or the thread running that
+/// destructor stays blocked until process exit.
+#[derive(Debug)]
+pub struct GateReleaseGuard {
+    gate: Arc<DestructorGate>,
+}
+
+impl GateReleaseGuard {
+    pub fn new(gate: Arc<DestructorGate>) -> Self {
+        Self { gate }
+    }
+}
+
+impl Drop for GateReleaseGuard {
+    fn drop(&mut self) {
+        self.gate.release();
     }
 }
 
