@@ -42,6 +42,9 @@ def main():
                         str(args.zip) + '.sha256', str(args.zip) + '.provenance.json',
                         '--repo', 'jnhu76/qianqian', '--verify-tag', '--target', args.source,
                         '--title', 'Qianqian ' + cr.version(args.tag), '--notes-file', str(notes_file)], check=True)
+    except cr.EvidenceMissing as exc:
+        print('EVIDENCE_MISSING: ' + str(exc), file=sys.stderr)
+        sys.exit(5)
     except cr.PolicyError as exc:
         print('POLICY_RED: ' + str(exc), file=sys.stderr)
         sys.exit(2)

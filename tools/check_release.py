@@ -30,6 +30,10 @@ class PolicyError(Exception):
     pass
 
 
+class EvidenceMissing(Exception):
+    pass
+
+
 def require(condition, message):
     if not condition:
         raise PolicyError(message)
@@ -176,6 +180,9 @@ def verify(args):
     v = source(args)
     name = f'{args.tag}-windows-x86_64'
     require(args.zip.name == name + '.zip', 'R5 ZIP filename mismatch')
+    for suffix in ('.sha256', '.provenance.json'):
+        if not Path(str(args.zip) + suffix).is_file():
+            raise EvidenceMissing('required external sidecar absent: ' + suffix)
     checksum = Path(str(args.zip) + '.sha256').read_text()
     require(checksum == file_hash(args.zip) + '  ' + args.zip.name + '\n', 'R5 ZIP checksum mismatch')
     receipt = read_json(str(args.zip) + '.provenance.json')
@@ -263,6 +270,9 @@ def main():
         else:
             publication_policy(args.event, args.ref, args.tag, args.existing)
         print('PASS: ' + args.operation)
+    except EvidenceMissing as exc:
+        print('EVIDENCE_MISSING: ' + str(exc), file=sys.stderr)
+        sys.exit(5)
     except PolicyError as exc:
         print('POLICY_RED: ' + str(exc), file=sys.stderr)
         sys.exit(2)

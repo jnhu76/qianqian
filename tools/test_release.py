@@ -153,6 +153,10 @@ def main():
         checker('verify', ['--zip', zip_path], 2, 'POLICY_RED: R4 symlink', 'E10-symlink')
         data = original.copy(); data['qianqian.exe'] += b'changed'; package_case('E11', data, 'R5 payload hash')
         package_case('E12', original, 'R5 ZIP checksum', checksum='0' * 64)
+        for suffix in ('.sha256', '.provenance.json'):
+            write_package(original)
+            Path(str(zip_path) + suffix).unlink()
+            checker('verify', ['--zip', zip_path], 5, 'EVIDENCE_MISSING:', 'E12-missing-' + suffix)
         data = original.copy(); data['qianqian.exe'] = (pe_root / 'bad.exe').read_bytes()
         m = json.loads(data[cr.MANIFEST]); m['files']['qianqian.exe'] = {'sha256': cr.digest(data['qianqian.exe']), 'bytes': len(data['qianqian.exe'])}
         data[cr.MANIFEST] = json.dumps(m).encode(); package_case('E13', data, 'R4 non-system DLL import: unshipped.dll')
