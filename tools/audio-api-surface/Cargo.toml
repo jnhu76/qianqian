@@ -1,0 +1,13 @@
+[package]
+name = "audio-api-surface"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Verification tooling only; never a production dependency/Plugin.
+[workspace]
+
+[dependencies]
+public-api = { version = "=0.52.2", default-features = false }
+syn = { version = "=2.0.119", features = ["full", "visit"] }
+proc-macro2 = "=1.0.107"

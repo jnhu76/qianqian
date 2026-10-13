@@ -1,0 +1,841 @@
+pub mod qianqian_audio_api
+pub mod qianqian_audio_api::ports
+pub enum qianqian_audio_api::ports::DecodeOutcome
+pub qianqian_audio_api::ports::DecodeOutcome::Eof
+pub qianqian_audio_api::ports::DecodeOutcome::Frames(usize)
+impl core::clone::Clone for qianqian_audio_api::ports::DecodeOutcome
+pub fn qianqian_audio_api::ports::DecodeOutcome::clone(&self) -> qianqian_audio_api::ports::DecodeOutcome
+impl core::clone::TrivialClone for qianqian_audio_api::ports::DecodeOutcome
+impl core::cmp::Eq for qianqian_audio_api::ports::DecodeOutcome
+pub fn qianqian_audio_api::ports::DecodeOutcome::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::DecodeOutcome
+pub fn qianqian_audio_api::ports::DecodeOutcome::eq(&self, &qianqian_audio_api::ports::DecodeOutcome) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::DecodeOutcome
+pub fn qianqian_audio_api::ports::DecodeOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::DecodeOutcome
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::DecodeOutcome
+impl core::marker::Freeze for qianqian_audio_api::ports::DecodeOutcome
+impl core::marker::Send for qianqian_audio_api::ports::DecodeOutcome
+impl core::marker::Sync for qianqian_audio_api::ports::DecodeOutcome
+impl core::marker::Unpin for qianqian_audio_api::ports::DecodeOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::DecodeOutcome
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::DecodeOutcome
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::DecodeOutcome where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::DecodeOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::DecodeOutcome where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::DecodeOutcome::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::DecodeOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::DecodeOutcome where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::DecodeOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::DecodeOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::DecodeOutcome where T: core::clone::Clone
+pub type qianqian_audio_api::ports::DecodeOutcome::Owned = T
+pub fn qianqian_audio_api::ports::DecodeOutcome::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::DecodeOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::DecodeOutcome where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::DecodeOutcome where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DecodeOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DecodeOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::DecodeOutcome where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::DecodeOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::DecodeOutcome
+pub fn qianqian_audio_api::ports::DecodeOutcome::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DecodeOutcome
+pub enum qianqian_audio_api::ports::DrainVerdict
+pub qianqian_audio_api::ports::DrainVerdict::Aborted
+pub qianqian_audio_api::ports::DrainVerdict::Drained
+impl core::clone::Clone for qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::clone(&self) -> qianqian_audio_api::ports::DrainVerdict
+impl core::clone::TrivialClone for qianqian_audio_api::ports::DrainVerdict
+impl core::cmp::Eq for qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::eq(&self, &qianqian_audio_api::ports::DrainVerdict) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::DrainVerdict
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::DrainVerdict
+impl core::marker::Freeze for qianqian_audio_api::ports::DrainVerdict
+impl core::marker::Send for qianqian_audio_api::ports::DrainVerdict
+impl core::marker::Sync for qianqian_audio_api::ports::DrainVerdict
+impl core::marker::Unpin for qianqian_audio_api::ports::DrainVerdict
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::DrainVerdict
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::DrainVerdict
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::DrainVerdict where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::DrainVerdict::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::DrainVerdict where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::DrainVerdict::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::DrainVerdict::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::DrainVerdict where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::DrainVerdict::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::DrainVerdict::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::DrainVerdict where T: core::clone::Clone
+pub type qianqian_audio_api::ports::DrainVerdict::Owned = T
+pub fn qianqian_audio_api::ports::DrainVerdict::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::DrainVerdict::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::DrainVerdict where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainVerdict::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::DrainVerdict where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DrainVerdict where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainVerdict::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DrainVerdict where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainVerdict::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::DrainVerdict where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::DrainVerdict::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DrainVerdict
+pub enum qianqian_audio_api::ports::GateEvent
+pub qianqian_audio_api::ports::GateEvent::Disengaged
+pub qianqian_audio_api::ports::GateEvent::Engaged
+pub qianqian_audio_api::ports::GateEvent::SeekDisengaged
+pub qianqian_audio_api::ports::GateEvent::SeekEngaged
+pub qianqian_audio_api::ports::GateEvent::SeekTailQuiesced
+pub qianqian_audio_api::ports::GateEvent::TailQuiesced
+impl core::clone::Clone for qianqian_audio_api::ports::GateEvent
+pub fn qianqian_audio_api::ports::GateEvent::clone(&self) -> qianqian_audio_api::ports::GateEvent
+impl core::clone::TrivialClone for qianqian_audio_api::ports::GateEvent
+impl core::cmp::Eq for qianqian_audio_api::ports::GateEvent
+pub fn qianqian_audio_api::ports::GateEvent::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::GateEvent
+pub fn qianqian_audio_api::ports::GateEvent::eq(&self, &qianqian_audio_api::ports::GateEvent) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::GateEvent
+pub fn qianqian_audio_api::ports::GateEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::GateEvent
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::GateEvent
+impl core::marker::Freeze for qianqian_audio_api::ports::GateEvent
+impl core::marker::Send for qianqian_audio_api::ports::GateEvent
+impl core::marker::Sync for qianqian_audio_api::ports::GateEvent
+impl core::marker::Unpin for qianqian_audio_api::ports::GateEvent
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::GateEvent
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::GateEvent
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::GateEvent where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::GateEvent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::GateEvent where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::GateEvent::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::GateEvent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::GateEvent where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::GateEvent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::GateEvent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::GateEvent where T: core::clone::Clone
+pub type qianqian_audio_api::ports::GateEvent::Owned = T
+pub fn qianqian_audio_api::ports::GateEvent::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::GateEvent::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::GateEvent where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateEvent::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::GateEvent where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::GateEvent where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateEvent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::GateEvent where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateEvent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::GateEvent where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::GateEvent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::GateEvent
+pub fn qianqian_audio_api::ports::GateEvent::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::GateEvent
+pub enum qianqian_audio_api::ports::GateSlice
+pub qianqian_audio_api::ports::GateSlice::SeekRelease(qianqian_audio_api::ports::SeekParkRelease)
+pub qianqian_audio_api::ports::GateSlice::TailProbe
+impl core::clone::Clone for qianqian_audio_api::ports::GateSlice
+pub fn qianqian_audio_api::ports::GateSlice::clone(&self) -> qianqian_audio_api::ports::GateSlice
+impl core::clone::TrivialClone for qianqian_audio_api::ports::GateSlice
+impl core::cmp::Eq for qianqian_audio_api::ports::GateSlice
+pub fn qianqian_audio_api::ports::GateSlice::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::GateSlice
+pub fn qianqian_audio_api::ports::GateSlice::eq(&self, &qianqian_audio_api::ports::GateSlice) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::GateSlice
+pub fn qianqian_audio_api::ports::GateSlice::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::GateSlice
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::GateSlice
+impl core::marker::Freeze for qianqian_audio_api::ports::GateSlice
+impl core::marker::Send for qianqian_audio_api::ports::GateSlice
+impl core::marker::Sync for qianqian_audio_api::ports::GateSlice
+impl core::marker::Unpin for qianqian_audio_api::ports::GateSlice
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::GateSlice
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::GateSlice
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::GateSlice where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::GateSlice::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::GateSlice where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::GateSlice::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::GateSlice::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::GateSlice where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::GateSlice::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::GateSlice::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::GateSlice where T: core::clone::Clone
+pub type qianqian_audio_api::ports::GateSlice::Owned = T
+pub fn qianqian_audio_api::ports::GateSlice::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::GateSlice::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::GateSlice where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateSlice::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::GateSlice where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::GateSlice where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateSlice::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::GateSlice where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::GateSlice::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::GateSlice where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::GateSlice::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::GateSlice
+pub fn qianqian_audio_api::ports::GateSlice::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::GateSlice
+pub enum qianqian_audio_api::ports::ParkOutcome
+pub qianqian_audio_api::ports::ParkOutcome::Proceeded
+pub qianqian_audio_api::ports::ParkOutcome::TailProbeFailed
+impl core::clone::Clone for qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::ParkOutcome::clone(&self) -> qianqian_audio_api::ports::ParkOutcome
+impl core::clone::TrivialClone for qianqian_audio_api::ports::ParkOutcome
+impl core::cmp::Eq for qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::ParkOutcome::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::ParkOutcome::eq(&self, &qianqian_audio_api::ports::ParkOutcome) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::ParkOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::ParkOutcome
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::ParkOutcome
+impl core::marker::Freeze for qianqian_audio_api::ports::ParkOutcome
+impl core::marker::Send for qianqian_audio_api::ports::ParkOutcome
+impl core::marker::Sync for qianqian_audio_api::ports::ParkOutcome
+impl core::marker::Unpin for qianqian_audio_api::ports::ParkOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::ParkOutcome
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::ParkOutcome
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::ParkOutcome where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::ParkOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::ParkOutcome where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::ParkOutcome::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::ParkOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::ParkOutcome where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::ParkOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::ParkOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::ParkOutcome where T: core::clone::Clone
+pub type qianqian_audio_api::ports::ParkOutcome::Owned = T
+pub fn qianqian_audio_api::ports::ParkOutcome::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::ParkOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::ParkOutcome where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ParkOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::ParkOutcome where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::ParkOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ParkOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::ParkOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ParkOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::ParkOutcome where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::ParkOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::ParkOutcome::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::ParkOutcome
+pub enum qianqian_audio_api::ports::PcmPull
+pub qianqian_audio_api::ports::PcmPull::Eof
+pub qianqian_audio_api::ports::PcmPull::Frames(usize)
+pub qianqian_audio_api::ports::PcmPull::Stopped
+impl core::clone::Clone for qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::PcmPull::clone(&self) -> qianqian_audio_api::ports::PcmPull
+impl core::clone::TrivialClone for qianqian_audio_api::ports::PcmPull
+impl core::cmp::Eq for qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::PcmPull::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::PcmPull::eq(&self, &qianqian_audio_api::ports::PcmPull) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::PcmPull::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::PcmPull
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::PcmPull
+impl core::marker::Freeze for qianqian_audio_api::ports::PcmPull
+impl core::marker::Send for qianqian_audio_api::ports::PcmPull
+impl core::marker::Sync for qianqian_audio_api::ports::PcmPull
+impl core::marker::Unpin for qianqian_audio_api::ports::PcmPull
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::PcmPull
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::PcmPull
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::PcmPull where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::PcmPull::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::PcmPull where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::PcmPull::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::PcmPull::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::PcmPull where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::PcmPull::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::PcmPull::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::PcmPull where T: core::clone::Clone
+pub type qianqian_audio_api::ports::PcmPull::Owned = T
+pub fn qianqian_audio_api::ports::PcmPull::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::PcmPull::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::PcmPull where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmPull::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::PcmPull where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::PcmPull where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmPull::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::PcmPull where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmPull::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::PcmPull where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::PcmPull::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::PcmPull::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::PcmPull
+pub enum qianqian_audio_api::ports::ProviderSeekOutcome
+pub qianqian_audio_api::ports::ProviderSeekOutcome::Applied
+pub qianqian_audio_api::ports::ProviderSeekOutcome::Applied::landing: core::option::Option<u64>
+pub qianqian_audio_api::ports::ProviderSeekOutcome::MutatedThenFailed
+pub qianqian_audio_api::ports::ProviderSeekOutcome::MutatedThenFailed::diagnostic: alloc::string::String
+pub qianqian_audio_api::ports::ProviderSeekOutcome::RefusedUnchanged
+impl core::clone::Clone for qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::clone(&self) -> qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::cmp::Eq for qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::eq(&self, &qianqian_audio_api::ports::ProviderSeekOutcome) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::marker::Freeze for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::marker::Send for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::marker::Sync for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::marker::Unpin for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::ProviderSeekOutcome
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::ProviderSeekOutcome
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::ProviderSeekOutcome where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::ProviderSeekOutcome where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::ProviderSeekOutcome::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::ProviderSeekOutcome where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::ProviderSeekOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::ProviderSeekOutcome where T: core::clone::Clone
+pub type qianqian_audio_api::ports::ProviderSeekOutcome::Owned = T
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::ProviderSeekOutcome where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::ProviderSeekOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::ProviderSeekOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::ProviderSeekOutcome where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::ProviderSeekOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::ProviderSeekOutcome::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::ProviderSeekOutcome
+pub enum qianqian_audio_api::ports::SeekParkRelease
+pub qianqian_audio_api::ports::SeekParkRelease::Aborted
+pub qianqian_audio_api::ports::SeekParkRelease::Committed
+pub qianqian_audio_api::ports::SeekParkRelease::Committed::landing: core::option::Option<u64>
+impl core::clone::Clone for qianqian_audio_api::ports::SeekParkRelease
+pub fn qianqian_audio_api::ports::SeekParkRelease::clone(&self) -> qianqian_audio_api::ports::SeekParkRelease
+impl core::clone::TrivialClone for qianqian_audio_api::ports::SeekParkRelease
+impl core::cmp::Eq for qianqian_audio_api::ports::SeekParkRelease
+pub fn qianqian_audio_api::ports::SeekParkRelease::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::SeekParkRelease
+pub fn qianqian_audio_api::ports::SeekParkRelease::eq(&self, &qianqian_audio_api::ports::SeekParkRelease) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::SeekParkRelease
+pub fn qianqian_audio_api::ports::SeekParkRelease::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::SeekParkRelease
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::SeekParkRelease
+impl core::marker::Freeze for qianqian_audio_api::ports::SeekParkRelease
+impl core::marker::Send for qianqian_audio_api::ports::SeekParkRelease
+impl core::marker::Sync for qianqian_audio_api::ports::SeekParkRelease
+impl core::marker::Unpin for qianqian_audio_api::ports::SeekParkRelease
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::SeekParkRelease
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::SeekParkRelease
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::SeekParkRelease where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::SeekParkRelease::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::SeekParkRelease where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::SeekParkRelease::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::SeekParkRelease::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::SeekParkRelease where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::SeekParkRelease::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::SeekParkRelease::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::SeekParkRelease where T: core::clone::Clone
+pub type qianqian_audio_api::ports::SeekParkRelease::Owned = T
+pub fn qianqian_audio_api::ports::SeekParkRelease::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::SeekParkRelease::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::SeekParkRelease where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SeekParkRelease::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::SeekParkRelease where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::SeekParkRelease where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SeekParkRelease::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::SeekParkRelease where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SeekParkRelease::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::SeekParkRelease where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::SeekParkRelease::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::SeekParkRelease
+pub fn qianqian_audio_api::ports::SeekParkRelease::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::SeekParkRelease
+pub enum qianqian_audio_api::ports::TailProbeOutcome
+pub qianqian_audio_api::ports::TailProbeOutcome::Failed
+pub qianqian_audio_api::ports::TailProbeOutcome::Pending
+pub qianqian_audio_api::ports::TailProbeOutcome::Quiesced
+impl core::clone::Clone for qianqian_audio_api::ports::TailProbeOutcome
+pub fn qianqian_audio_api::ports::TailProbeOutcome::clone(&self) -> qianqian_audio_api::ports::TailProbeOutcome
+impl core::clone::TrivialClone for qianqian_audio_api::ports::TailProbeOutcome
+impl core::cmp::Eq for qianqian_audio_api::ports::TailProbeOutcome
+pub fn qianqian_audio_api::ports::TailProbeOutcome::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::TailProbeOutcome
+pub fn qianqian_audio_api::ports::TailProbeOutcome::eq(&self, &qianqian_audio_api::ports::TailProbeOutcome) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::TailProbeOutcome
+pub fn qianqian_audio_api::ports::TailProbeOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::TailProbeOutcome
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::TailProbeOutcome
+impl core::marker::Freeze for qianqian_audio_api::ports::TailProbeOutcome
+impl core::marker::Send for qianqian_audio_api::ports::TailProbeOutcome
+impl core::marker::Sync for qianqian_audio_api::ports::TailProbeOutcome
+impl core::marker::Unpin for qianqian_audio_api::ports::TailProbeOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::TailProbeOutcome
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::TailProbeOutcome
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::TailProbeOutcome where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::TailProbeOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::TailProbeOutcome where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::TailProbeOutcome::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::TailProbeOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::TailProbeOutcome where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::TailProbeOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::TailProbeOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::TailProbeOutcome where T: core::clone::Clone
+pub type qianqian_audio_api::ports::TailProbeOutcome::Owned = T
+pub fn qianqian_audio_api::ports::TailProbeOutcome::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::TailProbeOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::TailProbeOutcome where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::TailProbeOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::TailProbeOutcome where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::TailProbeOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::TailProbeOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::TailProbeOutcome where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::TailProbeOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::TailProbeOutcome where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::TailProbeOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::TailProbeOutcome
+pub fn qianqian_audio_api::ports::TailProbeOutcome::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::TailProbeOutcome
+pub struct qianqian_audio_api::ports::AudioOutputCapability
+impl qianqian_composition::capability::Capability for qianqian_audio_api::ports::AudioOutputCapability
+pub type qianqian_audio_api::ports::AudioOutputCapability::Service = dyn qianqian_audio_api::ports::AudioOutput
+pub const qianqian_audio_api::ports::AudioOutputCapability::NAME: &'static str
+impl core::marker::Freeze for qianqian_audio_api::ports::AudioOutputCapability
+impl core::marker::Send for qianqian_audio_api::ports::AudioOutputCapability
+impl core::marker::Sync for qianqian_audio_api::ports::AudioOutputCapability
+impl core::marker::Unpin for qianqian_audio_api::ports::AudioOutputCapability
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::AudioOutputCapability
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::AudioOutputCapability
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::AudioOutputCapability where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::AudioOutputCapability::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::AudioOutputCapability where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::AudioOutputCapability::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::AudioOutputCapability::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::AudioOutputCapability where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::AudioOutputCapability::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::AudioOutputCapability::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::AudioOutputCapability where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AudioOutputCapability::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::AudioOutputCapability where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AudioOutputCapability::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::AudioOutputCapability where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AudioOutputCapability::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::AudioOutputCapability
+pub fn qianqian_audio_api::ports::AudioOutputCapability::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::AudioOutputCapability
+pub struct qianqian_audio_api::ports::DecodeError
+pub qianqian_audio_api::ports::DecodeError::message: alloc::string::String
+impl core::fmt::Debug for qianqian_audio_api::ports::DecodeError
+pub fn qianqian_audio_api::ports::DecodeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::DecodeError
+impl core::marker::Send for qianqian_audio_api::ports::DecodeError
+impl core::marker::Sync for qianqian_audio_api::ports::DecodeError
+impl core::marker::Unpin for qianqian_audio_api::ports::DecodeError
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::DecodeError
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::DecodeError
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::DecodeError where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::DecodeError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::DecodeError where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::DecodeError::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::DecodeError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::DecodeError where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::DecodeError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::DecodeError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::DecodeError where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DecodeError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DecodeError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::DecodeError
+pub fn qianqian_audio_api::ports::DecodeError::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DecodeError
+pub struct qianqian_audio_api::ports::DecodeOpenError
+pub qianqian_audio_api::ports::DecodeOpenError::message: alloc::string::String
+impl core::fmt::Debug for qianqian_audio_api::ports::DecodeOpenError
+pub fn qianqian_audio_api::ports::DecodeOpenError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::DecodeOpenError
+impl core::marker::Send for qianqian_audio_api::ports::DecodeOpenError
+impl core::marker::Sync for qianqian_audio_api::ports::DecodeOpenError
+impl core::marker::Unpin for qianqian_audio_api::ports::DecodeOpenError
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::DecodeOpenError
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::DecodeOpenError
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::DecodeOpenError where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::DecodeOpenError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::DecodeOpenError where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::DecodeOpenError::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::DecodeOpenError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::DecodeOpenError where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::DecodeOpenError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::DecodeOpenError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::DecodeOpenError where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOpenError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DecodeOpenError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOpenError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DecodeOpenError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DecodeOpenError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::DecodeOpenError
+pub fn qianqian_audio_api::ports::DecodeOpenError::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DecodeOpenError
+pub struct qianqian_audio_api::ports::DrainSignal
+impl qianqian_audio_api::ports::DrainSignal
+pub fn qianqian_audio_api::ports::DrainSignal::complete(&self, qianqian_audio_api::ports::DrainVerdict)
+pub fn qianqian_audio_api::ports::DrainSignal::new() -> Self
+pub fn qianqian_audio_api::ports::DrainSignal::with_on_complete(impl core::ops::function::Fn(qianqian_audio_api::ports::DrainVerdict) + core::marker::Send + core::marker::Sync + 'static) -> Self
+impl core::clone::Clone for qianqian_audio_api::ports::DrainSignal
+pub fn qianqian_audio_api::ports::DrainSignal::clone(&self) -> qianqian_audio_api::ports::DrainSignal
+impl core::default::Default for qianqian_audio_api::ports::DrainSignal
+pub fn qianqian_audio_api::ports::DrainSignal::default() -> qianqian_audio_api::ports::DrainSignal
+impl core::fmt::Debug for qianqian_audio_api::ports::DrainSignal
+pub fn qianqian_audio_api::ports::DrainSignal::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::DrainSignal
+impl core::marker::Send for qianqian_audio_api::ports::DrainSignal
+impl core::marker::Sync for qianqian_audio_api::ports::DrainSignal
+impl core::marker::Unpin for qianqian_audio_api::ports::DrainSignal
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::DrainSignal
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::DrainSignal
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::DrainSignal where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::DrainSignal::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::DrainSignal where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::DrainSignal::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::DrainSignal::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::DrainSignal where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::DrainSignal::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::DrainSignal::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::DrainSignal where T: core::clone::Clone
+pub type qianqian_audio_api::ports::DrainSignal::Owned = T
+pub fn qianqian_audio_api::ports::DrainSignal::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::DrainSignal::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::DrainSignal where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainSignal::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DrainSignal where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainSignal::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DrainSignal where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::DrainSignal::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::DrainSignal where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::DrainSignal::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::DrainSignal
+pub fn qianqian_audio_api::ports::DrainSignal::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DrainSignal
+pub struct qianqian_audio_api::ports::OutputError
+pub qianqian_audio_api::ports::OutputError::message: alloc::string::String
+impl core::fmt::Debug for qianqian_audio_api::ports::OutputError
+pub fn qianqian_audio_api::ports::OutputError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::OutputError
+impl core::marker::Send for qianqian_audio_api::ports::OutputError
+impl core::marker::Sync for qianqian_audio_api::ports::OutputError
+impl core::marker::Unpin for qianqian_audio_api::ports::OutputError
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::OutputError
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::OutputError
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::OutputError where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::OutputError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::OutputError where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::OutputError::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::OutputError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::OutputError where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::OutputError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::OutputError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::OutputError where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::OutputError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::OutputError where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::OutputError
+pub fn qianqian_audio_api::ports::OutputError::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::OutputError
+pub struct qianqian_audio_api::ports::OutputLevel
+impl qianqian_audio_api::ports::OutputLevel
+pub fn qianqian_audio_api::ports::OutputLevel::load(&self) -> f32
+pub fn qianqian_audio_api::ports::OutputLevel::new() -> Self
+pub fn qianqian_audio_api::ports::OutputLevel::route(&self, f32)
+impl core::clone::Clone for qianqian_audio_api::ports::OutputLevel
+pub fn qianqian_audio_api::ports::OutputLevel::clone(&self) -> qianqian_audio_api::ports::OutputLevel
+impl core::default::Default for qianqian_audio_api::ports::OutputLevel
+pub fn qianqian_audio_api::ports::OutputLevel::default() -> Self
+impl core::fmt::Debug for qianqian_audio_api::ports::OutputLevel
+pub fn qianqian_audio_api::ports::OutputLevel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::OutputLevel
+impl core::marker::Send for qianqian_audio_api::ports::OutputLevel
+impl core::marker::Sync for qianqian_audio_api::ports::OutputLevel
+impl core::marker::Unpin for qianqian_audio_api::ports::OutputLevel
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::OutputLevel
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::OutputLevel
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::OutputLevel where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::OutputLevel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::OutputLevel where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::OutputLevel::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::OutputLevel::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::OutputLevel where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::OutputLevel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::OutputLevel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::OutputLevel where T: core::clone::Clone
+pub type qianqian_audio_api::ports::OutputLevel::Owned = T
+pub fn qianqian_audio_api::ports::OutputLevel::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::OutputLevel::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::OutputLevel where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputLevel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::OutputLevel where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputLevel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::OutputLevel where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputLevel::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::OutputLevel where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::OutputLevel::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::OutputLevel
+pub fn qianqian_audio_api::ports::OutputLevel::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::OutputLevel
+pub struct qianqian_audio_api::ports::PcmDecodeCapability
+impl qianqian_composition::capability::Capability for qianqian_audio_api::ports::PcmDecodeCapability
+pub type qianqian_audio_api::ports::PcmDecodeCapability::Service = dyn qianqian_audio_api::ports::PcmDecode
+pub const qianqian_audio_api::ports::PcmDecodeCapability::NAME: &'static str
+impl core::marker::Freeze for qianqian_audio_api::ports::PcmDecodeCapability
+impl core::marker::Send for qianqian_audio_api::ports::PcmDecodeCapability
+impl core::marker::Sync for qianqian_audio_api::ports::PcmDecodeCapability
+impl core::marker::Unpin for qianqian_audio_api::ports::PcmDecodeCapability
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::PcmDecodeCapability
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::PcmDecodeCapability
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::PcmDecodeCapability where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::PcmDecodeCapability where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::PcmDecodeCapability::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::PcmDecodeCapability where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::PcmDecodeCapability::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::PcmDecodeCapability where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::PcmDecodeCapability where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::PcmDecodeCapability where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::PcmDecodeCapability
+pub fn qianqian_audio_api::ports::PcmDecodeCapability::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::PcmDecodeCapability
+pub struct qianqian_audio_api::ports::PcmFormat
+pub qianqian_audio_api::ports::PcmFormat::channel_mask: u64
+pub qianqian_audio_api::ports::PcmFormat::channels: u16
+pub qianqian_audio_api::ports::PcmFormat::sample_rate: u32
+impl core::clone::Clone for qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::PcmFormat::clone(&self) -> qianqian_audio_api::ports::PcmFormat
+impl core::clone::TrivialClone for qianqian_audio_api::ports::PcmFormat
+impl core::cmp::Eq for qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::PcmFormat::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::PcmFormat::eq(&self, &qianqian_audio_api::ports::PcmFormat) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::PcmFormat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::PcmFormat
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::PcmFormat
+impl core::marker::Freeze for qianqian_audio_api::ports::PcmFormat
+impl core::marker::Send for qianqian_audio_api::ports::PcmFormat
+impl core::marker::Sync for qianqian_audio_api::ports::PcmFormat
+impl core::marker::Unpin for qianqian_audio_api::ports::PcmFormat
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::PcmFormat
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::PcmFormat
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::PcmFormat where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::PcmFormat::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::PcmFormat where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::PcmFormat::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::PcmFormat::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::PcmFormat where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::PcmFormat::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::PcmFormat::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::PcmFormat where T: core::clone::Clone
+pub type qianqian_audio_api::ports::PcmFormat::Owned = T
+pub fn qianqian_audio_api::ports::PcmFormat::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::PcmFormat::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::PcmFormat where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmFormat::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::PcmFormat where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::PcmFormat where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmFormat::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::PcmFormat where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PcmFormat::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::PcmFormat where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::PcmFormat::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::PcmFormat::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::PcmFormat
+pub struct qianqian_audio_api::ports::PositionEvidence
+impl qianqian_audio_api::ports::PositionEvidence
+pub const qianqian_audio_api::ports::PositionEvidence::MAX_POSITION: u64
+pub fn qianqian_audio_api::ports::PositionEvidence::new() -> Self
+pub fn qianqian_audio_api::ports::PositionEvidence::publish_consumed(&self, u64, u64)
+pub fn qianqian_audio_api::ports::PositionEvidence::published(&self) -> core::option::Option<u64>
+pub fn qianqian_audio_api::ports::PositionEvidence::rebase(&self, core::option::Option<u64>)
+impl core::clone::Clone for qianqian_audio_api::ports::PositionEvidence
+pub fn qianqian_audio_api::ports::PositionEvidence::clone(&self) -> qianqian_audio_api::ports::PositionEvidence
+impl core::default::Default for qianqian_audio_api::ports::PositionEvidence
+pub fn qianqian_audio_api::ports::PositionEvidence::default() -> qianqian_audio_api::ports::PositionEvidence
+impl core::fmt::Debug for qianqian_audio_api::ports::PositionEvidence
+pub fn qianqian_audio_api::ports::PositionEvidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::PositionEvidence
+impl core::marker::Send for qianqian_audio_api::ports::PositionEvidence
+impl core::marker::Sync for qianqian_audio_api::ports::PositionEvidence
+impl core::marker::Unpin for qianqian_audio_api::ports::PositionEvidence
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::PositionEvidence
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::PositionEvidence
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::PositionEvidence where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::PositionEvidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::PositionEvidence where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::PositionEvidence::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::PositionEvidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::PositionEvidence where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::PositionEvidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::PositionEvidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::PositionEvidence where T: core::clone::Clone
+pub type qianqian_audio_api::ports::PositionEvidence::Owned = T
+pub fn qianqian_audio_api::ports::PositionEvidence::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::PositionEvidence::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::PositionEvidence where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PositionEvidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::PositionEvidence where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PositionEvidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::PositionEvidence where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::PositionEvidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::PositionEvidence where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::PositionEvidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::PositionEvidence
+pub fn qianqian_audio_api::ports::PositionEvidence::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::PositionEvidence
+pub struct qianqian_audio_api::ports::RenderGate
+impl qianqian_audio_api::ports::RenderGate
+pub fn qianqian_audio_api::ports::RenderGate::close_and_release(&self)
+pub fn qianqian_audio_api::ports::RenderGate::new() -> Self
+pub fn qianqian_audio_api::ports::RenderGate::park_loop_top(&self, impl core::ops::function::FnMut(qianqian_audio_api::ports::GateSlice) -> qianqian_audio_api::ports::TailProbeOutcome) -> qianqian_audio_api::ports::ParkOutcome
+pub fn qianqian_audio_api::ports::RenderGate::release_seek_hold(&self, qianqian_audio_api::ports::SeekParkRelease)
+pub fn qianqian_audio_api::ports::RenderGate::seek_release_pending(&self) -> bool
+pub fn qianqian_audio_api::ports::RenderGate::set_paused(&self, bool)
+pub fn qianqian_audio_api::ports::RenderGate::set_seek_hold(&self, bool)
+pub fn qianqian_audio_api::ports::RenderGate::with_observer(impl core::ops::function::Fn(qianqian_audio_api::ports::GateEvent) + core::marker::Send + core::marker::Sync + 'static) -> Self
+impl core::clone::Clone for qianqian_audio_api::ports::RenderGate
+pub fn qianqian_audio_api::ports::RenderGate::clone(&self) -> qianqian_audio_api::ports::RenderGate
+impl core::default::Default for qianqian_audio_api::ports::RenderGate
+pub fn qianqian_audio_api::ports::RenderGate::default() -> qianqian_audio_api::ports::RenderGate
+impl core::fmt::Debug for qianqian_audio_api::ports::RenderGate
+pub fn qianqian_audio_api::ports::RenderGate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for qianqian_audio_api::ports::RenderGate
+impl core::marker::Send for qianqian_audio_api::ports::RenderGate
+impl core::marker::Sync for qianqian_audio_api::ports::RenderGate
+impl core::marker::Unpin for qianqian_audio_api::ports::RenderGate
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::RenderGate
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::RenderGate
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::RenderGate where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::RenderGate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::RenderGate where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::RenderGate::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::RenderGate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::RenderGate where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::RenderGate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::RenderGate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::RenderGate where T: core::clone::Clone
+pub type qianqian_audio_api::ports::RenderGate::Owned = T
+pub fn qianqian_audio_api::ports::RenderGate::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::RenderGate::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::RenderGate where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderGate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::RenderGate where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderGate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::RenderGate where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderGate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::RenderGate where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::RenderGate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::RenderGate
+pub fn qianqian_audio_api::ports::RenderGate::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::RenderGate
+pub struct qianqian_audio_api::ports::RenderRequest
+pub qianqian_audio_api::ports::RenderRequest::drain: qianqian_audio_api::ports::DrainSignal
+pub qianqian_audio_api::ports::RenderRequest::format: qianqian_audio_api::ports::PcmFormat
+pub qianqian_audio_api::ports::RenderRequest::gate: qianqian_audio_api::ports::RenderGate
+pub qianqian_audio_api::ports::RenderRequest::input: alloc::sync::Arc<dyn qianqian_audio_api::ports::RenderPcmInput>
+pub qianqian_audio_api::ports::RenderRequest::level: qianqian_audio_api::ports::OutputLevel
+pub qianqian_audio_api::ports::RenderRequest::position: qianqian_audio_api::ports::PositionEvidence
+impl core::marker::Freeze for qianqian_audio_api::ports::RenderRequest
+impl core::marker::Send for qianqian_audio_api::ports::RenderRequest
+impl core::marker::Sync for qianqian_audio_api::ports::RenderRequest
+impl core::marker::Unpin for qianqian_audio_api::ports::RenderRequest
+impl !core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::RenderRequest
+impl !core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::RenderRequest
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::RenderRequest where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::RenderRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::RenderRequest where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::RenderRequest::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::RenderRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::RenderRequest where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::RenderRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::RenderRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for qianqian_audio_api::ports::RenderRequest where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::RenderRequest where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::RenderRequest where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::RenderRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::RenderRequest
+pub fn qianqian_audio_api::ports::RenderRequest::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::RenderRequest
+pub struct qianqian_audio_api::ports::SourceFacts
+pub qianqian_audio_api::ports::SourceFacts::duration: core::option::Option<core::time::Duration>
+pub qianqian_audio_api::ports::SourceFacts::format: qianqian_audio_api::ports::PcmFormat
+impl core::clone::Clone for qianqian_audio_api::ports::SourceFacts
+pub fn qianqian_audio_api::ports::SourceFacts::clone(&self) -> qianqian_audio_api::ports::SourceFacts
+impl core::clone::TrivialClone for qianqian_audio_api::ports::SourceFacts
+impl core::cmp::Eq for qianqian_audio_api::ports::SourceFacts
+pub fn qianqian_audio_api::ports::SourceFacts::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::SourceFacts
+pub fn qianqian_audio_api::ports::SourceFacts::eq(&self, &qianqian_audio_api::ports::SourceFacts) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::SourceFacts
+pub fn qianqian_audio_api::ports::SourceFacts::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::SourceFacts
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::SourceFacts
+impl core::marker::Freeze for qianqian_audio_api::ports::SourceFacts
+impl core::marker::Send for qianqian_audio_api::ports::SourceFacts
+impl core::marker::Sync for qianqian_audio_api::ports::SourceFacts
+impl core::marker::Unpin for qianqian_audio_api::ports::SourceFacts
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::SourceFacts
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::SourceFacts
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::SourceFacts where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::SourceFacts::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::SourceFacts where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::SourceFacts::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::SourceFacts::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::SourceFacts where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::SourceFacts::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::SourceFacts::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::SourceFacts where T: core::clone::Clone
+pub type qianqian_audio_api::ports::SourceFacts::Owned = T
+pub fn qianqian_audio_api::ports::SourceFacts::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::SourceFacts::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::SourceFacts where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SourceFacts::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::SourceFacts where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::SourceFacts where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SourceFacts::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::SourceFacts where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::SourceFacts::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::SourceFacts where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::SourceFacts::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::SourceFacts
+pub fn qianqian_audio_api::ports::SourceFacts::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::SourceFacts
+pub trait qianqian_audio_api::ports::AudioOutput
+pub fn qianqian_audio_api::ports::AudioOutput::open_stream(&self, qianqian_audio_api::ports::RenderRequest) -> core::result::Result<alloc::boxed::Box<dyn qianqian_audio_api::ports::RenderStream>, qianqian_audio_api::ports::OutputError>
+pub trait qianqian_audio_api::ports::DecodedPcmStream: core::marker::Send
+pub fn qianqian_audio_api::ports::DecodedPcmStream::format(&self) -> qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::DecodedPcmStream::read_frames(&mut self, &mut [f32]) -> core::result::Result<qianqian_audio_api::ports::DecodeOutcome, qianqian_audio_api::ports::DecodeError>
+pub fn qianqian_audio_api::ports::DecodedPcmStream::seek(&mut self, core::time::Duration) -> qianqian_audio_api::ports::ProviderSeekOutcome
+pub fn qianqian_audio_api::ports::DecodedPcmStream::source_duration(&self) -> core::option::Option<core::time::Duration>
+pub trait qianqian_audio_api::ports::PcmDecode
+pub fn qianqian_audio_api::ports::PcmDecode::open_media(&self, &std::path::Path) -> core::result::Result<alloc::boxed::Box<dyn qianqian_audio_api::ports::DecodedPcmStream>, qianqian_audio_api::ports::DecodeOpenError>
+pub trait qianqian_audio_api::ports::RenderPcmInput: core::marker::Send + core::marker::Sync
+pub fn qianqian_audio_api::ports::RenderPcmInput::read_frames(&self, &mut [f32]) -> qianqian_audio_api::ports::PcmPull
+pub fn qianqian_audio_api::ports::RenderPcmInput::stop(&self)
+pub trait qianqian_audio_api::ports::RenderStream: core::marker::Send
+pub fn qianqian_audio_api::ports::RenderStream::negotiated_format(&self) -> qianqian_audio_api::ports::PcmFormat
+pub fn qianqian_audio_api::ports::RenderStream::stop_and_join(alloc::boxed::Box<Self>)

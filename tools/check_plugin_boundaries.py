@@ -14,6 +14,11 @@ Inputs:
   - the same command per explicitly-known workspace-EXCLUDED production
     crate (qianqian-decode-songcore, qianqian-songcore-sys): exclusion
     from the workspace must never mean exclusion from the architecture.
+  - qianqian-audio-api: pinned rustdoc JSON + public-api structural
+    snapshot, with a syn portable-source guard (Issue #153). Trait members,
+    variants/payloads and impls are included; compilation/tool failure is
+    exit 2, never a substitute for contract RED. Setup/limits/inventory:
+    tools/audio-api-surface/README.md.
   - export-surface rules (source-level): the public production surface
     of the playback / decode / output crates must not re-open concrete
     mechanism access. For qianqian-playback and qianqian-output-wasapi
@@ -35,6 +40,8 @@ Exit codes: 0 PASS, 1 FAIL, 2 TOOLING-FAIL (refuses to mutate a dirty tree).
 """
 
 import argparse
+import difflib
+import os
 import json
 import subprocess
 import sys
@@ -589,6 +596,71 @@ def root_public_declarations(text):
     return declarations
 
 
+# #153: Rust-aware admission, not root_public_declarations() prefix matching.
+AUDIO_API_SNAPSHOT = "tools/audio-api-surface/admitted-api.txt"
+AUDIO_API_NIGHTLY = "nightly-2025-11-22"
+AUDIO_API_SOURCES = [
+    "crates/qianqian-audio-api/src/lib.rs",
+    "crates/qianqian-audio-api/src/ports.rs",
+]
+
+
+def audio_api_surface():
+    env = os.environ.copy()
+    # Dedicated artifact directory; ignore caller flags that change the cfg/API.
+    env["CARGO_TARGET_DIR"] = str(ROOT / "target/audio-api-gate")
+    for variable in ("RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTFLAGS",
+                     "CARGO_BUILD_TARGET"):
+        env.pop(variable, None)
+    helper = ["cargo", "run", "--offline", "--locked", "--quiet",
+              "--manifest-path", str(ROOT / "tools/audio-api-surface/Cargo.toml"), "--"]
+    sources = [str(ROOT / path) for path in AUDIO_API_SOURCES]
+
+    def run(command):
+        try:
+            result = subprocess.run(command, cwd=ROOT, env=env,
+                                    capture_output=True, text=True)
+        except OSError as error:
+            tooling_fail(f"audio-api command unavailable: {error}")
+        return result
+
+    guarded = run(helper + ["--guard", *sources])
+    if guarded.returncode:
+        if guarded.returncode == 1 and "AUDIO_API_SOURCE_POLICY_RED:" in guarded.stderr:
+            return ["source: qianqian-audio-api\ntarget: public contract\n"
+                    "kind: audio-api-source-policy\n" + guarded.stderr.strip()]
+        tooling_fail("audio-api source guard failed:\n" + guarded.stderr)
+    manifest = tomllib.loads((ROOT / "crates/qianqian-audio-api/Cargo.toml").read_text())
+    admitted_manifest = {
+        "package": {"name": "qianqian-audio-api", "version": {"workspace": True},
+                    "edition": {"workspace": True}},
+        "dependencies": {"qianqian-composition": {"path": "../qianqian-composition"}},
+    }
+    if manifest != admitted_manifest or (ROOT / "crates/qianqian-audio-api/build.rs").exists():
+        return ["source: qianqian-audio-api\ntarget: public contract\n"
+                "kind: audio-api-source-policy\n"
+                "AUDIO_API_SOURCE_POLICY_RED: new dependency/feature/lib/build configuration requires review"]
+    documented = run(["cargo", "+" + AUDIO_API_NIGHTLY, "rustdoc", "--offline", "--locked",
+                      "-p", "qianqian-audio-api", "--lib", "--target",
+                      "x86_64-unknown-linux-gnu", "--", "-Z", "unstable-options",
+                      "--output-format", "json", "--document-hidden-items"])
+    if documented.returncode:
+        tooling_fail("audio-api rustdoc failed (not contract RED):\n" + documented.stderr)
+    extracted = run(helper + [str(ROOT / "target/audio-api-gate/x86_64-unknown-linux-gnu/doc/qianqian_audio_api.json"), *sources])
+    if extracted.returncode:
+        tooling_fail("audio-api extraction failed (not contract RED):\n" + extracted.stderr)
+    actual = extracted.stdout.splitlines(keepends=True)
+    expected = (ROOT / AUDIO_API_SNAPSHOT).read_text().splitlines(keepends=True)
+    if actual != expected:
+        diff = "".join(difflib.unified_diff(expected, actual,
+                       fromfile="admitted audio-api contract", tofile="actual audio-api contract"))
+        return ["source: qianqian-audio-api\ntarget: public contract\n"
+                "kind: audio-api-contract\nrule: AUDIO_API_CONTRACT_RED\n"
+                "authority: ADR-PBK-002 D1/D6/D7/D14.5/.6/.7/.8/.9 + ADR-PBK-003 §5; "
+                "see tools/audio-api-surface/README.md for incidental rights and limits\n" + diff]
+    return []
+
+
 def scan():
     violations = []
 
@@ -726,6 +798,11 @@ def scan():
                 f"(the narrow public-surface amendment, synced with the surface)"
             )
 
+    # Existing topology controls deliberately invalidate the workspace lock.
+    # Settle their diagnosed boundary RED before attempting rustdoc; a lock
+    # failure must not replace the actual architecture violation with tooling.
+    if not violations:
+        violations.extend(audio_api_surface())
     return violations
 
 
@@ -749,6 +826,8 @@ def run_gate():
 # (same discipline as specs/playback-concurrency/check.sh).
 
 MUTABLE_FILES = [
+    *AUDIO_API_SOURCES,
+    "crates/qianqian-audio-api/Cargo.toml",
     "crates/qianqian-playback/Cargo.toml",
     "crates/qianqian-playback/src/lib.rs",
     "crates/qianqian-playback/src/handle.rs",
@@ -787,8 +866,8 @@ def expect_fail(label, expected_fragment, edits=None, creates=None):
     snapshots = {}
     for rel, transform in edits.items():
         p = ROOT / rel
-        snapshots[rel] = p.read_text(encoding="utf-8")
-        p.write_text(transform(snapshots[rel]), encoding="utf-8")
+        snapshots[rel] = p.read_bytes()
+        p.write_bytes(transform(snapshots[rel].decode("utf-8")).encode("utf-8"))
     for rel, content in creates.items():
         (ROOT / rel).parent.mkdir(parents=True, exist_ok=True)
         (ROOT / rel).write_text(content, encoding="utf-8")
@@ -797,7 +876,7 @@ def expect_fail(label, expected_fragment, edits=None, creates=None):
         captured = "\n".join(violations)
     finally:
         for rel, original in snapshots.items():
-            (ROOT / rel).write_text(original, encoding="utf-8")
+            (ROOT / rel).write_bytes(original)
         for rel in creates:
             (ROOT / rel).unlink(missing_ok=True)
         # prune directories created for the probe files, deepest first
@@ -809,21 +888,66 @@ def expect_fail(label, expected_fragment, edits=None, creates=None):
             except OSError:
                 pass
     for rel, original in snapshots.items():
-        if (ROOT / rel).read_text(encoding="utf-8") != original:
+        if (ROOT / rel).read_bytes() != original:
             tooling_fail(f"{label}: {rel} did not restore byte-exactly")
     if not violations:
         print(f"RESULT {label} TOOLING-FAIL (mutation was NOT caught)")
         sys.exit(1)
-    if expected_fragment not in captured:
+    fragments = (expected_fragment,) if isinstance(expected_fragment, str) else expected_fragment
+    if not all(fragment in captured for fragment in fragments):
         print(f"RESULT {label} TOOLING-FAIL (failed, but not with the expected signature)")
         sys.exit(1)
-    print(f"RESULT {label} RED (caught: {expected_fragment.splitlines()[0]})")
+    print(f"RESULT {label} RED (caught: {fragments[0].splitlines()[0]})")
 
 
 def append_dependency(text, section, line):
     marker = f"[{section}]"
     idx = text.index(marker) + len(marker)
     return text[:idx] + "\n" + line + text[idx:]
+
+
+def audio_api_controls():
+    """Concrete source counterexamples; each has an independent diagnostic target."""
+    lib, ports = AUDIO_API_SOURCES
+    contract = "AUDIO_API_CONTRACT_RED"
+    policy = "AUDIO_API_SOURCE_POLICY_RED:"
+    return [
+        ("audio-manifest-feature", (policy, "new dependency/feature/lib/build configuration"),
+         {"crates/qianqian-audio-api/Cargo.toml": lambda t: t + '\n[features]\nboundary_probe = []\n'}, {}),
+        ("audio-auto-build-script", (policy, "new dependency/feature/lib/build configuration"), {},
+         {"crates/qianqian-audio-api/build.rs": "fn main() {}\n"}),
+        ("audio-root-export", (contract, "Unauthorized"),
+         {lib: lambda t: t + "\npub struct Unauthorized;\n"}, {}),
+        ("audio-public-type", (contract, "Unauthorized"),
+         {ports: lambda t: t + "\npub struct Unauthorized;\n"}, {}),
+        ("audio-public-field", (contract, "OutputError::unauthorized"),
+         {ports: lambda t: t.replace("pub struct OutputError {", "pub struct OutputError {\n    pub unauthorized: u8,")}, {}),
+        ("audio-trait-method", (contract, "AudioOutput::unauthorized"),
+         {ports: lambda t: t.replace("pub trait AudioOutput {", "pub trait AudioOutput {\n    fn unauthorized(&self) {}")}, {}),
+        ("audio-enum-variant", (contract, "ProviderSeekOutcome::Unauthorized"),
+         {ports: lambda t: t.replace("pub enum ProviderSeekOutcome {", "pub enum ProviderSeekOutcome {\n    Unauthorized,")}, {}),
+        ("audio-enum-payload", (contract, "landing: core::option::Option<u32>"),
+         {ports: lambda t: t.replace("Applied { landing: Option<u64> }", "Applied { landing: Option<u32> }")}, {}),
+        ("audio-signature-change", (contract, "AudioOutput::open_stream(&mut self"),
+         {ports: lambda t: t.replace("fn open_stream(&self, request: RenderRequest)", "fn open_stream(&mut self, request: RenderRequest)")}, {}),
+        ("audio-signature-delete", (contract, "AudioOutput::open_stream"),
+         {ports: lambda t: t[:t.index("pub trait AudioOutput {")] + "pub trait AudioOutput {}" + t[t.index("\n}", t.index("pub trait AudioOutput {")) + 2:]}, {}),
+        ("audio-nested-reexport", (policy, "unadmitted public re-export"),
+         {ports: lambda t: t + "\npub mod escape { pub use super::PcmFormat as Format; }\n"}, {}),
+        ("audio-external-module-reexport", (policy, "unadmitted external module"),
+         {lib: lambda t: t + "\nmod escape; pub use escape::Unauthorized;\n"},
+         {"crates/qianqian-audio-api/src/escape.rs": "pub struct Unauthorized;\n"}),
+        ("audio-hidden-export", (contract, "Unauthorized"),
+         {ports: lambda t: t + '\n#[doc(hidden)] pub struct Unauthorized;\n'}, {}),
+        ("audio-conditional-export", (policy, "unadmitted attribute"),
+         {ports: lambda t: t + '\n#[cfg(windows)] pub struct Unauthorized;\n'}, {}),
+        ("audio-macro-conditional", (policy, "unadmitted nested macro/attribute tokens"),
+         {ports: lambda t: t + '\nfn probe() { assert!({ #[cfg(windows)] impl PositionEvidence { pub fn unauthorized(&self) {} } true }); }\n'}, {}),
+        ("audio-blanket-impl", (contract, "impl<T: core::fmt::Display> qianqian_audio_api::ports::PcmDecode for T"),
+         {ports: lambda t: t + '\nimpl<T: std::fmt::Display> PcmDecode for T { fn open_media(&self, _: &std::path::Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> { Err(DecodeOpenError { message: self.to_string() }) } }\n'}, {}),
+        ("audio-item-macro", (policy, "unadmitted item/type macro"),
+         {ports: lambda t: t + '\nmacro_rules! escape { () => { pub struct Unauthorized; } } escape!();\n'}, {}),
+    ]
 
 
 def run_negative_controls():
@@ -1076,6 +1200,9 @@ def run_negative_controls():
             )
         },
     )
+
+    for label, fragments, edits, creates in audio_api_controls():
+        expect_fail(label, fragments, edits, creates)
 
     violations = scan()
     if violations:

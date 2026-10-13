@@ -24,3 +24,6 @@ lefthook-local.yml
 # compiled artifact can silently diverge from its .py source)
 __pycache__/
 *.pyc
+
+# Standalone Rust-aware public-contract verifier.
+/tools/audio-api-surface/target
