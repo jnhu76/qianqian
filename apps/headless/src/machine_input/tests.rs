@@ -346,7 +346,12 @@ fn seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work() {
             // that skips the acknowledgement wait, its first_failure read.
             wait_closed(&input);
             // Fresh work must not overtake the drain while seal is in flight.
-            assert!(!input.line("stop", &PlaybackSessionHandle::new(), &mut no_output));
+            let fresh_handle = PlaybackSessionHandle::new();
+            assert!(!input.line("stop", &fresh_handle, &mut no_output));
+            assert!(
+                !fresh_handle.observe().stop_requested,
+                "rejected fresh work must not route Stop"
+            );
             release.send(()).unwrap();
             // VALUE witnesses retention of a postclosure admitted failure:
             // a seal reading before this record returns None. The false branch
