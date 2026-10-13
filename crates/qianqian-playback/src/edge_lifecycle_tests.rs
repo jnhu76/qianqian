@@ -114,6 +114,69 @@ fn eof_drains_before_terminating_and_stays_terminal() {
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Eof, "EOF is stable");
 }
 
+// These are local PcmEdge implementation regressions (execution-model §4.6),
+// not D11 episode Fact precedence: the Session remains the Fact authority.
+// Completed setter + terminal read establishes the first commit before the
+// competing setter. Consumer drain/abandonment independently exposes the EOF
+// consequence; no spawn order, scheduler win or timing premise is involved.
+#[test]
+fn eof_and_stop_keep_the_first_committed_edge_terminal() {
+    for eof_first in [true, false] {
+        let edge = PcmEdge::new(1, 2);
+        assert_eq!(edge.write_some(&[7.0]), 1);
+        let expected = if eof_first {
+            edge.close_eof();
+            EdgeTerminal::Eof
+        } else {
+            edge.stop();
+            EdgeTerminal::Stopped
+        };
+        assert_eq!(edge.terminal(), expected, "first setter committed");
+        if eof_first {
+            edge.stop();
+        } else {
+            edge.close_eof();
+        }
+        assert_eq!(edge.terminal(), expected, "late setter cannot relabel");
+        let mut dst = [0.0];
+        if eof_first {
+            assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
+            assert_eq!(dst, [7.0], "the committed EOF preserves buffered PCM");
+            assert_eq!(edge.read_frames(&mut dst), PcmPull::Eof);
+        } else {
+            assert_eq!(edge.read_frames(&mut dst), PcmPull::Stopped);
+            assert_eq!(dst, [0.0], "the committed stop abandons buffered PCM");
+        }
+    }
+}
+
+// Failed and Stopped share PcmPull::Stopped. Observe committed edge identity
+// before/after the late setter so read-side collapse cannot mask overwrite.
+#[test]
+fn failure_and_stop_keep_the_first_committed_edge_terminal() {
+    for failure_first in [true, false] {
+        let edge = PcmEdge::new(1, 2);
+        assert_eq!(edge.write_some(&[7.0]), 1);
+        let expected = if failure_first {
+            edge.fail();
+            EdgeTerminal::Failed
+        } else {
+            edge.stop();
+            EdgeTerminal::Stopped
+        };
+        assert_eq!(edge.terminal(), expected, "first setter committed");
+        if failure_first {
+            edge.stop();
+        } else {
+            edge.fail();
+        }
+        assert_eq!(edge.terminal(), expected, "late setter cannot relabel");
+        let mut dst = [0.0];
+        assert_eq!(edge.read_frames(&mut dst), PcmPull::Stopped);
+        assert_eq!(dst, [0.0], "both terminals abandon buffered PCM");
+    }
+}
+
 #[test]
 fn torn_remainder_at_eof_terminates_instead_of_wedging() {
     // Regression (adversarial review): a torn frame buffered at close_eof
