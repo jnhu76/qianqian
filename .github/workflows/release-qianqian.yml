@@ -1,0 +1,122 @@
+name: Qianqian Release
+
+on:
+  push:
+    tags: ['qianqian-v*']
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/*release*'
+      - 'tools/package-windows.sh'
+      - 'tools/publish-qianqian.py'
+      - '.github/workflows/release-qianqian.yml'
+      - 'CHANGELOG.md'
+      - 'docs/releasing.md'
+      - 'native/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'LICENSE*'
+      - 'QUICKSTART.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-qianqian-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      source: ${{ steps.identity.outputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 nasm make pkg-config zip unzip binutils
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          targets: x86_64-pc-windows-gnu
+          components: rustfmt, clippy
+      - uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: '2.9.7'
+      - name: Freeze exact source and version
+        id: identity
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          source=$(git rev-parse HEAD)
+          mode=dry-run
+          if [[ "$EVENT" == push && "$TAG_REF" == refs/tags/* ]]; then
+            tag=${TAG_REF#refs/tags/}
+            mode=formal
+          else
+            version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+            tag=qianqian-v$version
+          fi
+          python3 tools/check_release.py source --tag "$tag" --source "$source" --mode "$mode"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      - name: Release adversarial controls (E01–E18)
+        run: |
+          mkdir -p dist
+          python3 tools/test_release.py --report dist/release-controls.json
+      - name: Linux Rust regression
+        run: |
+          cargo fmt --check
+          cargo check --workspace --locked
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Fresh native bootstrap and shared product package verification
+        env:
+          TAG: ${{ steps.identity.outputs.tag }}
+          SOURCE: ${{ steps.identity.outputs.source }}
+          MODE: ${{ steps.identity.outputs.mode }}
+        run: bash tools/release-qianqian.sh prepare --tag "$TAG" --source "$SOURCE" --mode "$MODE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qianqian-release-${{ steps.identity.outputs.source }}
+          if-no-files-found: error
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+            dist/*.zip.provenance.json
+            dist/release-controls.json
+
+  publish:
+    needs: build
+    if: github.repository == 'jnhu76/qianqian' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/qianqian-v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: qianqian-release-${{ needs.build.outputs.source }}
+          path: dist
+      - name: Verify and create a new Release (never overwrite)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+          SOURCE: ${{ needs.build.outputs.source }}
+        run: python3 tools/publish-qianqian.py --tag "$TAG" --source "$SOURCE" --zip "dist/qianqian-v${TAG#qianqian-v}-windows-x86_64.zip"
