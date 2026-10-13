@@ -133,3 +133,41 @@ Windows MSVC all-target cross check：**COMPILE_ONLY_PASS**；不能当 Windows 
 当前 **G4 两个 fresh-context 独立 review 未执行（NOT_RUN）**；本文的自检不冒充独立 review。PR 保持 Draft，owner Ready/merge 决定未代行，不关闭 #258/#244 等父任务，也不编辑冻结 918 行 inventory。
 
 可迁移方法与后续跨 repo 试点以 [#262](https://github.com/jnhu76/qianqian/issues/262) 为记录入口；本文件仅记录 Qianqian 案例。重点修复顺序是：真实前提 → 正确观察范围/结算 → 独立反例 → 测试拥有资源的异常清理 → 必要的跨层内容边界。不要从新图、测试名、稳定绿灯或 mutation 分数推导新的产品语义。
+
+## G4 审查与 owner 裁决补记（2026-10-13）
+
+> 本节为文档发布（`0058589`）之后追加的补记；上文"当前 G4 两个 fresh-context 独立 review 未执行（NOT_RUN）"是发布时的状态，已被本节取代。原始运行日志、CSV 行、哈希与失败记录一律保持原样；本节只做语义澄清、转移论证与裁决记录，不改写任何既有证据。
+
+### 1. SUBJECT_SHA 与实际源码树身份的区别
+
+- 执行索引 / mutation 矩阵的 `SUBJECT_SHA` 列 = **该次运行发起时的仓库 HEAD 指针**（test-then-commit 工作流：运行先于提交落盘）。它**不是**"该 run 在该 commit 的 clean checkout 上执行"的出处声明。
+- 每次 run 的**实际源码身份**以该 run `metadata.json` 内的全仓 `source_hashes`（逐文件 sha256）为准；这是可复原的 ground truth。
+- G4 独立复核（Reviewer B）比对结论：101 行中 56 行的测试侧文件内容实际**新于**其 SUBJECT_SHA 标签（运行时工作树领先于当时提交）；18 条最终 H0 正控（settled-head-h0-01..18）的 `source_hashes` 与最终 HEAD 树**0 文件差异**——最终代码状态的逐项执行证据是完整接续的。
+- 使用规则：跨 run 比较、复现或引用一律以 `source_hashes` 为准；`SUBJECT_SHA` 仅用于定位运行时点的仓库指针。既有 CSV 行保持历史原样，本列语义以本节声明为准。
+
+### 2. mutation 证据向最终 HEAD 的转移论证与未验证边界
+
+转移前提（G4 两个 reviewer 各自独立字节验证）：
+
+1. 生产 Rust 文件 `daad414 → 0058589` 字节不变（`src/` 下唯一受碰文件 `completion.rs` 的全部 diff hunk 位于 test module 内）；
+2. `crates/` 树 `6dc8066 → 0058589` 零差异（最后两个提交仅 F5 patch 重定位与 docs/证据发布）；
+3. 18/18 H0 单项正控在实际树内容等于最终 HEAD 时 RUN_PASS；CI 五条 lane 在 `0058589` 全绿。
+
+因此各 catch 运行（`b002a69` 基座 ⊕ patch 同时携带测试升级与生产 fault）中的**生产侧 fault 载体与 landed HEAD 字节等价**，kill 结论可转移到 `0058589`。
+
+**未验证边界（必须保留）**：22 份 semantic catch patch 中仅 7 份经 G4 逐份测试侧等价 diff（覆盖 C14/C17/C18/C03/C09/C06 等载荷性家族），**其余 15 份未逐份验证**——其转移成立依赖上列字节前提，未做 per-file 等价证明；未在 `0058589` 执行原位 mutation rerun。owner 裁决（2026-10-13）：以本节显式归因替代机械重跑，不要求重放全部 mutation。
+
+### 3. G4 与 OQ-1/OQ-6 裁决状态引用
+
+- **G4 双 fresh-context 独立审查已完成**（2026-10-13）：Reviewer A（对抗性 Oracle 与因果正确性）、Reviewer B（架构/权威/证据完整性）均 APPROVE、零事实冲突；reconciliation 裁定 `APPROVE_G4_READY_FOR_OWNER_DECISION`，P0=0 / P1=1 / P2=4。报告位置：Review A = [PR #261 评论 6136250292](https://github.com/jnhu76/qianqian/pull/261#issuecomment-6136250292)；Review B = [PR #261 评论 6136252087](https://github.com/jnhu76/qianqian/pull/261#issuecomment-6136252087)；reconciliation = [#260 评论 6136261985](https://github.com/jnhu76/qianqian/issues/260#issuecomment-6136261985)。
+- **Owner 裁决（2026-10-13）**：
+  - **OQ-1 / OQ-6 supersession 接受，限定范围**：仅撤销此前相应测试前提上的带债裁决（OQ-1 原 AUTHORITY_BLOCKED、OQ-6 standing debt）；**不扩展**为真实 WASAPI、SongCore ABI、所有平台或所有调度的正确性证明；[#258](https://github.com/jnhu76/qianqian/issues/258) 中其他独立风险（含真机/ABI 类 RHR 项）继续保留。
+  - **P1（证据标注语义）处置**：按本补记第 1、2 节显式修正文档与证据归因；原始日志、哈希、失败记录不改写；不重跑全部 mutation；7/22 抽样边界保留声明。
+- 本补记即该 P1 的修正记录；merge 授权记录于 PR #261。
+
+### 4. P2 补充说明（不改变原始记录）
+
+- **最终 HEAD 的本地全量 gate**：`20261012T180342-publication-head-full-pre-push`（subject=0058589，`lefthook run pre-push --all-files`，rc=0，workspace 872/0，含 vocabulary / plugin-boundary 负控制、fmt、clippy、website）存在于本地原始运行目录但未纳入 101 行索引与 ZIP；此处引用其 RUN_ID 作为仓库内可引用指针（完整日志见本地证据目录与 #262 回读记录）。
+- **历史文档对照**：`h0-final-review-and-gate.md`、`h0-mutant-matrix.md`、`h0-property-graph.md`、`h0-execution-evidence-index.md`、`h0-lessons-learned.md` 为 `b002a69` 阶段历史执行记录：其处置计数 2/13/2/1 与 OQ-1 AUTHORITY_BLOCKED 为当时状态；**当前权威计数为本目录 disposition ledger 的 14/4**。旧 M-P106a"无现测试可杀"陈述已被本轮 C14 straddle 测试与 run `20261012T163012` 超越。
+- **F5 refreshed gate**：`20261012T171547` 的 metadata 未将 4 个 `.patch` 输入纳入 `source_hashes`；patch 字节身份经 `refreshed-f5-patches.json` 的哈希记录与仓库文件重算闭环（后续 h0-run.py 宜将 `.patch` 输入一并哈希）。
+- **INVALID run 主树状态**：`162418`（INVALID_BUILD_ARTIFACT_IDENTITY）当时 CWD 为主工作树；restore-proof 仅覆盖 mutants worktree，主树当时状态无专门 restoration 记录；主树当前 porcelain 干净为观察现状，非事后证明。
