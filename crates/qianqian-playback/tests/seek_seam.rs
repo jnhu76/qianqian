@@ -1222,7 +1222,7 @@ fn a_seek_on_a_never_activated_episode_is_inert() {
 
 /// A request_seek racing the worker's EOF exit can never wedge the
 /// episode: recording/worker-exit ordering (atomic recording hold +
-/// exit-funnel cleanup, pinned by the white-box boundary oracles) means
+/// exit-funnel cleanup, reviewed in source) means
 /// a request is rejected or its private record is cleared. A record may
 /// be Accepted then aborted, or never-Accepted Refused/Inert when ending
 /// invalidated Open before plant (temporal semantics §6.1) —
@@ -1231,8 +1231,11 @@ fn a_seek_on_a_never_activated_episode_is_inert() {
 /// the episode approaches and enters its EOF window, and the terminal
 /// MUST settle `Completed` (a stranded hold would park the leg past the
 /// final drain and D11 Completed would never settle). The deterministic
-/// halves live in the completion's white-box suite; this sweep exists to
-/// catch an integration-shaped regression the white-box cannot spell.
+/// boundary witnesses live in the completion and real-worker suites;
+/// they test admission and cleanup, while the strict order of the real
+/// funnel's two calls remains a source-review obligation. This sweep
+/// checks integration liveness on visited schedules; the burst and its
+/// pacing do not prove that a particular exit interleaving occurred.
 #[test]
 fn seek_acceptance_racing_worker_eof_settles_without_wedge() {
     let _lifecycle = common::lifecycle_lock();
