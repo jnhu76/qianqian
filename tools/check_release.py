@@ -4,6 +4,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -34,9 +35,17 @@ def require(condition, message):
         raise PolicyError(message)
 
 
+def git_environment(env=None):
+    # Git hooks export repository context. A cwd alone cannot select a temp repo.
+    # Drop all Git context/config overrides; ordinary config and GH auth remain.
+    return {k: v for k, v in (os.environ if env is None else env).items()
+            if not k.startswith('GIT_')}
+
+
 def run(argv, cwd=ROOT):
     return subprocess.run(argv, cwd=cwd, check=True, text=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.strip()
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          env=git_environment() if argv[0] == "git" else None).stdout.strip()
 
 
 def digest(data):
@@ -192,7 +201,7 @@ def verify(args):
         require(m['files'][f] == {'sha256': digest(data[f]), 'bytes': len(data[f])}, 'R5 payload hash/size mismatch: ' + f)
         if f != 'qianqian.exe':
             expected = subprocess.run(['git', 'show', args.source + ':' + f], cwd=args.repo,
-                                      check=True, stdout=subprocess.PIPE).stdout
+                                      check=True, stdout=subprocess.PIPE, env=git_environment()).stdout
             require(data[f] == expected, 'R2 shipped documentation differs from source: ' + f)
     with tempfile.TemporaryDirectory(prefix='qianqian-verify-') as tmp:
         exe = Path(tmp) / 'qianqian.exe'

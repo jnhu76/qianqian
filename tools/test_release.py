@@ -21,7 +21,7 @@ RESULTS = []
 
 
 def call(argv, cwd, expected=0, message='', env=None, label=''):
-    p = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True)
+    p = subprocess.run(argv, cwd=cwd, env=cr.git_environment(env), capture_output=True, text=True)
     text = p.stdout + p.stderr
     RESULTS.append({'id': label, 'command': argv, 'cwd': str(cwd), 'exit_code': p.returncode,
                     'expected': expected, 'stdout': p.stdout, 'stderr': p.stderr})
@@ -76,6 +76,11 @@ def main():
         checker('source', expected=2, message='POLICY_RED: R2 dirty', label='E05')
         (repo / 'unexpected-source').unlink()
         checker('source', label='source-baseline')
+        # Source checker must select --repo even under hook-exported Git context.
+        polluted = dict(os.environ, GIT_DIR=str(ROOT / '.git'), GIT_WORK_TREE=str(ROOT),
+                        GIT_INDEX_FILE=str(ROOT / '.git' / 'invalid-index'))
+        checker('source', label='E18-hook-repository-isolation', env=polluted)
+
         # Real PE baseline; then an actual import of our controllable non-system DLL.
         pe_root = Path(tmp) / 'pe'; pe_root.mkdir()
         (pe_root / 'main.c').write_text('int main(void) { return 0; }\n')
