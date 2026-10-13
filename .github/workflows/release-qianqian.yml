@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Install build prerequisites
@@ -90,7 +90,7 @@ jobs:
         run: bash tools/release-qianqian.sh prepare --tag "$TAG" --source "$SOURCE" --mode "$MODE"
       - uses: actions/upload-artifact@v4
         with:
-          name: qianqian-release-${{ github.sha }}
+          name: qianqian-release-${{ steps.identity.outputs.source }}
           if-no-files-found: error
           path: |
             dist/*.zip
@@ -107,12 +107,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
-          name: qianqian-release-${{ github.sha }}
+          name: qianqian-release-${{ needs.build.outputs.source }}
           path: dist
       - name: Verify and create a new Release (never overwrite)
         env:
