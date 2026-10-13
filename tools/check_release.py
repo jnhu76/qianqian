@@ -20,6 +20,8 @@ FILES = ('qianqian.exe', 'QUICKSTART.md', 'LICENSE', 'LICENSE-MIT',
          'LICENSE-APACHE', 'THIRD_PARTY_NOTICES.md')
 MANIFEST = 'BUILD-MANIFEST.txt'
 # Existing package-windows system allowlist, shared by build and offline verify.
+API_SET_DLLS = {'api-ms-win-core-synch-l1-2-0.dll',
+                'api-ms-win-core-winrt-error-l1-1-0.dll'}
 SYSTEM_DLLS = set(('kernel32 user32 userenv ws2_32 advapi32 shell32 bcrypt '
                   'bcryptprimitives combase msvcrt ntdll ole32 oleaut32 propsys '
                   'rpcrt4 gdi32 imm32 uxtheme dwmapi shcore secur32 crypt32 '
@@ -101,7 +103,7 @@ def imports(exe):
     for dll in dlls:
         low = dll.lower()
         require(low.endswith('.dll') and (low[:-4] in SYSTEM_DLLS or
-                low.startswith(('api-ms-win-', 'ext-ms-win-'))),
+                low in API_SET_DLLS),
                 'R4 non-system DLL import: ' + dll)
     return dlls
 

@@ -160,6 +160,17 @@ def main():
         data = original.copy(); data['qianqian.exe'] = (pe_root / 'bad.exe').read_bytes()
         m = json.loads(data[cr.MANIFEST]); m['files']['qianqian.exe'] = {'sha256': cr.digest(data['qianqian.exe']), 'bytes': len(data['qianqian.exe'])}
         data[cr.MANIFEST] = json.dumps(m).encode(); package_case('E13', data, 'R4 non-system DLL import: unshipped.dll')
+        # A custom DLL can spoof an API-set prefix; only exact approved OS names count.
+        spoof = 'api-ms-win-qianqian-unshipped-l1-1-0.dll'
+        call(['x86_64-w64-mingw32-gcc', '-shared', 'dll.c', '-o', spoof,
+              '-Wl,--out-implib,libspoof.a'], pe_root)
+        call(['x86_64-w64-mingw32-gcc', 'bad.c', '-L.', '-lspoof', '-o', 'spoof.exe'], pe_root)
+        assert 'DLL Name: ' + spoof in call(['objdump', '-p', 'spoof.exe'], pe_root)
+        data = original.copy(); data['qianqian.exe'] = (pe_root / 'spoof.exe').read_bytes()
+        m = json.loads(data[cr.MANIFEST]); m['files']['qianqian.exe'] = {
+            'sha256': cr.digest(data['qianqian.exe']), 'bytes': len(data['qianqian.exe'])}
+        data[cr.MANIFEST] = json.dumps(m).encode()
+        package_case('E13-api-set-spoof', data, 'R4 non-system DLL import: ' + spoof)
         write_package(original)
         missing_env = dict(os.environ, PATH='/nonexistent')
         checker('verify', ['--zip', zip_path], 3, 'TOOLING_FAIL:', 'E15-missing-tool', env=missing_env)

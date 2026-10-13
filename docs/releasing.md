@@ -27,7 +27,9 @@ unchanged. The [reality audit](audits/release-reality-audit.md) records the base
    QUICKSTART.md, LICENSE, LICENSE-MIT, LICENSE-APACHE, THIRD_PARTY_NOTICES.md,
    BUILD-MANIFEST.txt. No other executable, DLL, source, fixture, duplicate,
    symlink, traversal or alternate path is admitted. All real PE imports must
-   be in the explicit Windows system allowlist/API-set prefixes.
+   be in the explicit Windows system/API-set allowlist. API-set prefixes alone
+   cannot establish an OS dependency; only the two current product imports
+   are approved, and any new import requires a reviewed contract update.
 5. **R5 Integrity:** versioned ZIP, external SHA256 and provenance JSON are one
    delivery set. Manifest schema 2 is readable JSON in BUILD-MANIFEST.txt. It
    hashes the six payloads, never itself. Verification independently reads ZIP
