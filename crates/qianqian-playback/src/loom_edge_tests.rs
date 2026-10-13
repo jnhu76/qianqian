@@ -11,7 +11,7 @@
 //! Modeled slice (campaign B2.1: where concurrency actually begins): the
 //! edge is the only genuinely interleaved shared state in the playback
 //! session. Properties: L1 write/read/stop interleaving with FIFO ring
-//! integrity; L3 first-terminal-wins over {EOF, failure, stop}; L4
+//! integrity; L3 settled terminal/read consistency over {EOF, failure, stop}; L4
 //! blocked-endpoint wakeup under every terminal; L5–L7 (F5/D14.5) the
 //! non-terminal `invalidate` under every interleaving with the live
 //! endpoints — it purges, wakes, and never touches terminal truth. A
@@ -112,11 +112,12 @@ fn loom_l1_write_read_stop_interleave() {
     })
 }
 
-/// L3a — first terminal wins: `close_eof` × `stop` race. The terminal is
-/// one of the two, never downgraded or swapped, and the consumer outcome
-/// matches the final terminal exactly.
+/// L3a — settled terminal/read consistency after `close_eof` × `stop`.
+/// The final terminal is one of the two and the consumer matches it.
+/// This oracle cannot distinguish first-wins from last-wins; the native
+/// edge lifecycle twins separately witness ordered terminal preservation.
 #[test]
-fn loom_l3a_eof_stop_first_terminal_wins() {
+fn loom_l3a_eof_stop_settled_consumer_matches_terminal() {
     loom::model(|| {
         let edge = Arc::new(PcmEdge::new(1, 2));
         let eof = {
@@ -148,13 +149,12 @@ fn loom_l3a_eof_stop_first_terminal_wins() {
     })
 }
 
-/// L3b — first terminal wins: `fail` × `stop` race. Whichever terminal
-/// commits first keeps its identity internally (`Failed` is never
-/// downgraded to `Stopped` and vice versa — the edge holds a single
-/// winner, not a merged state); the consumer outcome is `Stopped` for
-/// both, which is the collapsed read-side view.
+/// L3b — settled terminal/read consistency after `fail` × `stop`.
+/// The final identity is Failed or Stopped, and both read as Stopped.
+/// This collapsed read-side view does not establish which setter won;
+/// the native edge lifecycle twins separately observe ordered identity.
 #[test]
-fn loom_l3b_fail_stop_first_terminal_wins() {
+fn loom_l3b_fail_stop_settled_consumer_matches_terminal() {
     loom::model(|| {
         let edge = Arc::new(PcmEdge::new(1, 2));
         let fail = {
