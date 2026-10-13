@@ -21,7 +21,7 @@ RESULTS = []
 
 
 def call(argv, cwd, expected=0, message='', env=None, label=''):
-    p = subprocess.run(argv, cwd=cwd, env=cr.git_environment(env), capture_output=True, text=True)
+    p = subprocess.run(argv, cwd=cwd, env=cr.git_environment(env) if argv[0] == "git" else env, capture_output=True, text=True)
     text = p.stdout + p.stderr
     RESULTS.append({'id': label, 'command': argv, 'cwd': str(cwd), 'exit_code': p.returncode,
                     'expected': expected, 'stdout': p.stdout, 'stderr': p.stderr})
