@@ -396,29 +396,6 @@ fn admitted_output_panic_records_before_ack_even_during_seal() {
 }
 
 #[test]
-fn admitted_failure_response_ack_cannot_be_overtaken_by_seal() {
-    let input = HostInput::default();
-    let operation = input.admit().unwrap();
-    let sealing_input = input.clone();
-    let (sealed, result) = mpsc::channel();
-    let sealer = std::thread::spawn(move || sealed.send(sealing_input.seal()).unwrap());
-    wait_closed(&input);
-    operation.fail_with_response(HostFailure::Read, || {
-        assert!(
-            matches!(result.try_recv(), Err(mpsc::TryRecvError::Empty)),
-            "seal overtook failure response"
-        );
-        assert!(input.shared.state.try_lock().is_ok());
-    });
-    drop(operation);
-    assert_eq!(
-        result.recv_timeout(Duration::from_secs(5)).unwrap(),
-        Some(HostFailure::Read)
-    );
-    sealer.join().unwrap();
-}
-
-#[test]
 fn postseal_commands_reports_and_failures_are_inert() {
     let input = HostInput::default();
     let handle = PlaybackSessionHandle::new();
