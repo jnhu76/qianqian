@@ -41,6 +41,8 @@ struct State {
 struct Shared {
     state: Mutex<State>,
     completed: Condvar,
+    #[cfg(test)]
+    seal_witness: tests::SealWitness,
 }
 
 #[derive(Clone, Default)]
@@ -89,7 +91,12 @@ impl HostInput {
                 .wait(state)
                 .expect("machine input lock");
         }
-        state.first_failure
+        let result = state.first_failure;
+        // Passive, invocation-local capture at the final result read. No wait,
+        // callback, assertion or fixture lock runs inside the bookkeeping lock.
+        #[cfg(test)]
+        self.shared.seal_witness.capture(state.operation_active);
+        result
     }
 
     fn failure(&self, failure: HostFailure, handle: &PlaybackSessionHandle) {

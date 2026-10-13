@@ -643,3 +643,127 @@ fn read_error_records_and_stops_before_terminal_wait() {
         "host cannot forge terminal"
     );
 }
+
+// Only test builds carry these two atomics. The response marker is written by
+// the fixture's response owner, independently of production ACK bookkeeping.
+// First capture wins: later Drop/seal calls cannot repair an illegal L snapshot.
+#[derive(Default)]
+pub(super) struct SealWitness {
+    response_completed: std::sync::atomic::AtomicBool,
+    snapshot: std::sync::atomic::AtomicU8,
+}
+
+impl SealWitness {
+    pub(super) fn capture(&self, operation_active: bool) {
+        use std::sync::atomic::Ordering;
+        let response_completed = self.response_completed.load(Ordering::Acquire);
+        let bits = 1 | (u8::from(operation_active) << 1) | (u8::from(response_completed) << 2);
+        let _ = self
+            .snapshot
+            .compare_exchange(0, bits, Ordering::Release, Ordering::Relaxed);
+    }
+}
+
+// PROPERTY/AUTHORITY: D3/D5 execution-model §8.2/§9, response R -> Drop ACK K
+// -> final read L -> return T. C5 additionally fixes F before R; Some(Read)
+// cannot mask an early L. No physical reader/TLS/pipe-consumer claim.
+// PRECONDITION: actual admission; channel proves callback entry (or returned
+// response with a still-owned guard); mutex observation proves closure while
+// the owner is held. The closure observer acquires the SAME mutex: a no-wait
+// sealer must already have captured L before it can expose closure to us.
+// LEGAL OUTCOME/OBSERVATION: at real L, R is complete AND active is false;
+// capture 0 is missing evidence and fails. Results alone are not the oracle.
+// FALSIFIERS: M-S skips the wait; M-F waits only while failure is absent.
+// EXPECTED RED: immutable snapshot is 3 (R/K pending) or 7 (K pending), rather
+// than 5. RESTORED GREEN and actual mutation identities live in PR evidence.
+fn witness_response_and_drop_before_seal(failure: bool, held_guard: bool) {
+    use std::sync::atomic::Ordering;
+    std::thread::scope(|scope| {
+        let input = HostInput::default();
+        let (entered, started) = mpsc::channel();
+        let (release, resume) = mpsc::channel();
+        // This sender drops on unwind before scope joins. Worker treats sender
+        // disappearance as release; all target assertions run after both joins.
+        let worker_input = input.clone();
+        let worker = scope.spawn(move || {
+            let response = || {
+                if !held_guard {
+                    entered.send(()).unwrap();
+                    let _ = resume.recv();
+                }
+                worker_input
+                    .shared
+                    .seal_witness
+                    .response_completed
+                    .store(true, Ordering::Release);
+            };
+            if failure || held_guard {
+                let operation = worker_input.admit().unwrap();
+                if failure {
+                    operation.fail_with_response(HostFailure::Read, response);
+                } else {
+                    // Normal legal ownership: completed output does not release
+                    // the admitted guard; only its actual Drop publishes ACK.
+                    response();
+                }
+                if held_guard {
+                    entered.send(()).unwrap();
+                    let _ = resume.recv();
+                }
+                drop(operation);
+            } else {
+                let handle = PlaybackSessionHandle::new();
+                assert!(worker_input.line("status", &handle, &mut |_, _| response()));
+            }
+        });
+        started.recv_timeout(Duration::from_secs(5)).unwrap();
+        {
+            let state = input.shared.state.lock().unwrap();
+            assert!(state.operation_active);
+            assert_eq!(state.first_failure, failure.then_some(HostFailure::Read));
+            assert_eq!(
+                input
+                    .shared
+                    .seal_witness
+                    .response_completed
+                    .load(Ordering::Acquire),
+                held_guard
+            );
+        }
+        let sealing_input = input.clone();
+        let sealer = scope.spawn(move || sealing_input.seal());
+        wait_closed(&input);
+        // No try_recv/try_lock Oracle. The snapshot is taken at L itself, so
+        // sealer preemption after return cannot hide an early read. Closure
+        // under the shared mutex orders the illegal L before this release.
+        release.send(()).unwrap();
+        worker.join().unwrap();
+        let result = sealer.join().unwrap();
+        assert_eq!(
+            input.shared.seal_witness.snapshot.load(Ordering::Acquire),
+            5,
+            "seal final read preceded response completion or Drop ACK"
+        );
+        assert_eq!(result, failure.then_some(HostFailure::Read));
+    });
+}
+
+#[test]
+fn seal_final_read_witnesses_normal_response_and_drop_ack() {
+    witness_response_and_drop_before_seal(false, false);
+}
+
+#[test]
+fn seal_final_read_witnesses_failure_response_and_drop_ack() {
+    witness_response_and_drop_before_seal(true, false);
+}
+
+#[test]
+fn seal_final_read_witnesses_normal_returned_response_with_held_guard() {
+    witness_response_and_drop_before_seal(false, true);
+}
+
+#[test]
+fn seal_final_read_witnesses_failure_returned_response_with_held_guard() {
+    witness_response_and_drop_before_seal(true, true);
+}
