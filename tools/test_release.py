@@ -109,6 +109,13 @@ def main():
         receipt['archive_sha256'] = '0' * 64; cr.write_json(receipt_path, receipt)
         checker('native', ['--native', native], 2, 'POLICY_RED: R3 native archive/receipt drift', 'E14-hash')
         cr.write_json(receipt_path, good_receipt)
+        archive_path = native / 'build/artifacts/libsongcore.a'
+        archive_bytes = archive_path.read_bytes()
+        call(['gcc', '-c', 'main.c', '-o', 'elf.o'], pe_root)
+        archive_path.unlink()
+        call(['ar', 'rcs', str(archive_path), 'elf.o'], pe_root)
+        checker('native', ['--native', native], 2, 'POLICY_RED: R3 native archive target mismatch', 'E14-real-ELF')
+        archive_path.write_bytes(archive_bytes)
         closure['target']['id'] = 'linux-x86_64'; cr.write_json(native / 'build/ffmpeg-xmake/manifest.json', closure)
         checker('native', ['--native', native], 2, 'POLICY_RED: R3 compile closure target', 'E14-target')
         closure['target']['id'] = 'windows-x86_64'; cr.write_json(native / 'build/ffmpeg-xmake/manifest.json', closure)

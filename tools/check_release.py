@@ -83,7 +83,7 @@ def source(args):
 def imports(exe):
     out = run(['objdump', '-p', str(exe)])
     require('file format pei-x86-64' in out, 'R4 canonical executable must be Windows x86_64 PE')
-    dlls = sorted(set(re.findall(r'DLL Name:\s*(\S+)', out)), key=str.lower)
+    dlls = sorted({dll.lower() for dll in re.findall(r'DLL Name:\s*(\S+)', out)})
     require(dlls, 'R4 PE has no imports')
     for dll in dlls:
         low = dll.lower()
