@@ -484,17 +484,40 @@ mod kill_tests {
             .take()
             .expect("setup produced the control flow");
 
+        // Observe the actual execution interval, not two post-run samples.
+        let kernel_ops_before = kernel.debug_op_count();
         let quanta = 10;
-        for _ in 0..quanta {
+        for quantum in 0..quanta {
+            let accesses_before = flow.directory().access_count();
             flow.run_quantum(4)
                 .expect("the control delivers correct data");
+            let accesses = flow.directory().accesses();
+            let this_quantum = &accesses[accesses_before..];
+            assert_eq!(
+                this_quantum.len(),
+                3,
+                "quantum {quantum} must itself perform three lookups"
+            );
+            for role in [
+                ParticipantRole::Source,
+                ParticipantRole::Stage,
+                ParticipantRole::Sink,
+            ] {
+                assert_eq!(
+                    this_quantum
+                        .iter()
+                        .filter(|access| access.role == role)
+                        .count(),
+                    1,
+                    "quantum {quantum} must look up {role:?} exactly once"
+                );
+            }
         }
         assert_eq!(source.borrow().frames_produced(), quanta * 4);
         assert_eq!(sink.borrow().frames_consumed(), quanta * 4);
 
         // The lookups bypassed the kernel entirely: the anti-shape is a
         // per-quantum lookup seam of any kind, not the composition kernel.
-        let kernel_ops_before = kernel.debug_op_count();
         let accesses = flow.directory().accesses();
         assert!(
             !accesses.is_empty(),
@@ -510,7 +533,7 @@ mod kill_tests {
         assert_eq!(
             kernel_ops_before,
             kernel.debug_op_count(),
-            "reading the witness is not a kernel operation and the control did not touch the kernel"
+            "the directory anti-shape performed zero kernel operations during its quanta"
         );
     }
 
