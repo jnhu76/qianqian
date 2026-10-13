@@ -162,6 +162,11 @@ def main():
                                       ('push', 'refs/tags/qianqian-v0.1.0', True)]:
             checker('publish-policy', args=['--event', event, '--ref', ref, '--tag', tag] + (['--existing'] if existing else []),
                     expected=2, message='POLICY_RED: R7', label='E16')
+        checker('publish-policy', args=['--event', 'push', '--ref', 'refs/tags/qianqian-v9.9.9',
+                '--tag', 'qianqian-v9.9.9', '--existing'], expected=2,
+                message='POLICY_RED: R7 existing', label='E16-existing-nonhistorical')
+        checker('publish-policy', args=['--event', 'push', '--ref', 'refs/tags/qianqian-v9.9.9',
+                '--tag', 'qianqian-v9.9.9'], label='E16-new-policy-only-no-publication')
         call(['bash', str(ROOT / 'tools/release-qianqian.sh'), 'publish'], repo, 2, 'POLICY_RED:', label='E16-local-publish')
         denied_env = dict(os.environ, GITHUB_EVENT_NAME='workflow_dispatch', GITHUB_REF='refs/tags/' + tag)
         call([sys.executable, str(ROOT / 'tools/publish-qianqian.py'), '--tag', tag, '--source', sha, '--zip', str(zip_path)], repo, 2, 'POLICY_RED: R7', env=denied_env, label='E16-real-publisher')
