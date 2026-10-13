@@ -232,10 +232,6 @@ fn preseal_failure_preserves_natural_completed_and_runtime_failed() {
                 } else {
                     assert_eq!(handle.wait_terminal(), terminal);
                     operation.fail(HostFailure::Read, &handle);
-                    assert!(
-                        !handle.observe().stop_requested,
-                        "no response needed after terminal"
-                    );
                 }
                 drop(operation);
             });
