@@ -26,22 +26,38 @@ name: Plugin Boundary Gate
 on:
   pull_request:
     paths:
+      # Cover the plugin-boundary Lefthook inputs, including auto build.rs
+      # and App/TUI source; the trigger check enforces both event profiles.
       - "Cargo.toml"
-      - "crates/*/Cargo.toml"
-      - "crates/*/src/**"
-      - "apps/*/Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+      - "clippy.toml"
+      - ".cargo/**"
+      - "crates/**"
+      - "apps/**"
       - "tools/check_plugin_boundaries.py"
+      - "tools/check_plugin_boundary_triggers.py"
       - "tools/audio-api-surface/**"
+      - "lefthook.yml"
       - ".github/workflows/plugin-boundary-gate.yml"
   push:
     branches: [main]
     paths:
+      # Cover the plugin-boundary Lefthook inputs, including auto build.rs
+      # and App/TUI source; the trigger check enforces both event profiles.
       - "Cargo.toml"
-      - "crates/*/Cargo.toml"
-      - "crates/*/src/**"
-      - "apps/*/Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+      - "clippy.toml"
+      - ".cargo/**"
+      - "crates/**"
+      - "apps/**"
       - "tools/check_plugin_boundaries.py"
+      - "tools/check_plugin_boundary_triggers.py"
       - "tools/audio-api-surface/**"
+      - "lefthook.yml"
       - ".github/workflows/plugin-boundary-gate.yml"
 
 concurrency:
@@ -64,6 +80,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+
+      - name: Boundary workflow input coverage and trigger negative controls
+        run: python3 tools/check_plugin_boundary_triggers.py --negative-controls
 
       - name: Install stable Rust (cargo metadata input)
         uses: dtolnay/rust-toolchain@stable

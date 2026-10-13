@@ -125,3 +125,34 @@ file using the exact rustdoc/helper commands in `audio_api_surface()`; review it
 diff against this inventory and ADR before replacing `admitted-api.txt`. There is
 no update-snapshots switch or automatic acceptance path. Never change this snapshot
 or negative expectations simply to obtain green checks.
+
+## Continuous invocation inputs (#274 final-review correction)
+
+Both `pull_request.paths` and main-branch `push.paths` include every literal
+pattern in the Lefthook plugin-boundary glob. The dedicated source trigger check
+runs in that existing CI job and local hook; it also covers its own configuration
+and source. No additional workflow/runner or production change is introduced.
+
+| Checker/execution input | Both CI events and local hook |
+| --- | --- |
+| Workspace topology and resolution | `Cargo.toml`, `Cargo.lock` |
+| Rust toolchain/lint/cargo execution configuration | `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `.cargo/**` |
+| Production crate manifests/source/auto build scripts | `crates/**` (including audio-api `build.rs`) |
+| Composition root and source-scanned playlist/TUI | `apps/**` |
+| Gate implementation | `tools/check_plugin_boundaries.py`, `tools/check_plugin_boundary_triggers.py`, `tools/audio-api-surface/**` |
+| Invocation configuration | `.github/workflows/plugin-boundary-gate.yml`, `lefthook.yml` |
+
+```sh
+python3 tools/check_plugin_boundary_triggers.py --negative-controls
+```
+
+The two counterexamples independently restore legacy crate filters
+(`crates/*/Cargo.toml`, `crates/*/src/**`) or the legacy App manifest filter
+(`apps/*/Cargo.toml`). They must miss a single audio-api `build.rs` change or
+single TUI `model/projection.rs` change for both events, while current profiles
+cover each. Exact pattern containment additionally enforces the local input
+matrix beyond those representative paths. These are source-based reachability
+checks, not executed single-file GitHub PR experiments. The checker deliberately
+supports only this workflow's quoted positive lists, literal paths, segment `*`
+and terminal `/**`; unsupported syntax fails closed and needs review. It does
+not emulate the complete GitHub event/diff/filter engine or its diff-size limits.
