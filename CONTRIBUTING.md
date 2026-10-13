@@ -292,3 +292,5 @@ A PR should explain:
 - unresolved blockers/manual validation.
 
 STOP at the current gate. Do not automatically continue into the next milestone.
+
+Product release preparation and publication: [docs/releasing.md](docs/releasing.md).

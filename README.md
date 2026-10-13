@@ -210,3 +210,5 @@ The playback reference is a behavioral oracle, not a source-layout template.
 ## Scope
 
 Qianqian is still a music player, not a generic framework product. The composability work exists to test whether strong component/lifecycle properties survive a real media runtime with explicit ordering, physical-system boundaries and realtime constraints.
+
+Release history: [CHANGELOG](CHANGELOG.md) · [Releases](https://github.com/jnhu76/qianqian/releases) · [Quick start](QUICKSTART.md).
