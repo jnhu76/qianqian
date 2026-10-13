@@ -35,6 +35,8 @@ Exit codes: 0 PASS, 1 FAIL, 2 TOOLING-FAIL (refuses to mutate a dirty tree).
 """
 
 import argparse
+import difflib
+import os
 import json
 import subprocess
 import sys
@@ -589,6 +591,71 @@ def root_public_declarations(text):
     return declarations
 
 
+# #153: Rust-aware admission, not root_public_declarations() prefix matching.
+AUDIO_API_SNAPSHOT = "tools/audio-api-surface/admitted-api.txt"
+AUDIO_API_NIGHTLY = "nightly-2025-11-22"
+AUDIO_API_SOURCES = [
+    "crates/qianqian-audio-api/src/lib.rs",
+    "crates/qianqian-audio-api/src/ports.rs",
+]
+
+
+def audio_api_surface():
+    env = os.environ.copy()
+    # Dedicated artifact directory; ignore caller flags that change the cfg/API.
+    env["CARGO_TARGET_DIR"] = str(ROOT / "target/audio-api-gate")
+    for variable in ("RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTFLAGS",
+                     "CARGO_BUILD_TARGET"):
+        env.pop(variable, None)
+    helper = ["cargo", "run", "--offline", "--locked", "--quiet",
+              "--manifest-path", str(ROOT / "tools/audio-api-surface/Cargo.toml"), "--"]
+    sources = [str(ROOT / path) for path in AUDIO_API_SOURCES]
+
+    def run(command):
+        try:
+            result = subprocess.run(command, cwd=ROOT, env=env,
+                                    capture_output=True, text=True)
+        except OSError as error:
+            tooling_fail(f"audio-api command unavailable: {error}")
+        return result
+
+    guarded = run(helper + ["--guard", *sources])
+    if guarded.returncode:
+        if guarded.returncode == 1 and "AUDIO_API_SOURCE_POLICY_RED:" in guarded.stderr:
+            return ["source: qianqian-audio-api\ntarget: public contract\n"
+                    "kind: audio-api-source-policy\n" + guarded.stderr.strip()]
+        tooling_fail("audio-api source guard failed:\n" + guarded.stderr)
+    manifest = tomllib.loads((ROOT / "crates/qianqian-audio-api/Cargo.toml").read_text())
+    admitted_manifest = {
+        "package": {"name": "qianqian-audio-api", "version": {"workspace": True},
+                    "edition": {"workspace": True}},
+        "dependencies": {"qianqian-composition": {"path": "../qianqian-composition"}},
+    }
+    if manifest != admitted_manifest or (ROOT / "crates/qianqian-audio-api/build.rs").exists():
+        return ["source: qianqian-audio-api\ntarget: public contract\n"
+                "kind: audio-api-source-policy\n"
+                "AUDIO_API_SOURCE_POLICY_RED: new dependency/feature/lib/build configuration requires review"]
+    documented = run(["cargo", "+" + AUDIO_API_NIGHTLY, "rustdoc", "--offline", "--locked",
+                      "-p", "qianqian-audio-api", "--lib", "--target",
+                      "x86_64-unknown-linux-gnu", "--", "-Z", "unstable-options",
+                      "--output-format", "json", "--document-hidden-items"])
+    if documented.returncode:
+        tooling_fail("audio-api rustdoc failed (not contract RED):\n" + documented.stderr)
+    extracted = run(helper + [str(ROOT / "target/audio-api-gate/x86_64-unknown-linux-gnu/doc/qianqian_audio_api.json"), *sources])
+    if extracted.returncode:
+        tooling_fail("audio-api extraction failed (not contract RED):\n" + extracted.stderr)
+    actual = extracted.stdout.splitlines(keepends=True)
+    expected = (ROOT / AUDIO_API_SNAPSHOT).read_text().splitlines(keepends=True)
+    if actual != expected:
+        diff = "".join(difflib.unified_diff(expected, actual,
+                       fromfile="admitted audio-api contract", tofile="actual audio-api contract"))
+        return ["source: qianqian-audio-api\ntarget: public contract\n"
+                "kind: audio-api-contract\nrule: AUDIO_API_CONTRACT_RED\n"
+                "authority: ADR-PBK-002 D1/D6/D7/D14.5/.6/.7/.8/.9 + ADR-PBK-003 §5; "
+                "see tools/audio-api-surface/README.md for incidental rights and limits\n" + diff]
+    return []
+
+
 def scan():
     violations = []
 
@@ -726,6 +793,11 @@ def scan():
                 f"(the narrow public-surface amendment, synced with the surface)"
             )
 
+    # Existing topology controls deliberately invalidate the workspace lock.
+    # Settle their diagnosed boundary RED before attempting rustdoc; a lock
+    # failure must not replace the actual architecture violation with tooling.
+    if not violations:
+        violations.extend(audio_api_surface())
     return violations
 
 
