@@ -56,7 +56,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
-use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, ProviderSeekOutcome};
+use qianqian_audio_api::ports::{
+    DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, ProviderSeekOutcome,
+};
 use qianqian_composition::{DesiredEntry, Revision};
 use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle};
 
@@ -104,6 +106,96 @@ struct Witnesses {
     consumed_values: Arc<Mutex<Vec<f32>>>,
     device_tail: DeviceTail,
     tail_probe: TailProbe,
+    post_seek_read: Arc<AtomicUsize>,
+    controlled_eof: bool,
+    eof_allowed: Arc<std::sync::atomic::AtomicBool>,
+    committed_offsets: common::CommittedOffsets,
+}
+
+/// Observe the real worker's first decoder read after each seek. For
+/// Applied, worker program order is release take -> clear_seek_in_flight
+/// -> read_frames. Position/rebase alone does NOT prove that slot-free.
+#[derive(Clone)]
+struct ReadWitnessDecode {
+    inner: TestDecode,
+    post_seek_read: Arc<AtomicUsize>,
+    controlled_eof: bool,
+    eof_allowed: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl PcmDecode for ReadWitnessDecode {
+    fn open_media(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
+        Ok(Box::new(ReadWitnessStream {
+            inner: self.inner.open_media(path)?,
+            post_seek_read: self.post_seek_read.clone(),
+            seeks: 0,
+            cursor: 0,
+            controlled_eof: self.controlled_eof,
+            eof_allowed: self.eof_allowed.clone(),
+        }))
+    }
+}
+
+struct ReadWitnessStream {
+    inner: Box<dyn DecodedPcmStream>,
+    post_seek_read: Arc<AtomicUsize>,
+    seeks: usize,
+    cursor: u64,
+    controlled_eof: bool,
+    eof_allowed: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl DecodedPcmStream for ReadWitnessStream {
+    fn format(&self) -> qianqian_audio_api::ports::PcmFormat {
+        self.inner.format()
+    }
+    fn source_duration(&self) -> Option<Duration> {
+        self.inner.source_duration()
+    }
+    fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+        self.post_seek_read.store(self.seeks, Ordering::SeqCst);
+        // Multi-cut fixtures stay Open until the test releases EOF, even
+        // when the main thread is delayed beyond the finite prefix. Paced
+        // continuation feeds the render read, so park stays reachable.
+        // EOF permission ends at the source extent; no wait blocks stop.
+        if self.controlled_eof
+            && self.eof_allowed.load(Ordering::SeqCst)
+            && self.cursor >= SOURCE_FRAMES as u64
+        {
+            return Ok(DecodeOutcome::Eof);
+        }
+        let result = self.inner.read_frames(dst)?;
+        if let DecodeOutcome::Frames(n) = result {
+            self.cursor += n as u64;
+        }
+        Ok(result)
+    }
+    fn seek(&mut self, target: Duration) -> ProviderSeekOutcome {
+        let result = self.inner.seek(target);
+        if let ProviderSeekOutcome::Applied { landing } = result {
+            self.cursor = landing
+                .unwrap_or(
+                    (target.as_nanos() * u128::from(TEST_FORMAT.sample_rate) / 1_000_000_000)
+                        as u64,
+                )
+                .min(SOURCE_FRAMES as u64);
+        }
+        self.seeks += 1;
+        result
+    }
+}
+
+fn wait_post_seek_read(witnesses: &Witnesses, cycle: usize) {
+    assert!(
+        wait_until(Duration::from_secs(5), || witnesses
+            .post_seek_read
+            .load(Ordering::SeqCst)
+            >= cycle),
+        "seek {cycle}: real post-seek read must witness worker slot-free"
+    );
 }
 
 /// Register the standard F5 episode: a seek-scripted decode double, an
@@ -114,12 +206,19 @@ fn registered_runtime(
     output: OutputBehavior,
     witnesses: &Witnesses,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
+) -> common::EpisodeFixture {
+    let decode = ReadWitnessDecode {
+        inner: decode,
+        post_seek_read: witnesses.post_seek_read.clone(),
+        controlled_eof: witnesses.controlled_eof,
+        eof_allowed: witnesses.eof_allowed.clone(),
+    };
     let consumed = witnesses.consumed.clone();
     let consumed_values = witnesses.consumed_values.clone();
     let device_tail = witnesses.device_tail.clone();
     let tail_probe = witnesses.tail_probe.clone();
-    let mut runtime = QianqianApp::new();
+    let committed_offsets = witnesses.committed_offsets.clone();
+    let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), witnesses.tail_probe.clone());
 
     runtime
         .register_component({
@@ -147,6 +246,7 @@ fn registered_runtime(
                         device_tail.clone(),
                     );
                     service.tail_probe = tail_probe.clone();
+                    service.committed_offsets = committed_offsets.clone();
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -178,7 +278,9 @@ fn activate(runtime: &mut QianqianApp) {
 /// The standard episode: an 8-second position-tagged source played out
 /// by a slow mock consumer (so a seek fired in the first second is
 /// decisively mid-stream), with the standard witness set.
-fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
+fn episode(
+    seeks: Vec<ProviderSeekOutcome>,
+) -> (Witnesses, PlaybackSessionHandle, common::EpisodeFixture) {
     episode_with_freeze(seeks, &ProducerFreezeWitness::default())
 }
 
@@ -189,17 +291,36 @@ fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle
 fn episode_with_freeze(
     seeks: Vec<ProviderSeekOutcome>,
     freeze: &ProducerFreezeWitness,
-) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
+) -> (Witnesses, PlaybackSessionHandle, common::EpisodeFixture) {
+    episode_with_source_policy(seeks, freeze, false)
+}
+
+fn episode_with_source_policy(
+    seeks: Vec<ProviderSeekOutcome>,
+    freeze: &ProducerFreezeWitness,
+    controlled_eof: bool,
+) -> (Witnesses, PlaybackSessionHandle, common::EpisodeFixture) {
     let witnesses = Witnesses {
         consumed: Arc::new(AtomicUsize::new(0)),
         consumed_values: Arc::new(Mutex::new(Vec::new())),
         device_tail: DeviceTail::default(),
         tail_probe: TailProbe::default(),
+        post_seek_read: Arc::new(AtomicUsize::new(0)),
+        controlled_eof,
+        eof_allowed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        committed_offsets: Arc::new(Mutex::new(Vec::new())),
     };
     let handle = PlaybackSessionHandle::new();
     let mut runtime = registered_runtime(
         TestDecode {
-            behavior: SourceBehavior::EofAfter(SOURCE_FRAMES),
+            behavior: if controlled_eof {
+                SourceBehavior::Paced {
+                    after: SOURCE_FRAMES,
+                    delay: Duration::from_millis(1),
+                }
+            } else {
+                SourceBehavior::EofAfter(SOURCE_FRAMES)
+            },
             duration: Some(Duration::from_secs(8)),
             seeks,
             freeze: freeze.clone(),
@@ -235,6 +356,33 @@ fn wait_for_position_past(handle: &PlaybackSessionHandle, frames: u64) -> u64 {
 /// The consumed content, snapped once.
 fn content(witnesses: &Witnesses) -> Vec<f32> {
     witnesses.consumed_values.lock().unwrap().clone()
+}
+
+/// After disposal, each nonempty submission window starts at that cut's
+/// actual source landing. Final jump counts cannot establish this boundary.
+fn assert_committed_windows(witnesses: &Witnesses, expected: &[(Option<u64>, u64)]) {
+    let cuts = witnesses.committed_offsets.lock().unwrap().clone();
+    let values = content(witnesses);
+    assert_eq!(
+        cuts.len(),
+        expected.len(),
+        "every committed callback, not last wins"
+    );
+    for (i, &(landing, actual)) in expected.iter().enumerate() {
+        assert_eq!(cuts[i].0, landing, "cut {i} receipt");
+        let first = cuts[i].1;
+        let end = cuts.get(i + 1).map_or(values.len(), |c| c.1);
+        assert!(
+            first <= end && end <= values.len(),
+            "submission indices must be ordered"
+        );
+        if first < end {
+            assert_eq!(
+                values[first], actual as f32,
+                "cut {i}: first submission after committed receipt must exclude old ring PCM"
+            );
+        }
+    }
 }
 
 /// Indices where the position-tagged sequence does not continue the
@@ -423,12 +571,16 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let later_landing = 6 * ONE_SECOND;
-        let (witnesses, handle, mut runtime) = episode(vec![
-            ProviderSeekOutcome::Applied { landing: None },
-            ProviderSeekOutcome::Applied {
-                landing: Some(later_landing),
-            },
-        ]);
+        let (witnesses, handle, mut runtime) = episode_with_source_policy(
+            vec![
+                ProviderSeekOutcome::Applied { landing: None },
+                ProviderSeekOutcome::Applied {
+                    landing: Some(later_landing),
+                },
+            ],
+            &ProducerFreezeWitness::default(),
+            true,
+        );
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
         assert!(
@@ -438,35 +590,41 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
                 .is_none()),
             "the unknown landing withdraws the projection"
         );
-        // A second committed cutover WITH a known landing must not
-        // resurrect the withdrawn projection: the withdrawal is for the
-        // rest of the episode (D14.5 position rebase). The withdrawal
-        // becomes observable when the parked leg consumes cut #1's
-        // release payload, but the one-seek slot frees only when the
-        // decode worker's next bounded poll observes that consumption —
-        // up to one worker wait slice (2 ms nominal), and Windows timer
-        // granularity can inflate that slice. A retry LOOP that fires a
-        // fresh request every poll is wrong here in both directions: a
-        // request landing inside the window is inert, but one landing
-        // AFTER cut #2's own slot-free yet before its content became
-        // observable is legal and accepted — a THIRD cutover the oracle
-        // rightly rejects (observed once on a slow Windows runner). The
-        // settle sleep closes the window deterministically (the same
-        // linearization-sleep idiom this suite already uses before the
-        // second mid-pause seek), so ONE request is issued and accepted.
-        std::thread::sleep(Duration::from_millis(200));
+        // The real worker read comes AFTER payload take and slot-free;
+        // Position None alone occurs earlier and cannot order request 2.
+        wait_post_seek_read(&witnesses, 1);
         handle.request_seek(Duration::from_secs(6));
+        wait_post_seek_read(&witnesses, 2);
         assert!(
-            wait_until(Duration::from_secs(5), || {
-                discontinuities(&content(&witnesses)).len() == 2
-            }),
-            "precondition: the second cutover must happen for this oracle"
+            wait_until(Duration::from_secs(5), || witnesses
+                .committed_offsets
+                .lock()
+                .unwrap()
+                .len()
+                == 2),
+            "both on-leg rebases must be applied"
         );
+        let live = handle.observe();
+        assert_eq!(
+            live.terminal_outcome, None,
+            "EOF is held until this live oracle"
+        );
+        assert!(
+            live.position.is_none(),
+            "known rebase cannot restore Position before terminal withdrawal: {live:?}"
+        );
+        witnesses.eof_allowed.store(true, Ordering::SeqCst);
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert!(
             handle.observe().position.is_none(),
             "the withdrawal survives a later known-landing cutover: {:?}",
             handle.observe()
+        );
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_committed_windows(
+            &witnesses,
+            &[(None, FIVE_SECONDS), (Some(later_landing), later_landing)],
         );
         // Both cuts are in the content, at the two landings.
         let values = content(&witnesses);
@@ -474,8 +632,6 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
         assert_eq!(breaks.len(), 2);
         assert_eq!(values[breaks[0]] as u64, FIVE_SECONDS);
         assert_eq!(values[breaks[1]] as u64, later_landing);
-        let snapshot = runtime.dispose().snapshot;
-        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
 
@@ -751,20 +907,25 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let second_landing = 6 * ONE_SECOND;
-        let (witnesses, handle, mut runtime) = episode(vec![
-            ProviderSeekOutcome::Applied {
-                landing: Some(FIVE_SECONDS),
-            },
-            ProviderSeekOutcome::Applied {
-                landing: Some(second_landing),
-            },
-        ]);
+        let (witnesses, handle, mut runtime) = episode_with_source_policy(
+            vec![
+                ProviderSeekOutcome::Applied {
+                    landing: Some(FIVE_SECONDS),
+                },
+                ProviderSeekOutcome::Applied {
+                    landing: Some(second_landing),
+                },
+            ],
+            &ProducerFreezeWitness::default(),
+            true,
+        );
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_pause();
         assert!(
             wait_until(Duration::from_secs(5), || handle.observe().paused()),
             "precondition: the episode never established Paused"
         );
+        let paused_prefix = content(&witnesses).len();
         handle.request_seek(Duration::from_secs(5));
         // Cut #1 commits and rebases while still paused (C1).
         assert!(
@@ -776,21 +937,9 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
             handle.observe()
         );
         assert!(handle.observe().paused(), "still paused after cut #1");
-        // Linearization window before firing cut #2 (protocol order,
-        // session.rs): the rebase becomes observable when the parked LEG
-        // consumes the routed release, but the one-seek slot frees only
-        // when the decode worker's next bounded poll observes that
-        // consumption — up to one worker wait slice (2 ms nominal)
-        // later, and Windows timer granularity can inflate that slice
-        // by an order of magnitude. A request landing inside the window
-        // is inert under the frozen one-seek policy (no queueing, no
-        // retry), so the slot must be given that slice before this test
-        // can pin "seekable AGAIN" — the same linearization-sleep idiom
-        // this suite already uses for the in-flight window above.
-        std::thread::sleep(Duration::from_millis(200));
-        // The slot has been freed by the resolved cut, so this second
-        // request is accepted and commits through the same pause
-        // attribution.
+        // Real worker program order establishes slot-free, including on
+        // Windows timer granularity; neither sleep nor repeated requests.
+        wait_post_seek_read(&witnesses, 1);
         handle.request_seek(Duration::from_secs(6));
         assert!(
             wait_until(Duration::from_secs(5), || handle
@@ -801,13 +950,30 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
              landing: {:?}",
             handle.observe()
         );
+        wait_post_seek_read(&witnesses, 2);
         let still = handle.observe();
         assert!(
             still.paused(),
             "the episode never resumed through either cut: {still:?}"
         );
+        witnesses.eof_allowed.store(true, Ordering::SeqCst);
         handle.request_resume();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        let cuts = witnesses.committed_offsets.lock().unwrap().clone();
+        assert_eq!(
+            cuts.iter().map(|c| c.1).collect::<Vec<_>>(),
+            vec![paused_prefix, paused_prefix],
+            "no submission during either paused cut"
+        );
+        assert_committed_windows(
+            &witnesses,
+            &[
+                (Some(FIVE_SECONDS), FIVE_SECONDS),
+                (Some(second_landing), second_landing),
+            ],
+        );
         // Both mid-pause cuts purged their pre-resume content, so the
         // consumed sequence shows exactly ONE visible discontinuity —
         // at the SECOND landing, after the resume.
@@ -822,8 +988,6 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
             values[breaks[0]] as u64, second_landing,
             "the visible cut must be the SECOND landing"
         );
-        let snapshot = runtime.dispose().snapshot;
-        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
 

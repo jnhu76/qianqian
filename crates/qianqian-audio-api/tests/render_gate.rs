@@ -6,7 +6,7 @@
 //! evidence, never abort the caller's leg. (These tests route no seek
 //! protocol; the seek shapes live in `render_gate_seek.rs`.)
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -48,6 +48,59 @@ fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
             return false;
         }
         std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+/// Own the gate and its leg BEFORE any fallible wait/assert. Drop releases
+/// both park conditions, then observes exit and actually joins. Normal join
+/// does not release the gate: the test must drive its intended exit first.
+/// The deadline is a failure bound, never an ordering premise; a genuinely
+/// stuck thread cannot be force-terminated by this owner.
+struct GateLeg<T> {
+    gate: RenderGate,
+    leg: Option<std::thread::JoinHandle<T>>,
+    joined: Arc<AtomicBool>,
+}
+
+impl<T> GateLeg<T> {
+    fn new(gate: &RenderGate, leg: std::thread::JoinHandle<T>) -> Self {
+        Self {
+            gate: gate.clone(),
+            leg: Some(leg),
+            joined: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn join(mut self, what: &str) -> T {
+        assert!(
+            wait_until(Duration::from_secs(5), || self
+                .leg
+                .as_ref()
+                .unwrap()
+                .is_finished()),
+            "leg never exited within 5s: {what}"
+        );
+        let result = self.leg.take().unwrap().join();
+        self.joined.store(true, Ordering::SeqCst);
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+}
+
+impl<T> Drop for GateLeg<T> {
+    fn drop(&mut self) {
+        if let Some(leg) = self.leg.take() {
+            self.gate.close_and_release();
+            let exited = wait_until(Duration::from_secs(5), || leg.is_finished());
+            let joined = exited && leg.join().is_ok();
+            self.joined.store(joined, Ordering::SeqCst);
+            eprintln!("gate leg cleanup: exited_within_5s={exited}, joined={joined}");
+            if !joined && !std::thread::panicking() {
+                panic!("gate leg cleanup did not join cleanly");
+            }
+        }
     }
 }
 
@@ -125,6 +178,7 @@ fn a_park_publishes_engagement_quiescence_and_disengagement_then_returns() {
         })
     };
 
+    let leg = GateLeg::new(&gate, leg);
     assert!(
         wait_until(Duration::from_secs(5), || events
             .snapshot()
@@ -140,24 +194,20 @@ fn a_park_publishes_engagement_quiescence_and_disengagement_then_returns() {
         events.snapshot()
     );
     gate.set_paused(false);
-    leg.join().expect("the parked leg must return");
+    leg.join("the parked leg after its release");
 
-    let seen = events.snapshot();
-    let engaged = seen.iter().filter(|e| **e == GateEvent::Engaged).count();
-    let quiesced = seen
-        .iter()
-        .filter(|e| **e == GateEvent::TailQuiesced)
-        .count();
-    let disengaged = seen.iter().filter(|e| **e == GateEvent::Disengaged).count();
-    assert_eq!(engaged, 1, "exactly one engagement: {seen:?}");
     assert_eq!(
-        quiesced, 1,
-        "quiescence publishes once per engagement: {seen:?}"
+        events.snapshot(),
+        vec![
+            GateEvent::Engaged,
+            GateEvent::TailQuiesced,
+            GateEvent::Disengaged
+        ]
     );
-    assert_eq!(disengaged, 1, "exactly one disengagement: {seen:?}");
-    assert!(
-        tail_calls.load(Ordering::SeqCst) >= 2,
-        "the tail observation runs between bounded slices"
+    assert_eq!(
+        tail_calls.load(Ordering::SeqCst),
+        3,
+        "quiescence on probe 3 stops future probes"
     );
 }
 
@@ -167,101 +217,70 @@ fn a_park_publishes_engagement_quiescence_and_disengagement_then_returns() {
 #[test]
 fn tail_quiescence_belongs_to_each_engagement_separately() {
     let events = Events::default();
-    let events_clone = events.clone();
-    let gate = RenderGate::with_observer(move |event| events_clone.record(event));
+    let writer = events.clone();
+    let gate = RenderGate::with_observer(move |event| writer.record(event));
+    let mut expected = Vec::new();
+    for cycle in 1..=2 {
+        gate.set_paused(true);
+        let leg_gate = gate.clone();
+        let leg = GateLeg::new(
+            &gate,
+            std::thread::spawn(move || pause_only(&leg_gate, || true)),
+        );
+        assert!(
+            wait_until(Duration::from_secs(5), || events
+                .snapshot()
+                .iter()
+                .filter(|e| **e == GateEvent::TailQuiesced)
+                .count()
+                == cycle),
+            "cycle {cycle} must earn its own quiescence"
+        );
+        gate.set_paused(false);
+        leg.join("quiesced pause cycle");
+        expected.extend([
+            GateEvent::Engaged,
+            GateEvent::TailQuiesced,
+            GateEvent::Disengaged,
+        ]);
+        assert_eq!(
+            events.snapshot(),
+            expected,
+            "each settled cycle has its own ordered evidence"
+        );
+    }
 
-    // Engagement 1: immediately quiescent.
+    // Real Pending callback, not a timed negative window. Observe the
+    // entire cycle through release AND actual join, including exit events.
     gate.set_paused(true);
-    let leg = {
-        let gate = gate.clone();
-        std::thread::spawn(move || pause_only(&gate, || true))
-    };
-    assert!(
-        wait_until(Duration::from_secs(5), || events
-            .snapshot()
-            .contains(&GateEvent::TailQuiesced)),
-        "engagement 1 never quiesced: {:?}",
-        events.snapshot()
-    );
-    gate.set_paused(false);
-    leg.join().expect("leg 1 joins");
-
-    // Engagement 2: the tail becomes quiescent again in this cycle. The
-    // gate must RE-OBSERVE it (per-engagement reset, not a stuck latch):
-    // a second TailQuiesced proves the fresh cycle published its own
-    // evidence, and the phase before it proves the first cycle's
-    // quiescence never leaked in.
-    gate.set_paused(true);
-    let leg = {
-        let gate = gate.clone();
-        std::thread::spawn(move || pause_only(&gate, || true))
-    };
-    assert!(
-        wait_until(Duration::from_secs(5), || {
-            let seen = events.snapshot();
-            seen.iter().filter(|e| **e == GateEvent::Engaged).count() == 2
+    let (tx, rx) = std::sync::mpsc::channel();
+    let leg_gate = gate.clone();
+    let leg = GateLeg::new(
+        &gate,
+        std::thread::spawn(move || {
+            pause_only(&leg_gate, || {
+                let _ = tx.send(());
+                false
+            })
         }),
-        "engagement 2 never latched: {:?}",
-        events.snapshot()
     );
-    // Between the two engagements no quiescence may exist, and the new
-    // engagement must earn its own evidence through a fresh observation.
-    assert!(
-        wait_until(Duration::from_secs(5), || events
-            .snapshot()
-            .iter()
-            .filter(|e| **e == GateEvent::TailQuiesced)
-            .count()
-            == 2),
-        "engagement 2 never published its own quiescence: {:?}",
-        events.snapshot()
-    );
-    let seen_final = events.snapshot();
+    rx.recv_timeout(Duration::from_secs(5))
+        .expect("third cycle reached its real Pending probe");
+    let mut prefix = expected.clone();
+    prefix.push(GateEvent::Engaged);
     assert_eq!(
-        seen_final
-            .iter()
-            .filter(|e| **e == GateEvent::Engaged)
-            .count(),
-        2,
-        "exactly two engagements: {seen_final:?}"
+        events.snapshot(),
+        prefix,
+        "prior quiescence cannot authorize the Pending cycle"
     );
     gate.set_paused(false);
-    leg.join().expect("leg 2 joins");
-
-    // A final engagement whose tail NEVER goes quiescent must stay
-    // engaged without a third TailQuiesced — the stale-latch direction
-    // of the same invariant. The engagement is witnessed latched first,
-    // so the negative assertion cannot pass vacuously on a leg that
-    // never parked.
-    gate.set_paused(true);
-    let leg = {
-        let gate = gate.clone();
-        std::thread::spawn(move || pause_only(&gate, || false))
-    };
-    assert!(
-        wait_until(Duration::from_secs(5), || {
-            let seen = events.snapshot();
-            seen.iter().filter(|e| **e == GateEvent::Engaged).count() == 3
-        }),
-        "engagement 3 never latched: {:?}",
-        events.snapshot()
-    );
-    // The tail observation runs every bounded slice (~10ms); a stale
-    // latch would have published a third TailQuiesced within this
-    // window.
-    std::thread::sleep(Duration::from_millis(50));
-    let seen_after = events.snapshot();
+    leg.join("Pending pause cycle");
+    expected.extend([GateEvent::Engaged, GateEvent::Disengaged]);
     assert_eq!(
-        seen_after
-            .iter()
-            .filter(|e| **e == GateEvent::TailQuiesced)
-            .count(),
-        2,
-        "an engaged-but-not-quiescent cycle must not inherit prior \
-         quiescence: {seen_after:?}"
+        events.snapshot(),
+        expected,
+        "no quiescence, including at the release/exit outlet"
     );
-    gate.set_paused(false);
-    leg.join().expect("leg 3 joins");
 }
 
 /// The open-abort lifetime (D14.7 corrective-2): once a gate is closed,
@@ -283,7 +302,7 @@ fn a_closed_gate_never_parks_or_engages_again() {
 
     let tail_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let (tx, rx) = std::sync::mpsc::channel();
-    {
+    let leg = {
         let gate = gate.clone();
         let tail_calls = tail_calls.clone();
         std::thread::spawn(move || {
@@ -292,14 +311,16 @@ fn a_closed_gate_never_parks_or_engages_again() {
                 false
             });
             let _ = tx.send(());
-        });
-    }
+        })
+    };
+    let leg = GateLeg::new(&gate, leg);
     assert_eq!(
         rx.recv_timeout(Duration::from_secs(5)),
         Ok(()),
         "the closed gate parked the leg: it never returned from \
          the loop-top gate"
     );
+    leg.join("closed gate leg");
     assert_eq!(
         tail_calls.load(Ordering::SeqCst),
         0,
@@ -330,7 +351,7 @@ fn a_failed_tail_observation_exits_the_pause_park_without_quiescence() {
     let parked = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let parked_clone = parked.clone();
     let (tx, rx) = std::sync::mpsc::channel();
-    {
+    let leg = {
         let gate = gate.clone();
         std::thread::spawn(move || {
             let outcome = pause_with_outcome(&gate, || {
@@ -338,8 +359,9 @@ fn a_failed_tail_observation_exits_the_pause_park_without_quiescence() {
                 TailProbeOutcome::Failed
             });
             let _ = tx.send(outcome);
-        });
-    }
+        })
+    };
+    let leg = GateLeg::new(&gate, leg);
     assert!(
         wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
         "the leg never parked"
@@ -347,6 +369,7 @@ fn a_failed_tail_observation_exits_the_pause_park_without_quiescence() {
     let outcome = rx
         .recv_timeout(Duration::from_secs(5))
         .expect("the park must end on the failed observation, with pause intent still routed");
+    leg.join("failed pause probe leg");
     assert_eq!(
         outcome,
         ParkOutcome::TailProbeFailed,
@@ -378,12 +401,12 @@ fn a_failed_pause_park_still_delivers_a_routed_committed_payload() {
     gate.set_paused(true);
     let parked = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let parked_clone = parked.clone();
-    let captured: Arc<Mutex<Option<SeekParkRelease>>> = Arc::new(Mutex::new(None));
+    let captured: Arc<Mutex<Vec<SeekParkRelease>>> = Arc::new(Mutex::new(Vec::new()));
     let sink = captured.clone();
     let failed = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let failed_reader = failed.clone();
     let (tx, rx) = std::sync::mpsc::channel();
-    {
+    let leg = {
         let gate = gate.clone();
         let failed_reader = failed_reader.clone();
         std::thread::spawn(move || {
@@ -397,13 +420,14 @@ fn a_failed_pause_park_still_delivers_a_routed_committed_payload() {
                     }
                 }
                 GateSlice::SeekRelease(release) => {
-                    *sink.lock().expect("release lock") = Some(release);
+                    sink.lock().expect("release lock").push(release);
                     TailProbeOutcome::Pending
                 }
             });
             let _ = tx.send(outcome);
-        });
-    }
+        })
+    };
+    let leg = GateLeg::new(&gate, leg);
     assert!(
         wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
         "the leg never parked"
@@ -411,19 +435,23 @@ fn a_failed_pause_park_still_delivers_a_routed_committed_payload() {
     // The cut commits while the leg is parked: the payload routes
     // MID-PARK and must reach the leg while it stays parked.
     gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(9) });
-    wait_until(Duration::from_secs(5), || {
-        captured.lock().expect("release lock").is_some()
-    });
+    assert!(
+        wait_until(Duration::from_secs(5), || {
+            !captured.lock().expect("release lock").is_empty()
+        }),
+        "committed callback must arrive before forcing the failed-tail exit"
+    );
     // Then the device's observation fails: the park must still end
     // bounded, with no quiescence published.
     failed.store(true, Ordering::SeqCst);
     let outcome = rx
         .recv_timeout(Duration::from_secs(5))
         .expect("the park must end on the failed observation");
+    leg.join("failed pause probe leg");
     assert_eq!(outcome, ParkOutcome::TailProbeFailed);
     assert_eq!(
         *captured.lock().expect("release lock"),
-        Some(SeekParkRelease::Committed { landing: Some(9) }),
+        vec![SeekParkRelease::Committed { landing: Some(9) }],
         "the committed rebase reached the leg before the failure exit"
     );
     assert_eq!(
@@ -432,4 +460,34 @@ fn a_failed_pause_park_still_delivers_a_routed_committed_payload() {
         "no quiescence may publish for the failed observation: {:?}",
         events.snapshot()
     );
+}
+
+#[test]
+fn a_pause_assertion_after_engagement_releases_and_joins() {
+    let gate = RenderGate::new();
+    gate.set_paused(true);
+    let (tx, rx) = std::sync::mpsc::channel();
+    let leg_gate = gate.clone();
+    let leg = GateLeg::new(
+        &gate,
+        std::thread::spawn(move || {
+            pause_only(&leg_gate, || {
+                let _ = tx.send(());
+                false
+            })
+        }),
+    );
+    let joined = leg.joined.clone();
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        let _owned = leg;
+        rx.recv_timeout(Duration::from_secs(5))
+            .expect("real Pending park");
+        panic!("original pause assertion");
+    }))
+    .expect_err("assertion must propagate");
+    assert_eq!(
+        panic.downcast_ref::<&str>(),
+        Some(&"original pause assertion")
+    );
+    assert!(joined.load(Ordering::SeqCst));
 }

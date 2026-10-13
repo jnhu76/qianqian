@@ -44,7 +44,9 @@ use mutations::{
     SplitPublication, StaleAcquisition, WeakHandlesReader,
 };
 use publication::{PublishedViews, Reader, ViewState};
-use resources::{DestructorGate, EventLog, ResourceEvent, TrackedResource, new_event_log};
+use resources::{
+    DestructorGate, EventLog, GateReleaseGuard, ResourceEvent, TrackedResource, new_event_log,
+};
 use view::RealtimeView;
 
 /// Builds one immutable view with freshly tracked resources.
@@ -850,6 +852,59 @@ fn final_drop_on_the_reader_thread_destroys_there_hazard_witness() {
 // Physical destruction outside the publication lock
 // ---------------------------------------------------------------------------
 
+/// The owner must collect even if the entry premise or a later assertion
+/// fails. Exercise the real resource Drop and real publication acquire;
+/// count only joins that actually returned, then preserve the original panic.
+#[test]
+fn destructor_premise_and_assertion_unwind_release_and_collect() {
+    for after_entry in [false, true] {
+        let log = new_event_log();
+        let gate = DestructorGate::new();
+        let old = make_view(
+            0,
+            0,
+            FLOW_PARTICIPANTS,
+            vec![TrackedResource::new_blocking(10, log.clone(), gate.clone())],
+            log.clone(),
+        );
+        let next = make_view(
+            1,
+            1,
+            FLOW_PARTICIPANTS,
+            tracked_resources(&[20], &log),
+            log.clone(),
+        );
+        let publication = Arc::new(PublishedViews::new(old));
+        publication.publish(next);
+        let mut owned = GateReleaseGuard::new(gate.clone());
+        let joined = owned.joined.clone();
+        assert!(publication.certify_reclaimable(0));
+        let writer = publication.clone();
+        owned.track(std::thread::spawn(move || {
+            assert!(writer.release_reclaimable(0));
+        }));
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let mut owned = owned;
+            if after_entry {
+                assert!(gate.wait_entered_bounded(std::time::Duration::from_secs(5)));
+                owned.track(std::thread::spawn(move || {
+                    drop(publication.acquire());
+                }));
+            }
+            panic!("original destructor assertion");
+        }))
+        .expect_err("the original failure must propagate");
+        assert_eq!(
+            panic.downcast_ref::<&str>(),
+            Some(&"original destructor assertion")
+        );
+        assert_eq!(
+            joined.load(std::sync::atomic::Ordering::SeqCst),
+            if after_entry { 2 } else { 1 }
+        );
+    }
+}
+
 #[test]
 fn blocking_destruction_does_not_hold_the_publication_lock() {
     let log = new_event_log();
@@ -878,6 +933,8 @@ fn blocking_destruction_does_not_hold_the_publication_lock() {
     );
     let publication = Arc::new(PublishedViews::new(view0));
     publication.publish(view1);
+    // Install ownership before the first fallible premise or spawn.
+    let mut owned = GateReleaseGuard::new(destructor_gate.clone());
     assert!(
         publication.certify_reclaimable(0),
         "view 0 has no reader and is certified reclaimable"
@@ -894,10 +951,17 @@ fn blocking_destruction_does_not_hold_the_publication_lock() {
         );
     });
 
-    // Deterministic: wait until the resource destructor has entered and is
-    // blocked inside `Drop` before allowing any acquire probe.
-    destructor_gate.wait_entered();
+    owned.track(control);
 
+    // Deterministic: wait until the resource destructor has entered and is
+    // blocked inside `Drop` before allowing any acquire probe. Bounded:
+    // a mechanism regression that never drops the view is a NAMED
+    // premise failure, not an unbounded wait.
+    assert!(
+        destructor_gate.wait_entered_bounded(std::time::Duration::from_secs(10)),
+        "the destructor never entered its Drop within 10s — the reclaimable \
+         view was never physically released"
+    );
     // While the destructor remains blocked, another reader must be able to
     // acquire the current view: physical destruction must not hold the
     // publication lock.
@@ -908,6 +972,8 @@ fn blocking_destruction_does_not_hold_the_publication_lock() {
         drop(view);
         acquire_done_tx.send(identity).expect("the probe acquired");
     });
+
+    owned.track(probe);
 
     // If release_reclaimable dropped the view inside the lock, the probe
     // would be stuck on the mutex and this receive would time out.
@@ -920,9 +986,7 @@ fn blocking_destruction_does_not_hold_the_publication_lock() {
     );
 
     // Only now release the destructor so the control thread can finish.
-    destructor_gate.release();
-    control.join().expect("the control thread joins");
-    probe.join().expect("the probe thread joins");
+    owned.finish();
 
     let destroyed = destroyed_events(&log);
     assert_eq!(

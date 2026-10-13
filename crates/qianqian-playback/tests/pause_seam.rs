@@ -70,7 +70,7 @@ fn registered_runtime(
     device_tail: DeviceTail,
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
+) -> common::EpisodeFixture {
     registered_runtime_with_decode(
         EofWitnessedDecode::new(TestDecode::new(source)),
         output,
@@ -95,8 +95,28 @@ fn registered_runtime_with_decode(
     device_tail: DeviceTail,
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
-) -> QianqianApp {
-    let mut runtime = QianqianApp::new();
+) -> common::EpisodeFixture {
+    registered_runtime_with_decode_and_lifecycle(
+        decode,
+        output,
+        consumed,
+        device_tail,
+        tail_probe,
+        handle,
+        common::StreamLifecycle::default(),
+    )
+}
+
+fn registered_runtime_with_decode_and_lifecycle(
+    decode: EofWitnessedDecode,
+    output: OutputBehavior,
+    consumed: Arc<AtomicUsize>,
+    device_tail: DeviceTail,
+    tail_probe: TailProbe,
+    handle: PlaybackSessionHandle,
+    lifecycle: common::StreamLifecycle,
+) -> common::EpisodeFixture {
+    let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), tail_probe.clone());
 
     runtime
         .register_component({
@@ -123,6 +143,7 @@ fn registered_runtime_with_decode(
                         device_tail.clone(),
                     );
                     service.tail_probe = tail_probe.clone();
+                    service.lifecycle = lifecycle.clone();
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -381,8 +402,15 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
         let consumed = Arc::new(AtomicUsize::new(0));
         let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
+        // The premise "still playing at the stop" must not rest on the
+        // source's length against decode/render scheduling: a finite
+        // source could drain toward EOF while a slow machine establishes
+        // the pause, and an EOF-completed settle would false-RED the
+        // Stopped oracle below. `endless_audio` keeps the episode
+        // unsettled until the stop, structurally (Paced never returns
+        // Eof), so the shape under test is the only reachable one.
         let mut runtime = registered_runtime(
-            seconds_of_audio(30),
+            endless_audio(30),
             OutputBehavior::Consume,
             consumed,
             device_tail,
@@ -749,73 +777,73 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
     });
 }
 
-/// A pause that linearizes AFTER the teardown release must not re-park
-/// the leg: the stream teardown releases the gate and then joins it, so
-/// a pause landing between the two would wedge `stop_and_join` forever
-/// (the teardown-side twin of the stop-linearization oracle). The leg
-/// is held inside a slow (legal) tail observation, so it cannot observe
-/// the release until the hostile pause has routed and the probe lets
-/// go — the ordering is decided by the routing linearization, not by a
-/// race. If extreme scheduling ever delayed dispose past the hostile
-/// pause, the test would degrade to the safe interleaving (still
-/// passing, no longer exercising the suppressor); the mutation check
-/// is what proves the oracle's bite.
+/// D14.7 teardown: the real Session inverse calls release_pause_gate
+/// BEFORE the output provider's stop_and_join. Witness that exact provider
+/// entry, then issue hostile pause while the real leg is held in TailProbe.
+/// A deadline only detects progress failure; rescue close cannot count PASS.
 #[test]
 fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail = DeviceTail::default();
         let tail_probe = TailProbe::default();
         let handle = PlaybackSessionHandle::new();
-        let mut runtime = registered_runtime(
-            endless_audio(30),
+        let stream = common::StreamLifecycle::default();
+        let joined = stream.clone();
+        let mut runtime = registered_runtime_with_decode_and_lifecycle(
+            EofWitnessedDecode::new(TestDecode::new(endless_audio(30))),
             OutputBehavior::Consume,
             consumed.clone(),
-            device_tail.clone(),
+            DeviceTail::default(),
             tail_probe.clone(),
             handle.clone(),
+            stream.clone(),
         );
         activate(&mut runtime);
-
         assert!(
             wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
                 > 0),
-            "the episode never produced audio"
+            "real audio production premise"
         );
-
-        // Park the leg and hold it inside its first (slow, legal) tail
-        // observation: from here it cannot observe any release until the
-        // probe lets go.
         tail_probe.arm();
         handle.request_pause();
         assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().pause_engagement
-                == PauseEngagement::Engaged),
-            "the render leg never engaged: {:?}",
-            handle.observe()
+            tail_probe.wait_held_within(Duration::from_secs(5)),
+            "real park observation must be held"
         );
-        tail_probe.wait_held();
 
-        // Fire the hostile pause from another thread well after dispose
-        // began (dispose is already inside the teardown join by then:
-        // the release runs within microseconds of dispose on this
-        // thread, five orders of magnitude before the pause fires), and
-        // only then let the leg re-check. With linearized routing the
-        // post-release pause is inert and the leg exits; without it, it
-        // re-parks and the join below never returns.
-        let hostile = {
-            let handle = handle.clone();
-            let tail_probe = tail_probe.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(100));
+        // Scoped child is joined on both normal and panic paths. If a
+        // premise fails it still unholds the callback before returning.
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let (release_witness, completed_without_rescue) = std::thread::scope(|scope| {
+            let pauser = scope.spawn(move || {
+                let Some(gate) = stream.wait_stop_entered(Duration::from_secs(5)) else {
+                    tail_probe.unhold();
+                    return (false, false);
+                };
                 handle.request_pause();
                 tail_probe.unhold();
-            })
-        };
-        let snapshot = runtime.dispose().snapshot;
-        hostile.join().expect("the hostile pauser joins");
-        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+                let completed = done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+                if !completed {
+                    gate.close_and_release();
+                }
+                (true, completed)
+            });
+            let snapshot = runtime.dispose().snapshot;
+            let _ = done_tx.send(());
+            let result = pauser.join().expect("hostile pauser joins");
+            assert!(snapshot.quiet, "real teardown must discharge: {snapshot:?}");
+            result
+        });
+        assert!(
+            release_witness,
+            "stop_and_join entry must establish teardown-release order"
+        );
+        assert!(
+            completed_without_rescue,
+            "hostile pause after real teardown release wedged the join; rescue close was required"
+        );
+        assert!(joined.joined(), "actual output join must return");
     });
 }
 
@@ -851,7 +879,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
         handle.request_pause();
         assert!(handle.observe().pause_requested);
 
-        let mut runtime = QianqianApp::new();
+        let mut runtime = common::EpisodeFixture::new(QianqianApp::new(), tail_probe.clone());
         runtime
             .register_component({
                 qianqian_composition::ComponentSpec::new("test_decode_plugin")
@@ -985,3 +1013,69 @@ fn assert_no_leg_threads() {
 
 #[cfg(not(target_os = "linux"))]
 fn assert_no_leg_threads() {}
+
+/// Test-owned root failure: use the real Session inverses, not ordinary
+/// Drop(app), and observe actual output join plus quiet K0 discharge.
+#[test]
+fn fixture_assertions_dispose_real_legs_even_with_a_held_probe() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), || {
+        for held in [false, true] {
+            let probe = TailProbe::default();
+            let handle = PlaybackSessionHandle::new();
+            let stream = common::StreamLifecycle::default();
+            let cleanup = std::cell::RefCell::new(None);
+            let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut runtime = registered_runtime_with_decode_and_lifecycle(
+                    EofWitnessedDecode::new(TestDecode::new(endless_audio(1))),
+                    OutputBehavior::Consume,
+                    Arc::new(AtomicUsize::new(0)),
+                    DeviceTail::default(),
+                    probe.clone(),
+                    handle.clone(),
+                    stream.clone(),
+                );
+                *cleanup.borrow_mut() = Some(runtime.cleanup_quiet.clone());
+                activate(&mut runtime);
+                if held {
+                    probe.arm();
+                }
+                handle.request_pause();
+                if held {
+                    assert!(
+                        probe.wait_held_within(Duration::from_secs(5)),
+                        "real held TailProbe premise"
+                    );
+                } else {
+                    wait_established(&handle);
+                }
+                panic!("original session fixture assertion");
+            }))
+            .expect_err("assertion must propagate");
+            assert_eq!(
+                panic.downcast_ref::<&str>(),
+                Some(&"original session fixture assertion")
+            );
+            // Rescue only if the fixture owner itself is broken. This
+            // cannot make either disposal or actual-join oracle pass.
+            if !stream.joined() {
+                probe.unhold();
+                handle.request_stop();
+                assert!(
+                    wait_until(Duration::from_secs(5), || handle
+                        .observe()
+                        .terminal_outcome
+                        .is_some()),
+                    "failed cleanup rescue must settle"
+                );
+                assert_no_leg_threads();
+            }
+            assert!(cleanup.borrow().as_ref().unwrap().load(Ordering::SeqCst));
+            assert!(
+                stream.joined(),
+                "output join must actually return, not detach"
+            );
+            assert_no_leg_threads();
+        }
+    });
+}

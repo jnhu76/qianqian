@@ -55,6 +55,37 @@ fn stereo() -> PcmFormat {
     PcmFormat::new(48_000, 2).expect("stereo is a valid format")
 }
 
+/// Oracle calibration for the finite identity reference: use real checked
+/// PCM views and the sink's consume path, including both stereo channels.
+#[test]
+fn finite_reference_rejects_nonfinite_and_out_of_tolerance_samples() {
+    use participants::PcmSink;
+    for channel in 0..2 {
+        for actual in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 2e-6] {
+            let mut storage = [
+                harness::deterministic_sample(0, 0),
+                harness::deterministic_sample(0, 1),
+            ];
+            storage[channel] = actual;
+            let block = harness::PcmView::new(stereo(), &storage).unwrap();
+            let error = VerifyingSink::new(stereo()).consume(&block).unwrap_err();
+            assert!(
+                matches!(error, TransferError::SampleMismatch { channel: c, .. } if c == channel)
+            );
+        }
+    }
+    // Positive boundary: legitimate small error, exact samples and signed
+    // zero stay accepted. No extra allocation is added to the hot oracle.
+    for delta in [0.0, -0.0, 0.5e-6, -0.5e-6] {
+        let storage = [
+            harness::deterministic_sample(0, 0) + delta,
+            harness::deterministic_sample(0, 1),
+        ];
+        let block = harness::PcmView::new(stereo(), &storage).unwrap();
+        VerifyingSink::new(stereo()).consume(&block).unwrap();
+    }
+}
+
 /// Composes the honest identity flow: deterministic source, identity stage,
 /// verifying sink, all bound through the real kernel.
 fn identity_fixture_with_block(block_frames: usize) -> CompositionFixture {
@@ -156,15 +187,30 @@ fn transforming_stage_value_flows_through_the_middle_participant() {
 fn honest_path_observes_reused_storage_without_intermediates() {
     let mut fixture = identity_fixture_with_block(8);
     run_stream(&mut fixture, 64, 8).expect("the stream verifies in order");
-    let observed = fixture
-        .sink
-        .borrow()
-        .observed_storage_addr()
-        .expect("the sink observed storage");
+    // The storage-identity witness must cover EVERY block: a
+    // last-block-only sample cannot see substitution in earlier quanta
+    // (the partial-copy twin in mutations.rs exists precisely to keep
+    // this oracle honest). Returned-storage substitution changes the
+    // observed address; a legitimate reborrow keeps the arena address.
+    // This cannot exclude a scratch copy copied back into that arena.
+    // The witness is O(1) and
+    // allocation-free by construction (the steady-state zero-
+    // allocation oracle shares this binary).
+    let witness = fixture.sink.borrow().storage_identity_witness();
     assert_eq!(
-        observed,
-        fixture.flow.block_storage_addr(),
-        "the sink must observe the flow's own reusable block storage"
+        witness.blocks_consumed, 8,
+        "the witness covers every quantum: {witness:?}"
+    );
+    let flow_storage = fixture.flow.block_storage_addr();
+    assert_eq!(
+        witness.first_block_storage_addr,
+        Some(flow_storage),
+        "the first quantum observed the flow's own reusable block storage"
+    );
+    assert!(
+        !witness.later_block_on_different_storage,
+        "EVERY block must observe the flow's own reusable block storage: \
+         a per-quantum substitution would have flipped the mismatch flag"
     );
 }
 

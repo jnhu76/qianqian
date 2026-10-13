@@ -52,6 +52,22 @@ pub trait PcmStage {
     fn process<'block>(&mut self, block: PcmViewMut<'block>) -> PcmView<'block>;
 }
 
+/// The all-blocks storage-identity witness, O(1) in stream length:
+/// the FIRST block's storage address, whether ANY later block observed
+/// different storage, and how many blocks were consumed. Deliberately
+/// not a per-block address list — this binary pins measured zero
+/// steady-state allocation, so the witness itself must not heap-
+/// allocate per quantum. The triple is equivalent for the oracle: a
+/// per-quantum substitution (any quantum on storage other than the
+/// first block's) flips `later_block_on_different_storage`, while a
+/// legitimate reborrow of the same arena keeps every address equal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StorageIdentityWitness {
+    pub first_block_storage_addr: Option<usize>,
+    pub later_block_on_different_storage: bool,
+    pub blocks_consumed: usize,
+}
+
 /// A realtime sink participant: verifies and consumes one block.
 pub trait PcmSink {
     fn consume(&mut self, block: &PcmView<'_>) -> Result<(), TransferError>;
@@ -62,6 +78,11 @@ pub trait PcmSink {
     /// Storage address observed through the most recent block — the
     /// storage-identity readout. `None` before the first block.
     fn observed_storage_addr(&self) -> Option<usize>;
+
+    /// The all-blocks storage-identity witness (see
+    /// [`StorageIdentityWitness`]): per-quantum provenance without
+    /// per-quantum allocation.
+    fn storage_identity_witness(&self) -> StorageIdentityWitness;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +168,8 @@ pub struct VerifyingSink {
     sample_scale: f32,
     next_frame: usize,
     observed_storage_addr: Option<usize>,
+    first_block_storage_addr: Option<usize>,
+    later_block_on_different_storage: bool,
     quanta_consumed: usize,
 }
 
@@ -161,6 +184,8 @@ impl VerifyingSink {
             sample_scale,
             next_frame: 0,
             observed_storage_addr: None,
+            first_block_storage_addr: None,
+            later_block_on_different_storage: false,
             quanta_consumed: 0,
         }
     }
@@ -172,7 +197,13 @@ impl VerifyingSink {
                 block: block.format(),
             });
         }
-        self.observed_storage_addr = Some(block.storage_ptr() as usize);
+        let addr = block.storage_ptr() as usize;
+        self.observed_storage_addr = Some(addr);
+        match self.first_block_storage_addr {
+            None => self.first_block_storage_addr = Some(addr),
+            Some(first) if first != addr => self.later_block_on_different_storage = true,
+            Some(_) => {}
+        }
         let channels = self.format.channel_count() as usize;
         for frame in 0..block.frames() {
             for channel in 0..channels {
@@ -186,7 +217,11 @@ impl VerifyingSink {
                         expected,
                         actual: f32::NAN,
                     })?;
-                if (actual - expected).abs() > 1e-6 {
+                // This fixture's reference is finite. NaN comparisons are
+                // unordered, so a rejection-only `error > epsilon` silently
+                // accepts corruption. This is a test oracle, not a DSP policy.
+                if !actual.is_finite() || !expected.is_finite() || (actual - expected).abs() > 1e-6
+                {
                     return Err(TransferError::SampleMismatch {
                         frame: self.next_frame + frame,
                         channel,
@@ -213,6 +248,14 @@ impl PcmSink for VerifyingSink {
 
     fn observed_storage_addr(&self) -> Option<usize> {
         self.observed_storage_addr
+    }
+
+    fn storage_identity_witness(&self) -> StorageIdentityWitness {
+        StorageIdentityWitness {
+            first_block_storage_addr: self.first_block_storage_addr,
+            later_block_on_different_storage: self.later_block_on_different_storage,
+            blocks_consumed: self.quanta_consumed,
+        }
     }
 }
 
@@ -378,5 +421,9 @@ impl PcmSink for ObservedSink {
 
     fn observed_storage_addr(&self) -> Option<usize> {
         self.inner.borrow().observed_storage_addr()
+    }
+
+    fn storage_identity_witness(&self) -> StorageIdentityWitness {
+        self.inner.borrow().storage_identity_witness()
     }
 }
