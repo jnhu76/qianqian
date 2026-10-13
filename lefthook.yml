@@ -148,3 +148,16 @@ pre-push:
           exit 1
         fi
         npx vitepress build
+
+    release-policy:
+      priority: 7
+      glob:
+        - "tools/*release*"
+        - "tools/package-windows.sh"
+        - "tools/publish-qianqian.py"
+        - "CHANGELOG.md"
+        - "docs/releasing.md"
+        - ".github/workflows/release-qianqian.yml"
+        - "native/**"
+        - "lefthook.yml"
+      run: python3 tools/test_release.py
