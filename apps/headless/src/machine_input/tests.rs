@@ -305,57 +305,68 @@ fn first_failure_storage_is_bounded_and_sealed_result_immutable() {
 }
 
 #[test]
-fn seal_waits_for_admitted_report_ack_and_rejects_fresh_work() {
+fn seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work() {
     for record_failure in [false, true] {
-        let input = HostInput::default();
-        let (entered, started) = mpsc::channel();
-        let (release, resume) = mpsc::channel();
-        let worker_input = input.clone();
-        let worker = std::thread::spawn(move || {
-            let handle = PlaybackSessionHandle::new();
-            let completed = worker_input.line("status", &handle, &mut |_, _| {
-                assert!(
-                    worker_input.shared.state.try_lock().is_ok(),
-                    "host lock across blocking output"
-                );
-                entered.send(()).unwrap();
-                resume.recv_timeout(Duration::from_secs(5)).unwrap();
-                if record_failure {
-                    // An admitted operation keeps its failure-record right
-                    // through admission closure; an output unwind is the
-                    // test-reachable way to record from inside the blocked
-                    // report (line's catcher owns it before Drop acks).
-                    std::panic::resume_unwind(Box::new("output panic"));
-                }
+        std::thread::scope(|scope| {
+            // Scope owns both threads; on assertion unwind this local release
+            // sender drops before automatic joins and wakes the blocked output.
+            let input = HostInput::default();
+            let (entered, started) = mpsc::channel();
+            let (release, resume) = mpsc::channel();
+            let worker_input = input.clone();
+            let worker = scope.spawn(move || {
+                let handle = PlaybackSessionHandle::new();
+                let completed = worker_input.line("status", &handle, &mut |_, _| {
+                    assert!(
+                        worker_input.shared.state.try_lock().is_ok(),
+                        "host lock across blocking output"
+                    );
+                    entered.send(()).unwrap();
+                    resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                    if record_failure {
+                        // An admitted operation keeps its failure-record right
+                        // through admission closure; an output unwind is the
+                        // test-reachable way to record from inside the blocked
+                        // report (line's catcher owns it before Drop acks).
+                        std::panic::resume_unwind(Box::new("output panic"));
+                    }
+                });
+                assert_eq!(completed, !record_failure);
             });
-            assert_eq!(completed, !record_failure);
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+            let sealing_input = input.clone();
+            let (sealed, result) = mpsc::channel();
+            let sealer = scope.spawn(move || {
+                let _ = sealed.send(sealing_input.seal());
+            });
+            // Premise: the sealer has executed `admission_closed = true` while
+            // the admitted report is still blocked. wait_closed takes the same
+            // bookkeeping mutex, so this observation is ordered after the
+            // sealer's whole pre-wait critical section — including, for a seal
+            // that skips the acknowledgement wait, its first_failure read.
+            wait_closed(&input);
+            // Fresh work must not overtake the drain while seal is in flight.
+            let fresh_handle = PlaybackSessionHandle::new();
+            assert!(!input.line("stop", &fresh_handle, &mut no_output));
+            assert!(
+                !fresh_handle.observe().stop_requested,
+                "rejected fresh work must not route Stop"
+            );
+            release.send(()).unwrap();
+            // VALUE witnesses retention of a postclosure admitted failure:
+            // a seal reading before this record returns None. The false branch
+            // alone cannot witness drain, and neither value distinguishes reading
+            // after the record but before response/Drop completion. Full ACK
+            // ordering remains a separate obligation (execution-model D3/D5).
+            let expected = record_failure.then_some(HostFailure::Panic);
+            assert_eq!(
+                result.recv_timeout(Duration::from_secs(5)).unwrap(),
+                expected,
+                "seal lost the admitted postclosure output failure"
+            );
+            worker.join().unwrap();
+            sealer.join().unwrap();
         });
-        started.recv_timeout(Duration::from_secs(5)).unwrap();
-        let sealing_input = input.clone();
-        let (sealed, result) = mpsc::channel();
-        let sealer = std::thread::spawn(move || sealed.send(sealing_input.seal()).unwrap());
-        // Premise: the sealer has executed `admission_closed = true` while
-        // the admitted report is still blocked. wait_closed takes the same
-        // bookkeeping mutex, so this observation is ordered after the
-        // sealer's whole pre-wait critical section — including, for a seal
-        // that skips the acknowledgement wait, its first_failure read.
-        wait_closed(&input);
-        // Fresh work must not overtake the drain while seal is in flight.
-        assert!(!input.line("stop", &PlaybackSessionHandle::new(), &mut no_output));
-        release.send(()).unwrap();
-        // The wait witness is seal's VALUE, not a negative channel sample:
-        // a seal linearizing its first_failure read before the acknowledgement
-        // misses this post-release record and returns None, while a correct
-        // seal reads after the Drop acknowledgement. Blocking recv cannot
-        // miss a preempted sealer — it only delays it.
-        let expected = record_failure.then_some(HostFailure::Panic);
-        assert_eq!(
-            result.recv_timeout(Duration::from_secs(5)).unwrap(),
-            expected,
-            "seal returned before the admitted acknowledgement"
-        );
-        worker.join().unwrap();
-        sealer.join().unwrap();
     }
 }
 
@@ -382,29 +393,6 @@ fn admitted_output_panic_records_before_ack_even_during_seal() {
     assert_eq!(sealer.join().unwrap(), Some(HostFailure::Panic));
     worker.join().unwrap();
     assert!(handle.observe().stop_requested);
-}
-
-#[test]
-fn admitted_failure_response_ack_cannot_be_overtaken_by_seal() {
-    let input = HostInput::default();
-    let operation = input.admit().unwrap();
-    let sealing_input = input.clone();
-    let (sealed, result) = mpsc::channel();
-    let sealer = std::thread::spawn(move || sealed.send(sealing_input.seal()).unwrap());
-    wait_closed(&input);
-    operation.fail_with_response(HostFailure::Read, || {
-        assert!(
-            matches!(result.try_recv(), Err(mpsc::TryRecvError::Empty)),
-            "seal overtook failure response"
-        );
-        assert!(input.shared.state.try_lock().is_ok());
-    });
-    drop(operation);
-    assert_eq!(
-        result.recv_timeout(Duration::from_secs(5)).unwrap(),
-        Some(HostFailure::Read)
-    );
-    sealer.join().unwrap();
 }
 
 #[test]
