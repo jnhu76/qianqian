@@ -67,9 +67,12 @@ pre-push:
         - "apps/**"
         # the checker itself is part of its own gate:
         - "tools/check_plugin_boundaries.py"
+        - "tools/audio-api-surface/**"
       run: |
         # the gate plus its negative controls (non-vacuity) — the same
         # two steps the CI plugin-boundary job runs
+        cargo fmt --manifest-path tools/audio-api-surface/Cargo.toml --check &&
+        cargo clippy --offline --locked --manifest-path tools/audio-api-surface/Cargo.toml -- -D warnings &&
         python3 tools/check_plugin_boundaries.py &&
         python3 tools/check_plugin_boundaries.py --negative-controls
 

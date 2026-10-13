@@ -31,6 +31,7 @@ on:
       - "crates/*/src/**"
       - "apps/*/Cargo.toml"
       - "tools/check_plugin_boundaries.py"
+      - "tools/audio-api-surface/**"
       - ".github/workflows/plugin-boundary-gate.yml"
   push:
     branches: [main]
@@ -40,6 +41,7 @@ on:
       - "crates/*/src/**"
       - "apps/*/Cargo.toml"
       - "tools/check_plugin_boundaries.py"
+      - "tools/audio-api-surface/**"
       - ".github/workflows/plugin-boundary-gate.yml"
 
 concurrency:
@@ -65,6 +67,14 @@ jobs:
 
       - name: Install stable Rust (cargo metadata input)
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Prepare pinned Rust-aware API verifier
+        run: |
+          rustup toolchain install nightly-2025-11-22 --profile minimal
+          cargo fetch --locked
+          cargo fetch --locked --manifest-path tools/audio-api-surface/Cargo.toml
+          cargo fmt --manifest-path tools/audio-api-surface/Cargo.toml --check
+          cargo clippy --locked --offline --manifest-path tools/audio-api-surface/Cargo.toml -- -D warnings
 
       - name: Plugin boundary gate (topology allowlist + export surface)
         run: python3 tools/check_plugin_boundaries.py
