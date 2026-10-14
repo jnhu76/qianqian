@@ -22,10 +22,13 @@ fn cell_width(text: &str) -> u16 {
 }
 
 /// Greedy word-wrap of one body line to `width` cells. A word longer
-/// than the width is hard-broken at the width; a continuation line
-/// keeps the original line's leading indentation, so a wrapped help
-/// row stays visually inside its own section. Width 0 degrades to the
-/// unwrapped text (the layout has already degraded truthfully).
+/// than the width fills the current line's remaining cells and is
+/// hard-broken at the width; a continuation line keeps the original
+/// line's leading indentation, so a wrapped help row stays visually
+/// inside its own section. Width 0 degrades to the unwrapped text (the
+/// layout has already degraded truthfully); widths 1–2 are below every
+/// caller's reachable floor (the narrowest inner width is 10 cells) and
+/// make no packing promise.
 fn wrap_text(text: &str, width: u16) -> Vec<String> {
     use unicode_width::UnicodeWidthChar;
     if width == 0 || cell_width(text) <= width {
@@ -55,13 +58,29 @@ fn wrap_text(text: &str, width: u16) -> Vec<String> {
             current.push_str(word);
             current_width += word_width;
         } else if word_width > width.saturating_sub(indent_width) {
-            // The word cannot fit any line: flush, hard-break it.
+            // The word cannot fit any line: fill the current line's
+            // remaining cells first (no row is wasted on the flush),
+            // then hard-break the rest at the width.
+            let mut chars = word.chars().peekable();
             if current_width > indent_width {
+                if current_width < width {
+                    current.push(' ');
+                    current_width += 1;
+                }
+                while let Some(&c) = chars.peek() {
+                    let c_width = UnicodeWidthChar::width(c).unwrap_or(0) as u16;
+                    if current_width + c_width > width {
+                        break;
+                    }
+                    current.push(c);
+                    current_width += c_width;
+                    chars.next();
+                }
                 lines.push(std::mem::replace(&mut current, indent.clone()));
             }
             let mut piece = indent.clone();
             let mut piece_width = indent_width;
-            for c in word.chars() {
+            for c in chars {
                 let c_width = UnicodeWidthChar::width(c).unwrap_or(0) as u16;
                 if piece_width + c_width > width {
                     lines.push(std::mem::replace(&mut piece, indent.clone()));
@@ -102,7 +121,7 @@ fn tail_fit(text: &str, width: u16) -> String {
 }
 
 /// The confirmation's consequence, wrapped to the popup's inner width
-/// (#235: the Clear spelling is 72 cells — longer than any class's
+/// (#235: the Clear spelling is 71 cells — longer than any class's
 /// unwrapped inner width; it wraps instead of clipping at the border).
 fn wrapped_consequence(kind: ConfirmKind, inner_width: u16) -> Vec<Line<'static>> {
     wrap_text(kind.consequence(), inner_width)
@@ -561,10 +580,15 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                         entry.name.clone()
                     };
                     let mut line = Line::from(format!("{cursor_mark} {name}"));
-                    // A held press on the row: the same transient
-                    // inversion as every control (§16).
-                    if model.pressed(&HitTarget::PickerRow(index)) {
-                        line.style = Style::default().add_modifier(Modifier::REVERSED);
+                    // The focus composition (#235, review F4): while the
+                    // listing owns the keyboard focus its CURSOR row
+                    // carries the REVERSED shape with the accent riding
+                    // on top — the preset menu's own rule; a held press
+                    // renders the same composition transiently (§16).
+                    if (model.focus() == Some(FocusId::PickerList) && picker.cursor == Some(index))
+                        || model.pressed(&HitTarget::PickerRow(index))
+                    {
+                        line.style = theme::focus();
                     }
                     line
                 })
@@ -678,12 +702,26 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             let popup = input_popup_area(area, 3);
             frame.render_widget(Clear, popup);
             // The typed line yields from its LEFT end when it would
-            // overflow — the static grammar suffix never clips (#235).
+            // overflow; the static grammar degrades in bounded steps so
+            // the typed input always keeps cells of its own and nothing
+            // clips at the border (review F1: the full suffix alone is
+            // 38 cells — wider than the inner width at the supported
+            // minimum).
             let inner_width = popup.width.saturating_sub(2);
-            let static_width = cell_width("Go to: []  (Enter = seek, Esc = cancel)");
-            let shown = tail_fit(input, inner_width.saturating_sub(static_width));
+            let (prefix, suffix) = [
+                ("Go to: [", "]  (Enter = seek, Esc = cancel)"),
+                ("Go to: [", "]  (Enter/Esc)"),
+                ("Go to: [", "]"),
+            ]
+            .into_iter()
+            .find(|(prefix, suffix)| cell_width(prefix) + cell_width(suffix) < inner_width)
+            .expect("the popup floor leaves room for the shortest prompt");
+            let shown = tail_fit(
+                input,
+                inner_width - (cell_width(prefix) + cell_width(suffix)),
+            );
             frame.render_widget(
-                Paragraph::new(format!("Go to: [{shown}]  (Enter = seek, Esc = cancel)")).block(
+                Paragraph::new(format!("{prefix}{shown}{suffix}")).block(
                     Block::bordered()
                         .title(theme::title(" Go to "))
                         .border_style(theme::border()),
@@ -1279,6 +1317,53 @@ mod tests {
         );
     }
 
+    /// Review F1 (regression guard): at the supported minimum the GoTo
+    /// prompt must still SHOW the typed input. Before the fix the
+    /// 39-cell static suffix consumed the whole 34-cell inner width:
+    /// the input was invisible AND the suffix still clipped — the
+    /// grammar now degrades in bounded steps so the input always has
+    /// cells of its own.
+    #[test]
+    fn the_goto_prompt_keeps_its_typed_input_visible_at_the_supported_minimum() {
+        let mut model = plain_model();
+        model.open_modal(ModalKind::GoTo);
+        for c in "1234567890".chars() {
+            model.modal_push(c);
+        }
+        let text = rendered(
+            &mut model,
+            crate::tui::model::MIN_WIDTH,
+            crate::tui::model::MIN_HEIGHT,
+        );
+        assert!(text.contains("Go to: ["), "{text}");
+        assert!(
+            text.contains("1234567890"),
+            "the typed input must stay visible at the supported minimum:\n{text}"
+        );
+        assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// Review F2: an over-long word FILLS the current line's remaining
+    /// cells before it hard-breaks — no row is wasted on the flush.
+    /// Before the fix, `Target:` was pushed alone onto its own row and
+    /// the wrapped tail lost the `(folder)` marker to the bounded cap.
+    #[test]
+    fn an_overlong_word_fills_the_current_line_before_hard_breaking() {
+        let lines = wrap_text(
+            "Target: C:\\Users\\fred1\\qianqian-tui-acceptance\\media (folder)",
+            34,
+        );
+        assert!(lines.len() <= 2, "packed into the bounded rows: {lines:?}");
+        assert!(
+            lines[0].starts_with("Target: C"),
+            "the path starts on the label's own row: {lines:?}"
+        );
+        let joined = lines.join("");
+        for part in ["Target:", "qianqian-tui-acceptance", "(folder)"] {
+            assert!(joined.contains(part), "{part:?} lost in {lines:?}");
+        }
+    }
+
     /// C1: the help overlay wraps its widest lines at the supported
     /// minimum instead of clipping them at the popup border. The tour
     /// scrolls there, so the walk pages through it the way a short
@@ -1309,10 +1394,13 @@ mod tests {
         );
     }
 
-    /// C1: the picker's note row (the honest error diagnostic) wraps
-    /// inside its bounded rows instead of clipping mid-diagnostic.
+    /// C1 / review F2: the picker's note row (the honest error
+    /// diagnostic) wraps inside its bounded rows instead of clipping
+    /// mid-diagnostic at the border. The bound is a deliberate degrade:
+    /// at the supported minimum the rows hold the diagnostic's head;
+    /// anything beyond the budget is dropped (never a border overrun).
     #[test]
-    fn the_picker_note_wraps_its_diagnostic_whole() {
+    fn the_picker_note_wraps_its_diagnostic_inside_the_bounded_rows() {
         let mut model = plain_model();
         model.open_modal(ModalKind::Open);
         model.set_open_listing(
@@ -1328,6 +1416,17 @@ mod tests {
                 "the diagnostic word {word:?} must stay visible:\n{text}"
             );
         }
+        // The supported minimum: the bounded rows hold the head; the
+        // frame stays honest (no border overrun, no fabricated line).
+        let text = rendered(
+            &mut model,
+            crate::tui::model::MIN_WIDTH,
+            crate::tui::model::MIN_HEIGHT,
+        );
+        for word in "listing failed: the directory".split_whitespace() {
+            assert!(text.contains(word), "{text}");
+        }
+        assert_eq!(scan(&text), None, "{text}");
     }
 
     /// C2: a focused modal control is unmistakable — the keyboard
@@ -1386,7 +1485,50 @@ mod tests {
                         "the focused field carries BOLD"
                     );
                 }
+                FocusId::PickerList => {
+                    // The listing's emphasis shows on its CURSOR row;
+                    // give it one (the field's Enter does this natively)
+                    // and re-read the frame.
+                    model.move_picker_cursor(PlaylistCursor::Row(0));
+                    let buffer = rendered_buffer(&mut model, 100, 30);
+                    let region = model
+                        .regions()
+                        .iter()
+                        .find(|region| region.target == HitTarget::PickerRow(0))
+                        .expect("the cursor row's region");
+                    let cell = buffer
+                        .cell((region.area.x, region.area.y))
+                        .expect("the cursor row's first cell");
+                    assert!(
+                        cell.modifier.contains(Modifier::REVERSED),
+                        "the focused listing marks its cursor row"
+                    );
+                }
                 _ => {}
+            }
+            // Negative control (review F6): the accent sits ONLY on the
+            // focused stop — a bug styling every button would fail here.
+            let focused_button = match model.focus() {
+                Some(FocusId::PickerButton(button)) => Some(HitTarget::ModalButton(button)),
+                _ => None,
+            };
+            for region in model
+                .regions()
+                .iter()
+                .filter(|region| matches!(region.target, HitTarget::ModalButton(_)))
+            {
+                if Some(region.target) == focused_button {
+                    continue;
+                }
+                let cell = buffer
+                    .cell((region.area.x, region.area.y))
+                    .expect("the label's first cell");
+                assert_ne!(
+                    cell.fg,
+                    Color::Cyan,
+                    "an unfocused button carries no accent: {:?}",
+                    region.target
+                );
             }
         }
     }

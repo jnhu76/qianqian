@@ -54,7 +54,10 @@ pub(super) fn border() -> Style {
 /// stays — a monochrome terminal keeps every distinction — and the
 /// accent color rides on top as redundancy, so a focused button reads
 /// at a glance while Tab-cycling (the #230 native feedback: REVERSED
-/// alone was judged too easy to miss).
+/// alone was judged too easy to miss). Scope note: the shell's route,
+/// transport and playlist controls keep the #233 vocabulary (REVERSED
+/// without the accent — one focus language per surface family; the
+/// modal family was the one the #235 defect was reported against).
 pub(super) fn focus() -> Style {
     Style::default().fg(ACCENT).add_modifier(Modifier::REVERSED)
 }
