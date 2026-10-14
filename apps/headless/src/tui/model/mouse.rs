@@ -957,6 +957,67 @@ mod tests {
         (region.area.x + 1, region.area.y + region.area.height / 2)
     }
 
+    /// C3 (#235, adjudicating #230's observation): the idle Now Playing
+    /// pane is INERT — a click inside the content panel neither arms
+    /// nor dispatches anything — and the [Open] transport cell below it
+    /// is the one visible, intended picker affordance. The click that
+    /// "opened the picker from the pane" was the [Open] button.
+    #[test]
+    fn the_idle_pane_is_inert_and_open_is_the_visible_affordance() {
+        // The idle page, drawn AFTER the episode is cleared, so the
+        // published regions are the idle frame's own.
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.set_episode(None);
+        model.set_route(TuiRoute::NowPlaying);
+        redraw(&mut model, 100, 30);
+
+        // A cell well inside the bordered content panel — verify it is
+        // covered by NO published region, then press and release there.
+        let (pane_col, pane_row) = (30u16, 8u16);
+        assert!(
+            model
+                .regions()
+                .iter()
+                .all(|region| !region.area.contains((pane_col, pane_row).into())),
+            "the chosen cell must be pane interior, not a control"
+        );
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Down(MouseButton::Left), pane_col, pane_row),
+                &mut model
+            ),
+            None,
+            "the pane Down dispatches nothing"
+        );
+        assert_eq!(model.armed(), None, "a pane click arms nothing");
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), pane_col, pane_row),
+                &mut model
+            ),
+            None,
+            "the pane Up dispatches nothing"
+        );
+
+        // The [Open] transport cell: the visible affordance, one press.
+        let (col, row) = region_cell(&model, &HitTarget::Transport(TransportButton::Open));
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Down(MouseButton::Left), col, row),
+                &mut model
+            ),
+            None
+        );
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), col, row),
+                &mut model
+            ),
+            Some(TuiAction::OpenModal(ModalKind::Open))
+        );
+    }
+
     // ------------------------------------------------------------------
     // Responsive class tests (§27/§28 mechanics only).
     // ------------------------------------------------------------------
