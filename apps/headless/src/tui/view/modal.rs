@@ -714,8 +714,9 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             // two-cell glyph could vanish again there.
             let inner_width = popup.width.saturating_sub(2);
             // The longest legal token ("01:35.5") is 7 cells; a floor of
-            // 8 keeps the ladder monotone: a wider terminal never shows
-            // a smaller input window than a narrower one.
+            // 8 keeps the input window usable at every width — the tier
+            // switch can still shrink it (inner 46→47: 24→8 cells), but
+            // never below the token.
             const MIN_INPUT_CELLS: u16 = 8;
             let (prefix, suffix) = [
                 ("Go to: [", "]  (Enter = seek, Esc = cancel)"),
