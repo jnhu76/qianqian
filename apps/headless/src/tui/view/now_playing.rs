@@ -49,7 +49,11 @@ pub(super) fn draw_now_playing(
             lines.push(Line::from(""));
             lines.push(Line::from(NO_MUSIC_LINE));
             lines.push(Line::from(
-                "Open a file or folder with the Open button below.",
+                // #235/#230 adjudication: the pane itself is inert; the
+                // [Open] button below is THE click affordance, and the
+                // key is named beside it so both affordances are
+                // discoverable from the idle page itself.
+                "Open a file or folder with the Open button below (or press O).",
             ));
             if let Some((position, total)) = model.navigation_position() {
                 lines.push(Line::from(format!(

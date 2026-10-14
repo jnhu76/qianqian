@@ -612,8 +612,8 @@ mod tests {
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains(NO_MUSIC_LINE), "{text}");
         assert!(
-            text.contains("Open a file or folder with the Open button below"),
-            "{text}"
+            text.contains("Open a file or folder with the Open button below (or press O)"),
+            "the idle page names BOTH affordances — the button and the key:\n{text}"
         );
         for fabricated in ["Source:", "Format:", "Position:", "Terminal:", "Paused:"] {
             assert!(

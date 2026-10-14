@@ -92,15 +92,36 @@ impl TuiModel {
     }
 
     /// Presentation-only route change (§5): moves the active route,
-    /// disarms any armed click (§17), and revalidates focus. It never
-    /// touches the player, playback, DSP or Observation state.
+    /// disarms any armed click (§17), revalidates focus, and takes a
+    /// keyboard focus resting on the tab row along to the new route's
+    /// tab ([`TuiModel::tab_focus_follows`]) — EVERY route change
+    /// enforces that invariant, the picker-success routing included.
+    /// It never touches the player, playback, DSP or Observation state.
     pub fn set_route(&mut self, route: TuiRoute) {
         if self.route == route {
+            // A same-route activation still converges a tab-row focus
+            // (clicking the already-active tab brings the marker home).
+            self.tab_focus_follows(route);
             return;
         }
         self.route = route;
         self.invalidate_frame();
+        self.tab_focus_follows(route);
         self.validate_focus();
+    }
+
+    /// Owner adjudication (2026-10-14, the native focus finding): a
+    /// route change takes a keyboard focus already resting on the tab
+    /// row along to the new route's tab, so the row's focus marker
+    /// never lingers on a tab that is no longer the active page (read
+    /// natively as a second, wrong "selection" — clicking the Audio
+    /// tab left the marker inverted on Visualizer). A focus of `None`
+    /// or in the page body is untouched: §16's mouse-only rule and
+    /// §12's body re-home both stand.
+    pub fn tab_focus_follows(&mut self, route: TuiRoute) {
+        if matches!(self.focus, Some(FocusId::RouteTab(_))) {
+            self.focus = Some(FocusId::RouteTab(route));
+        }
     }
 
     /// Invalidate the current frame's interactive geometry (§15/§29):
