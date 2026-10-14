@@ -27,8 +27,12 @@ say which side is wrong.
 
 ## The rule
 
-An instrument may adjudicate only after its validity has been established on the
-same surface, in the same session, and recorded with the evidence:
+An instrument may adjudicate only after its validity has been established for
+the signal and acquisition path in question under comparable conditions.
+Run controls in the same session when practical; otherwise record why an earlier
+calibration remains applicable (surface, tool version, capture configuration,
+timebase). Re-validate if those conditions change. Record the controls and
+limits with the evidence:
 
 | control | question it answers | example |
 |---|---|---|
@@ -45,8 +49,10 @@ Additional rules:
   streams or running under different conditions.
 - "The instrument saw nothing" is evidence about the **instrument** until its
   controls pass — not about the measured system.
-- Archive the instrument (code + raw output) with the evidence. An unarchived
-  artifact cannot be re-examined when its figure is challenged later.
+- Archive locally authored instrument code and raw output with the evidence;
+  for third-party tools, record an identifiable version, exact invocation and
+  configuration, plus raw output. Unidentifiable or unarchived measurements
+  cannot be independently re-examined when challenged.
 - Precision is not validity: a tight p50 from an unvalidated instrument is
   still not evidence.
 
@@ -63,8 +69,8 @@ Additional rules:
 instrument           validation                                        result
 PrintWindow burst    positive: 30 Hz writer -> ~27.5 changes/s;        e881152: 16.06/s (noise),
                      negative: 1 Hz position line -> 1.00/s            16.72/s (ballad)
-gdigrab desktop      control refuted it for Windows Terminal           secondary instrument only;
-video                content: byte-static while the app updated        never the sole evidence
+gdigrab desktop      one WT capture control was byte-static            exclude that run;
+video                despite live window updates                        cross-check only in separately validated runs
 diag builds          direct loop decomposition: poll p50 62.5 ms,      draw p50 0.38 ms
                      draw p50 0.38 ms
 ~~~
@@ -92,7 +98,8 @@ controls and recorded limits?
 Are both sides of a comparison measured by the same method?
 Which surfaces is the instrument known to miss, and does any conclusion
 rely on them?
-Is the instrument (code + raw output) archived with the evidence?
+Is the instrument code (or pinned tool version/invocation) and raw output
+archived with the evidence?
 Does the result contradict an implementation-level fact - and if so, why is
 the instrument believed over the fact?
 ~~~
