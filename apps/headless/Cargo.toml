@@ -19,6 +19,9 @@ qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optiona
 # internal edge), and they never cross the F2 episode seam.
 ratatui = "0.30"
 crossterm = "0.29"
+# Cell-width measurement for modal text layout (a CJK glyph is two
+# cells) — the same width truth the renderer above renders by.
+unicode-width = "0.2"
 
 # The canonical product binary (U1, Issue #166). Windows users get
 # qianqian.exe. The wrapper is thin: all behavior lives in the

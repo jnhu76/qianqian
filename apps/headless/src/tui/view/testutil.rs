@@ -74,9 +74,7 @@ pub(crate) fn established(model: &mut TuiModel) {
 /// Draw the model at a fixed size on a virtual terminal and return
 /// the rows as plain text. The model keeps the published regions.
 pub(crate) fn rendered(model: &mut TuiModel, width: u16, height: u16) -> String {
-    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("virtual terminal");
-    terminal.draw(|frame| draw(frame, model)).expect("draw");
-    let buffer = terminal.backend().buffer().clone();
+    let buffer = rendered_buffer(model, width, height);
     (0..buffer.area.height)
         .map(|y| {
             (0..buffer.area.width)
@@ -85,6 +83,20 @@ pub(crate) fn rendered(model: &mut TuiModel, width: u16, height: u16) -> String 
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Draw the model at a fixed size on a virtual terminal and return
+/// the rendered BUFFER (symbols + styles), for assertions that must
+/// see how a cell is styled, not only what it says. The model keeps
+/// the published regions.
+pub(crate) fn rendered_buffer(
+    model: &mut TuiModel,
+    width: u16,
+    height: u16,
+) -> ratatui::buffer::Buffer {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("virtual terminal");
+    terminal.draw(|frame| draw(frame, model)).expect("draw");
+    terminal.backend().buffer().clone()
 }
 
 pub(crate) fn plain_model() -> TuiModel {

@@ -50,6 +50,22 @@ pub(super) fn border() -> Style {
     Style::default().fg(CHROME)
 }
 
+/// A focused MODAL control's claim (#235): the REVERSED shape carrier
+/// stays — a monochrome terminal keeps every distinction — and the
+/// accent color rides on top as redundancy, so a focused button reads
+/// at a glance while Tab-cycling (the #230 native feedback: REVERSED
+/// alone was judged too easy to miss).
+pub(super) fn focus() -> Style {
+    Style::default().fg(ACCENT).add_modifier(Modifier::REVERSED)
+}
+
+/// A focused input FIELD's claim (#235): the field has no button shape
+/// to invert, so BOLD is the shape carrier and the accent is the
+/// redundancy — the same composition rule as every theme style.
+pub(super) fn focus_field() -> Style {
+    Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)
+}
+
 /// The spectrum bar color for one bar row by its height fraction (0 at
 /// the panel's floor, 1 at the ceiling): the cava/level-meter gradient
 /// — green body, yellow hot zone, red overload zone. Loud passages
