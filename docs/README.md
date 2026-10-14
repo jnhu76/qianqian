@@ -27,6 +27,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md` + `../specs/realtime-publication/` — evidence only |
 | Current Rust behavior | current code + tests |
 | Writing or reviewing concurrency, teardown, wakeup, and terminal-ordering tests | `development/concurrency-test-design.md` — test-authoring method only (not a new source of product semantics); applies to new/materially modified tests, no bulk migration |
+| Adjudicating an architecture/performance question with measurements (rates, cadence, latency, instruments) | `development/measurement-oracle-validity.md` — measurement-oracle governance: instrument controls (positive/negative/limits) before adjudication, same-method pairs, archived artifacts; includes the #233 Measurement Oracle Failure case; method only (not product semantics) |
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — historical audit evidence at its recorded BASE_SHA; its then-pending hardening status is not a current implementation claim |
