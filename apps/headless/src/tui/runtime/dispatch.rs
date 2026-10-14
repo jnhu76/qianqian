@@ -928,6 +928,35 @@ mod tests {
         );
     }
 
+    /// Review round 2 (N2): the SAME-ROUTE branch of `set_route` (a
+    /// click or activation on the already-active page) converges a
+    /// tab-row focus the same way a changed route does — the marker
+    /// comes home instead of lingering on a stale tab.
+    #[test]
+    fn activating_the_already_active_route_brings_the_tab_row_focus_home() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        assert_eq!(model.route(), TuiRoute::NowPlaying);
+        model.set_focus(Some(FocusId::RouteTab(TuiRoute::Visualizer)));
+
+        assert_eq!(
+            dispatch(
+                TuiAction::Navigate(TuiRoute::NowPlaying),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
+        );
+
+        assert_eq!(model.route(), TuiRoute::NowPlaying, "the route stands");
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
+            "the same-route activation still brings the marker home"
+        );
+    }
+
     /// Review F3: the adjudicated invariant holds on EVERY route change
     /// — the picker-success routing included. A keyboard focus resting
     /// on a tab when the picker opens is restored by the modal close

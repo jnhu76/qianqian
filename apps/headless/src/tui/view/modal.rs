@@ -26,9 +26,10 @@ fn cell_width(text: &str) -> u16 {
 /// hard-broken at the width; a continuation line keeps the original
 /// line's leading indentation, so a wrapped help row stays visually
 /// inside its own section. Width 0 degrades to the unwrapped text (the
-/// layout has already degraded truthfully); widths 1–2 are below every
-/// caller's reachable floor (the narrowest inner width is 10 cells) and
-/// make no packing promise.
+/// layout has already degraded truthfully); the degenerate widths —
+/// `indent_width >= width`, or a single glyph wider than the whole
+/// width — are below every caller's reachable floor (indents are ≤ 3
+/// cells, inner widths ≥ 10) and make no packing promise.
 fn wrap_text(text: &str, width: u16) -> Vec<String> {
     use unicode_width::UnicodeWidthChar;
     if width == 0 || cell_width(text) <= width {
@@ -705,16 +706,26 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             // overflow; the static grammar degrades in bounded steps so
             // the typed input always keeps cells of its own and nothing
             // clips at the border (review F1: the full suffix alone is
-            // 38 cells — wider than the inner width at the supported
-            // minimum).
+            // 39 cells — wider than the inner width at the supported
+            // minimum). The tier is chosen WITH a minimum input window
+            // (review round 2, N1): without the floor the longest
+            // fitting tier could leave a single cell at exactly 46
+            // columns, so the budget dipped non-monotonically and a
+            // two-cell glyph could vanish again there.
             let inner_width = popup.width.saturating_sub(2);
+            // The longest legal token ("01:35.5") is 7 cells; a floor of
+            // 8 keeps the ladder monotone: a wider terminal never shows
+            // a smaller input window than a narrower one.
+            const MIN_INPUT_CELLS: u16 = 8;
             let (prefix, suffix) = [
                 ("Go to: [", "]  (Enter = seek, Esc = cancel)"),
                 ("Go to: [", "]  (Enter/Esc)"),
                 ("Go to: [", "]"),
             ]
             .into_iter()
-            .find(|(prefix, suffix)| cell_width(prefix) + cell_width(suffix) < inner_width)
+            .find(|(prefix, suffix)| {
+                cell_width(prefix) + cell_width(suffix) + MIN_INPUT_CELLS <= inner_width
+            })
             .expect("the popup floor leaves room for the shortest prompt");
             let shown = tail_fit(
                 input,
@@ -1341,6 +1352,28 @@ mod tests {
             "the typed input must stay visible at the supported minimum:\n{text}"
         );
         assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// Review round 2 (N1): the tier ladder keeps a USABLE input window
+    /// at every operable width. Without the minimum-input floor the
+    /// longest fitting tier left a single cell at exactly 46 columns,
+    /// so the budget dipped non-monotonically and an input whose last
+    /// glyph is two cells wide vanished there again. The longest legal
+    /// token must stay whole at every width in the Minimum band upward.
+    #[test]
+    fn the_goto_prompt_keeps_a_usable_input_window_at_every_class_width() {
+        let mut model = plain_model();
+        model.open_modal(ModalKind::GoTo);
+        for c in "01:35.5".chars() {
+            model.modal_push(c);
+        }
+        for width in crate::tui::model::MIN_WIDTH..=130 {
+            let text = rendered(&mut model, width, 24);
+            assert!(
+                text.contains("Go to: [01:35.5]"),
+                "the typed token must stay whole at width {width}:\n{text}"
+            );
+        }
     }
 
     /// Review F2: an over-long word FILLS the current line's remaining
