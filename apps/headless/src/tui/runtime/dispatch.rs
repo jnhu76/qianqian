@@ -49,14 +49,12 @@ pub(super) fn dispatch<S: EpisodeStart>(
         // with no episode committed — the idle shell must stay
         // quittable.
         TuiAction::Quit => Step::Exit,
-        // Route changes are presentation-only (§5). An activation also
+        // Route changes are presentation-only (§5): set_route also
         // takes a tab-row focus along to the navigated-to tab (owner
-        // adjudication 2026-10-14, the native focus finding): the row's
-        // focus marker never lingers on a tab that is no longer the
-        // active page. Focus `None` or in the page body is untouched.
+        // adjudication 2026-10-14) — every route change enforces it,
+        // this activation and the picker-success routing alike.
         TuiAction::Navigate(route) => {
             model.set_route(route);
-            model.tab_focus_follows(route);
             Step::Continue
         }
         TuiAction::MoveFocus(direction) => {
@@ -927,6 +925,34 @@ mod tests {
         assert!(
             !matches!(focus, FocusId::RouteTab(_)),
             "a body focus never surfaces as a tab-row marker: {focus:?}"
+        );
+    }
+
+    /// Review F3: the adjudicated invariant holds on EVERY route change
+    /// — the picker-success routing included. A keyboard focus resting
+    /// on a tab when the picker opens is restored by the modal close
+    /// and must ride along to the navigated-to tab (a file commits to
+    /// Now Playing), not linger on the stale one.
+    #[test]
+    fn a_picker_commit_takes_a_tab_row_focus_along() {
+        let tree = TempTree::new("picker-focus-follow");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        model.set_focus(Some(FocusId::RouteTab(TuiRoute::Playlist)));
+
+        open_via_keys(&mut model, &mut player, &file);
+
+        assert_eq!(
+            model.route(),
+            TuiRoute::NowPlaying,
+            "a file opens to Now Playing"
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
+            "the tab-row focus rides along to the navigated-to page"
         );
     }
 
