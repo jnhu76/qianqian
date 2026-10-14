@@ -19,7 +19,11 @@ use super::state::TuiModel;
 /// moves the keyboard focus (owner ruling: a pressed control must
 /// bounce back, so the focus inversion follows the keyboard alone —
 /// the seek bar already worked exactly this way); focus moves only
-/// through Tab/arrow navigation. The ARMED press itself renders: the
+/// through Tab/arrow navigation — plus the owner adjudication of
+/// 2026-10-14: ACTIVATING a route takes a focus already resting on the
+/// tab row along to the activated tab ([`TuiModel::tab_focus_follows`],
+/// invoked by the dispatch, so keyboard and mouse converge; the press
+/// here still moves nothing). The ARMED press itself renders: the
 /// control under a held press shows the same transient inversion
 /// (REVERSED, via `TuiModel::claims`) for exactly the hold's duration,
 /// and the release bounces it back — 按下变白、松开弹回. Drag, a moved

@@ -49,9 +49,14 @@ pub(super) fn dispatch<S: EpisodeStart>(
         // with no episode committed — the idle shell must stay
         // quittable.
         TuiAction::Quit => Step::Exit,
-        // Route changes are presentation-only (§5).
+        // Route changes are presentation-only (§5). An activation also
+        // takes a tab-row focus along to the navigated-to tab (owner
+        // adjudication 2026-10-14, the native focus finding): the row's
+        // focus marker never lingers on a tab that is no longer the
+        // active page. Focus `None` or in the page body is untouched.
         TuiAction::Navigate(route) => {
             model.set_route(route);
+            model.tab_focus_follows(route);
             Step::Continue
         }
         TuiAction::MoveFocus(direction) => {
@@ -851,6 +856,78 @@ mod tests {
         assert!(!observation.stop_requested);
         assert!(!observation.pause_requested);
         assert_eq!(activations(), activations_before, "still no probe, no open");
+    }
+
+    /// Owner adjudication (2026-10-14, the native focus finding): the
+    /// keyboard focus already ON the tab row follows the activated
+    /// route — the row's focus marker never lingers on a tab that is no
+    /// longer the active page (natively the owner read that marker as a
+    /// second "selection" and reported the tab button as wrong). Focus
+    /// that is `None` or in the page body is untouched by this rule:
+    /// §16's "mouse never invents a focus" still stands.
+    #[test]
+    fn activating_a_route_takes_a_tab_row_focus_along() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        // The exact native state: the keyboard had walked the focus
+        // onto the Visualizer tab, then the page moved by mouse.
+        model.set_focus(Some(FocusId::RouteTab(TuiRoute::Visualizer)));
+
+        // Mouse: click the Audio tab. The click decodes to the same
+        // Navigate the keyboard produces, and the focus takes it along.
+        let wanted = crate::tui::model::HitTarget::RouteTab(TuiRoute::Audio);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        assert_eq!(
+            click_at(column, row, &mut model, &mut player),
+            Some(TuiAction::Navigate(TuiRoute::Audio))
+        );
+        assert_eq!(model.route(), TuiRoute::Audio);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::Audio)),
+            "the focus marker follows the navigated-to page"
+        );
+
+        // Keyboard: Enter on the focused tab — the focus is already on
+        // the activated tab and stays there.
+        model.set_focus(Some(FocusId::RouteTab(TuiRoute::Playlist)));
+        let action = model.activation().expect("the tab activates");
+        assert_eq!(action, TuiAction::Navigate(TuiRoute::Playlist));
+        assert_eq!(dispatch(action, &mut model, &mut player), Step::Continue);
+        assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::Playlist)));
+
+        // §16 stands where the keyboard has not spoken: a `None` focus
+        // is not invented by a route change.
+        model.set_focus(None);
+        assert_eq!(
+            dispatch(
+                TuiAction::Navigate(TuiRoute::NowPlaying),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
+        );
+        assert_eq!(model.focus(), None, "no keyboard, no focus");
+
+        // Focus in the page body is not pulled up to the tab row: the
+        // §12 stale-focus re-home still lands it in the NEW route's
+        // body, never on a stale tab.
+        model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
+        assert_eq!(
+            dispatch(
+                TuiAction::Navigate(TuiRoute::Audio),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
+        );
+        let focus = model.focus().expect("the stale body focus re-homes");
+        assert!(
+            !matches!(focus, FocusId::RouteTab(_)),
+            "a body focus never surfaces as a tab-row marker: {focus:?}"
+        );
     }
 
     // ------------------------------------------------------------------
