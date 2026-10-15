@@ -57,13 +57,17 @@ Target    PRESERVE the behavior table (as corrected) as the regression baseline;
           currently unobservable across the ABI, R1.1)
 Modify    none for preservation; ABI/SongCore + adapter+session if D-5 adopted
 Docs      none (behavior is ABI+worker-conformant; no frozen text contradicts it)
-Acceptance  E-1 (R1 §8, R1.1 phase-disciplined form): observe the FIRST read after
-          the Applied landing; old-vs-new error attribution via the controlled fault
-          position + C-level message provenance, never the outcome class alone. The
+Acceptance  E-1 (R1 §8, R1.2 attribution rules): observe the FIRST read after the
+          Applied landing; old-vs-new attribution rests on the one-shot injection
+          record, the call phase, and a controlled-healthy post-cut region (verified
+          on the no-injection control) — the "pending decode error" wording means
+          DEFERRED REPORTING, not fault identity, and is corroboration only. The
           stop-race half is a separate observable: a stop inside the window yields
-          Stopped OR Failed{pending decode error} with the worker-position
-          discriminator recorded — never an assertion that stop alone forces Stopped;
-          freezing the pre-R1.1 wording in an oracle is the failure mode this row exists
+          Stopped OR Failed{pending decode error} with the worker's actual exit
+          surface recorded (default position / mid-write / remainder-flush — §2.3.1's
+          R1.2 enumeration; a canceled pending seek is not an exit) — never an
+          assertion that stop alone forces Stopped; freezing the pre-R1.1 wording in
+          an oracle is the failure mode this row exists
           to prevent. A counterexample to the corrected table itself would falsify
           R1 §2.3, not the goal
 ```
@@ -111,7 +115,7 @@ Unified remediation table (R1.1 — one table, hazard class separated from fix c
 | #9 | wasapi.rs:538-547 opened line | caught by catch #1 AFTER `Opened` published → post-activation abort, `Failed{"device"}` misattribution, or N-01 cascade via #8 | delays first Start (playback onset) | YES (writer swap) — same partial scope |
 | #10 | wasapi.rs:678-686 volume recoverable failure | caught by catch #2 → recoverable failure escalated to `Aborted` → `Failed{"device"}` (A F-07) | render-loop stall → device underrun (B F6) | YES (writer swap) — same partial scope |
 | #11 | panic default hook + chain-to-previous | reentrancy only | blocks the panic translation itself; chain restores default sync stderr for all non-reader threads (B F7) | NO — process-global hook, not fixable by a writer swap; mechanism OPEN (T5-8) |
-| #5 | machine_input.rs:230-233 reader protocol writes | caught (:119) → `HostFailure::Panic` → episode terminated by a diagnostic write | full pipe → reader stuck → `seal()` waits forever | NO — protocol class, deliberately outside §1.5 (see §1.7; the two-class split is the answer, not silencing) |
+| #5 | machine_input.rs:230-233 reader protocol writes | caught (:119) → `HostFailure::Panic` → episode terminated by a diagnostic write | full pipe → reader stuck → `seal()` waits forever | NO — protocol class with its OWN acceptance (E-9, R1.2): its write failure is a legitimate host-operation failure by T5-7 and must NOT be held to the logging-inertness oracle; the two-class split (§1.7) is the contract |
 
 ```text
 Current   decode funnel + render post-catch cone run outside every catch with
@@ -134,10 +138,10 @@ Acceptance  E-7 tier 1 (R1 §8, R1.1): per changed site (#8/#9/#10), broken-sink
           wakeup ordering identical to the sink-healthy control (N-01's write-failure
           mode impossible by construction; demonstrated by the write-error control);
           PLUS a blocked-sink control that documents the RESIDUAL (publication still
-          delayed — expected, recorded as residual; NOT sold as isolation). Reader
-          (#5) and hook (#11) outlets keep their E-7 tier-2 registry entries for the
-          future framework round — they are out of this corrective's scope, so the
-          acceptance set no longer names objects the corrective does not change
+          delayed — expected, recorded as residual; NOT sold as isolation). The hook
+          (#11) keeps its E-7 tier-2 registry entry for the future framework round;
+          the reader (#5) is validated by E-9 against its OWN documented classes
+          (R1.2) — the acceptance set names only objects with a matching expectation
 ```
 
 ### 1.6 Partial activation and cleanup failure (D14.6 baseline; D-7 open)
@@ -163,8 +167,12 @@ Target    classification codified: protocol write failure = host-operation failu
           (visible, may terminate); diagnostic sink failure = diagnostic loss only
 Modify    docs/checklists; code only via T5-4 corrective
 Docs      playback-execution-model D3/D5 rows gain the explicit two-class statement
-Acceptance  E-7/E-8: broken-pipe harness per site asserting the two classes diverge
-          exactly as classified
+Acceptance  E-9 (R1 §8, R1.2 — protocol-write conformance, its own oracle): per stream
+          (stdout/stderr) broken/closed-sink harness around the reader's status writes
+          asserting the DOCUMENTED host-failure path (caught → HostFailure::Panic →
+          conditional request_stop → episode terminates; seal obligations met), and
+          E-8 for the main-thread report sites — the two classes must diverge exactly
+          as classified; a protocol write is never silently dropped like a diagnostic
 ```
 
 ### 1.8 Real SongCore → Session composition entry (E-2)
@@ -349,7 +357,8 @@ TEST-QUALITY-STANDARD-v1 apply to any future test authoring this plan induces.
 | T1-6 userdata context (if adopted) | OS-reason fidelity + slot hygiene | E-3's fault-injecting harness: retained (kind, raw_os_error) matches the injected failure; successful operations clear the slot | a stale error attributed to a later successful operation |
 | T2-5 (either carrier) | verdict-only settlement | mock-abort tests, snapshot present vs absent | terminal differs when the snapshot is dropped |
 | T5-4 (writer-swap tier, #8/#9/#10) | panic-escalation removal only | E-7 tier 1: broken-sink control per site × {gate on, off}, identical terminal/exit path vs sink-healthy; blocked-sink control DOCUMENTS the residual delay (not isolation) | any terminal/exit-path change keyed on sink state; residual blocking presented as isolation |
-| T5 framework (future, incl. #5/#11) | producer/terminal independence from sink state | E-7 tier 2: four R0 §6 controls per outlet | any semantic change (episode class, exit path beyond documented ones) |
+| T5 framework (future — diagnostic outlets only, incl. #11; R1.2) | producer/terminal independence from DIAGNOSTIC sink state | E-7 tier 2: four R0 §6 controls per diagnostic outlet | any semantic change (episode class, exit path beyond documented ones) |
+| Protocol writes (#5) | conformance to the documented host-failure classes (NOT terminal invariance) | E-9 (R1.2): broken/closed stdout+stderr harness asserting the T5-7 classes | a protocol-write panic escaping the catch; protocol rows silently dropped like diagnostics; seal proceeding unacknowledged |
 | T3-1 (if adopted — AFTER the observability gap is closed by an ABI/SongCore amendment, R1.1) | witness inertness | interleave test (E-1) asserting classification never reads the witness | any Failed/Completed divergence caused by the witness |
 | E-2 entry | real-chain binding | one feature-gated end-to-end on curated fixtures + healthy control | stage-family mismatch or hang |
 | §1.9 migration | oracle coherence | table regeneration + TLC refinement + census update in one commit | byte-compare red; unfrozen stage panic; stale text assertions |
@@ -386,12 +395,20 @@ For a fresh reviewer picking this package up:
 ## 6. Round boundary
 
 Delivered by this PR round: the three R1 companion documents + R0 attribution/index
-update; R1.1 (audit round) corrects all eight REVISE findings in place — the stop ×
-pending-fatal commit race (§1.3), the T2-5 delivery path (§1.4), the unified cone
-remediation table with #9 included and panic/blocking separated (§1.5), the userdata
-retention candidate (§1.11), the narrowed zero-amendment claim (§3.1/§3.4), the
-E-1/E-5/E-6 redesigns and the E-7 two-tier split (§4). Not delivered, by explicit
-constraint: production changes, test changes, build changes, authority status changes,
-experiment execution, issue closure, merge. The NEEDS_RUNTIME_EVIDENCE registry
-(R1 §8) is the bridge to any future evidence round; OPEN-DECISION D-2..D-11 are the
-bridge to any future owner ruling.
+update; R1.1 (first audit round) corrected all eight REVISE findings in place — the
+stop × pending-fatal commit race (§1.3), the T2-5 delivery path (§1.4), the unified
+cone remediation table with #9 included and panic/blocking separated (§1.5), the
+userdata retention candidate (§1.11), the narrowed zero-amendment claim (§3.1/§3.4),
+the E-1/E-5/E-6 redesigns and the E-7 two-tier split (§4). R1.2 (second audit round,
+six findings) further corrected: the §2.3.1 stop-exit list rebuilt from actual control
+flow (a canceled pending seek is release-only bookkeeping, not an exit; the zero-frame
+arm is window-unreachable with the real provider), the audibility vocabulary extended
+to evidence levels with no audibility asserted, E-1 attribution decoupled from message
+text, E-7 tier 2 narrowed to diagnostic outlets with E-9 carrying protocol-write
+conformance, the queue-cost claims corrected against the pinned toolchain's std (no
+advantage verdict asserted), and T5-8's chain-to-previous made a condition rather
+than an unconditional duty. Not delivered, by explicit constraint: production changes,
+test changes, build changes, authority status changes, experiment execution, issue
+closure, merge. The NEEDS_RUNTIME_EVIDENCE registry (R1 §8) is the bridge to any
+future evidence round; OPEN-DECISION D-2..D-11 are the bridge to any future owner
+ruling.

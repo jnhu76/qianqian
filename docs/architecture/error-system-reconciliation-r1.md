@@ -55,6 +55,24 @@ R1.1 (2026-10-15)         = static adversarial audit of 847e9d1 returned REVISE 
                             T1-3/T1-6/T2-5/T3-1/T5-2/T5-4/T5-5/T5-8, D-3/D-5/D-9/D-10 and
                             migration §1.3/§1.4/§1.5/§2/§3/§4 + new §1.11. SOURCE_BASE_SHA
                             unchanged; still zero execution.
+R1.2 (2026-10-16)         = second static audit of 4bbe2fe returned REVISE with six findings;
+                            all six re-verified and accepted. Corrections: §2.3.1 stop-exit
+                            list rebuilt from actual control flow (canceled pending seek is
+                            release-only bookkeeping, NOT a worker exit — session.rs:613-618 has
+                            no return; the zero-frame arm is unreachable in this window with the
+                            real provider because C:1111 returns the latch before any zero-frame
+                            OK; genuine stop-exits are the mid-write capacity-wait terminal
+                            observation and the preserved-remainder flush break), audibility
+                            vocabulary extended (ReleaseBuffer can fail after the pull,
+                            wasapi.rs:721-723 — the error system asserts NO audibility level),
+                            E-1 attribution decoupled from message text (pending wording =
+                            deferred reporting, not fault identity), E-7 tier 2 narrowed to
+                            diagnostic outlets with new E-9 for protocol-write conformance,
+                            queue-cost claims corrected against the pinned toolchain's std
+                            (bounded sync_channel documents a pre-allocated fixed buffer —
+                            rustc 1.97.1 std/src/sync/mpsc.rs; no per-record-allocation or
+                            crossbeam-advantage verdict is asserted), T5-8 chain-to-previous
+                            made co-satisfiable with the isolation goal.
 REVIEW ATTRIBUTION NOTE   = PR #280's "independent Astra review" is recorded by the owner's
                             PR comment of 2026-10-15 (issue comment, verifiable) as a static
                             assessment shared off-GitHub at 3c866cfa. The reviewer's identity
@@ -185,35 +203,59 @@ choice (belongs to the target-contract document, not current behavior).
 
 | Next operation after a partial success (fatal latched, N frames delivered) | Path | Effect on the latched fatal | Episode outcome | Class |
 |---|---|---|---|---|
-| Next `read_frames` (default) | C:1111-1113 → adapter `_` arm (lib.rs:288-291) → `decode_failed("… pending decode error")` (session.rs:889-893) | surfaced, then consumed by the failure | `Failed{decode: … pending decode error}`; no rollback. Audibility is split (R1.1): only frames the render leg already pulled into the device buffer before `edge.fail()` are heard; frames merely admitted to the edge are abandoned — the render-side read checks Failed/Stopped BEFORE data (edge.rs:233-239, "buffered frames are abandoned") | A |
+| Next `read_frames` (default) | C:1111-1113 → adapter `_` arm (lib.rs:288-291) → `decode_failed("… pending decode error")` (session.rs:889-893) | surfaced, then consumed by the failure | `Failed{decode: … pending decode error}`; no rollback. Audibility (R1.2): only frames the render leg pulled past the edge and successfully submitted to the device CAN be heard — and even those may be lost to a stop or device failure before consumption; frames merely admitted to the edge are abandoned outright (render-side terminal-before-data, edge.rs:233-239). The error system asserts no audibility level (§2.3.1 vocabulary) | A |
 | `request_seek`, worker picks it up, `song_seek` **succeeds** (`Applied`) | C:1177 `av_seek_frame` ≥ 0 → C:1195-1196 flush + `reset_decode_state` → **latch cleared**; worker: remainder discarded, `edge.invalidate()` purge, landing published (session.rs:683-694) | **erased without ever surfacing** | episode continues from the new position; the decode anomaly in the replaced region never reaches D11 or any diagnostic | A (mechanism) / B (schedule observed only statically) |
 | `request_seek`, provider returns `RefusedUnchanged` | `classify_seek_status` (lib.rs:254-260): only `SONG_ERR_INVALID_ARGUMENT` classifies so; `fail_arg` (C:1166) overwrites the diagnostic but not the latch; worker resumes old cursor (session.rs:644-655) | retained (diagnostic overwritten) | next read surfaces it → `Failed` as row 1. Note: from the production adapter `INVALID_ARGUMENT` is unreachable (`Duration` targets are ≥ 0; handle non-null) — the class is contract-live via mocks/ABI controls, production-dead | A (mapping) / B (schedule) |
 | `request_seek`, provider returns `MutatedThenFailed` | `fail()` overwrites diagnostic; latch retained but moot; worker: `release_seek_without_commit` + `decode_failed("seek failed: …")` + `edge.fail()` (session.rs:656-667) | superseded by the seek failure | `Failed{decode: seek failed: …}` (D14.5 conservative routing) | A |
-| `request_stop` | `request_stop` records intent, releases gate, `edge.stop()` (completion.rs:532-562) — **it commits no outcome itself** | depends on worker position (§2.3.1) | **either** `Stopped` **or** `Failed{decode: pending decode error}` — both legal; in the default position (worker at/after loop-top with edge space, no pending seek) the next read surfaces the latch and `worker_failure` wins the commit race (completion.rs:1262 checks it first, before any stop-intent consult); `Stopped` results only when the worker exits through a stop-observing path (mid-write `WriteStep::Stopped`, stranded-seek abort, zero-frame terminal check) without another read | A (both arms code-derived; R1.1 corrects the prior "stop wins" claim) |
+| `request_stop` | `request_stop` records intent, releases gate, `edge.stop()` (completion.rs:532-562) — **it commits no outcome itself** | depends on worker position (§2.3.1) | **either** `Stopped` **or** `Failed{decode: pending decode error}` — both legal; in the default position (worker at/after loop-top with edge space; a canceled pending seek is NOT an exit — the release at :613-618 is bookkeeping and control falls through to the read) the next read surfaces the latch and `worker_failure` wins the commit race (completion.rs:1262 checks it first, before any stop-intent consult); `Stopped` results only from a genuine stop-exit: the mid-write capacity-wait terminal observation (`WriteStep::Stopped`, :985-988) or the preserved-remainder flush break (:798-802) — see §2.3.1 for the full control-flow enumeration | A (both arms code-derived; R1.2 corrects the R1.1 exit list) |
 | Teardown / replacement / quit | retire path records stop first (`request_stop` + `wait_terminal`, player.rs:723-743) → waits for whichever terminal commits | as row 5 | old episode settles `Stopped` **or** `Failed{pending decode error}` per the same commit race; replacement proceeds on the committed terminal either way | A (R1.1) |
 | Pause / resume / volume / DSP-refusal | no provider call; worker keeps producing | retained | later read surfaces it (row 1) unless a seek/stop intervenes first | A |
 | EOF | unreachable with a latched fatal: `song_read_pcm` returns the fatal before any EOF branch (C:1111-1113 precedes; C:1157-1158 ordering) | — | — | A |
 
-### 2.3.1 Commit ordering, not command ordering (R1.1 correction of the prior rows 5/6)
+### 2.3.1 Commit ordering, not command ordering (R1.1 correction; exit list rebuilt in R1.2)
 
 `first-wins` (completion.rs:1238-1249) is a property of **terminal commit**, not of
 command arrival. `request_stop` publishes no outcome: it records `stop_requested`,
 releases the gate, and stops the edge. Which terminal an episode in the pending-fatal
-window takes is decided by where the decode worker is when the stop lands:
+window takes is decided by where the decode worker is when the stop lands. The exit
+inventory below is rebuilt from the actual control flow of the worker closure —
+**canceling a seek, stopping a write, and exiting the worker are three different
+things**, and only the third produces `worker_exited`:
 
-- **Default position (loop-top reached, no pending seek, edge has space — the state
-  after the partial-success block's write completed):** nothing checks the edge
-  terminal between loop-top and `read_frames`, so the next read runs regardless of the
-  stop, re-publishes the latch (C:1111-1113), returns `Err`, and the Err arm calls
-  `decode_failed` unconditionally (session.rs:889-892) → `worker_failure` → the
-  resolver's FIRST rule commits **Failed** (completion.rs:1262 precedes every
+- **Default position (loop-top reached, edge has space, no in-flight write or
+  remainder — the state after the partial-success block's write completed):** nothing
+  checks the edge terminal between loop-top and `read_frames`, so the next read runs
+  regardless of the stop, re-publishes the latch (C:1111-1113), returns `Err`, and the
+  Err arm calls `decode_failed` unconditionally (session.rs:889-892) → `worker_failure`
+  → the resolver's FIRST rule commits **Failed** (completion.rs:1262 precedes every
   stop-intent consult). A stop intent recorded earlier cannot relabel it. In this
   window **the pending fatal beats the stop**, the opposite of the pre-R1.1 wording.
-- **Stop-observing positions:** inside a capacity wait or mid-block write
-  (`write_observing_seek` returns `WriteStep::Stopped`, :933-944), holding a pending
-  seek (`seek_aborted` release, :613-617), or a zero-frame read (the `Frames(0)` arm
-  checks the terminal, :831-834): the worker exits **without** another read →
-  `worker_exited(Stopped)` → drain Aborted + stop intent → **Stopped**.
+- **Canceled pending seek is NOT an exit (R1.2):** the loop-top `seek_aborted` branch
+  executes only `release_seek_without_commit(); pending_seek = None;`
+  (session.rs:613-618) — no `return`, no `continue`. Control falls through the
+  remainder flush (none), the DSP pickup, and INTO `read_frames`: the latch surfaces
+  and the episode commits **Failed** exactly as the default position. The R1.1 list
+  wrongly counted this as a stop-exit.
+- **Genuine stop-exits (worker returns without another read):**
+  (a) **mid-block write, capacity wait:** `write_observing_seek` returns
+  `WriteStep::Stopped` only when a write made zero progress AND the edge terminal is
+  no longer Open (:985-988); the caller returns (:877) → `worker_exited(Stopped)`;
+  (b) **preserved-remainder flush:** the refused-seek tail breaks out of its flush
+  loop on a terminal (:798-802) and returns → `Stopped` (the latch is still retained
+  here — a RefusedUnchanged seek never cleared it — and it is erased by the exit
+  without surfacing).
+- **Provider-general exits that are UNREACHABLE in this window with the real
+  provider (R1.2):** the `Frames(0)` arm's terminal check (:831-834) can never observe
+  a stop caused by a pending fatal — `song_read_pcm` returns the latched error at
+  entry (C:1111-1113) before any zero-frame success can occur — and the EOF arm
+  likewise never runs. Both remain live for mock providers and other states, which is
+  why the production worker keeps them.
+- **In-flight-seek returns, for completeness:** the edge-terminal returns inside the
+  Applied cutover wait (:718-728, :746-764) do exit the worker, but by then the
+  provider seek has already completed — an `Applied` outcome has already cleared the
+  latch (C:1196), so those exits belong to row 2's "erased" story, not to the
+  pending-fatal race; a `RefusedUnchanged` outcome reaches exit (b) through its
+  remainder.
 
 Every cell of this matrix is therefore bounded by four phases: (1) read start,
 (2) error publication (`decode_failed`), (3) stop-intent recording, (4) terminal
@@ -221,11 +263,15 @@ commit. A claim about which signal "wins" is well-formed only relative to a phas
 ordering; acceptance designs must observe the phases (E-1), not just the final
 outcome class.
 
-**Audibility vocabulary (row-1 correction):** "decoded" (produced by the C loop) ≠
-"admitted to the edge" (write completed) ≠ "submitted to the device" (render leg
-pulled) ≠ "audible" (played before the data-plane terminal). Only the last two
-survive a subsequent `edge.fail()`; edge-buffered frames are abandoned by the
-render-side terminal-before-data check (edge.rs:233-239).
+**Evidence-level vocabulary for delivered PCM (R1.2, replacing the R1.1 audibility
+split):** "decoded" (produced by the C loop) → "admitted to the edge" (write
+completed) → "pulled from the edge" (render leg copied it out) → "submitted to the
+device" (`ReleaseBuffer` returned OK — it CAN fail after a successful pull,
+wasapi.rs:721-723, aborting the episode) → "mechanism-reported consumed" (padding
+observations) → "physically audible". The error system owns evidence only up to the
+fifth level and **asserts no audibility**: even successfully submitted frames can be
+lost to a stop or device invalidation before consumption. Statements in this package
+claim at most "submitted, may have been heard".
 
 ### 2.4 Execution DAG (pending-fatal window)
 
@@ -242,10 +288,10 @@ render-side terminal-before-data check (edge.rs:233-239).
                │       └─ Mutated/Refused → rows 3/4 above
                └── no seek → read_frames → C:1111-1113 "pending decode error"
                      → Err → decode_failed → edge.fail → resolve Failed (DAG-A/1)
-  [any time] stop/teardown → edge.stop → worker exit path depends on position (§2.3.1):
-        mid-write / parked-seek / zero-frame → observes stop → exits → Stopped
-        at/after loop-top (default) → next read surfaces the latch first →
-        decode_failed → worker_failure precedence → Failed (stop intent cannot relabel)
+  [any time] stop/teardown → edge.stop → outcome depends on the worker's actual
+        exit surface (§2.3.1): a canceled pending seek is NOT an exit (falls through
+        to the read → Failed); genuine stop-exits are the mid-write capacity-wait
+        terminal observation and the preserved-remainder flush break → Stopped
 ```
 
 ### 2.5 Adjudication
@@ -605,13 +651,14 @@ answer. None is claimed as run, passed, or failed.
 
 | E | Question | Minimal design (owner-gated; not authorized by this PR) | Falsification condition |
 |---|---|---|---|
-| E-1 | Pending-fatal × seek-Applied interleave under a real scheduler | Test-side (no production change): real SongCore provider + scripted decode fault after N frames (adapter-level fault injection or a truncated-at-offset source), request seek during the window. **R1.1 phase discipline (§2.3.1):** the discriminator is the FIRST read following the Applied landing. Allowed outcomes: (a) that first read succeeds — any LATER failure is a fresh error ("decode error" signature, C:1139) and does not bear on row 2; (b) it fails with the re-published pending signature ("pending decode error", C:1112) — this alone falsifies row 2 (the latch survived `reset_decode_state`). Old-vs-new attribution must come from the controlled fault position (the single injected failure site, pre-cut) plus the C-level message provenance, never from the outcome class alone. The stop-race half (§2.3.1 rows 5/6) is a separate observable: a stop issued inside the window must yield `Stopped` or `Failed{pending decode error}` with the worker-position discriminator recorded — never an assertion that stop alone forces `Stopped` | The pending-signature failure on the first post-Applied read (with the injected fault proven pre-cut) falsifies §2.3 row 2; a fresh-signature failure on any later read falsifies nothing |
+| E-1 | Pending-fatal × seek-Applied interleave under a real scheduler | Test-side (no production change): real SongCore provider + a ONE-SHOT scripted decode fault at a known pre-cut offset, landing in a verified-healthy post-cut region. **R1.2 attribution rules — the message text is never the identity:** the "pending decode error" wording only means DEFERRED REPORTING (a partial-success wrapper around any fault — old or new — produces it on the next read, C:1104-1158), so it cannot distinguish the pre-seek fault from a post-seek one. Attribution rests on three preconditions, each independently witnessed: (i) the injection record proves the old latch existed (the harness observed the fault fire pre-cut and the partial delivery that deferred it); (ii) the Applied verdict is observed (seek return + landing); (iii) the post-cut region is controlled-healthy (verified on the no-injection control run), so any post-Applied failure is anomalous and gets investigated, not auto-classified. Under those preconditions: the FIRST read after the Applied landing must succeed — a failure there falsifies row 2 (the old latch survived `reset_decode_state`); message signatures are corroboration only. The stop-race half (§2.3.1) is a separate observable: a stop issued inside the window must produce `Stopped` or `Failed{pending decode error}` with the worker's actual exit surface recorded (default position / mid-write / remainder-flush), never an assertion that stop alone forces `Stopped` | A failure of the first post-Applied read (with preconditions (i)-(iii) all witnessed) falsifies §2.3 row 2; a later failure under the same preconditions is an anomaly to investigate, not a row-2 verdict |
 | E-2 | Real SongCore error → D11 end-to-end | Feature-gated test (dev-dep on `qianqian-decode-songcore` in the test target only) driving `establish` with a real native handle against a corrupted fixture; assert the Failed terminal + stage family | A green run proves the chain binds; any stage-family mismatch falsifies the assumed passthrough |
 | E-3 | Mid-read host I/O failure (U1) | A seekable fault-injecting source behind the existing io callback seam in a binding-crate test (the callback closure is currently fixed to `File::read` — the test lives in the excluded crate; the same harness serves the T1-6 userdata-context candidate, migration §1.11) | If SongCore surfaces the read failure as anything other than latched 103/`pending`/`decode error` family, the C mapping table is wrong |
 | E-4 | Worker stuck in an uninterruptible native call | Filesystem-backed hang injection (e.g. FUSE or a stuck NFS mount) during steady decode; observe dispose/`wait_terminal` blocking and the absence of any Violated/timeout | Any automatic escape (timeout, Violated) would falsify "dispose has no escape" |
 | E-5 | Slow/normal devices vs DRAIN_CAP=5 s | Instrumented drain timing on real endpoints (healthy + Bluetooth-class suspended sink). **R1.1 rewording:** the experiment produces the cap-exceedance datum; it does not adjudicate the classification. A healthy device exceeding 5 s shows the cap is exceeded in practice; whether settling that episode `Failed{device}` is a misclassification remains the D-4 owner ruling (C-8's DESIGN_DECISION half, inside the authority-declared OPEN resolver-precedence space) — that verdict belongs to the target contract, not to the measurement | All tested devices draining < 5 s downgrades the tuning risk to unobserved; an exceedance alone proves only the exceedance |
 | E-6 | SEEK_UNSUPPORTED post-state | Real unseekable container (raw ADTS) + seek attempt + bit-exact continuation probe at the ABI layer (extends F5 E1's method to the unmeasured statuses). **R1.1 scope obligations:** state the result's coverage with the result — container/format family, FFmpeg closure version, sample set; a bit-identical continuation on the tested corpus establishes the provability fact FOR THAT CORPUS only. Class-level reclassification additionally needs either broader coverage or an FFmpeg-internal state argument (what `av_seek_frame` touches on an index-less demuxer before failing); one sample never proves the class | A non-identical continuation on any tested sample keeps the conservative routing; an identical result does not by itself amend D14.5 (migration §3.2 preconditions) |
-| E-7 | N-01 / stderr hazards under blocked & broken sinks | **R1.1 two-tier split, matching the corrective's actual scope (migration §1.5):** Tier 1 (writer-swap corrective, sites #8/#9/#10): broken-sink negative control per site × {gate on, gate off} — terminal class, exit path and wakeup ordering identical to the sink-healthy control (N-01's write-failure mode impossible by construction); plus a blocked-sink control that documents the RESIDUAL blocking hazard (publication still delayed — expected and recorded as residual until the T5 framework lands; it is not an isolation pass). Tier 2 (future framework adoption): the four R0 §6 controls (blocked, stopped consumer, queue full, write failure) per outlet including #5 reader and #11 hook, asserting producer/terminal independence | Tier 1: any terminal/exit-path change keyed on sink state, or the residual blocking presented as isolation. Tier 2: any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
+| E-7 | N-01 / stderr hazards under blocked & broken sinks — **DIAGNOSTIC outlets only** | **R1.1 two-tier split; R1.2 scope: tier 2 covers diagnostic sinks (#8/#9/#10/#11, av_log #12 when restored) — the protocol outlet #5 is NOT a member (its write failure is a legitimate host operation failure by T5-7; see E-9).** Tier 1 (writer-swap corrective, sites #8/#9/#10): broken-sink negative control per site × {gate on, gate off} — terminal class, exit path and wakeup ordering identical to the sink-healthy control (N-01's write-failure mode impossible by construction); plus a blocked-sink control that documents the RESIDUAL blocking hazard (publication still delayed — expected and recorded as residual until the T5 framework lands; it is not an isolation pass). Tier 2 (future framework adoption): the four R0 §6 controls (blocked, stopped consumer, queue full, write failure) per diagnostic outlet, asserting producer/terminal independence | Tier 1: any terminal/exit-path change keyed on sink state, or the residual blocking presented as isolation. Tier 2: any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
+| E-9 | Protocol-write failure conformance (#5, R1.2 — separated from the logging-inertness matrix) | Broken/closed stdout and stderr harnesses around the reader's status-response writes (machine_input.rs:230-233), per stream: assert the DOCUMENTED host-failure path, not terminal invariance — write panic → caught (:119) → `HostFailure::Panic` recorded (`first_failure`, :156-163) → conditional `request_stop` (only if no terminal is already committed, :160-162) → episode terminates, `seal()` obligations still met; a full stdout pipe is the blocking variant (reader stuck inside its admitted operation; seal delay documented, ledger #5). The two-class split of migration §1.7 (protocol = host-operation failure, visible; diagnostic = loss-only) is the acceptance object | Any behavior OUTSIDE the documented classes (e.g. a protocol-write panic escaping the catch; a diagnostic-style silent-drop being applied to protocol rows; seal proceeding while the reader is unacknowledged) falsifies the classification |
 | E-8 | Broken-pipe exit-101 reachability on the main thread | Pipe-closed stdout/stderr harness around the binary at each report site (#1-#7) | Confirms A's F-07 main-thread scenario end-to-end; absence would falsify the std-panic premise on this platform |
 
 ---
