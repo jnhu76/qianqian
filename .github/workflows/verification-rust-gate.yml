@@ -4,7 +4,11 @@ name: Verification Rust Gate
 # qianqian-composition scenario matrices (native + Miri) with their
 # production mutation negative controls (specs/composition-kernel-0-rust),
 # and the real-PcmEdge Loom concurrency suite with its negative control
-# (specs/playback-concurrency), via specs/check.sh rust.
+# (specs/playback-concurrency), via specs/check.sh rust — plus the F5
+# seek-implementation production mutation gate
+# (specs/f5-seek-implementation/check.sh, called directly so the F5 TLA
+# suite is not re-run here; the formal side of F5 lives in the Formal
+# Semantic Gate).
 #
 # Toolchain contract (fail-closed preflight below enforces it):
 #   plain rustc/cargo   = stable  — native matrices, §G.6 dependent-consumer
@@ -18,20 +22,23 @@ name: Verification Rust Gate
 # Fail-closed contract: dirty production file, missing nightly-miri
 # toolchain, a matrix failure, a Miri finding, a mutation that is no
 # longer caught, a lost loom deadlock, or any nonzero runner exit fails
-# this job. No continue-on-error, no || true, no allowed failure.
+# this workflow. No continue-on-error, no || true, no allowed failure.
+# The f5-implementation job adds: its native regression must come back
+# green and non-empty, every one of the M1–M11 production patches must
+# apply AND be caught by its targeted suite, and the touched files must
+# restore byte-exact — a green mutated run is TOOLING-FAIL there.
 #
 # Trigger paths are repository-reality scoped: the verified production
-# crates (kernel + playback), the suite definitions themselves, and the
-# authority documents the Rust refinement evidence is checked against
-# (K0 design/implementation ADRs — the composition refinement matrix
-# claims them; ADR-PBK-002 D8/D11 — the PCM data-plane boundary and the
-# episode terminal-outcome authority realized by qianqian-playback).
-# qianqian-audio-api is intentionally not listed: its src/ hosts only
-# portable ports, and the P1–P5 mechanism harness under its tests/ is a
-# test-local candidate realization — no multi-generation publication
-# mechanism exists in any production crate yet (ADR-PBK-001 §6/§12 keeps
-# the production representation OPEN; ADR-PBK-001 itself triggers the
-# Formal Semantic Gate, not this one). One artifact from the formal
+# crates (kernel + playback + audio-api), the suite definitions
+# themselves, and the authority documents the Rust refinement evidence
+# is checked against (K0 design/implementation ADRs — the composition
+# refinement matrix claims them; ADR-PBK-002 D8/D11 — the PCM data-plane
+# boundary and the episode terminal-outcome authority realized by
+# qianqian-playback). crates/qianqian-audio-api IS listed: its src/
+# ports.rs hosts the F5 implementation mutation targets RenderGate /
+# TailProbeOutcome / PositionEvidence (M4/M11 patch set), and the P1–P5
+# test-local candidate harness under its tests/ stays covered by the
+# ordinary rust-regression workflow. One artifact from the formal
 # side IS listed: the settlement decision table
 # (specs/episode-terminal-settlement/CurrentDecisionTable.tla) is
 # frozen from the production resolver by the exhaustive Rust oracle
@@ -47,15 +54,23 @@ name: Verification Rust Gate
 #
 # Cost note: Miri here is the ~1-minute 7-matrix pass over
 # qianqian-composition (see specs/composition-kernel-0-rust/RESULTS.md),
-# not a cross-workspace Miri campaign.
+# not a cross-workspace Miri campaign. The f5-implementation job is
+# ~1 native regression + 11 bounded targeted mutation runs (each capped
+# by the runner's own 900 s timeout) over the already-built
+# playback/audio-api test targets.
 
 on:
   pull_request:
     paths:
       - "crates/qianqian-composition/**"
       - "crates/qianqian-playback/**"
+      - "crates/qianqian-audio-api/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
+      # F5 implementation mutation gate: the patch set itself and the
+      # three production files it patches (completion.rs / session.rs /
+      # ports.rs — the latter via the audio-api trigger above).
+      - "specs/f5-seek-implementation/**"
       # Decision-table refinement-oracle artifact: frozen from
       # completion.rs by the exhaustive oracle this gate runs.
       - "specs/episode-terminal-settlement/CurrentDecisionTable.tla"
@@ -69,8 +84,11 @@ on:
     paths:
       - "crates/qianqian-composition/**"
       - "crates/qianqian-playback/**"
+      - "crates/qianqian-audio-api/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
+      # F5 implementation mutation gate (see pull_request above).
+      - "specs/f5-seek-implementation/**"
       # Decision-table refinement-oracle artifact (see pull_request).
       - "specs/episode-terminal-settlement/CurrentDecisionTable.tla"
       - "specs/check.sh"
@@ -121,3 +139,29 @@ jobs:
 
       - name: Rust-side verification (specs/check.sh rust)
         run: specs/check.sh rust
+
+  # F5 seek implementation mutation gate — the eleven production
+  # patches (M1–M11) over completion.rs / session.rs / ports.rs, each
+  # of which must be CAUGHT by its targeted executable suite. Called
+  # directly (not via `specs/check.sh f5`) so the F5 TLA suite is not
+  # re-run here: the formal side of F5 belongs to the Formal Semantic
+  # Gate. Stable toolchain only — no Miri/loom dependency. The runner
+  # is fail-closed by design (refuses dirty files; a green mutated run
+  # is TOOLING-FAIL; byte-exact restore verified after every mutation).
+  f5-implementation-mutations:
+    name: F5 seek implementation mutations (specs/f5-seek-implementation/check.sh)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Preflight — stable toolchain must be active
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: F5 implementation mutation gate
+        run: specs/f5-seek-implementation/check.sh

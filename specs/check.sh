@@ -6,12 +6,16 @@
 # 没有历史模式：pre-reset playback 模型已从 main 删除（Git 历史存档），
 # 见 specs/README.md。
 #
-# 用法：specs/check.sh [current|k0|realtime|terminal|rust]（缺省 current）
+# 用法：specs/check.sh [current|k0|realtime|terminal|f5|rust]（缺省 current）
 #   current  — composition-kernel-0 + realtime-publication +
-#              episode-terminal-settlement（TLA+/TLC）
+#              episode-terminal-settlement + f5-seek-discontinuity
+#              （TLA+/TLC，四套 current 套件）
 #   k0       — K0 控制面套件
 #   realtime — realtime publication 套件
 #   terminal — episode terminal settlement 套件（D11 current-spec conformance）
+#   f5       — f5 TLA 套件 + f5-seek-implementation 实现 mutation 门禁
+#              （CI 上后者由 verification-rust-gate 的独立 job 直接调用
+#               specs/f5-seek-implementation/check.sh，不重跑 TLA）
 #   rust     — Rust 侧当前验证：composition-kernel-0-rust（cargo 矩阵 +
 #              Miri + production mutation 负控制）与 playback-concurrency
 #              （native + loom + mutation）。需要 nightly miri / loom

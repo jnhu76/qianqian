@@ -2,8 +2,9 @@ name: Formal Semantic Gate
 
 # Durable gate for the CURRENT formal semantic evidence (post-139 spec
 # reset): the K0 control-plane TLA+ suite, the realtime-publication
-# TLA+ suite, and the episode-terminal-settlement conformance suite
-# (ADR-PBK-002 D11), via specs/check.sh current.
+# TLA+ suite, the episode-terminal-settlement conformance suite
+# (ADR-PBK-002 D11), and the F5 seek-discontinuity cutover suite
+# (ADR-PBK-002 §20 D14.5), via specs/check.sh current.
 #
 # Fail-closed contract (task NORTH STAR: explicit proof obligation ->
 # smallest sufficient verifier -> negative control -> durable gate):
@@ -45,6 +46,10 @@ on:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
       - "specs/episode-terminal-settlement/**"
+      # The seek-cutover refinement is implementation-side (see the
+      # verification-rust-gate's f5-implementation mutation job); the
+      # formal gate covers the model itself.
+      - "specs/f5-seek-discontinuity/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
@@ -65,6 +70,7 @@ on:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
       - "specs/episode-terminal-settlement/**"
+      - "specs/f5-seek-discontinuity/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
@@ -82,7 +88,7 @@ concurrency:
 
 jobs:
   tla-semantic:
-    name: TLA+/TLC current suites (K0 + realtime publication + episode terminal settlement)
+    name: TLA+/TLC current suites (K0 + realtime publication + episode terminal settlement + F5 seek discontinuity)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
