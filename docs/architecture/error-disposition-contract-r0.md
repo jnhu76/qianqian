@@ -2,7 +2,10 @@
 
 > **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
 > **Evidence anchor:** `main@524c6efeeabcfc94ceaf8e9cf1392e88861288c3` (2026-10-15).
-> **Review status:** revised after independent Astra REVISE assessment (P1 + P2); repeat review pending; no owner adoption.
+> **Review status:** revised after the prior static review (owner-attributed to "Astra" in
+> the PR #280 owner comment of 2026-10-15; the reviewer's identity and independence are not
+> verifiable from repository records and are not asserted here) — findings P1 + P2
+> incorporated; repeat review pending; no owner adoption.
 > **Scope:** #231 error provenance, stage-local handling, escalation and diagnostic requirements.
 > **Explicitly out of scope:** #277 Failed auto-advance decision; changes to existing ADRs, public API, SongCore ABI, implementation, or tests.
 
@@ -390,5 +393,33 @@ LOGGING = CONCEPTUAL_ONLY; BASELINE_STDERR_PROGRESS_HAZARD = UNRESOLVED
 PRODUCTION = UNCHANGED
 TESTS = UNCHANGED
 OWNER_ADOPTION = PENDING
-ASTRA_REVIEW = REVISE_AT_3c866cfa; RECHECK_REVISED_HEAD
+PRIOR_STATIC_REVIEW = REVISE_AT_3c866cfa (owner-attributed "Astra"; identity unverified);
+                      RECHECK_REVISED_HEAD
 ~~~
+
+## 9. R1 extension layer (current facts vs target design)
+
+This document remains the R0 design candidate. The round recorded in the companion files
+adds, without promoting anything here to authority:
+
+1. **Directed evidence + A/B reconciliation** —
+   [error-system-reconciliation-r1.md](error-system-reconciliation-r1.md): the unified
+   boundary ledger, the GAP-01..05 re-verification (including the pending-fatal × seek
+   interaction matrix, the exact `catch_unwind` coverage map, the host-output ledger, and
+   the adjudication/errata table for scans #281/#282), and the
+   `NEEDS_RUNTIME_EVIDENCE` registry.
+2. **Six-module target contracts** —
+   [error-system-target-contract-r1.md](error-system-target-contract-r1.md): candidate
+   obligations per module (representation, propagation, handling, lifecycle, logging,
+   migration), each with basis / current / target / change class / counterexample /
+   acceptance, plus the DeepSeek-harness reference mapping. All CANDIDATE.
+3. **Migration and acceptance** —
+   [error-system-migration-r1.md](error-system-migration-r1.md): per-boundary migration
+   rows, the authority-amendment correspondence table with concrete candidate texts, and
+   acceptance-by-nature designs.
+
+Layering rule: sections 0–8 above describe **current behavior and candidate reasoning**
+as of the R0 baselines; the R1 companions separate *proven current facts* (anchored at
+`5e60da4c`), *reachable-but-unobserved behavior*, and *target-contract choices*. Nothing
+in any of these files changes D11, D14.*, the SongCore ABI, U2, or any accepted document;
+merging them authorizes implementation of nothing.
