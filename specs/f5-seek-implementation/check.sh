@@ -55,9 +55,24 @@
 #   M7 ResumeAfterMutatedSeek     the worker continues old-cursor
 #                                 production after a destructive provider
 #                                 failure (session.rs)
-#                                  → caught by the destructive matrix
-#                                 (production must stop for good at the
-#                                 Failed terminal).
+#                                  → caught by the stateful continuation
+#                                 probe (no post-failure production; the
+#                                 destructive seek may never reconstruct
+#                                 the old continuation).
+#                                 2026-10-16 re-pin: the previous targeted
+#                                 oracle (seek_seam's producer-freeze
+#                                 witness) went blind after 8542386
+#                                 removed the completion-side disengagement
+#                                 latch — the mutated fall-through then
+#                                 re-enters the seek protocol instead of
+#                                 the read path, so the endpoint read
+#                                 count never moves. The stateful probe
+#                                 observes post-failure PRODUCTION totals
+#                                 and catches the same defect (86016 vs
+#                                 23552 frames in the incident log). No
+#                                 CI ran this gate when 8542386 landed —
+#                                 the blinding this re-pin repairs is the
+#                                 concrete cost of the AF-2 wiring gap.
 #
 # M8 is corrective-1's own guardrail (current-cut attribution): the
 #   per-cut evidence latches are reset when a new seek is accepted;
@@ -218,8 +233,8 @@ run_mutation M6RefusalDropsRemainder M6RefusalDropsRemainder.patch \
   a_refused_seek_finishes_its_own_remainder_with_zero_content_loss
 
 run_mutation M7ResumeAfterMutatedSeek M7ResumeAfterMutatedSeek.patch \
-  -p qianqian-playback --test seek_seam \
-  a_destructive_provider_failure_fails_the_episode_and_never_resumes
+  -p qianqian-playback --lib \
+  stateful_probe_tests::a_mutated_then_failed_seek_never_reconstructs_the_old_continuation
 
 run_mutation M8StaleCutEvidence M8StaleCutEvidence.patch \
   -p qianqian-playback --lib \
