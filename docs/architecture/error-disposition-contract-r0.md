@@ -2,7 +2,7 @@
 
 > **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
 > **Evidence anchor:** `main@524c6efeeabcfc94ceaf8e9cf1392e88861288c3` (2026-10-15).
-> **Review status:** proposed for an independent Astra review; no owner adoption.
+> **Review status:** revised after independent Astra REVISE assessment (P1 + P2); repeat review pending; no owner adoption.
 > **Scope:** #231 error provenance, stage-local handling, escalation and diagnostic requirements.
 > **Explicitly out of scope:** #277 Failed auto-advance decision; changes to existing ADRs, public API, SongCore ABI, implementation, or tests.
 
@@ -50,18 +50,17 @@ whose owner decides the next consequence. An unproven continuation must fail
 closed. Success/error status, diagnostic severity and user-visible wording
 must not be interchanged.
 
-We use the following names *only as review annotations*, not proposed Rust
-types or new runtime states:
 
-| Annotation | Meaning | Permission boundary |
-|---|---|---|
-| HANDLED | Internal protocol condition or anomaly fully resolved without changing the promised result | Local owner proves invariants; no new Episode outcome |
-| DEGRADED_CONTINUE | Reduced service with an explicit product/operation contract | **Candidate only** unless that degradation is already authorized |
-| REFUSED_UNCHANGED | Operation rejected before the relevant prior state changes | Must prove unchanged continuation; not a generic fallback |
-| ESCALATED | Callee cannot discharge caller's required guarantee | Report sufficient, accurate operation evidence; caller adjudicates |
-| ESTABLISHMENT_FAILURE | No live episode was established | Never forge D11 Failed |
-| EPISODE_FAILURE | Live episode cannot satisfy current playback contract | Playback Session alone commits D11 Fact under existing precedence |
-| FAIL_STOP | Existing lifecycle/teardown guarantee violated | Respect existing latch; no attempt to disguise recovery |
+The analysis dimensions are **not mutually exclusive** and must not be
+flattened into a universal disposition vocabulary: an operation can be
+escalated to its caller, prevent episode establishment, and subsequently
+encounter a teardown fail-stop. "Handled", "refused unchanged", "escalated",
+"establishment failure", "episode failure" and "fail-stop" in this document
+are ordinary descriptions at **different owners and times**, not a common
+enum, ordering, transition graph, or proposed dispatcher. Existing
+operation-specific typed contracts (notably \`ProviderSeekOutcome\`) remain
+the only authorized representations. Never derive recovery permission from
+a generic label.
 
 ## 2. Product-visible outcome candidates (not accepted #277 policy)
 
@@ -81,22 +80,43 @@ classify "bad media" from a generic decode failure.
 Actual user wording and controls are later UX decisions; the category does not
 automatically authorize retry, seek, drop-packet, bypass, or next-track.
 
+
 ## 3. Stage-by-stage disposition matrix
 
-Every "may continue" entry means **only if the specified proof obligation
-holds**. It is not a declaration that present code implements that recovery.
+**Status vocabulary in this table describes evidence, not a new product
+state:** \`CURRENT\` means observed in production code or supported by the
+accepted authority cited in the row; \`NOT_EARNED\` means a possible future
+behavior requiring its own proof and, where necessary, authority amendment.
+The invariant in each row is what a reviewer could **falsify** with a
+counterexample. Source EOF may be normal under the current byte/decode
+protocol without proving the underlying file was complete.
 
-| Owner / stage | Local handling and legal continuation | Mandatory escalation | Diagnostic evidence worth retaining |
+| Owner/stage and authority anchor | Status + conditions to continue (testable invariant) | Must escalate when | Diagnostic evidence, if actually captured |
 |---|---|---|---|
-| **Host source / byte I/O** (source provider) | Successful read/seek; normal source EOF according to its existing contract. A transient retry only if bounded and without changing cursor/data ordering, and explicitly supported | Persistent read/seek/size failure, unknowable cursor/data validity | Operation, OS error/code if available, safe byte offset, retry/short-read facts |
-| **SongCore demux / container** | Normal internal demux protocol; successful resynchronization only if packet boundary, stream identity and continuation are actually proven | Cannot establish valid stream, required packet boundary, or continued demux | Container, stage, stream index, native code, known packet/byte location |
-| **SongCore decoder / PCM conversion** | Internal EAGAIN send/receive coordination; decoded frames with correct format/layout; localized bad-packet recovery **only if separately proven and authorized** | Unusable decoder continuation, untrusted PCM, unsupported midstream format change, non-recoverable decode result | Codec, operation, native code, returned status, produced-frame count, delayed-fatal evidence |
-| **Rust SongCore adapter** (FFI translation) | Exact SONG_OK / SONG_EOF; map the provider's **already proven** seek dispositions; copy diagnostics while handle still owns them | An unhandled native status or a destructive/unknown continuation | Typed song_status; native_code/message when available; original operation; mapped result |
-| **Playback Session decode worker / PcmEdge** | Existing frames, bounded edge backpressure, stop and EOF obligations; D14.5 RefusedUnchanged remains nonterminal | Endpoint read error, destructive seek failure, processing failure, worker panic; publish existing failure evidence and settle under D11 | Existing worker origin, operation and observation snapshot; avoid fake media-local attribution |
-| **DSP processing** (episode-owned stage) | Validated/rejected configuration with no illegal mutation; completed processing; any bypass **requires distinct authority/evidence first** | An accepted processing operation fails without a proven authorized continuation | Processor stage, update/apply context, rejection vs fatal distinction |
-| **Output backend / render leg** (Output Plugin mechanism) | Legal device protocol and normal drain; retry only if bound, safe and established for this backend | Device/stream failure, terminal aborted render, failed mandatory tail observation; release/wake waiters per existing contracts | Concrete backend/operation, OS/HRESULT when captured, LoopOutcome and drain evidence |
-| **Playback Session completion** (D11 authority) | Nonterminal command dispositions remain commands; settle exactly as currently authorized | Publish exactly one terminal Fact when decisive evidence exists; no observer-dependent commit | Fact, competing evidence relevant to precedence, existing stage diagnostic |
-| **App / playlist / TUI / host** (product policy) | Safe Open refusal, normal Completed-only auto-next, manual user navigation, truthful presentation | Existing fail-stop for teardown; host failure stays host failure; do not invent playback Fact | User action and Open result, optional terminal diagnostic, navigation attempt/result |
+| **Host byte I/O** — \`qianqian-decode-songcore/src/lib.rs\` \`file_read/seek/size\`; \`songcore_ffmpeg.c\` \`io_read/io_seek\` | **CURRENT:** successful read/seek preserves byte order/position; zero-byte read maps to source EOF under the existing API, **not** an integrity claim. **NOT_EARNED:** retry after I/O error; must prove unchanged cursor or exactly known progress, no duplicated/dropped bytes, bounded attempts, stop responsiveness | Read/seek/size error or unknown cursor/progress: report to SongCore as the current I/O contract permits; never silently convert read failure to EOF | Operation, original OS error if captured, validated offset, short-read/retry count (present callback currently loses OS detail) |
+| **SongCore demux** — \`songcore_ffmpeg.c\` \`decode_one_frame()\`, \`av_read_frame\` branch | **CURRENT:** normal packet selection and FFmpeg internal progress; no generic corruption recovery. **NOT_EARNED:** resync; must prove correct stream identity and packet boundary, explicit treatment of lost media/time, consistent decoder continuation, bounded progress and stop observability | Demux cannot deliver a trustworthy continuation or returns non-EOF failure | Native FFmpeg code, stage, stream/packet and byte position **only if known** |
+| **SongCore decoder / PCM conversion** — \`decode_one_frame()\`, \`decode_status()\`, \`song_read_pcm()\`; SongCore ABI | **CURRENT:** \`EAGAIN\` send/receive loop, valid PCM, format invariance, legal success/EOF, and latched fatal reported after already-produced frames. **NOT_EARNED:** drop malformed packet; requires authorized content-loss/gap semantics, sample/position and timestamp treatment, decoder state and stream identity proof, frame format, forward progress, and stop responsiveness. Later decodable frames alone do not prove legality | Decoder continuation invalid, conversion/format contradiction, unrecoverable native result; retain latched fatal for next read as today | Typed SongCore status, native code, produced frame count, whether fatal reporting was deferred |
+| **Rust SongCore adapter** — \`native/include/songcore.h\` diagnostic lifetime; \`ports.rs\` \`DecodedPcmStream\`, D14.5 | **CURRENT:** \`SONG_OK\` → Frames; \`SONG_EOF\` → Eof; \`ProviderSeekOutcome::RefusedUnchanged\` only on proven pre-mutation refusal. Any diagnostic pointer is valid only **until the next SongCore call on the same handle**; bounded ownership transfer must finish inside that window | Unhandled status or invalid decoder continuation; destructive seek → existing failure path, no fake unchanged refusal | \`song_status\`; \`song_error.native_code/message\` **copied before the next same-handle call** if needed; no borrowed native pointer across async boundary |
+| **Playback Session / decode worker / PcmEdge** — PBK-002 D11, D14.5, D14.11; \`session.rs\`, \`completion.rs\` | **CURRENT:** previously accepted frames and bounded edge behavior follow existing ordering; seek \`RefusedUnchanged\` permits old continuation; stop/EOF settlement follow frozen precedence. Invariant: no resumption of old PCM after destructive seek and no observer-dependent terminal creation | Endpoint read failure, destructive seek, processing failure or worker panic; publish mechanism evidence and let D11 owner settle | Actual worker origin and current episode-associated evidence; error text is presentation-only |
+| **DSP processing** — PBK-002 D14.11; \`session.rs\` \`processing.stage/poll_update\`; \`dsp-product-model.md\` | **CURRENT:** successful staging and proven no-mutation validation rejection. **NOT_EARNED:** bypass on failed accepted processing; would need explicit signal/timeline, state-reset and lifecycle guarantees | Accepted processing fails and no authorized continuation exists | Applied stage/update, refusal vs failure, stage diagnostic; never rename a DSP failure as decode |
+| **Output render / drain** — PBK-003; \`wasapi.rs\` \`run_render_thread\`; PBK-002 D11 | **CURRENT:** legal device/edge interaction, drain completion, stop-handling; \`Aborted\` alone is not device failure. **NOT_EARNED:** general device retry; needs stream/resource validity, correct PCM and position, bounded attempts, stop/teardown responsiveness | Output/stream cannot progress or correct drain cannot be established; publish stop/wake/drain evidence without waiting for log output | Backend and operation, HRESULT if captured, \`LoopOutcome\`, drain verdict, diagnostic text separate from the verdict |
+| **Output volume control** — PBK-002 **D14.9**, \`wasapi.rs\` \`SetAllVolumes\` branch | **CURRENT:** ordinary non-device-invalidating apply failure retains **last successfully applied level**; remembers the attempted routed value to avoid repeating a failed COM call each iteration, and tries on a later routed value change. No episode failure from the ordinary apply error. Invariant: no invented "applied" readback or repeated failed application per quantum | **CURRENT:** \`AUDCLNT_E_DEVICE_INVALIDATED\` aborts through the existing device-failure path. No automatic recovery of dead render | Desired/routed versus last successfully applied (not a fabricated device readback), HRESULT, one diagnostic *attempt* per episode; see existing synchronous logging hazard §6 |
+| **Playback Session completion** — PBK-002 D11/D14.2; \`completion.rs\` \`resolve()\`, \`handle.rs\` | **CURRENT:** at most one committed terminal outcome; resolve using all decisive worker/drain/stop-intent evidence, by semantic precedence. Pending observations do not create facts | Decisive evidence requires authoritative terminal commit; cannot defer it for a logging sink | Terminal result, origin diagnostic and decisive inputs where legally observable |
+| **App / playlist / TUI / host** — PBK-002 §20 U2, D14.6; \`player.rs\` \`replace_episode/poll_eof_policy\` | **CURRENT:** probe-before-destruction refusal preserves old episode; \`Completed\` only triggers at most one auto-next attempt, committing cursor only on successful Open; explicit manual navigation remains available. Invariant: failed activation after old teardown is **not** equivalent to preflight refusal | Teardown violation → existing fail-stop; host error remains host failure; Failed is not an App-manufactured Completed | Open phase/result, old/new episode status only as supported, candidate and cursor commit, diagnostics without policy string parsing |
+
+### NOT_EARNED recovery admissions (no experiment claimed in R0)
+
+| Candidate | Minimum independently falsifiable continuation proof before approval |
+|---|---|
+| **Host retry** | Exact bytes/cursor before and after failure; no duplicate or lost bytes; finite tries; stop can interrupt/win; read error never silently treated as natural EOF |
+| **Demux resynchronization** | Real next packet/stream boundary is identified; any skipped bytes/data are accounted for; decoder state is valid at the new point; downstream sample/timeline expectations are explicitly satisfied; finite progress and stop responsiveness |
+| **Decode bad-packet skip** | Explicit authority for content loss and any silence/gap/position discontinuity; correct source format; no untrusted PCM passed through; decoder reset/continuation validity; finite forward progress and cancellation; prove on corrupt and healthy controls |
+| **DSP bypass** | Authorized bypass semantics; correct post-processing PCM, signal history and timeline; valid publication/lifetime and teardown; no covert reclassification of failure |
+| **Device restart/retry** | Fresh/valid device ownership and host resources; no old-stream use-after-release; correct PCM positioning/drain semantics; bounded response to stop and teardown |
+
+These proofs are **preconditions**, not implementations or evidence of
+capability. The present R0 review is allowed to leave every NOT_EARNED item
+unimplemented, untested, and forbidden.
 
 ### Why these are not interchangeable
 
@@ -129,9 +149,9 @@ holds**. It is not a declaration that present code implements that recovery.
 | `native/src/songcore_ffmpeg.c`: `song_read_pcm()` | Partial frames may be returned before a latched fatal is reported on the next read; `ok(h)` clears diagnostic under ABI contract | **Do not "repair" this by deleting ok(h)**; investigate separate original-message retention only if earned |
 | `crates/qianqian-decode-songcore/src/lib.rs`: `file_read/seek/size` | Rust I/O errors become -1; SongCore sees generic EIO | Loss of OS specificity is a bounded diagnostic candidate, not proof of media corruption |
 | `crates/qianqian-decode-songcore/src/lib.rs`: `read_frames()`, `last_error()` | Non-success codes become `DecodeError { message }`; `native_code` not read | #231 L1/L2 candidate internal retention; adding fields alone **does not** earn App policy input |
-| `crates/qianqian-audio-api/src/ports.rs`: `DecodeError` / `DecodeOpenError` | Public domain-facing errors contain messages only | Widen the contract only for a proven consumer and backend-neutral semantic need |
+| `crates/qianqian-audio-api/src/ports.rs`: `DecodeError` / `DecodeOpenError` | Public domain-facing errors contain messages only | Widen only for a concrete diagnostic or control consumer, evidence that local reporting is insufficient, and the minimum backend-neutral contract; a diagnostic-only change **must not** change control behavior |
 | `crates/qianqian-playback/src/session.rs` and `completion.rs` | Decode/seek/processing evidence drives existing D11 resolver; no playlist awareness | Keep semantic precedence, first committed Fact, worker-exit and teardown ordering |
-| `crates/qianqian-output-wasapi/src/wasapi.rs` | `LoopOutcome::Aborted { message }` is optionally printed, then mapped to drain Aborted without message | Diagnostics may be lost (L7); not permission to relabel playback outcome |
+| `crates/qianqian-output-wasapi/src/wasapi.rs` | `LoopOutcome::Aborted { message }` is optionally printed **synchronously before** `render_input.stop()` and `drain.complete()`; volume-apply recoverable failure also has a synchronous `eprintln!` in the render loop | **Existing progress hazard**, not a new bug from this PR: a blocked stderr can delay wakeup, drain publication or render-loop progress. D11 semantics unchanged; §6 records the gap. |
 | `crates/qianqian-playback/src/handle.rs` | Public terminal enum has only Completed/Stopped/Failed; `failure_diagnostic` is presentation-only | Do not branch on message or add Failed subtypes |
 | `apps/headless/src/player.rs`: `poll_eof_policy()` | Only committed Completed drives auto-traversal; one attempt per episode, commit cursor on successful Open | #277 must independently amend §20 U2 before any Failed-driven transition |
 
@@ -151,69 +171,123 @@ adjudication. A FFmpeg 7.0.1 CLI comparison is not a like-for-like control
 against Qianqian's pinned 9.0.1 closure. Do not label this file definitively
 corrupt, definitively healthy, or the decoder definitively defective.
 
+
 ## 5. Information-preservation and collapse rules (candidate)
 
-When designing a boundary, answer in order:
+A shared error *result* may be smaller than the data available for diagnosis.
+The justification is specific to the next owner, never the convenience of an
+\`Error\` super-enum.
 
-1. **Which next-owner obligation would become impossible if the field
-   disappeared?** If none, preserve it locally for diagnosis if useful;
-   do not expand a general public API by symmetry.
-2. **Does the source evidence actually prove that category?** No
-   `generic DECODE_ERROR => media-corrupt` or `EIO => this file is bad`
-   leap. Native FFmpeg codes can be ambiguous across stages.
-3. **Can two errors share a control result?** Yes, if they impose the
-   same caller-visible obligations **and** no needed discriminator is
-   destroyed. They may still have different local diagnostics.
-4. **Is a new type/field needed beyond the boundary?** Only if a
-   concrete consumer and false-merge counterexample earn it.
-5. **Does any new recovery require ADR authority?** Do not smuggle
-   changed semantics through a diagnostic code path.
+1. **Who consumes which distinction?** Identify the concrete diagnostic
+   **or** control consumer and obligation; show why existing local
+   diagnosis/observation is insufficient.
+2. **What does the producer actually prove?** A generic
+   \`DECODE_ERROR\` is not a media-corruption witness, nor is EIO proof
+   that one file is the only affected resource.
+3. **Can two failures share a caller result?** Yes if the caller has the
+   same obligations; preserve only those independent distinctions that
+   could alter those obligations. Diagnostic provenance may still be
+   different and local.
+4. **Is a wider public contract necessary?** Require the smallest
+   backend-neutral fields and a real consumer. A **diagnostic-only**
+   extension must demonstrate it does **not** change control semantics
+   or act as implicit recovery permission. A **behavior-changing**
+   extension requires separate owner/ADR authorization.
+5. **Which distinctions must not collapse?** Seek
+   \`RefusedUnchanged\` versus \`MutatedThenFailed\`; normal EOF versus
+   unhandled read failure (while accepting EOF proves no integrity);
+   stop-intent + worker/drain evidence versus an isolated Aborted;
+   preflight Open refusal versus post-destruction activation failure
+   versus teardown violation; accepted PCM with **pending fatal**
+   versus genuinely recovered error.
+6. **What does the FFI own?** \`song_error\` and its borrowed
+   \`message\` are valid only **until the next SongCore call on the same
+   handle**, not until the handle is destroyed. If needed, copy the
+   bounded diagnostic while valid, then pass **owned** data to an
+   asynchronous diagnostic consumer. If the copy/report fails, the
+   original operation's typed success/failure still follows its
+   contract; losing a log is permissible, losing the failed operation
+   is not.
 
-The three paths remain separate in responsibility, **not necessarily three
-implemented channels**:
+Keep mechanism errors scoped to their proper owner. Do not route all
+FFmpeg/OS enums into Playback Session or UI; do not flatten
+control-critical data into localized text. SongCore C ABI changes have
+not been earned; local adapter retention from #231 remains a
+candidate, not an implementation approval.
 
-~~~text
-Local stage -- handled --> existing success/operation result
-           -- unhandled --> existing typed operation failure --> owner decision
-           -- diagnostic --> best-effort observation/logging (never an authority)
-~~~
-
-Do not route all FFmpeg/OS enums into Playback Session or UI, and do not
-flatten control-critical distinctions into localized strings. SongCore C ABI
-changes are **not earned** by current evidence; internal adapter retention
-(option B in #231) remains a targeted candidate, not a selected PR implementation.
 
 ## 6. Diagnostic contract for future logging (candidate, no logger yet)
 
-Future logs are **evidence**, not Facts and not recovery commands.
-A useful local record may contain, only where known:
+**No new logging mechanism is implemented or authorized here.** Logging
+is evidence, not a Fact, a recovery command, or an owner of termination.
+When actually captured, a local record might include component, operation
+and stage; typed source status/native code; known offset/produced-frame
+count/delayed-fatal context; existing episode context if necessary; and
+an unstable message. There is no requirement to invent an Episode ID.
 
-- component/operation/stage; typed source error status and optional native
-  error code; whether error was handled, refused or escalated;
-- caller-safe context (e.g. packet/byte position, produced PCM frame count,
-  delayed-fatal occurrence); linkage to the **existing** episode record if
-  necessary (no new Generation/Epoch identity);
-- an unstable human-readable diagnostic separate from all control decisions.
+### Proposed critical-path firewall — beyond the steady audio quantum
 
-Logging constraints to retain from the outset:
+The **whole failure publication and exit cone** is protected, not just
+the per-PCM-block render loop:
 
-- Best effort: disabled, dropped, failed or reworded logs **never** change
-  operation results, D11 settlement, data-plane behavior, or teardown.
-- No file/network I/O, unbounded queues/locks, repeated formatting or
-  expensive allocations on the WASAPI render quantum / realtime hot path.
-  Avoid logging every normal FFmpeg EAGAIN or every PCM block.
-- Prefer one bounded failure summary and optional aggregate counts to an
-  unbounded stream of repetitive faults; a queue's drop count is diagnostic
-  only. No latency or memory bound is asserted without measurement.
-- Treat file paths, filenames, directory locations and media tags as potentially
-  sensitive: minimize defaults; any fuller user-requested diagnostic export
-  must be a separate product/privacy choice.
-- Do not make a new Logging Plugin/Capability/EventBus. Any eventual mechanism
-  must first demonstrate a consumer, performance envelope, ownership and
-  need under PBK-002 D13 and the existing realtime firewall.
+- Never let a logging sink's latency/success influence the publication
+  of failure evidence, \`render_input.stop()\`/wakeups, drain completion,
+  D11 settlement, or resource release and thread/episode teardown.
+- No synchronous sink under the settlement lock or while holding a
+  resource needed for an owner to make terminal progress. An unavailable,
+  backpressured, full or broken diagnostic consumer must not block
+  producer publication or episode shutdown; the caller may **drop the
+  diagnostic**, never the actual failure signal.
+- Limit producer work and diagnostic payloads at the actual boundary:
+  any optional snapshot/copy or handoff must be bounded/nonblocking;
+  expensive formatting, disk I/O, network delivery and other blocking
+  sink operations are outside the RT/failure-publication/teardown path.
+  A log consumer is not an owner that must be joined or awaited before
+  the required terminal evidence/discharge.
+- **"Only one log per episode" bounds count, not output latency.**
+  A single \`eprintln!\` to a stalled pipe can block indefinitely.
+  Logging off, dropped or delayed cannot alter behavior or introduce
+  another completion barrier. No wall-time bound is asserted by this
+  design without an executable witness.
+- Source/FFI borrowed diagnostic pointers are never handed to any
+  asynchronous consumer. If useful, materialize an **owned, bounded**
+  snapshot before the next SongCore operation on the same handle; if
+  this optional capture fails, preserve the operation/terminal result
+  regardless. Do not change \`song_read_pcm()\`'s \`ok(h)\` diagnostic
+  clearing or latched-fatal reporting to accommodate logging.
 
-**Severity != disposition.** An error log does not require stopping
-playback, and a fail-stop does not depend on successful logging.
+**Known BASE_SHA progress hazards (NOT FIXED by this docs-only PR):**
+
+1. \`crates/qianqian-output-wasapi/src/wasapi.rs:257–273\`
+   (at frozen \`524c6efe\`) calls \`eprintln!\` for
+   \`LoopOutcome::Aborted\` **before**
+   \`render_input.stop()\` and \`drain.complete()\`.
+   With \`QIANQIAN_AUDIO_LOG\` enabled, a blocked stderr can delay
+   the producer wakeup, drain evidence and render-thread exit. This
+   is an **existing code/progress risk**, not an assertion that
+   the error class or D11 resolver misclassifies the episode.
+2. The recoverable \`SetAllVolumes\` apply-error branch around
+   \`wasapi.rs:674–685\` also issues a synchronous \`eprintln!\`
+   from the render loop, despite the one-per-episode guard. The
+   output volume itself holds the last successful level, but a stalled
+   diagnostic sink can delay the next render iteration.
+
+Before treating any future logging implementation as satisfying this
+candidate firewall, explicitly demonstrate **negative controls**
+(stderr sink blocked, consumer stopped, queue full and write failure)
+while verifying stop/wake, drain/settlement, render progress and
+teardown are independent. No such experiment is claimed here; a
+separate, minimal corrective may be needed for today's opt-in logging.
+Do not turn this paragraph into authorization for a broad logging
+refactor.
+
+Default diagnostics must avoid unnecessary private filenames,
+absolute file paths and metadata; fuller exports require a separate
+product/privacy decision. Do not record each normal FFmpeg EAGAIN,
+every PCM block, or every repeated failure. Severity is independent
+of disposition; even high-severity logging is best-effort. Do not
+create a Logging Plugin, EventBus, K0 capability, new error registry,
+or independently managed lifecycle without separate D13 evidence.
 
 ## 7. Adversarial examples / counterexample obligations
 
@@ -229,6 +303,9 @@ playback, and a fail-stop does not depend on successful logging.
 | Candidate Open refused | No episode, cursor unchanged as required | Create D11 Failed or advance silently |
 | Failed episode with a healthy next song | Manual navigation permitted; U2 still Completed-only | Auto-skip before #277 owner approval |
 | Several consecutive failures / Repeat One | Future policy needs explicit boundedness and traversal proof | Unbounded automatic failure cascade |
+| WASAPI abort while stderr is blocked | Producer wakeup and drain completion cannot depend on diagnostic sink availability; existing baseline has risk | "Only one error log" means bounded execution time |
+| Recoverable output-volume COM apply error | D14.9 holds last successful level; device invalidation escalates; blocked stderr must not stall rendering | Convert every apply failure to Failed or assume one-time print cannot block |
+| SongCore diagnostic borrowed across an async task | Copy bounded, owned evidence **before next same-handle SongCore call**, never wait for sink | Assume pointer survives as long as handle exists |
 
 ## 8. Decision gates and independent-review questions
 
@@ -238,11 +315,12 @@ playback, and a fail-stop does not depend on successful logging.
       mistaken for an ADR amendment or implementation authorization.
 - [ ] Every current-behavior claim maps to code or accepted authority at
       the stated baseline, without treating diagnostic text as semantics.
-- [ ] Review stage-local continuation proof versus failure escalation.
+- [ ] For each stage, confirm a CURRENT/NOT_EARNED status, authority anchor, and falsifiable continuation invariant; do not bless candidate recovery by analogy.
 - [ ] Challenge whether a smaller (or no) shared error taxonomy suffices.
 - [ ] Verify no new Plugin, EventBus, terminal variant, cross-platform
       backend leakage or extra episode identity is being proposed.
-- [ ] Verify logging remains bounded/best-effort and outside correctness.
+- [ ] Verify logging remains nonblocking throughout evidence publication, stop/wakeup, drain, settlement, and teardown, **not only** the audio quantum; audit the existing WASAPI stderr hazards.
+- [ ] Verify SongCore borrowed diagnostics expire at the **next same-handle call** and async consumers can only receive owned data.
 - [ ] Verify #277 owner policy is not silently resolved.
 
 ### Later gates — NOT performed or authorized by this PR
@@ -259,9 +337,13 @@ positive/negative witnesses for SongCore status/native_code and deferred
 fatal; test actual D11 ingress where needed. Mark unrun cells NOT_RUN.
 
 **R3 (possible implementation decision):** choose the smallest earned
-adapter/diagnostic correction if needed; no public Decode Port or observation
-expansion until a concrete semantics-changing consumer and authority approve
-it. Any changed handling/recovery requires separate evidence and ADR review.
+adapter/diagnostic correction if needed, preferring local retention.
+Public Decode Port or observation expansion requires **a concrete
+diagnostic or control consumer**, evidence that existing local routes
+cannot serve it, and a minimum backend-neutral contract. Diagnostic-only
+changes must be proven control-inert. Changes to recovery, continuation
+or product behavior separately require the appropriate authority and
+ADR review. Neither class of change is approved in R0.
 
 **R4 (#277 separate):** owner decides whether Failed-driven App traversal
 exists at all. Until explicitly amended, PBK-002 §20 U2's Completed-only
@@ -286,6 +368,13 @@ remain fully binding.
 8. Which lines should be **deleted**, not turned into new Rust code?
 9. If #277 remains conservative, is any new architecture or implementation
    actually necessary for correct playback today?
+10. Do the known WASAPI stderr calls obstruct stop/drain/exit under blocked
+    sink, even on the one-shot abort path? Is any suggested solution narrower
+    than a logging subsystem?
+11. Does each NOT_EARNED continuation claim define **content loss, position,
+    decoder state, bounded progress and stop response** where relevant?
+12. Can a diagnostic-only Port extension be justified by a real consumer
+    without inventing a semantics-changing use case?
 
 ## R0 disposition
 
@@ -297,8 +386,9 @@ ISSUE_277 = UNCHANGED / NO_FAILED_AUTO_ADVANCE
 D11 = UNCHANGED
 SONGCORE_ABI = UNCHANGED
 RUST_PUBLIC_API = UNCHANGED
-LOGGING = CONCEPTUAL_ONLY
+LOGGING = CONCEPTUAL_ONLY; BASELINE_STDERR_PROGRESS_HAZARD = UNRESOLVED
 PRODUCTION = UNCHANGED
 TESTS = UNCHANGED
 OWNER_ADOPTION = PENDING
+ASTRA_REVIEW = REVISE_AT_3c866cfa; RECHECK_REVISED_HEAD
 ~~~
