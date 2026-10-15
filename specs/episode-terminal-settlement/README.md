@@ -21,11 +21,12 @@
 > 快照相等，缺 durable binding（"TLA models do not re-run on implementation
 > diffs" 使漂移可以静默通过 CI）。修正：**production ↔ formal 判决合同
 > refinement oracle**（见下节）——单一共享真值表 artifact
-> `CurrentDecisionTable.tla`（48 元组穷举、由 Rust oracle 从公开 seam 生成/
-> 比对），TLC run 逐行校验表 ↔ formal 判决函数；completion.rs 与该
-> artifact 进入两个 gate 的 trigger。W7/M10 证明的是"给定 formal ground
-> truth，C5 对完整域承重"；ground truth ↔ production 的相等性由本 oracle
-> 机器维护。
+> `CurrentDecisionTable.tla`（48 元组穷举、由 Rust oracle 生成/比对；F2 起
+> oracle 为 `src/decision_table_oracle.rs` crate-internal 白盒，pre-F2 的
+> "公开 seam"表述已过时），TLC run 逐行校验表 ↔ formal 判决函数；
+> completion.rs 与该 artifact 进入两个 gate 的 trigger。W7/M10 证明的是
+> "给定 formal ground truth，C5 对完整域承重"；ground truth ↔ production
+> 的相等性由本 oracle 机器维护。
 >
 > 语义真相只有一份：`docs/adr/ADR-PBK-001.md` §2（semantic commit /
 > fact authority identity / projection 非权威）与
@@ -91,9 +92,9 @@ stage 级改值（failed-device→failed-decode，TLC 投影不可见）→ Rust
 byte-compare 失败。三条漂移路径全部有牙齿。
 
 边界：oracle 冻结的是**静态**判决合同（证据形状 → 判决类，intent 在
-resolve 时刻固定）。production `resolve()` 读当前 stop intent 的 known
-differential（late intent 重判）不在表域内——那是动态时序问题，由主模型
-M4/W4 机器检查、D11 记录、F2 修正；本 oracle 不是它的替代品。
+resolve 时刻固定）。late intent 重判不在表域内——那是动态时序问题，由主模型
+M4/W4 机器检查、D11 记录（pre-F2 生产 resolve() 读当前 stop intent 的差分
+已随 F2 的同步 settlement 闭合）；本 oracle 不是它的替代品。
 
 ## 与 `f2-terminal-commit-boundary/` 的 authority 关系
 
@@ -128,7 +129,7 @@ decision（分类边界）与 semantic commit 执行**可以分离**：
 | C1 单个 terminal Fact | 一个 episode 至多一个终局（None→Completed/Stopped/Failed 一次），提交后不可改写 | safety | `TerminalOutcomeImmutable`（S2）；mutation M3 |
 | C2 authority-owned settlement | 歌播完/失败后，**不需要有人来问**，authority 自己负责把终局落下来。Observe/Wait/Projection/App query 都不是 Fact 出现的必要条件 | safety + witness | `AuthorityIsSoleWriter`（S3，transition 级）+ `WitnessNoConsumerCommit`（W6）；mutation M1/M2/M9 |
 | C3 Observe 纯读 | observe() 只能读；不能 resolve/commit/改证据/改 stop intent/改生命周期 | safety | `Observe` 只写 `observeRan`；mutation M1 |
-| C4 Wait 纯等待 | wait() 只能等 authority 已经落下的 Fact；不跑 resolver、不是 terminal writer、不是 Fact 存在的前提。TLA 不模拟 OS blocking，只需 wait 动作无 semantic writer 效果 | safety | `Wait` 只写 `waitRan`；mutation M2（今日生产 `wait()->resolve()` differential 的形状，必须被抓住） |
+| C4 Wait 纯等待 | wait() 只能等 authority 已经落下的 Fact；不跑 resolver、不是 terminal writer、不是 Fact 存在的前提。TLA 不模拟 OS blocking，只需 wait 动作无 semantic writer 效果 | safety | `Wait` 只写 `waitRan`；mutation M2（pre-F2 生产 wait()->resolve() 差分的缺陷形状，F2 已闭合；本 mutation 是对该形状的形式化否定） |
 | C5 teardown settlement 边界 | 如果 teardown 已经完成，那"早就足够判决"的 terminal Fact 不能还没落下来。这是 safety 边界，**不是**"每个 episode 最终都会 teardown"的进度承诺 | safety | `TeardownRequiresSettlement`（S10，条件形式；判定用全形状触发域）；mutation M5 / M10 |
 | C6 late-command stability | 终局证据首次决定性**之后**才到的 stop 命令，不能改变这次 episode 应得的分类：决定性已判 Failed 时晚到 stop ≠ Stopped；边界**之前**记录的 stop intent 仍满足 Stopped | safety | `stopAtDecision` ghost + `CommittedOutcomeMatchesContract`（S9）+ `NoFalseStopped`（S7）；mutation M4/M8；正向 witness W4/W5 |
 | C7 activation failure firewall | activation failure 是 diagnostic，不是 D11 episode terminal Failed（除非 live episode 的 terminal evidence 独立满足 contract） | safety | `ActivationFailureIsNotTerminalFailed`（S8）；mutation M6 |
@@ -144,10 +145,10 @@ decision（分类边界）与 semantic commit 执行**可以分离**：
 | `RequestStop` / `stopSeen` | `SessionCompletion::request_stop` / `stop_requested` | command 状态，不是 fact；单调 FALSE→TRUE；"stop before full open" 在 bind 时生效（`bind_stop_target`） |
 | `PublishDecodeFailure` | `SessionCompletion::decode_failed` | worker / panic guard 发布，first-wins |
 | `PublishWorkerEof/Stopped/Failed` / `workerTerminal` | `SessionCompletion::worker_exited(edge.terminal())` | decode worker 退出前最后一步；edge terminal first-wins 单调 |
-| `PublishDrainDrained/Aborted` / `drainVerdict` | `DrainSignal::complete(verdict)` | render 线程退出前必发（`qianqian-output-wasapi/src/wasapi.rs`）；`stop_and_join()` 返回 ⇒ verdict 已发布 |
-| `BeginTeardown` / `FinishTeardown` | session fiber 的 effect 逆序释放（LIFO：stop edge + join worker → `stop_and_join` stream） | `session.rs` `register_relation` 逆序；join 返回 ⇒ 对应 leg 的发布必然已执行（`FinishTeardown` 守卫 1 的现实依据） |
-| `AuthoritySettle` | Playback Session semantic authority 的 settlement 动作。**当前 Rust 由 consumer 调用路径代为触发**（`wait()`/`try_resolve_now()` → `resolve()`）——这正是 D11 记录的 known differential，F2 修正目标。本模型按 accepted contract 建 authority-owned settlement | `completion.rs::resolve`（current realization） |
-| `Observe` / `Wait` | D14.2 seam 语义的纯读 / 纯等待 | 当前生产 `wait()` 会顺手 resolve（known differential；M2 形式化证明当前 contract 拒绝它） |
+| `PublishDrainDrained/Aborted` / `drainVerdict` | `DrainSignal::complete(verdict)` | render 线程退出前必发（`qianqian-output-wasapi/src/wasapi.rs`，**正常退出路径**；"`stop_and_join()` 返回 ⇒ verdict 已发布"仅在该路径成立——panic/N-01 模式下被丢弃的 join 仍返回而发布被跳过，见模型 FinishTeardown 环境假设注） |
+| `BeginTeardown` / `FinishTeardown` | session fiber 的 effect 逆序释放（LIFO：stop edge + join worker → `stop_and_join` stream） | `session.rs` `register_relation` 逆序；"join 返回 ⇒ 对应 leg 的发布已执行"是**正常退出路径的环境假设**（`FinishTeardown` 守卫 1；异常路径被 N-01/N-02 证伪，模型内不机器检查） |
+| `AuthoritySettle` | Playback Session semantic authority 的 settlement 动作。当前 Rust 生产在 `publish_evidence` 的单一 completion 锁持有内同步完成发布+resolve+commit（`completion.rs`，F2 起），notify 在锁释放后；模型把 Publish 与 AuthoritySettle 拆开是 writer identity 的证明装置，**不是**生产目标（不得据此建议异步 resolver，D14.3） | `completion.rs::publish_evidence`（current realization） |
+| `Observe` / `Wait` | D14.2 seam 语义的纯读 / 纯等待 | 当前生产 `wait_terminal` 为纯 condvar 等待（`handle.rs`，F2 起）；pre-F2 wait()->resolve() 差分已闭合，M2 是对该历史缺陷形状的形式化否定 |
 | `terminalOutcome` / `firstCommitted` | `CompletionState.outcome`（memoized） | `completion.rs` |
 | `decisionLatched` / `stopAtDecision` | **无 production 对应**（verifier-only ghost） | 见下节 |
 | `observeRan` / `waitRan` / `firstCommitted` | **无 production 对应**（verifier-only 见证变量；`firstCommitted` 只服务改写检出） | — |
@@ -166,9 +167,9 @@ CurrentDecisionVerdict(sa, df, wt, dv)
     current contract 对可判决形状的判决值，在**边界冻结 stop intent**
     下求值。current realization conformance oracle：精确 precedence
     （Aborted+Eof→Failed(device)、stage 文本等）是 realization，
-    决策 contract 演进时随 authority 变更重推导；与 production 的唯一
-    刻意偏差是模型读边界 intent（D11 late-command rule），production
-    resolve() 读当前 stop_requested（known differential，F2 修正目标）。
+    决策 contract 演进时随 authority 变更重推导；与 production 的刻意
+    偏差是模型读边界 intent（D11 late-command rule）——pre-F2 生产
+    resolve() 读当前 stop_requested 的差分已随 F2 的同步 settlement 闭合。
 
 D11 的三条外部命题（Completed/Stopped 的成立条件、无虚构）由独立
 不变式（S6/S7）承载，不从判决表导出——normative 层与 realization 层
@@ -206,10 +207,11 @@ writer 集合检查可被"顺手维护 ghost"的冒写动作骗过，writer iden
    `resolve()` 在无 worker 证据时返回 None），本模型把这类情形折叠为
    "activation 失败下无证据"，不用于推理激活期机制时序。
 3. **teardown 完成的两个守卫性质不同**：join 纪律（两条腿都已发布）是
-   **生产现实**（join 返回 ⇒ 发布已执行），不是额外假设；settlement 边界
-   （decisive 未提交时不得完成）是 **accepted D11-C5 要求**——今日生产
-   可以在决定性证据未提交时完成 teardown（consumer-triggered commit
-   differential，F2 修正目标），模型表达的是 accepted contract。
+   **正常退出路径的环境假设**（"join 返回 ⇒ 发布已执行"只在正常退出路径
+   成立；panic/N-01 与锁毒化/N-02 异常路径证伪两侧蕴含）；settlement 边界
+   （decisive 未提交时不得完成）是 **accepted D11-C5 要求**——F2 起生产
+   满足它（publish_evidence 单锁内同步 settle，无 consumer 触发的独立
+   commit），模型表达的是 accepted contract。
 4. **teardown 两个阶段折叠**：两条 leg 的 join 中间态对 terminal
    settlement 问题不可观测。
 5. **`CHECK_DEADLOCK FALSE`**：终局之后"环境停摆"是 `[][Next]_vars`
@@ -217,9 +219,9 @@ writer 集合检查可被"顺手维护 ghost"的冒写动作骗过，writer iden
 6. **已知粗粒度处（如实声明）**：`Activate` 是原子步骤；激活期间发布
    drain verdict 的极端时序折叠进 Activate 之后。对该问题不可观测。
 7. **chronology 只有一维**：模型里唯一的时序轴是"stop intent 相对决定性
-   边界的先后"（由 ghost 捕获）。production 的 `resolve()` 读调用瞬间的
-   `stop_requested`（无边界概念）——该 differential 已由 D11 记录、F2 修正；
-   模型表达的是 accepted contract，不是 differential。
+   边界的先后"（由 ghost 捕获）。pre-F2 生产 `resolve()` 读调用瞬间的
+   `stop_requested`（无边界概念）——该差分已由 D11 记录并随 F2 闭合；
+   模型表达的是 accepted contract，不是差分。
 8. **一处保守超近似**：模型允许 `(decodeFailure, worker=None, drain=Drained)`
    这一 production 不可达组合（decode failure 会 fail 掉 edge，render leg
    只会 abort 不会 Drained）。保守方向无害：该形状在两侧都判 Failed
@@ -296,7 +298,7 @@ Rust oracle run（Verification Rust Gate 内执行，不在本 check.sh）：
 | 文件 | 注入 | 期望击穿 |
 | --- | --- | --- |
 | `mutations/ObserveCommits.cfg` | 纯读偷偷提交（值正确，但 writer 不是 AuthoritySettle） | `AuthorityIsSoleWriter`（S3 非空洞；状态不变式全绿——writer identity 只能由 transition 级性质承载） |
-| `mutations/WaitCommits.cfg` | 纯等待调用 settlement（= 今日生产 differential 的形状） | 同上（与 M1 分开成 run） |
+| `mutations/WaitCommits.cfg` | 纯等待调用 settlement（= pre-F2 生产 wait()->resolve() 差分的缺陷形状；F2 已闭合，本 mutation 是对该形状的形式化否定） | 同上（与 M1 分开成 run） |
 | `mutations/TerminalRewritable.cfg` | late stop 改写已提交 Completed/Failed | `TerminalOutcomeImmutable`（S2 非空洞） |
 | `mutations/LateStopReadsCurrentIntent.cfg` | settlement 读当前 stopSeen（决定性已判 Failed → 晚到 stop → 提交 Stopped） | `CommittedOutcomeMatchesContract`（S9；late-command rule 约束力的核心 mutation，附带击穿 `NoFalseStopped`） |
 | `mutations/TeardownBeforeSettlement.cfg` | 去掉 FinishTeardown 的 settlement 守卫 | `TeardownRequiresSettlement`（S10 非空洞） |

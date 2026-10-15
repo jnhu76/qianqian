@@ -36,21 +36,33 @@
 (*   PublishDecodeFailure      SessionCompletion::decode_failed（first-wins） *)
 (*   PublishWorkerEof/         SessionCompletion::worker_exited(edge.terminal)*)
 (*   Stopped/Failed            —— worker 退出前最后一步                      *)
-(*   PublishDrainDrained/      DrainSignal::complete（render 线程退出前必发；*)
-(*   Aborted                   stop_and_join 返回 => verdict 已发布）        *)
+(*   PublishDrainDrained/      DrainSignal::complete（**正常退出路径**上       *)
+(*   Aborted                   render 线程退出前必发。"join 返回 => verdict  *)
+(*                             已发布"只在正常退出路径成立：线程经 panic 死亡 *)
+(*                             时丢弃的 join 仍返回而发布被跳过——N-01 模式，  *)
+(*                             见 FinishTeardown 动作注释的环境假设声明）      *)
 (*   BeginTeardown /           session fiber 的 effect 逆序释放（LIFO：       *)
 (*   FinishTeardown            stop edge + join worker -> stop_and_join      *)
-(*                             stream）。守卫 1（join 纪律）是生产现实；      *)
-(*                             守卫 2（settlement 边界）是 accepted D11-C5    *)
-(*                             要求（见动作注释）。                           *)
+(*                             stream）。守卫 1（join 纪律）是**环境假设**    *)
+(*                             （正常退出路径的生产事实，异常路径被 N-01/N-02 *)
+(*                             证伪，模型内不机器检查）；守卫 2（settlement    *)
+(*                             边界）是 accepted D11-C5 要求（见动作注释）。   *)
 (*   AuthoritySettle           Playback Session semantic authority 的         *)
-(*                             settlement 动作（当前 Rust 中由               *)
-(*                             consumer 调用路径代为触发——那是 D11 已记录的   *)
-(*                             known differential，F2 修正目标；本模型按      *)
-(*                             accepted contract 建模 authority-owned）。     *)
-(*   Observe / Wait            纯读 / 纯等待（D14.2 seam 语义；当前生产       *)
-(*                             wait() 会顺手 resolve——known differential，   *)
-(*                             M2 mutation 形式化地证明它不满足当前 contract）。*)
+(*                             settlement 动作。模型把 Publish 与             *)
+(*                             AuthoritySettle 拆成两个动作是**语义拆分的     *)
+(*                             证明装置**（让 writer identity 可被 transition  *)
+(*                             级性质机器检查）；当前 Rust 生产在同一          *)
+(*                             completion 锁持有内同步完成发布、resolve、     *)
+(*                             commit（completion.rs:1238-1248 的             *)
+(*                             publish_evidence，F2 起），notify 在锁释放后   *)
+(*                             （completion.rs:1246-1247）。拆分**不是**生产  *)
+(*                             目标：不得据此建议恢复异步 resolver 或          *)
+(*                             consumer 触发 settlement（D14.3）。            *)
+(*   Observe / Wait            纯读 / 纯等待（D14.2 seam 语义）。当前生产     *)
+(*                             wait_terminal 是纯 condvar 等待（handle.rs，   *)
+(*                             F2 起）；pre-F2 的 wait()->resolve() 差分已    *)
+(*                             闭合，M2 mutation 保留的是对该历史缺陷形状的   *)
+(*                             形式化否定，不是今日生产行为的描述。            *)
 (*                                                                         *)
 (* 关键状态区分（绝不合并）：                                                *)
 (*   evidence 已发布 != decision 已锁定 != terminal outcome 已 commit        *)
@@ -68,8 +80,10 @@
 (*                                                                         *)
 (* 负控制（Mutation 常量，逐个独立注入；稳定语义名）：                        *)
 (*   MutationObserveCommits            纯读动作偷偷提交（M1）                 *)
-(*   MutationWaitCommits               纯等待动作偷偷提交（M2；即今日生产      *)
-(*                                     wait()->resolve() differential 的形状）*)
+(*   MutationWaitCommits               纯等待动作偷偷提交（M2；pre-F2 生产     *)
+(*                                     wait()->resolve() 差分的缺陷形状，F2   *)
+(*                                     已闭合——本 mutation 是对该形状的形式   *)
+(*                                     化否定）                               *)
 (*   MutationTerminalRewritable        已提交终局被 late stop 改写（M3）      *)
 (*   MutationLateStopReadsCurrentIntent settlement 读取当前 stopSeen 而非     *)
 (*                                     决策边界记录值（M4 —— D11 late-command *)
@@ -214,8 +228,9 @@ CurrentDecisionDecisive(df, wt, dv) ==
 \*     realization 的 conformance oracle：精确 precedence 是 realization，
 \*     决策 contract 演进时本表随 authority 变更重推导；normative 层是
 \*     (1) 的触发域全覆盖 + S6/S7 承载的 D11 外部命题，不是这张表的
-\*     具体取值。与 production 的唯一刻意偏差：production resolve() 读
-\*     **当前** stop_requested（known differential，F2 修正目标）；本模型
+\*     具体取值。与 production 的历史偏差说明：pre-F2 production resolve()
+\*     读**当前** stop_requested（该差分已由 F2 闭合——settlement 在
+\*     publish_evidence 的单锁持有内同步发生，见文件头部映射注）；本模型
 \*     按 D11 late-command rule 读边界 intent。
 CurrentDecisionVerdict(sa, df, wt, dv) ==
     IF ~CurrentDecisionDecisive(df, wt, dv) THEN "None"
@@ -423,18 +438,23 @@ BeginTeardown ==
 
 \* teardown 完成。两个守卫的性质不同：
 \*
-\* 1. join 纪律（**生产现实**，不是额外假设）：reality 中 join 返回时
-\*    worker 必然已执行 worker_exited、stop_and_join 返回时 render 线程
-\*    必然已执行 drain.complete（session.rs 逆序 LIFO + wasapi.rs
-\*    run_render_thread 退出前必发 verdict），所以"两条腿都已发布"是
-\*    teardown 完成的前置条件。
-\* 2. settlement 边界（**accepted D11-C5 要求**，不是今日生产现实）：
-\*    decisive evidence 存在而 outcome 未提交时，teardown 不允许完成。
-\*    今日生产可以在决定性证据未提交时完成 teardown（consumer-triggered
-\*    commit differential，见本文件头部），F2 将把 commit progress 收回
-\*    authority 自己的执行/teardown path。settlement 本身是 authority 的
-\*    独立动作（AuthoritySettle），可以在 Active 或 TeardownStarted 期间
-\*    发生——"settlement 挂在 teardown path 上"的最小实现即这两步的先后。
+\* 1. join 纪律（**环境假设**，不是本模型机器检查的生产不变量）：在
+\*    **正常退出路径**上，join 返回时 worker 必然已执行 worker_exited、
+\*    stop_and_join 返回时 render 线程必然已执行 drain.complete（session.rs
+\*    逆序 LIFO + wasapi.rs run_render_thread 退出前必发 verdict）。但
+\*    "join 返回 ⇒ 发布已完成"不是无条件生产保证：线程退出、join 返回、
+\*    证据发布完成是三个不同事件——render 线程经 panic 死亡时（诊断写
+\*    失败在两级 catch 之外，N-01 模式）或边锁中毒时（N-02），被丢弃的
+\*    join 仍会返回而 stop/complete 发布被跳过或中途死亡。本守卫因此是
+\*    模型对环境的假设声明（锥的机制进度问题由 Rust 侧故障注入证据
+\*    承载，不在此模型内检查）；套件的 10 个 mutation 不针对守卫 1。
+\* 2. settlement 边界（**accepted D11-C5 要求**）：decisive evidence 存在
+\*    而 outcome 未提交时，teardown 不允许完成。F2 起生产满足该要求：
+\*    publish_evidence 在单一 completion 锁持有内同步完成发布与 settle，
+\*    每个发布者路径都自带 settlement，无 consumer 触发的独立 commit。
+\*    settlement 本身是 authority 的独立动作（AuthoritySettle），可以在
+\*    Active 或 TeardownStarted 期间发生——"settlement 挂在 teardown path
+\*    上"的最小实现即这两步的先后。
 \*    负控制 MutationTeardownBeforeSettlement 去掉守卫 2。
 \*    守卫 2 的 decisive 判定走 SettlementGateDecisive：M10 负控制把它缩回
 \*    deliberately-minimal 触发域（Eof+Aborted 落在门外），C5 不变式仍按

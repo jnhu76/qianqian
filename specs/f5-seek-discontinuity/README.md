@@ -37,7 +37,9 @@ worker       保持生产直到 leg 的 parked 证据到达（提前停产会把
 session      CommitCut：landing ∧ edge 干净 ∧ 设备尾排空（D14.7
              padding==0 证据）∧ leg parked ∧ unsettled（D14.8 rebase
              触发点）
-stop         terminal 恒赢：committed 永不成立，协议夭折
+stop         seek 协议域恒赢：committed 永不成立，协议夭折（不判 D11
+             终局——窗口内 stop 的 episode 终局由 terminal contract 裁决，
+             生产侧 worker_failure 优先，见 reconciliation §2.3.1）
 ```
 
 ## 模型词 → production 映射
@@ -52,7 +54,7 @@ stop         terminal 恒赢：committed 永不成立，协议夭折
 | `WorkerCut` | song_seek 成功后 worker 自行的 purge：staging 丢弃 + edge 清空 + landing 证据 + 持有产量直到 release（模型中 = `SubmitNew` 的 committed 护栏） |
 | `CommitCut` | session cutover commit（D14.8 rebase 触发点；D14.7 padding==0 证据） |
 | `DrainOld`/`DrainNew` | 设备消费（audible truth 抽象） |
-| `Stop` | D14.4/D11 terminal stop |
+| `Stop` | seek 协议夭折动作（协议域"恒赢"；不是 D11 Stopped 的判定——D14.4 约束 stop 命令接受面，窗口内 stop 的 episode 终局归 terminal contract，reconciliation §2.3.1） |
 | `PublishPositionOld/New` | D14.8 位置发布的 epoch 归属（rebase 前后；base 模型中为惰性动作——见 RESULTS §17 诚实注） |
 
 Ghost 变量（`oldDrainEver`/`oldAfterCommit`/`posMixAfterCommit`）是
