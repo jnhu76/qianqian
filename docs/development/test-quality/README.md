@@ -123,7 +123,23 @@ CLOSEOUT FINDING the recorded local roots DO NOT EXIST on the operator machine u
                    /home/hoo/Source/qianqian-r1-reports      ABSENT
                  (bounded home-directory search plus the recorded paths; no matching
                  tarball found)
+TRACKER SCAN     an exhaustive scan of this repository tracker on 2026-10-15 (all 279
+                 issue/PR items: bodies, issue comments and PR review comments) found
+                 NO uploaded attachment anywhere: no user-attachments or
+                 githubusercontent object URL, only unrelated CodeRabbit badge images.
+                 A cross-repository search over the account for the package name and
+                 for its sha256 returns text mentions only. Discussions are disabled
+                 and neither release carries this asset. The package was therefore
+                 never published through the tracker, and a reader should not expect
+                 to find it there.
+PRECEDENT        the later H0 / H1 / H-D rounds did deliver their evidence packages,
+                 by committing them under docs/development/test-quality/evidence/
+                 (largest: hd-initial-evidence.zip, 18,406,453 B). That channel exists
+                 and is proven; decision (c) above deliberately did not use it, so
+                 revisiting that decision is the only route that needs no new
+                 infrastructure.
 CURRENT STATUS   LOCAL_COPY_NOT_FOUND + NOT_PUBLISHED + NOT_INDEPENDENTLY_HASH_VERIFIED
+                 + NOT_PRESENT_IN_TRACKER (scanned 2026-10-15)
 CONSEQUENCE      the DURABLE artifacts available today are the GitHub comment payloads
                  (reports, inventories, ledgers, the reconstruction table) and the
                  identity record above. The raw logs are not retrievable here, and no
