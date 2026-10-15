@@ -138,8 +138,12 @@ PRECEDENT        the later H0 / H1 / H-D rounds did deliver their evidence packa
                  and is proven; decision (c) above deliberately did not use it, so
                  revisiting that decision is the only route that needs no new
                  infrastructure.
-CURRENT STATUS   LOCAL_COPY_NOT_FOUND + NOT_PUBLISHED + NOT_INDEPENDENTLY_HASH_VERIFIED
-                 + NOT_PRESENT_IN_TRACKER (scanned 2026-10-15)
+OWNER RULING     the archive is recorded as LOST_PERMANENTLY (owner ruling,
+                 2026-10-15): it was never published, the recorded local roots are
+                 gone, and it is not present in the tracker. The issue is closed on
+                 that basis with the loss declared, not with a delivery claim.
+CURRENT STATUS   LOST_PERMANENTLY (the identity below is preserved so that the loss
+                 stays documented and any future copy can still be checked against it)
 CONSEQUENCE      the DURABLE artifacts available today are the GitHub comment payloads
                  (reports, inventories, ledgers, the reconstruction table) and the
                  identity record above. The raw logs are not retrievable here, and no

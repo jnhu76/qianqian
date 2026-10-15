@@ -523,7 +523,11 @@ identity   package name, byte length, outer sha256, tar member/directory/file
            counts, run count, per-file checksum result, and the count of files with
            no recorded sum (normally the manifest itself, which cannot hash itself)
 status     DELIVERED_AND_VERIFIED | ARCHIVED_LOCALLY | NOT_PUBLISHED |
-           NOT_INDEPENDENTLY_HASH_VERIFIED | LOCAL_COPY_NOT_FOUND
+           NOT_INDEPENDENTLY_HASH_VERIFIED | LOCAL_COPY_NOT_FOUND |
+           LOST_PERMANENTLY -- an owner ruling that the bytes are unrecoverable.
+           A package recorded as lost keeps its identity record so the loss stays
+           declared instead of silently dropped, and no later document may cite
+           the missing bytes as verified evidence
            A package may NOT be described as delivered, published or verified on the
            strength of its own digest table.
 disclosure do not add a binary blob to repository history, do not cut a product
