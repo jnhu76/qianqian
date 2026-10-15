@@ -524,6 +524,30 @@ all are mounted by K0 as Fibers
 
 This is why the old “Playback Session is Component but not Plugin” taxonomy was corrected (Issue #138 basis; PBK-002 D12) without a production runtime redesign.
 
+## Error-system design round status (derived projection; routing in docs/README.md)
+
+The #231/#280/#283 error-system line is a DESIGN_CANDIDATE track, not
+authority and not implemented:
+
+```text
+frozen facts + boundary ledger -> docs/architecture/error-system-reconciliation.md
+target designs (DG-1..DG-4c)   -> docs/architecture/error-system-target-contract.md
+migration + acceptance designs -> docs/architecture/error-system-migration.md
+decision record (A–J directions,
+recommendations, amendment
+candidates, pending evidence)  -> docs/architecture/error-system-decision-record.md
+```
+
+2026-10-16 round (BASE e44aa80): CC-2 gate wiring landed (F5 TLA now triggers
+the formal gate; the f5-implementation mutation gate runs in CI as the
+`f5-implementation-mutations` job — during that wiring the M7 targeted oracle
+was found blinded by 8542386 and re-pinned to the stateful continuation
+probe); CC-3 model-comment corrections landed (comment-only, machine content
+byte-identical); owner directions A–J recorded; DG-1..DG-4c / real-cone
+oracle / E-1 harness designs delivered; F5 GAP-01 recommendation =
+EXTEND_EXISTING_MODEL behind acceptance-gated triggers. Production
+error/logging refactor: NOT STARTED (owner-gated via D-2..D-11).
+
 ---
 
 # Historical evidence
