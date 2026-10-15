@@ -1,4 +1,4 @@
-# Error-system directed evidence and A/B reconciliation — R1 companion (#231, #280)
+# Error-system directed evidence and A/B reconciliation (#231, #280)
 
 > **Truth class: INVESTIGATION RECORD / DESIGN INPUT. NOT AUTHORITY. NOT IMPLEMENTED.**
 > **Evidence anchor (frozen read tree):** `SOURCE_BASE_SHA = 5e60da4c3bd5f0fa93b4215670f4e898e2ac844e`
@@ -10,8 +10,8 @@
 > **Method:** directed re-verification of named gaps only (no new blanket census); every
 > load-bearing conclusion re-anchored to `file:line` at the frozen SHA. Zero execution:
 > no test, binary, device or fault-injection run. Companion documents:
-> [target contracts](error-system-target-contract-r1.md),
-> [migration/acceptance](error-system-migration-r1.md), [R0 contract](error-disposition-contract-r0.md).
+> [target contracts](error-system-target-contract.md),
+> [migration/acceptance](error-system-migration.md), [R0 contract](error-disposition-contract.md).
 
 This document answers four questions the two scans left open or conflicting:
 
@@ -36,12 +36,12 @@ edited; the errata live here.
 SOURCE_BASE_SHA           = 5e60da4c3bd5f0fa93b4215670f4e898e2ac844e  (frozen read tree)
 INITIAL_DOCUMENT_HEAD_SHA = 5e60da4c3bd5f0fa93b4215670f4e898e2ac844e  (PR #280 HEAD at round start)
 PR-head-vs-base delta     = PR branch == SOURCE_BASE_SHA; no re-basing of conclusions needed.
-                            (PR branch adds only docs/architecture/error-disposition-contract-r0.md
+                            (PR branch adds only docs/architecture/error-disposition-contract.md
                              on top of main@524c6ef; production code identical.)
 READ_TREE                 = isolated worktree, clean, detached at SOURCE_BASE_SHA
-WRITE_SCOPE               = docs/architecture/{error-disposition-contract-r0.md (edit),
-                            error-system-reconciliation-r1.md, error-system-target-contract-r1.md,
-                            error-system-migration-r1.md} on the PR #280 branch
+WRITE_SCOPE               = docs/architecture/{error-disposition-contract.md (edit),
+                            error-system-reconciliation.md, error-system-target-contract.md,
+                            error-system-migration.md} on the PR #280 branch
 EXECUTION                 = NONE (no test/build/device/fault-injection run; all "test exists"
                             statements are code-existence readings of the frozen tree)
 R1.1 (2026-10-15)         = static adversarial audit of 847e9d1 returned REVISE with eight
@@ -73,6 +73,24 @@ R1.2 (2026-10-16)         = second static audit of 4bbe2fe returned REVISE with 
                             rustc 1.97.1 std/src/sync/mpsc.rs; no per-record-allocation or
                             crossbeam-advantage verdict is asserted), T5-8 chain-to-previous
                             made co-satisfiable with the isolation goal.
+R1.3 (2026-10-16)         = third audit returned APPROVE_DESIGN_CANDIDATE with one
+                            non-blocking P3; applied: T2-2 lock-hold wording fixed
+                            (notify runs AFTER the guard is dropped, completion.rs:1246-1247 —
+                            the earlier "notify in one lock hold" was wrong), E-9 gained the
+                            three-mode stdout checkpoint (print panic / flush-Err — the
+                            explicit flush result is ignored at machine_input.rs:232, an
+                            unconstructed checkpoint, not a proven defect / blocking).
+                            Owner instruction executed: the four documents renamed to stable
+                            names without round suffixes (error-disposition-contract.md,
+                            error-system-{reconciliation,target-contract,migration}.md); all
+                            in-file links and document-shorthand references updated
+                            ("R0 §"/"R1 §" → "disposition-contract §"/"reconciliation §");
+                            round labels (R0/R1/R1.1/R1.2/R1.3) survive only as history in
+                            version records and §6. Approval is design-candidate level only:
+                            it authorizes no implementation and no merge; the OPEN items
+                            (D-2..D-11, exporter exit mechanism, hook isolation, teardown
+                            panic posture) remain owner-gated entry points, not resolved by
+                            any green gate.
 REVIEW ATTRIBUTION NOTE   = PR #280's "independent Astra review" is recorded by the owner's
                             PR comment of 2026-10-15 (issue comment, verifiable) as a static
                             assessment shared off-GitHub at 3c866cfa. The reviewer's identity
@@ -305,7 +323,7 @@ claim at most "submitted, may have been heard".
   to the replaced continuation; D14.5 `Applied` discards the old world by design, and the
   ABI never promises surfacing except on the next read. Candidate target-contract
   obligations (diagnostic witness of a superseded fatal, wording) are C-class items
-  recorded in [target contracts §M3](error-system-target-contract-r1.md); choosing one is
+  recorded in [target contracts §M3](error-system-target-contract.md); choosing one is
   an owner decision, not a correction.
 - **"下次 read 报错" was not extended by either scan.** The matrix is the complete
   operation set; no other operation surfaces the latch.
@@ -630,7 +648,7 @@ NEW_BOUNDARY / DESIGN_DECISION.
 | C-3 | "pending fatal 清除在生产不可达" | A F-14 | CONFLICT → corrected | §2: reachable via partial-success + seek-Applied before the next read; premise ("edge already Failed") false in that state. Not adjudicated a defect (§2.5). |
 | C-4 | "日志只延迟、不可能改变结果" | B F5/F6/F7 summary | UNSUPPORTED (blocking-only truth) | True for **blocking**; false for **write-failure panics**: reader print panic terminates the episode (machine_input.rs:119/:253); volume print panic escalates a recoverable failure to `Aborted`→`Failed{"device"}` (wasapi.rs:320-327); main-thread report panic exits 101 past dispose. Plus N-01: the post-catch abort-line panic skips publication entirely. |
 | C-5 | "所有宿主报告都在清理后" | B B-L3 | UNSUPPORTED (universal) | §4 ledger: true for finish_episode transport rows only; `source:`/`playing` and per-command status rows run mid-episode; the NotEstablished activation report precedes dispose. |
-| C-6 | "人类/TUI 不是具体消费者" | A MIGRATION §5 (R0 §5.1 reading) | DESIGN_DECISION | Code fact: the only consumers of `failure_diagnostic`/`activation_error` are presentation surfaces (machine rows, TUI, quit report); zero control-flow consumers. Whether presentation consumers satisfy R0 §5.1's "concrete consumer" bar is an owner design ruling, not a code fact. |
+| C-6 | "人类/TUI 不是具体消费者" | A MIGRATION §5 (disposition-contract §5.1 reading) | DESIGN_DECISION | Code fact: the only consumers of `failure_diagnostic`/`activation_error` are presentation surfaces (machine rows, TUI, quit report); zero control-flow consumers. Whether presentation consumers satisfy disposition-contract §5.1's "concrete consumer" bar is an owner design ruling, not a code fact. |
 | C-7 | "精确文字测试自动形成稳定语义契约" | (implicit in A's oracle list) | UNSUPPORTED | §5.5: semantic freezes are the decision-table class structure (TLA-coupled) + the §5.3 behavioral oracles; stage text couples only through the fail-closed verifier `classify`; TLA is stage-agnostic; exact-text tests are presentation tests / migration cost. |
 | C-8 | "drain 超时证明设备损坏 / 误判" | A F-04 (second half) | SPLIT | Proven current behavior: deadline → `Aborted` → with worker `Eof`/`Failed` → `Failed{"device"}` via the intent-blind `Some(_)` arm (completion.rs:1306-1310) — even a recorded stop intent cannot relabel it; only the `Stopped`-terminal arm consults intent. "Proves device damage" is false (the cap is declared local tuning, wasapi.rs:746-747). "误判" is DESIGN_DECISION inside the authority-declared OPEN resolver-precedence space (AI-7; ADR-PBK-002:751-754) — an owner ruling, not a correction. Related nuance: a stop during the EOF-drain window that still drains in time resolves **Completed** (the `Drained` branch never consults intent; stop-into-EOF is a late command, D14.4-consistent). |
 | C-9 | "SEEK_UNSUPPORTED 返回证明旧续段未变" | (question raised in review) | UNSUPPORTED (as a provability claim) | C-side, a failing `song_seek` returns before flush/reset (C:1178-1194), so SongCore's own state is untouched; whether `av_seek_frame` already mutated demuxer internals is unproven without FFmpeg sources. D14.5's destructive routing for SEEK_UNSUPPORTED is a frozen authority choice listed by name; reclassifying requires an authority amendment plus FFmpeg-level evidence (§8 E-6). B F14's "authority-conservative, not a defect" stands. |
@@ -657,8 +675,8 @@ answer. None is claimed as run, passed, or failed.
 | E-4 | Worker stuck in an uninterruptible native call | Filesystem-backed hang injection (e.g. FUSE or a stuck NFS mount) during steady decode; observe dispose/`wait_terminal` blocking and the absence of any Violated/timeout | Any automatic escape (timeout, Violated) would falsify "dispose has no escape" |
 | E-5 | Slow/normal devices vs DRAIN_CAP=5 s | Instrumented drain timing on real endpoints (healthy + Bluetooth-class suspended sink). **R1.1 rewording:** the experiment produces the cap-exceedance datum; it does not adjudicate the classification. A healthy device exceeding 5 s shows the cap is exceeded in practice; whether settling that episode `Failed{device}` is a misclassification remains the D-4 owner ruling (C-8's DESIGN_DECISION half, inside the authority-declared OPEN resolver-precedence space) — that verdict belongs to the target contract, not to the measurement | All tested devices draining < 5 s downgrades the tuning risk to unobserved; an exceedance alone proves only the exceedance |
 | E-6 | SEEK_UNSUPPORTED post-state | Real unseekable container (raw ADTS) + seek attempt + bit-exact continuation probe at the ABI layer (extends F5 E1's method to the unmeasured statuses). **R1.1 scope obligations:** state the result's coverage with the result — container/format family, FFmpeg closure version, sample set; a bit-identical continuation on the tested corpus establishes the provability fact FOR THAT CORPUS only. Class-level reclassification additionally needs either broader coverage or an FFmpeg-internal state argument (what `av_seek_frame` touches on an index-less demuxer before failing); one sample never proves the class | A non-identical continuation on any tested sample keeps the conservative routing; an identical result does not by itself amend D14.5 (migration §3.2 preconditions) |
-| E-7 | N-01 / stderr hazards under blocked & broken sinks — **DIAGNOSTIC outlets only** | **R1.1 two-tier split; R1.2 scope: tier 2 covers diagnostic sinks (#8/#9/#10/#11, av_log #12 when restored) — the protocol outlet #5 is NOT a member (its write failure is a legitimate host operation failure by T5-7; see E-9).** Tier 1 (writer-swap corrective, sites #8/#9/#10): broken-sink negative control per site × {gate on, gate off} — terminal class, exit path and wakeup ordering identical to the sink-healthy control (N-01's write-failure mode impossible by construction); plus a blocked-sink control that documents the RESIDUAL blocking hazard (publication still delayed — expected and recorded as residual until the T5 framework lands; it is not an isolation pass). Tier 2 (future framework adoption): the four R0 §6 controls (blocked, stopped consumer, queue full, write failure) per diagnostic outlet, asserting producer/terminal independence | Tier 1: any terminal/exit-path change keyed on sink state, or the residual blocking presented as isolation. Tier 2: any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
-| E-9 | Protocol-write failure conformance (#5, R1.2 — separated from the logging-inertness matrix) | Broken/closed stdout and stderr harnesses around the reader's status-response writes (machine_input.rs:230-233), per stream: assert the DOCUMENTED host-failure path, not terminal invariance — write panic → caught (:119) → `HostFailure::Panic` recorded (`first_failure`, :156-163) → conditional `request_stop` (only if no terminal is already committed, :160-162) → episode terminates, `seal()` obligations still met; a full stdout pipe is the blocking variant (reader stuck inside its admitted operation; seal delay documented, ledger #5). The two-class split of migration §1.7 (protocol = host-operation failure, visible; diagnostic = loss-only) is the acceptance object | Any behavior OUTSIDE the documented classes (e.g. a protocol-write panic escaping the catch; a diagnostic-style silent-drop being applied to protocol rows; seal proceeding while the reader is unacknowledged) falsifies the classification |
+| E-7 | N-01 / stderr hazards under blocked & broken sinks — **DIAGNOSTIC outlets only** | **R1.1 two-tier split; R1.2 scope: tier 2 covers diagnostic sinks (#8/#9/#10/#11, av_log #12 when restored) — the protocol outlet #5 is NOT a member (its write failure is a legitimate host operation failure by T5-7; see E-9).** Tier 1 (writer-swap corrective, sites #8/#9/#10): broken-sink negative control per site × {gate on, gate off} — terminal class, exit path and wakeup ordering identical to the sink-healthy control (N-01's write-failure mode impossible by construction); plus a blocked-sink control that documents the RESIDUAL blocking hazard (publication still delayed — expected and recorded as residual until the T5 framework lands; it is not an isolation pass). Tier 2 (future framework adoption): the four disposition-contract §6 controls (blocked, stopped consumer, queue full, write failure) per diagnostic outlet, asserting producer/terminal independence | Tier 1: any terminal/exit-path change keyed on sink state, or the residual blocking presented as isolation. Tier 2: any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
+| E-9 | Protocol-write failure conformance (#5, R1.2 — separated from the logging-inertness matrix) | Broken/closed stdout and stderr harnesses around the reader's status-response writes (machine_input.rs:230-233), per stream: assert the DOCUMENTED host-failure path, not terminal invariance — write panic → caught (:119) → `HostFailure::Panic` recorded (`first_failure`, :156-163) → conditional `request_stop` (only if no terminal is already committed, :160-162) → episode terminates, `seal()` obligations still met; a full stdout pipe is the blocking variant (reader stuck inside its admitted operation; seal delay documented, ledger #5). The two-class split of migration §1.7 (protocol = host-operation failure, visible; diagnostic = loss-only) is the acceptance object. **R1.3 variants (audit checkpoint):** stdout failure must be observed as THREE separately-recorded modes — print panic (write error inside `print!`), flush returning `Err`, and blocking. The explicit `let _ = io::stdout().flush()` at :232 currently IGNORES the flush result; an independent flush failure under real status output has not been constructed, so the flush-Err mode is a recorded checkpoint, not a proven defect. Each mode's observed outcome must land in the documented classes | Any behavior OUTSIDE the documented classes (e.g. a protocol-write panic escaping the catch; a diagnostic-style silent-drop being applied to protocol rows; seal proceeding while the reader is unacknowledged; a flush-`Err` whose handling diverges from the print-panic class without an owner ruling) falsifies the classification |
 | E-8 | Broken-pipe exit-101 reachability on the main thread | Pipe-closed stdout/stderr harness around the binary at each report site (#1-#7) | Confirms A's F-07 main-thread scenario end-to-end; absence would falsify the std-panic premise on this platform |
 
 ---

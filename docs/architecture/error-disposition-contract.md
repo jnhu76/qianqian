@@ -1,4 +1,4 @@
-# Error disposition contract — R0 design candidate (#231)
+# Error disposition contract — design candidate (#231)
 
 > **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
 > **Evidence anchor:** `main@524c6efeeabcfc94ceaf8e9cf1392e88861288c3` (2026-10-15).
@@ -397,31 +397,31 @@ PRIOR_STATIC_REVIEW = REVISE_AT_3c866cfa (owner-attributed "Astra"; identity unv
                       RECHECK_REVISED_HEAD
 ~~~
 
-## 9. R1 extension layer (current facts vs target design)
+## 9. Extension layer (current facts vs target design)
 
 This document remains the R0 design candidate. The round recorded in the companion files
 adds, without promoting anything here to authority:
 
 1. **Directed evidence + A/B reconciliation** —
-   [error-system-reconciliation-r1.md](error-system-reconciliation-r1.md): the unified
+   [error-system-reconciliation.md](error-system-reconciliation.md): the unified
    boundary ledger, the GAP-01..05 re-verification (including the pending-fatal × seek
    interaction matrix, the exact `catch_unwind` coverage map, the host-output ledger, and
    the adjudication/errata table for scans #281/#282), and the
    `NEEDS_RUNTIME_EVIDENCE` registry.
 2. **Six-module target contracts** —
-   [error-system-target-contract-r1.md](error-system-target-contract-r1.md): candidate
+   [error-system-target-contract.md](error-system-target-contract.md): candidate
    obligations per module (representation, propagation, handling, lifecycle, logging,
    migration), each with basis / current / target / change class / counterexample /
    acceptance, plus the DeepSeek-harness reference mapping. All CANDIDATE.
 3. **Migration and acceptance** —
-   [error-system-migration-r1.md](error-system-migration-r1.md): per-boundary migration
+   [error-system-migration.md](error-system-migration.md): per-boundary migration
    rows, the authority-amendment correspondence table with concrete candidate texts, and
    acceptance-by-nature designs.
 
 Layering rule: sections 0–8 above describe **current behavior and candidate reasoning**
-as of the R0 baselines; the R1 companions separate *proven current facts* (anchored at
+as of the R0 baselines; the companion documents separate *proven current facts* (anchored at
 `5e60da4c`), *reachable-but-unobserved behavior*, and *target-contract choices*. Nothing
 in any of these files changes D11, D14.*, the SongCore ABI, U2, or any accepted document;
 merging them authorizes implementation of nothing. Where §6's two-item hazard list or any
-other R0 summary overlaps the R1 evidence, the R1 ledger (reconciliation §4) and its
-R1.1 corrections are the current fact authority; R0 §6 is a historical subset.
+other R0 summary overlaps the companion evidence, the ledger (reconciliation §4) and its
+R1.1 corrections are the current fact authority; disposition-contract §6 is a historical subset.

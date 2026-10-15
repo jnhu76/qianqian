@@ -1,12 +1,12 @@
-# Error-system migration and acceptance — R1 companion (#231, #280)
+# Error-system migration and acceptance (#231, #280)
 
 > **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
 > This file plans how the candidate goals in
-> [error-system-target-contract-r1.md](error-system-target-contract-r1.md) would be
+> [error-system-target-contract.md](error-system-target-contract.md) would be
 > adopted, what would break, and what evidence each adoption would owe. It performs no
 > migration, changes no authority, and approves nothing. Baseline:
 > `5e60da4c3bd5f0fa93b4215670f4e898e2ac844e` (facts in
-> [error-system-reconciliation-r1.md](error-system-reconciliation-r1.md)).
+> [error-system-reconciliation.md](error-system-reconciliation.md)).
 
 ## 1. Per-boundary migration matrix
 
@@ -40,16 +40,16 @@ Current   song_error valid until next same-handle call (songcore.h:99-102); adap
 Target    PRESERVE the copy-before-next-call rule as a review checklist item; probe
           reads before its own close; owned copies only cross into async/diagnostic hands
 Modify    checklist/doc only (code already conformant post T1-2)
-Docs      R0 §5.6 wording already correct; no authority change
+Docs      disposition-contract §5.6 wording already correct; no authority change
 Acceptance  test: fault → read last_error → issue another call → assert the copied
           snapshot is unaffected by the newer diagnostic
 ```
 
-### 1.3 Partial success × seek/stop/close interleaving (R1 §2 matrix)
+### 1.3 Partial success × seek/stop/close interleaving (reconciliation §2 matrix)
 
 ```text
 Current   proven matrix: next read surfaces; Applied erases via reset_decode_state;
-          stop/teardown are a COMMIT RACE, not stop-determinism (R1.1, R1 §2.3.1 —
+          stop/teardown are a COMMIT RACE, not stop-determinism (R1.1, reconciliation §2.3.1 —
           the default worker position lets the pending fatal win; a stop wins only
           from stop-observing positions); RefusedUnchanged production-dead
 Target    PRESERVE the behavior table (as corrected) as the regression baseline;
@@ -57,7 +57,7 @@ Target    PRESERVE the behavior table (as corrected) as the regression baseline;
           currently unobservable across the ABI, R1.1)
 Modify    none for preservation; ABI/SongCore + adapter+session if D-5 adopted
 Docs      none (behavior is ABI+worker-conformant; no frozen text contradicts it)
-Acceptance  E-1 (R1 §8, R1.2 attribution rules): observe the FIRST read after the
+Acceptance  E-1 (reconciliation §8, R1.2 attribution rules): observe the FIRST read after the
           Applied landing; old-vs-new attribution rests on the one-shot injection
           record, the call phase, and a controlled-healthy post-cut region (verified
           on the no-injection control) — the "pending decode error" wording means
@@ -69,7 +69,7 @@ Acceptance  E-1 (R1 §8, R1.2 attribution rules): observe the FIRST read after t
           assertion that stop alone forces Stopped; freezing the pre-R1.1 wording in
           an oracle is the failure mode this row exists
           to prevent. A counterexample to the corrected table itself would falsify
-          R1 §2.3, not the goal
+          reconciliation §2.3, not the goal
 ```
 
 ### 1.4 Output verdict and reason delivery (T2-5, D-10)
@@ -111,7 +111,7 @@ Unified remediation table (R1.1 — one table, hazard class separated from fix c
 
 | Ledger row | Site | Panic hazard | Blocking hazard | Covered by the D-3 corrective? |
 |---|---|---|---|---|
-| #8 | wasapi.rs:261 post-catch abort line | skips `render_input.stop`+`drain.complete` → N-01 hang (write-FAILURE mode, four preconditions, R1 §3.2) | delays wakeup/drain publication (B F5) | YES (writer swap) — panic removed; blocking REMAINS until framework |
+| #8 | wasapi.rs:261 post-catch abort line | skips `render_input.stop`+`drain.complete` → N-01 hang (write-FAILURE mode, four preconditions, reconciliation §3.2) | delays wakeup/drain publication (B F5) | YES (writer swap) — panic removed; blocking REMAINS until framework |
 | #9 | wasapi.rs:538-547 opened line | caught by catch #1 AFTER `Opened` published → post-activation abort, `Failed{"device"}` misattribution, or N-01 cascade via #8 | delays first Start (playback onset) | YES (writer swap) — same partial scope |
 | #10 | wasapi.rs:678-686 volume recoverable failure | caught by catch #2 → recoverable failure escalated to `Aborted` → `Failed{"device"}` (A F-07) | render-loop stall → device underrun (B F6) | YES (writer swap) — same partial scope |
 | #11 | panic default hook + chain-to-previous | reentrancy only | blocks the panic translation itself; chain restores default sync stderr for all non-reader threads (B F7) | NO — process-global hook, not fixable by a writer swap; mechanism OPEN (T5-8) |
@@ -130,10 +130,10 @@ Target    the THREE wasapi gated sites (#8/#9/#10) swap to a non-panicking write
           OPEN pending K0 review
 Modify    wasapi.rs three sites + a small writer helper; nothing else this round
 Docs      playback-execution-model hazard rows updated when the corrective lands;
-          R0 §6 hazard list marked resolved-at-<sha> at that time — for the PANIC
+          disposition-contract §6 hazard list marked resolved-at-<sha> at that time — for the PANIC
           class only, with the residual blocking hazard stated in the same row
 Removal   none
-Acceptance  E-7 tier 1 (R1 §8, R1.1): per changed site (#8/#9/#10), broken-sink
+Acceptance  E-7 tier 1 (reconciliation §8, R1.1): per changed site (#8/#9/#10), broken-sink
           negative control × {gate on, gate off} — terminal class, exit path and
           wakeup ordering identical to the sink-healthy control (N-01's write-failure
           mode impossible by construction; demonstrated by the write-error control);
@@ -148,7 +148,7 @@ Acceptance  E-7 tier 1 (R1 §8, R1.1): per changed site (#8/#9/#10), broken-sink
 
 ```text
 Current   five raise classes unwind LIFO; failure_clean_start distinguishes
-          ActivationFailedClean vs FailStop; panicking inverse crashes (R1 §3.4)
+          ActivationFailedClean vs FailStop; panicking inverse crashes (reconciliation §3.4)
 Target    PRESERVE D14.6 machinery; D-7 records the crash-propagation posture explicitly
           or sends catch→Violated to K0 authority review (never implemented ad hoc)
 Modify    none now; qianqian-app lib.rs / kernel.rs only after a K0 review decision
@@ -167,7 +167,7 @@ Target    classification codified: protocol write failure = host-operation failu
           (visible, may terminate); diagnostic sink failure = diagnostic loss only
 Modify    docs/checklists; code only via T5-4 corrective
 Docs      playback-execution-model D3/D5 rows gain the explicit two-class statement
-Acceptance  E-9 (R1 §8, R1.2 — protocol-write conformance, its own oracle): per stream
+Acceptance  E-9 (reconciliation §8, R1.2 — protocol-write conformance, its own oracle): per stream
           (stdout/stderr) broken/closed-sink harness around the reader's status writes
           asserting the DOCUMENTED host-failure path (caught → HostFailure::Panic →
           conditional request_stop → episode terminates; seal obligations met), and
@@ -188,11 +188,11 @@ Modify    apps/headless tests + Cargo dev-target wiring; NO production Cargo cha
 Docs      playback-execution-validation contract gains an evidence-mode row IF adopted
 Removal   none
 Acceptance  the test itself (fixtures with known failure stage families + one healthy
-          control); a green run binds the chain; absence of the test keeps the R1 C-1
+          control); a green run binds the chain; absence of the test keeps the reconciliation C-1
           corrected claim ("constructible, not yet constructed")
 ```
 
-### 1.9 Text coupling and formal-mapping migration (F10 census; R1 §5)
+### 1.9 Text coupling and formal-mapping migration (F10 census; reconciliation §5)
 
 ```text
 Current   presentation text pinned by ~6 assertion families; decision-table oracle
@@ -357,7 +357,7 @@ TEST-QUALITY-STANDARD-v1 apply to any future test authoring this plan induces.
 | T1-6 userdata context (if adopted) | OS-reason fidelity + slot hygiene | E-3's fault-injecting harness: retained (kind, raw_os_error) matches the injected failure; successful operations clear the slot | a stale error attributed to a later successful operation |
 | T2-5 (either carrier) | verdict-only settlement | mock-abort tests, snapshot present vs absent | terminal differs when the snapshot is dropped |
 | T5-4 (writer-swap tier, #8/#9/#10) | panic-escalation removal only | E-7 tier 1: broken-sink control per site × {gate on, off}, identical terminal/exit path vs sink-healthy; blocked-sink control DOCUMENTS the residual delay (not isolation) | any terminal/exit-path change keyed on sink state; residual blocking presented as isolation |
-| T5 framework (future — diagnostic outlets only, incl. #11; R1.2) | producer/terminal independence from DIAGNOSTIC sink state | E-7 tier 2: four R0 §6 controls per diagnostic outlet | any semantic change (episode class, exit path beyond documented ones) |
+| T5 framework (future — diagnostic outlets only, incl. #11; R1.2) | producer/terminal independence from DIAGNOSTIC sink state | E-7 tier 2: four disposition-contract §6 controls per diagnostic outlet | any semantic change (episode class, exit path beyond documented ones) |
 | Protocol writes (#5) | conformance to the documented host-failure classes (NOT terminal invariance) | E-9 (R1.2): broken/closed stdout+stderr harness asserting the T5-7 classes | a protocol-write panic escaping the catch; protocol rows silently dropped like diagnostics; seal proceeding unacknowledged |
 | T3-1 (if adopted — AFTER the observability gap is closed by an ABI/SongCore amendment, R1.1) | witness inertness | interleave test (E-1) asserting classification never reads the witness | any Failed/Completed divergence caused by the witness |
 | E-2 entry | real-chain binding | one feature-gated end-to-end on curated fixtures + healthy control | stage-family mismatch or hang |
@@ -368,10 +368,10 @@ TEST-QUALITY-STANDARD-v1 apply to any future test authoring this plan induces.
 
 For a fresh reviewer picking this package up:
 
-1. **Fastest falsification targets** (R1 HANDOFF mirrors): re-derive R1 §2.3 row 2
+1. **Fastest falsification targets** (reconciliation HANDOFF mirrors): re-derive reconciliation §2.3 row 2
    (seek erases the latch) from songcore_ffmpeg.c:1111-1156/1161-1226 + session.rs:601-643 —
    the single most consequential correction this round makes to scan A. R1.1 adds a
-   second: re-derive the stop × pending-fatal commit race (R1 §2.3.1) from
+   second: re-derive the stop × pending-fatal commit race (reconciliation §2.3.1) from
    completion.rs:1238-1262 (worker_failure precedence; request_stop commits nothing)
    + session.rs:827-893 (no terminal check between loop-top and read; unconditional
    `decode_failed` in the Err arm) + edge.rs:233-239 — confirming that in the default
@@ -394,7 +394,7 @@ For a fresh reviewer picking this package up:
 
 ## 6. Round boundary
 
-Delivered by this PR round: the three R1 companion documents + R0 attribution/index
+Delivered by this PR round: the three companion documents + R0 attribution/index
 update; R1.1 (first audit round) corrected all eight REVISE findings in place — the
 stop × pending-fatal commit race (§1.3), the T2-5 delivery path (§1.4), the unified
 cone remediation table with #9 included and panic/blocking separated (§1.5), the
@@ -407,8 +407,16 @@ to evidence levels with no audibility asserted, E-1 attribution decoupled from m
 text, E-7 tier 2 narrowed to diagnostic outlets with E-9 carrying protocol-write
 conformance, the queue-cost claims corrected against the pinned toolchain's std (no
 advantage verdict asserted), and T5-8's chain-to-previous made a condition rather
-than an unconditional duty. Not delivered, by explicit constraint: production changes,
-test changes, build changes, authority status changes, experiment execution, issue
-closure, merge. The NEEDS_RUNTIME_EVIDENCE registry (R1 §8) is the bridge to any
-future evidence round; OPEN-DECISION D-2..D-11 are the bridge to any future owner
-ruling.
+than an unconditional duty. R1.3 (third audit: **APPROVE_DESIGN_CANDIDATE**, one
+non-blocking P3) applied the T2-2 lock-hold wording fix (notify after the guard is
+dropped), added E-9's three-mode stdout checkpoint (flush-Err currently ignored and
+unconstructed — a checkpoint, not a proven defect), and executed the owner's rename
+instruction: stable filenames without round suffixes, links and shorthand references
+updated. The approval is design-candidate level only — it authorizes no
+implementation and no merge; the OPEN items (D-2..D-11, exporter exit mechanism,
+hook isolation, teardown panic posture) are the entry points for future design and
+implementation work and are not resolved by any green gate. Not delivered, by
+explicit constraint: production changes, test changes, build changes, authority
+status changes, experiment execution, issue closure, merge. The NEEDS_RUNTIME_EVIDENCE
+registry (reconciliation §8) is the bridge to any future evidence round;
+OPEN-DECISION D-2..D-11 are the bridge to any future owner ruling.
