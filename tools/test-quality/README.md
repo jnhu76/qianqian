@@ -3,7 +3,10 @@
 ```text
 STATUS      = OPT-IN PILOT (R2 calibration, #244/#248/#249 campaign)
               NOT installed in lefthook, NOT in any GitHub CI job,
-              NOT a repository norm. See
+              Since TEST-QUALITY-STANDARD-v1
+              (docs/development/test-quality-standard.md section 11) its output
+              is defined as a REVIEW_SIGNAL: it may rank review and can never
+              adjudicate adequacy. See
               docs/development/test-quality/r2-checker-calibration.md
               for the calibration record behind this copy.
 CHECKER     = check_test_quality_prototype.py  (prototype grade:

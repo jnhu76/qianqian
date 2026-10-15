@@ -390,6 +390,8 @@ Green Cargo tests are regression evidence, not architecture acceptance. Verifica
 
 When adding or materially modifying a scheduling-, lifecycle-, or timing-sensitive test, follow [concurrency test design](docs/development/concurrency-test-design.md): identify the authority-owned property, prove each required precondition through a real synchronization seam, deterministically construct the intended schedule or verify every legal outcome, observe at the correct settlement boundary, and identify what defect would make the oracle fail. This is a **test-authoring method**, not new product semantics. Do not bulk-rewrite existing tests or turn a fixture's scheduling assumption into authority.
 
+Test authoring, review, admission and execution-evidence retention are governed by the repository test-process authority, `docs/development/test-quality-standard.md` (`TEST-QUALITY-STANDARD-v1`). It decides which evidence a materially added or modified test owes, through an independent mechanism x risk matrix and a six-question authoring record. It defines no product semantics, authorizes no new runtime, scheduler, DSL or property registry, and adds no step to the local pre-push gate. Read it before changing a high-risk test claim; low-risk deterministic tests keep near-zero ceremony. The concurrency guide above remains the concurrency sub-domain method and is incorporated there as the M3 case.
+
 ## Local pre-push gate (Lefthook)
 
 Lefthook is the repository's Git hook orchestrator. The `pre-push` gate is the fast local rejection layer; GitHub Actions remains the authority for platform, formal, concurrency, mutation, Windows and release evidence.
@@ -482,7 +484,7 @@ During development, run the smallest relevant Rust/native/binding/target test lo
 
 `docs/README.md` is the documentation router and truth-class index.
 
-Keep one current authority per durable fact. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation; PBK-003 owns the stable Output Plugin / pluggable Host Render Backend boundary and backend-neutral `AudioOutput` contract interpretation.
+Keep one current authority per durable fact. Test authoring, review, admission and execution-evidence retention are owned by `docs/development/test-quality-standard.md` (`TEST-QUALITY-STANDARD-v1`), the single repository-side test-process authority; it defines no product semantics. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation; PBK-003 owns the stable Output Plugin / pluggable Host Render Backend boundary and backend-neutral `AudioOutput` contract interpretation.
 
 `README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, website and diagrams are derived projections/routers; they may summarize, route and show status, but must not define or extend architecture semantics.
 

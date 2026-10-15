@@ -28,6 +28,8 @@ Load only the documentation needed for the current task. Git history and externa
 | Current Rust behavior | current code + tests |
 | Writing or reviewing concurrency, teardown, wakeup, and terminal-ordering tests | `development/concurrency-test-design.md` — test-authoring method only (not a new source of product semantics); applies to new/materially modified tests, no bulk migration |
 | Adjudicating an architecture/performance question with measurements (rates, cadence, latency, instruments) | `development/measurement-oracle-validity.md` — measurement-oracle governance: instrument controls (positive/negative/limits) before adjudication, same-method pairs, archived artifacts; includes the #233 Measurement Oracle Failure case; method only (not product semantics) |
+| Writing, reviewing or admitting a test (adequacy, mechanism x risk obligations, sleep/timing roles, evidence retention) | `development/test-quality-standard.md` — **TEST-PROCESS AUTHORITY** for test authoring/review/admission/evidence only; incorporates `development/concurrency-test-design.md` as the M3 case; defines no product semantics |
+| Test-quality campaign records, checker calibration and evidence-package delivery status | `development/test-quality/README.md` — evidence index + delivery record (not an authority); the raw R3-B archive status and pickup contract live there |
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — historical audit evidence at its recorded BASE_SHA; its then-pending hardening status is not a current implementation claim |
@@ -87,6 +89,14 @@ NORMATIVE AUTHORITY
 
   K0 representation decisions
       -> architecture/composition-kernel-0-implementation-adr.md
+
+TEST-PROCESS AUTHORITY (how a test claim is authored, reviewed, admitted and
+  evidenced; defines no product semantics and no runtime mechanism)
+      -> development/test-quality-standard.md
+         (TEST-QUALITY-STANDARD-v1; incorporates
+          development/concurrency-test-design.md as the M3 case;
+          development/measurement-oracle-validity.md remains the
+          instrument-validation rule for measurements)
 
 VALIDATION CONTRACT (governance — how Stage-8 validation verdicts are
   decided; defines no architecture semantics)
