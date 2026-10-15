@@ -422,4 +422,6 @@ Layering rule: sections 0–8 above describe **current behavior and candidate re
 as of the R0 baselines; the R1 companions separate *proven current facts* (anchored at
 `5e60da4c`), *reachable-but-unobserved behavior*, and *target-contract choices*. Nothing
 in any of these files changes D11, D14.*, the SongCore ABI, U2, or any accepted document;
-merging them authorizes implementation of nothing.
+merging them authorizes implementation of nothing. Where §6's two-item hazard list or any
+other R0 summary overlaps the R1 evidence, the R1 ledger (reconciliation §4) and its
+R1.1 corrections are the current fact authority; R0 §6 is a historical subset.

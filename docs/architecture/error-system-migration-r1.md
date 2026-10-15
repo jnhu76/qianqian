@@ -49,14 +49,23 @@ Acceptance  test: fault → read last_error → issue another call → assert th
 
 ```text
 Current   proven matrix: next read surfaces; Applied erases via reset_decode_state;
-          stop/teardown win by first-wins; RefusedUnchanged production-dead
-Target    PRESERVE the behavior table as the regression baseline; optionally T3-1
-          (superseded-fatal diagnostic witness — OPEN-DECISION D-5)
-Modify    none for preservation; adapter+session if D-5 adopted
+          stop/teardown are a COMMIT RACE, not stop-determinism (R1.1, R1 §2.3.1 —
+          the default worker position lets the pending fatal win; a stop wins only
+          from stop-observing positions); RefusedUnchanged production-dead
+Target    PRESERVE the behavior table (as corrected) as the regression baseline;
+          optionally T3-1 (superseded-fatal diagnostic witness — OPEN-DECISION D-5;
+          currently unobservable across the ABI, R1.1)
+Modify    none for preservation; ABI/SongCore + adapter+session if D-5 adopted
 Docs      none (behavior is ABI+worker-conformant; no frozen text contradicts it)
-Acceptance  E-1 (R1 §8): real-provider interleave test asserting exactly one of
-          {Failed{pending decode error}} or {Applied continuation with no Failed};
-          counterexample to the baseline table itself would falsify R1 §2, not the goal
+Acceptance  E-1 (R1 §8, R1.1 phase-disciplined form): observe the FIRST read after
+          the Applied landing; old-vs-new error attribution via the controlled fault
+          position + C-level message provenance, never the outcome class alone. The
+          stop-race half is a separate observable: a stop inside the window yields
+          Stopped OR Failed{pending decode error} with the worker-position
+          discriminator recorded — never an assertion that stop alone forces Stopped;
+          freezing the pre-R1.1 wording in an oracle is the failure mode this row exists
+          to prevent. A counterexample to the corrected table itself would falsify
+          R1 §2.3, not the goal
 ```
 
 ### 1.4 Output verdict and reason delivery (T2-5, D-10)
@@ -64,13 +73,26 @@ Acceptance  E-1 (R1 §8): real-provider interleave test asserting exactly one of
 ```text
 Current   LoopOutcome::Aborted{message} exists as gated stderr + thread-local only;
           session settles Failed{"device"} with the reason unrecoverable (L7)
-Target    bounded owned reason snapshot delivered alongside the verdict (session-internal
-          cell first); verdict-only settlement semantics unchanged
-Modify    wasapi.rs abort path (writer), playback session (cell + observation surface or
-          internal-only), tests/common mock OutputBehavior (if it crosses the port —
-          option (b) only)
-Docs      PBK-003 interpretation note IF option (b); D14.2 untouched either way (content
-          is Class-C diagnostic, control-inertness witness required)
+Path      allocation: session creates the cell before open_stream
+          → handoff: CROSSES qianqian-audio-api in every carrier — (a') a
+          RenderRequest field carrying an audio-api-typed cell (the pattern
+          OutputLevel/PositionEvidence already use, ports.rs:962-985; wasapi's deps
+          are audio-api+composition only, so nothing playback-typed can reach the
+          render thread) or (b) a parameter on the drain.complete-adjacent delivery
+          API (DrainSignal is likewise audio-api-typed)
+          → write: render thread at abort stores a bounded owned copy into the cell
+          → read: session publication / internal diagnostic surface (exposure on the
+          public observation plane is a separate T1-3/D-9 question)
+          → retirement: episode teardown drops the session's cell; the mechanism
+          held only a clone
+Target    bounded owned reason snapshot delivered alongside the verdict; verdict-only
+          settlement semantics unchanged
+Modify    qianqian-audio-api (the handoff type, either carrier) + wasapi.rs abort path
+          (writer) + playback session (cell + read side); tests/common mock
+          OutputBehavior follows whichever carrier D-10 picks
+Docs      PBK-003 interpretation note applies to T2-5 in EITHER carrier (§3.4, R1.1);
+          D14.2 untouched either way (content is Class-C diagnostic; control-inertness
+          witness required)
 Removal   the QIANQIAN_AUDIO_LOG-only carrier for the abort reason may be demoted to a
           debug line AFTER the reliable carrier exists (never before)
 Acceptance  stop_seam-style: identical outcome class with snapshot present/absent;
@@ -80,23 +102,42 @@ Acceptance  stop_seam-style: identical outcome class with snapshot present/absen
 
 ### 1.5 Observer / exit-funnel integrity (N-01, N-02, T5-4, D-3)
 
+Unified remediation table (R1.1 — one table, hazard class separated from fix class;
+"writer swap" fixes panic, never blocking):
+
+| Ledger row | Site | Panic hazard | Blocking hazard | Covered by the D-3 corrective? |
+|---|---|---|---|---|
+| #8 | wasapi.rs:261 post-catch abort line | skips `render_input.stop`+`drain.complete` → N-01 hang (write-FAILURE mode, four preconditions, R1 §3.2) | delays wakeup/drain publication (B F5) | YES (writer swap) — panic removed; blocking REMAINS until framework |
+| #9 | wasapi.rs:538-547 opened line | caught by catch #1 AFTER `Opened` published → post-activation abort, `Failed{"device"}` misattribution, or N-01 cascade via #8 | delays first Start (playback onset) | YES (writer swap) — same partial scope |
+| #10 | wasapi.rs:678-686 volume recoverable failure | caught by catch #2 → recoverable failure escalated to `Aborted` → `Failed{"device"}` (A F-07) | render-loop stall → device underrun (B F6) | YES (writer swap) — same partial scope |
+| #11 | panic default hook + chain-to-previous | reentrancy only | blocks the panic translation itself; chain restores default sync stderr for all non-reader threads (B F7) | NO — process-global hook, not fixable by a writer swap; mechanism OPEN (T5-8) |
+| #5 | machine_input.rs:230-233 reader protocol writes | caught (:119) → `HostFailure::Panic` → episode terminated by a diagnostic write | full pipe → reader stuck → `seal()` waits forever | NO — protocol class, deliberately outside §1.5 (see §1.7; the two-class split is the answer, not silencing) |
+
 ```text
 Current   decode funnel + render post-catch cone run outside every catch with
           poison-sensitive locks; gated abort-line panic skips stop+complete (N-01);
-          volume print panic upgrades a recoverable failure (ledger #10)
-Target    cone sites (#8/#10/#11) use a non-panicking writer; funnel/post-catch ordering
-          documented as load-bearing; D-7 (panic→latch in teardown) stays OPEN pending
-          K0 review
-Modify    wasapi.rs two sites + a small writer helper; machine_input reader write path is
-          already catch-contained (no change); entry.rs report sites are host-operation
-          failures by classification (protocol rows — no silencing)
+          volume print panic upgrades a recoverable failure (#10); opened-line print
+          (#9) panics into catch #1 after the Opened verdict published
+Target    the THREE wasapi gated sites (#8/#9/#10) swap to a non-panicking writer —
+          a PARTIAL remediation: panic/skip escalations removed, full-pipe BLOCKING
+          remains on every synchronous site until the T5 framework lands (T5-2/T5-3);
+          #11 and #5 keep their own classes per the table above; funnel/post-catch
+          ordering documented as load-bearing; D-7 (panic→latch in teardown) stays
+          OPEN pending K0 review
+Modify    wasapi.rs three sites + a small writer helper; nothing else this round
 Docs      playback-execution-model hazard rows updated when the corrective lands;
-          R0 §6 hazard list marked resolved-at-<sha> at that time
+          R0 §6 hazard list marked resolved-at-<sha> at that time — for the PANIC
+          class only, with the residual blocking hazard stated in the same row
 Removal   none
-Acceptance  E-7 negative controls per outlet: blocked sink / write error / consumer
-          stopped — with AUDIO_LOG on AND off, asserting identical terminal class,
-          exit path, and wakeup ordering; the N-01 hang must become impossible by
-          construction (writer cannot panic), demonstrated by the write-error control
+Acceptance  E-7 tier 1 (R1 §8, R1.1): per changed site (#8/#9/#10), broken-sink
+          negative control × {gate on, gate off} — terminal class, exit path and
+          wakeup ordering identical to the sink-healthy control (N-01's write-failure
+          mode impossible by construction; demonstrated by the write-error control);
+          PLUS a blocked-sink control that documents the RESIDUAL (publication still
+          delayed — expected, recorded as residual; NOT sold as isolation). Reader
+          (#5) and hook (#11) outlets keep their E-7 tier-2 registry entries for the
+          future framework round — they are out of this corrective's scope, so the
+          acceptance set no longer names objects the corrective does not change
 ```
 
 ### 1.6 Partial activation and cleanup failure (D14.6 baseline; D-7 open)
@@ -176,6 +217,32 @@ Acceptance  test: force a teardown violation, assert the assembly result reports
           while dispose still returns the authoritative verdict
 ```
 
+### 1.11 Host I/O reason retention via adapter-owned userdata context (T1-6, R1.1)
+
+```text
+Current   file_read/file_seek return -1 on any io::Error; the OS detail never crosses
+          the callback RETURN value (lib.rs:70-93); open-path Display carries
+          (os error N) but mid-read does not
+Target    candidate (compared — replaces the prior "not retainable" verdict):
+          userdata points at an adapter-private context {file, last_io_error}; the
+          callback records the io::Error before returning -1; the adapter clears the
+          slot at each binding-level operation start and reads it after the SongCore
+          call returns — no ABI or callback-shape change (userdata is binding-created,
+          lib.rs:163-168)
+Obligations
+          before adoption: per-operation association (attribute the recorded error
+          to the right binding-level call — read vs seek vs probe); stale-error
+          clearing discipline; multiple internal callbacks per call (FFmpeg may issue
+          several reads — define first/last-wins); context ownership/lifetime with
+          the endpoint (Box<File> becomes Box<IoContext>)
+Modify    qianqian-decode-songcore only (callbacks + context + read sites)
+Docs      binding-architecture note rides with T1-1/T1-2 (§3.5)
+Acceptance  fault-injecting source behind the io seam (E-3's harness): assert the
+          retained (kind, raw_os_error) matches the injected failure AND that a
+          successful operation clears the slot; counterexample: a stale error
+          attributed to a later successful operation
+```
+
 ## 2. Authority-amendment correspondence table
 
 Only documents actually touched by some candidate goal are listed. "CONDITIONAL" =
@@ -186,7 +253,7 @@ option. **No ACCEPTED document is modified by this PR.**
 |---|---|---|
 | ADR-PBK-001 (foundations) | — (no goal creates a new realtime view or publication overlap; T2-5 content is Class C; P1-P5 untriggered) | NO CHANGE |
 | ADR-PBK-002 (D11/D14.*/U2) | C-8/D-4 (drain semantics — resolver precedence is authority-OPEN, AI-7); D14.5 SEEK_UNSUPPORTED reclass (C-9); D14.9 untouched by T5-4 (grading preserved); D14.2 untouched by T1-3/T2-5 (diagnostic stays presentation, control-inertness witnessed); U2 untouched (#277 separate) | NO MANDATORY AMENDMENT; CONDITIONAL candidates §3.2/§3.3 |
-| ADR-PBK-003 (Output boundary) | T2-5 option (b) (public port shape) | CONDITIONAL §3.4 |
+| ADR-PBK-003 (Output boundary) | T2-5 — EITHER carrier: the reason handoff crosses the backend-neutral port crate in both shapes (R1.1 path drawing, §1.4; previously scoped to option (b) only) | CONDITIONAL §3.4 |
 | songcore-binding-architecture | T1-1/T1-2 (binding-internal retention note; parity unchanged) | NOTE-LEVEL §3.5 (not an amendment) |
 | playback-execution-model | T5-4 corrective (hazard rows), §1.7 two-class statement | UPDATE-WHEN-LANDED (evidence doc, non-authority status per its FROZEN scope — its hazard rows describe execution facts; changes ride with the implementation PR) |
 | dsp-product-model | — (T3-1 doesn't touch DSP; refuse/apply/fail triad already authoritative) | NO CHANGE |
@@ -195,13 +262,16 @@ option. **No ACCEPTED document is modified by this PR.**
 
 ## 3. Concrete amendment candidate texts (CANDIDATE — not adopted; differences stated)
 
-### 3.1 No mandatory amendments
+### 3.1 No mandatory amendments — scope narrowed in R1.1
 
-The six-module goals as recommended (T1-1/T1-2 internal retention, T5-4 corrective,
-T2-5 option (a)) require **zero** changes to accepted authority: they add no terminal
-variant, no semantic subclass, no public control surface, no K0 primitive, and no realtime
-mechanism. This is the round's primary design claim; the conditional texts below exist so
-that an owner choosing otherwise starts from concrete words, not vibes.
+T1-1/T1-2 internal retention and the T5-4 writer-swap corrective require **zero**
+changes to accepted authority: they add no terminal variant, no semantic subclass, no
+public control surface, no K0 primitive, and no realtime mechanism. **R1.1 narrowing:
+T2-5 no longer belongs in the zero-change list** — its handoff crosses
+`qianqian-audio-api` in every carrier (§1.4 path), so the PBK-003 interpretation note
+(§3.4) is cited by both D-10 options; whether that note must become an accepted
+amendment is part of the D-10 ruling, not pre-decided here. The conditional texts
+below exist so that an owner choosing otherwise starts from concrete words, not vibes.
 
 ### 3.2 CONDITIONAL — ADR-PBK-002 D14.5, SEEK_UNSUPPORTED provability note
 
@@ -233,7 +303,9 @@ evidence — declined by this round.
 
 ### 3.4 CONDITIONAL — ADR-PBK-003, AudioOutput diagnostic attachment
 
-Trigger: T2-5 option (b) (public port extension). Candidate differential:
+Trigger: T2-5 adoption, **either carrier** (the reason handoff crosses the
+backend-neutral port crate — `RenderRequest` field or drain-adjacent parameter;
+R1.1 §1.4). Candidate differential:
 
 ```text
 + (CANDIDATE) The backend-neutral AudioOutput contract MAY carry a bounded,
@@ -245,8 +317,10 @@ Trigger: T2-5 option (b) (public port extension). Candidate differential:
 ```
 
 Difference: one optional diagnostic parameter class on an existing delivery point;
-verdict semantics, Output Plugin identity, and backend ownership untouched. Option (a)
-(session-internal cell) needs **no** PBK-003 text.
+verdict semantics, Output Plugin identity, and backend ownership untouched. R1.1: a
+carrier whose cell is read only session-internally still uses a PBK-003-governed port
+type for the handoff; the note is written so it covers both carriers without mandating
+observation-surface exposure.
 
 ### 3.5 NOTE-LEVEL — songcore-binding-architecture
 
@@ -272,9 +346,11 @@ TEST-QUALITY-STANDARD-v1 apply to any future test authoring this plan induces.
 | Adoption | Property | Nature of evidence | Counterexample that fails it |
 |---|---|---|---|
 | T1-1/T1-2 | retention fidelity, copy-before-next-call | binding-crate unit tests on synthesized faults + garbage fixture (real ABI) | public diff ≠ ∅; a stale snapshot after a newer same-handle call |
-| T2-5 | verdict-only settlement | mock-abort tests, snapshot present vs absent | terminal differs when the snapshot is dropped |
-| T5-4 | cone isolation | E-7 four negative controls × {gate on, gate off} × {reader, render-abort, volume, hook} | any terminal/exit-path change keyed on sink state |
-| T3-1 (if adopted) | witness inertness | interleave test (E-1) asserting classification never reads the witness | any Failed/Completed divergence caused by the witness |
+| T1-6 userdata context (if adopted) | OS-reason fidelity + slot hygiene | E-3's fault-injecting harness: retained (kind, raw_os_error) matches the injected failure; successful operations clear the slot | a stale error attributed to a later successful operation |
+| T2-5 (either carrier) | verdict-only settlement | mock-abort tests, snapshot present vs absent | terminal differs when the snapshot is dropped |
+| T5-4 (writer-swap tier, #8/#9/#10) | panic-escalation removal only | E-7 tier 1: broken-sink control per site × {gate on, off}, identical terminal/exit path vs sink-healthy; blocked-sink control DOCUMENTS the residual delay (not isolation) | any terminal/exit-path change keyed on sink state; residual blocking presented as isolation |
+| T5 framework (future, incl. #5/#11) | producer/terminal independence from sink state | E-7 tier 2: four R0 §6 controls per outlet | any semantic change (episode class, exit path beyond documented ones) |
+| T3-1 (if adopted — AFTER the observability gap is closed by an ABI/SongCore amendment, R1.1) | witness inertness | interleave test (E-1) asserting classification never reads the witness | any Failed/Completed divergence caused by the witness |
 | E-2 entry | real-chain binding | one feature-gated end-to-end on curated fixtures + healthy control | stage-family mismatch or hang |
 | §1.9 migration | oracle coherence | table regeneration + TLC refinement + census update in one commit | byte-compare red; unfrozen stage panic; stale text assertions |
 | §1.10 | assembly feedback | forced-violation test | Ok(()) returned with a latched Blocked |
@@ -283,9 +359,15 @@ TEST-QUALITY-STANDARD-v1 apply to any future test authoring this plan induces.
 
 For a fresh reviewer picking this package up:
 
-1. **Fastest falsification targets** (R1 HANDOFF mirrors): re-derive R1 §2 row 2 (seek
-   erases the latch) from songcore_ffmpeg.c:1111-1156/1161-1226 + session.rs:601-643 —
-   the single most consequential correction this round makes to scan A.
+1. **Fastest falsification targets** (R1 HANDOFF mirrors): re-derive R1 §2.3 row 2
+   (seek erases the latch) from songcore_ffmpeg.c:1111-1156/1161-1226 + session.rs:601-643 —
+   the single most consequential correction this round makes to scan A. R1.1 adds a
+   second: re-derive the stop × pending-fatal commit race (R1 §2.3.1) from
+   completion.rs:1238-1262 (worker_failure precedence; request_stop commits nothing)
+   + session.rs:827-893 (no terminal check between loop-top and read; unconditional
+   `decode_failed` in the Err arm) + edge.rs:233-239 — confirming that in the default
+   worker position the pending fatal beats the stop, the opposite of the pre-R1.1
+   wording.
 2. **N-01**: read wasapi.rs:240-273 and confirm the :261 print is outside both catches;
    then confirm finish_episode's order (entry.rs:418-419) makes the consequence a
    pre-dispose hang.
@@ -304,7 +386,12 @@ For a fresh reviewer picking this package up:
 ## 6. Round boundary
 
 Delivered by this PR round: the three R1 companion documents + R0 attribution/index
-update. Not delivered, by explicit constraint: production changes, test changes, build
-changes, authority status changes, experiment execution, issue closure, merge. The
-NEEDS_RUNTIME_EVIDENCE registry (R1 §8) is the bridge to any future evidence round;
-OPEN-DECISION D-2..D-11 are the bridge to any future owner ruling.
+update; R1.1 (audit round) corrects all eight REVISE findings in place — the stop ×
+pending-fatal commit race (§1.3), the T2-5 delivery path (§1.4), the unified cone
+remediation table with #9 included and panic/blocking separated (§1.5), the userdata
+retention candidate (§1.11), the narrowed zero-amendment claim (§3.1/§3.4), the
+E-1/E-5/E-6 redesigns and the E-7 two-tier split (§4). Not delivered, by explicit
+constraint: production changes, test changes, build changes, authority status changes,
+experiment execution, issue closure, merge. The NEEDS_RUNTIME_EVIDENCE registry
+(R1 §8) is the bridge to any future evidence round; OPEN-DECISION D-2..D-11 are the
+bridge to any future owner ruling.

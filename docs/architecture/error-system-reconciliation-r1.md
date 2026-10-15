@@ -44,6 +44,17 @@ WRITE_SCOPE               = docs/architecture/{error-disposition-contract-r0.md 
                             error-system-migration-r1.md} on the PR #280 branch
 EXECUTION                 = NONE (no test/build/device/fault-injection run; all "test exists"
                             statements are code-existence readings of the frozen tree)
+R1.1 (2026-10-15)         = static adversarial audit of 847e9d1 returned REVISE with eight
+                            findings; all eight re-verified against the frozen tree and
+                            accepted. Corrections in this file: §2.3 rows 1/5/6 + new
+                            §2.3.1 (stop × pending-fatal is a commit race, not stop-determinism;
+                            audibility split), §2.4 DAG annotation, N-01 condition narrowing
+                            (write-failure vs full-pipe modes; four preconditions), ledger #9
+                            consequence fix (Opened verdict publishes BEFORE the print),
+                            E-1/E-5/E-6 redesigns and E-7 two-tier split. Companion files carry
+                            T1-3/T1-6/T2-5/T3-1/T5-2/T5-4/T5-5/T5-8, D-3/D-5/D-9/D-10 and
+                            migration §1.3/§1.4/§1.5/§2/§3/§4 + new §1.11. SOURCE_BASE_SHA
+                            unchanged; still zero execution.
 REVIEW ATTRIBUTION NOTE   = PR #280's "independent Astra review" is recorded by the owner's
                             PR comment of 2026-10-15 (issue comment, verifiable) as a static
                             assessment shared off-GitHub at 3c866cfa. The reviewer's identity
@@ -174,14 +185,47 @@ choice (belongs to the target-contract document, not current behavior).
 
 | Next operation after a partial success (fatal latched, N frames delivered) | Path | Effect on the latched fatal | Episode outcome | Class |
 |---|---|---|---|---|
-| Next `read_frames` (default) | C:1111-1113 → adapter `_` arm (lib.rs:288-291) → `decode_failed("… pending decode error")` (session.rs:889-893) | surfaced, then consumed by the failure | `Failed{decode: … pending decode error}`; already-delivered N frames stay in the edge and are heard; no rollback | A |
+| Next `read_frames` (default) | C:1111-1113 → adapter `_` arm (lib.rs:288-291) → `decode_failed("… pending decode error")` (session.rs:889-893) | surfaced, then consumed by the failure | `Failed{decode: … pending decode error}`; no rollback. Audibility is split (R1.1): only frames the render leg already pulled into the device buffer before `edge.fail()` are heard; frames merely admitted to the edge are abandoned — the render-side read checks Failed/Stopped BEFORE data (edge.rs:233-239, "buffered frames are abandoned") | A |
 | `request_seek`, worker picks it up, `song_seek` **succeeds** (`Applied`) | C:1177 `av_seek_frame` ≥ 0 → C:1195-1196 flush + `reset_decode_state` → **latch cleared**; worker: remainder discarded, `edge.invalidate()` purge, landing published (session.rs:683-694) | **erased without ever surfacing** | episode continues from the new position; the decode anomaly in the replaced region never reaches D11 or any diagnostic | A (mechanism) / B (schedule observed only statically) |
 | `request_seek`, provider returns `RefusedUnchanged` | `classify_seek_status` (lib.rs:254-260): only `SONG_ERR_INVALID_ARGUMENT` classifies so; `fail_arg` (C:1166) overwrites the diagnostic but not the latch; worker resumes old cursor (session.rs:644-655) | retained (diagnostic overwritten) | next read surfaces it → `Failed` as row 1. Note: from the production adapter `INVALID_ARGUMENT` is unreachable (`Duration` targets are ≥ 0; handle non-null) — the class is contract-live via mocks/ABI controls, production-dead | A (mapping) / B (schedule) |
 | `request_seek`, provider returns `MutatedThenFailed` | `fail()` overwrites diagnostic; latch retained but moot; worker: `release_seek_without_commit` + `decode_failed("seek failed: …")` + `edge.fail()` (session.rs:656-667) | superseded by the seek failure | `Failed{decode: seek failed: …}` (D14.5 conservative routing) | A |
-| `request_stop` | `request_stop` records intent, releases gate, `edge.stop()` (completion.rs:532-562) → worker's write/loop observes terminal → return → `worker_exited(Stopped)` | never surfaced | `Stopped` (intent recorded) — stop wins over the pending fatal; correct per first-wins | A |
-| Teardown / replacement / quit | retire path records stop first (`request_stop` + `wait_terminal`, player.rs:723-743) → same as stop | never surfaced | `Stopped` on the old episode; replacement proceeds | A |
+| `request_stop` | `request_stop` records intent, releases gate, `edge.stop()` (completion.rs:532-562) — **it commits no outcome itself** | depends on worker position (§2.3.1) | **either** `Stopped` **or** `Failed{decode: pending decode error}` — both legal; in the default position (worker at/after loop-top with edge space, no pending seek) the next read surfaces the latch and `worker_failure` wins the commit race (completion.rs:1262 checks it first, before any stop-intent consult); `Stopped` results only when the worker exits through a stop-observing path (mid-write `WriteStep::Stopped`, stranded-seek abort, zero-frame terminal check) without another read | A (both arms code-derived; R1.1 corrects the prior "stop wins" claim) |
+| Teardown / replacement / quit | retire path records stop first (`request_stop` + `wait_terminal`, player.rs:723-743) → waits for whichever terminal commits | as row 5 | old episode settles `Stopped` **or** `Failed{pending decode error}` per the same commit race; replacement proceeds on the committed terminal either way | A (R1.1) |
 | Pause / resume / volume / DSP-refusal | no provider call; worker keeps producing | retained | later read surfaces it (row 1) unless a seek/stop intervenes first | A |
 | EOF | unreachable with a latched fatal: `song_read_pcm` returns the fatal before any EOF branch (C:1111-1113 precedes; C:1157-1158 ordering) | — | — | A |
+
+### 2.3.1 Commit ordering, not command ordering (R1.1 correction of the prior rows 5/6)
+
+`first-wins` (completion.rs:1238-1249) is a property of **terminal commit**, not of
+command arrival. `request_stop` publishes no outcome: it records `stop_requested`,
+releases the gate, and stops the edge. Which terminal an episode in the pending-fatal
+window takes is decided by where the decode worker is when the stop lands:
+
+- **Default position (loop-top reached, no pending seek, edge has space — the state
+  after the partial-success block's write completed):** nothing checks the edge
+  terminal between loop-top and `read_frames`, so the next read runs regardless of the
+  stop, re-publishes the latch (C:1111-1113), returns `Err`, and the Err arm calls
+  `decode_failed` unconditionally (session.rs:889-892) → `worker_failure` → the
+  resolver's FIRST rule commits **Failed** (completion.rs:1262 precedes every
+  stop-intent consult). A stop intent recorded earlier cannot relabel it. In this
+  window **the pending fatal beats the stop**, the opposite of the pre-R1.1 wording.
+- **Stop-observing positions:** inside a capacity wait or mid-block write
+  (`write_observing_seek` returns `WriteStep::Stopped`, :933-944), holding a pending
+  seek (`seek_aborted` release, :613-617), or a zero-frame read (the `Frames(0)` arm
+  checks the terminal, :831-834): the worker exits **without** another read →
+  `worker_exited(Stopped)` → drain Aborted + stop intent → **Stopped**.
+
+Every cell of this matrix is therefore bounded by four phases: (1) read start,
+(2) error publication (`decode_failed`), (3) stop-intent recording, (4) terminal
+commit. A claim about which signal "wins" is well-formed only relative to a phase
+ordering; acceptance designs must observe the phases (E-1), not just the final
+outcome class.
+
+**Audibility vocabulary (row-1 correction):** "decoded" (produced by the C loop) ≠
+"admitted to the edge" (write completed) ≠ "submitted to the device" (render leg
+pulled) ≠ "audible" (played before the data-plane terminal). Only the last two
+survive a subsequent `edge.fail()`; edge-buffered frames are abandoned by the
+render-side terminal-before-data check (edge.rs:233-239).
 
 ### 2.4 Execution DAG (pending-fatal window)
 
@@ -198,7 +242,10 @@ choice (belongs to the target-contract document, not current behavior).
                │       └─ Mutated/Refused → rows 3/4 above
                └── no seek → read_frames → C:1111-1113 "pending decode error"
                      → Err → decode_failed → edge.fail → resolve Failed (DAG-A/1)
-  [any time] stop/teardown → edge.stop → worker observes terminal → Stopped
+  [any time] stop/teardown → edge.stop → worker exit path depends on position (§2.3.1):
+        mid-write / parked-seek / zero-frame → observes stop → exits → Stopped
+        at/after loop-top (default) → next read surfaces the latch first →
+        decode_failed → worker_failure precedence → Failed (stop intent cannot relabel)
 ```
 
 ### 2.5 Adjudication
@@ -258,16 +305,33 @@ thread entry
                                                     observer invoked OUTSIDE the verdict lock (ports.rs:135-155)
 ```
 
-**N-01 (NEW_BOUNDARY, this round).** The gated abort line at `wasapi.rs:261` sits after
-both catches. With `QIANQIAN_AUDIO_LOG` enabled and a broken/full stderr, `eprintln!`
-panics; nothing catches it; `render_input.stop()` and `drain.complete()` are **skipped**.
-Consequences: the decode worker wedges on a full edge with no data-plane stop;
-`wait_terminal` (which the machine path runs BEFORE dispose, entry.rs:418-419) blocks
-indefinitely — the process hangs before it could clean up or report. Scan A's F-07 covered
-the volume-apply print (inside `steady_loop`, hence caught and escalated to `Aborted`);
-scan B's F5 covered blocking of the same line. The panic-skips-publication case at :261 is
-in neither scan. Class: mechanism CODE_FACT; reachability requires the gated log + a broken
-stderr (`STATIC_INFERENCE`, not executed).
+**N-01 (NEW_BOUNDARY, this round; conditions narrowed in R1.1).** The gated abort line at
+`wasapi.rs:261` sits after both catches. Two distinct sink-failure modes must not be
+conflated at this line:
+
+- **Write failure (e.g. broken pipe) → panic → publication skipped.** `eprintln!` panics
+  on a write *error*; nothing catches it; `render_input.stop()` and `drain.complete()`
+  are **skipped**. All four preconditions are required: (i) `QIANQIAN_AUDIO_LOG`
+  enabled; (ii) the stderr write *fails* — a full pipe does NOT panic, it blocks (next
+  bullet); (iii) no other stop/failure publisher has already settled the episode (a
+  committed outcome makes the skipped `drain.complete` inert — `publish_evidence` is
+  first-wins and late evidence is dropped); (iv) the hang itself: `wait_terminal`
+  (which the machine path runs BEFORE dispose, entry.rs:418-419) then finds no
+  committed terminal, and the decode worker wedges on a full edge with no data-plane
+  stop — the process hangs before it could clean up or report.
+- **Full pipe → block → publication delayed (B F5's case, same line).** A full stderr
+  blocks the `eprintln!`; `render_input.stop()`/`drain.complete()` eventually run, so
+  the consequence is unbounded *delay* of wakeup/drain publication, not a skip. This
+  mode is remediable only by removing the synchronous write (T5-2/T5-3 framework), not
+  by a non-panicking writer.
+
+Scan A's F-07 covered the volume-apply print (inside `steady_loop`, hence caught and
+escalated to `Aborted`); scan B's F5 covered blocking of the same line. The
+panic-skips-publication case at :261 is in neither scan. The panic hook's own stderr
+write and its chain-to-previous (which restores the default hook's synchronous stderr
+for every non-reader thread) share the blocking mode (ledger #11) — no platform bound
+is claimed for it (T5-8). Class: mechanism CODE_FACT; reachability requires the gated
+log plus the matching sink condition (`STATIC_INFERENCE`, not executed).
 
 **N-02 (structural, no identified trigger).** If the edge lock was poisoned (a prior panic
 while holding it — no production point identified today), post-catch `render_input.stop()`
@@ -353,7 +417,7 @@ re-confirmed: no `[profile]` in root Cargo.toml, `.cargo/config.toml` linker onl
 | 6 | machine.rs pure renderers (outcome_report / activation_failure_report / disposal warnings / StartFailure) via entry.rs:259-260,447-451 | main | AFTER wait_terminal + dispose + seal (finish_episode order :418-438) | none | transport report rows (protocol stdout / stderr) | panic → exit 101 skipping later reports only (episode already disposed); blocks → exit delay |
 | 7 | entry.rs:380 NotEstablished activation report | main | before attempted-root dispose (:381) | none | transport report | panic → exit 101; attempted root leaks (no dispose) |
 | 8 | wasapi.rs:261 `[qianqian-wasapi] render aborted` | render | post-catch, BEFORE stop/complete | none | gated diagnostic | **blocks → delays wakeup/drain publication (B F5)**; **panics → skips stop+complete → worker wedge + wait_terminal hang (N-01)** |
-| 9 | wasapi.rs:538-547 open line | render | open phase, after verdict, before Start | none | gated diagnostic | panic → caught by catch #1 → Aborted (activation fails with HRESULT message); blocks → delays first Start |
+| 9 | wasapi.rs:538-547 open line | render | open phase, after verdict, before Start | none | gated diagnostic | **R1.1 correction** (the `Opened` verdict publishes at :534, BEFORE this print): panic → caught by catch #1 → `Aborted{"render thread panicked"}` while activation has already reported success — the post-catch cone then re-prints (#8) on the same sink: if it still fails, the N-01 hang cascade follows; if it recovered, the episode aborts post-activation and settles `Failed{"device"}` (no stop intent) with a diagnostic that misattributes a logging failure to the device. blocks → delays first Start (playback onset; activation result unaffected) |
 | 10 | wasapi.rs:678-686 volume recoverable failure | render | steady loop | none | gated + latched diagnostic | panic → caught by catch #2 → recoverable failure escalated to `Aborted` → `Failed{"device"}` (A confirmed); blocks → render-loop stall → device underrun (B F6) |
 | 11 | panic default hook (all threads except machine-transport reader, which swaps it) | any | any panic | whatever the panicking site held | ungated stderr | blocking → delays catch translation (B F7); hook write itself is std-synced stderr |
 | 12 | songcore_ffmpeg.c av_log callback (:50-61) | FFmpeg-calling threads | any SongCore call | none | default **empty callback** (chatter discarded); `QIANQIAN_FFMPEG_LOG` restores default logger per `song_open` (:822) | restored-logger write failures are FFmpeg-internal; default path writes nothing |
@@ -541,13 +605,13 @@ answer. None is claimed as run, passed, or failed.
 
 | E | Question | Minimal design (owner-gated; not authorized by this PR) | Falsification condition |
 |---|---|---|---|
-| E-1 | Pending-fatal × seek-Applied interleave under a real scheduler | Test-side (no production change): real SongCore provider + scripted decode fault after N frames (adapter-level fault injection or a truncated-at-offset source), request seek during the window, observe either the `Applied` continuation without any Failed, or the `pending decode error` Failed | Observing `Failed{pending decode error}` despite a successful Applied seek would falsify §2.3 row 2 |
+| E-1 | Pending-fatal × seek-Applied interleave under a real scheduler | Test-side (no production change): real SongCore provider + scripted decode fault after N frames (adapter-level fault injection or a truncated-at-offset source), request seek during the window. **R1.1 phase discipline (§2.3.1):** the discriminator is the FIRST read following the Applied landing. Allowed outcomes: (a) that first read succeeds — any LATER failure is a fresh error ("decode error" signature, C:1139) and does not bear on row 2; (b) it fails with the re-published pending signature ("pending decode error", C:1112) — this alone falsifies row 2 (the latch survived `reset_decode_state`). Old-vs-new attribution must come from the controlled fault position (the single injected failure site, pre-cut) plus the C-level message provenance, never from the outcome class alone. The stop-race half (§2.3.1 rows 5/6) is a separate observable: a stop issued inside the window must yield `Stopped` or `Failed{pending decode error}` with the worker-position discriminator recorded — never an assertion that stop alone forces `Stopped` | The pending-signature failure on the first post-Applied read (with the injected fault proven pre-cut) falsifies §2.3 row 2; a fresh-signature failure on any later read falsifies nothing |
 | E-2 | Real SongCore error → D11 end-to-end | Feature-gated test (dev-dep on `qianqian-decode-songcore` in the test target only) driving `establish` with a real native handle against a corrupted fixture; assert the Failed terminal + stage family | A green run proves the chain binds; any stage-family mismatch falsifies the assumed passthrough |
-| E-3 | Mid-read host I/O failure (U1) | A seekable fault-injecting source behind the existing io callback seam in a binding-crate test (the callback closure is currently fixed to `File::read` — the test lives in the excluded crate) | If SongCore surfaces the read failure as anything other than latched 103/`pending`/`decode error` family, the C mapping table is wrong |
+| E-3 | Mid-read host I/O failure (U1) | A seekable fault-injecting source behind the existing io callback seam in a binding-crate test (the callback closure is currently fixed to `File::read` — the test lives in the excluded crate; the same harness serves the T1-6 userdata-context candidate, migration §1.11) | If SongCore surfaces the read failure as anything other than latched 103/`pending`/`decode error` family, the C mapping table is wrong |
 | E-4 | Worker stuck in an uninterruptible native call | Filesystem-backed hang injection (e.g. FUSE or a stuck NFS mount) during steady decode; observe dispose/`wait_terminal` blocking and the absence of any Violated/timeout | Any automatic escape (timeout, Violated) would falsify "dispose has no escape" |
-| E-5 | Slow/normal devices vs DRAIN_CAP=5 s | Instrumented drain timing on real endpoints (healthy + Bluetooth-class suspended sink) | A healthy device exceeding 5 s turns C-8's "tuning risk" into an observed misclassification; all devices < 5 s downgrades it |
-| E-6 | SEEK_UNSUPPORTED post-state | Real unseekable container (raw ADTS) + seek attempt + bit-exact continuation probe at the ABI layer (extends F5 E1's method to the unmeasured statuses) | Bit-identical continuation would establish the provability fact the authority chose not to assume (amendment input, not automatic reclassification) |
-| E-7 | N-01 / stderr hazards under blocked & broken sinks | The four negative controls R0 §6 already names (blocked, stopped consumer, queue full, write failure), per outlet (#5/#8/#10/#11), on a pipe-farmed stderr | Any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
+| E-5 | Slow/normal devices vs DRAIN_CAP=5 s | Instrumented drain timing on real endpoints (healthy + Bluetooth-class suspended sink). **R1.1 rewording:** the experiment produces the cap-exceedance datum; it does not adjudicate the classification. A healthy device exceeding 5 s shows the cap is exceeded in practice; whether settling that episode `Failed{device}` is a misclassification remains the D-4 owner ruling (C-8's DESIGN_DECISION half, inside the authority-declared OPEN resolver-precedence space) — that verdict belongs to the target contract, not to the measurement | All tested devices draining < 5 s downgrades the tuning risk to unobserved; an exceedance alone proves only the exceedance |
+| E-6 | SEEK_UNSUPPORTED post-state | Real unseekable container (raw ADTS) + seek attempt + bit-exact continuation probe at the ABI layer (extends F5 E1's method to the unmeasured statuses). **R1.1 scope obligations:** state the result's coverage with the result — container/format family, FFmpeg closure version, sample set; a bit-identical continuation on the tested corpus establishes the provability fact FOR THAT CORPUS only. Class-level reclassification additionally needs either broader coverage or an FFmpeg-internal state argument (what `av_seek_frame` touches on an index-less demuxer before failing); one sample never proves the class | A non-identical continuation on any tested sample keeps the conservative routing; an identical result does not by itself amend D14.5 (migration §3.2 preconditions) |
+| E-7 | N-01 / stderr hazards under blocked & broken sinks | **R1.1 two-tier split, matching the corrective's actual scope (migration §1.5):** Tier 1 (writer-swap corrective, sites #8/#9/#10): broken-sink negative control per site × {gate on, gate off} — terminal class, exit path and wakeup ordering identical to the sink-healthy control (N-01's write-failure mode impossible by construction); plus a blocked-sink control that documents the RESIDUAL blocking hazard (publication still delayed — expected and recorded as residual until the T5 framework lands; it is not an isolation pass). Tier 2 (future framework adoption): the four R0 §6 controls (blocked, stopped consumer, queue full, write failure) per outlet including #5 reader and #11 hook, asserting producer/terminal independence | Tier 1: any terminal/exit-path change keyed on sink state, or the residual blocking presented as isolation. Tier 2: any observed semantic change (episode class, exit path beyond the documented ones) marks the corresponding outlet a defect rather than a hazard |
 | E-8 | Broken-pipe exit-101 reachability on the main thread | Pipe-closed stdout/stderr harness around the binary at each report site (#1-#7) | Confirms A's F-07 main-thread scenario end-to-end; absence would falsify the std-panic premise on this platform |
 
 ---
