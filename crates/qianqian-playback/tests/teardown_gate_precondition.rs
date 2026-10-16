@@ -68,12 +68,12 @@ fn leg_loop(input: &Arc<dyn RenderPcmInput>, gate: &RenderGate) -> DrainVerdict 
             }),
             ParkOutcome::TailProbeFailed
         ) {
-            return DrainVerdict::Aborted;
+            return DrainVerdict::aborted();
         }
         match input.read_frames(&mut dst) {
             PcmPull::Frames(_) => {}
             PcmPull::Eof => return DrainVerdict::Drained,
-            PcmPull::Stopped => return DrainVerdict::Aborted,
+            PcmPull::Stopped => return DrainVerdict::aborted(),
         }
     }
 }

@@ -46,17 +46,20 @@ pub fn qianqian_audio_api::ports::DecodeOutcome::from(T) -> T
 impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::DecodeOutcome
 pub enum qianqian_audio_api::ports::DrainVerdict
 pub qianqian_audio_api::ports::DrainVerdict::Aborted
+pub qianqian_audio_api::ports::DrainVerdict::Aborted::reason: core::option::Option<qianqian_audio_api::ports::AbortReason>
 pub qianqian_audio_api::ports::DrainVerdict::Drained
+impl qianqian_audio_api::ports::DrainVerdict
+pub fn qianqian_audio_api::ports::DrainVerdict::aborted() -> Self
+pub fn qianqian_audio_api::ports::DrainVerdict::aborted_with(qianqian_audio_api::ports::AbortReason) -> Self
+pub fn qianqian_audio_api::ports::DrainVerdict::reason(&self) -> core::option::Option<&qianqian_audio_api::ports::AbortReason>
 impl core::clone::Clone for qianqian_audio_api::ports::DrainVerdict
 pub fn qianqian_audio_api::ports::DrainVerdict::clone(&self) -> qianqian_audio_api::ports::DrainVerdict
-impl core::clone::TrivialClone for qianqian_audio_api::ports::DrainVerdict
 impl core::cmp::Eq for qianqian_audio_api::ports::DrainVerdict
 pub fn qianqian_audio_api::ports::DrainVerdict::assert_receiver_is_total_eq(&self)
 impl core::cmp::PartialEq for qianqian_audio_api::ports::DrainVerdict
 pub fn qianqian_audio_api::ports::DrainVerdict::eq(&self, &qianqian_audio_api::ports::DrainVerdict) -> bool
 impl core::fmt::Debug for qianqian_audio_api::ports::DrainVerdict
 pub fn qianqian_audio_api::ports::DrainVerdict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for qianqian_audio_api::ports::DrainVerdict
 impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::DrainVerdict
 impl core::marker::Freeze for qianqian_audio_api::ports::DrainVerdict
 impl core::marker::Send for qianqian_audio_api::ports::DrainVerdict
@@ -78,7 +81,6 @@ pub fn qianqian_audio_api::ports::DrainVerdict::clone_into(&self, &mut T)
 pub fn qianqian_audio_api::ports::DrainVerdict::to_owned(&self) -> T
 impl<T> core::any::Any for qianqian_audio_api::ports::DrainVerdict where T: 'static + ?core::marker::Sized
 pub fn qianqian_audio_api::ports::DrainVerdict::type_id(&self) -> core::any::TypeId
-impl<T> core::asserting::Printable for qianqian_audio_api::ports::DrainVerdict where T: core::marker::Copy + core::fmt::Debug
 impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::DrainVerdict where T: ?core::marker::Sized
 pub fn qianqian_audio_api::ports::DrainVerdict::borrow(&self) -> &T
 impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::DrainVerdict where T: ?core::marker::Sized
@@ -180,6 +182,50 @@ pub unsafe fn qianqian_audio_api::ports::GateSlice::clone_to_uninit(&self, *mut 
 impl<T> core::convert::From<T> for qianqian_audio_api::ports::GateSlice
 pub fn qianqian_audio_api::ports::GateSlice::from(T) -> T
 impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::GateSlice
+pub enum qianqian_audio_api::ports::OutputAbortClass
+pub qianqian_audio_api::ports::OutputAbortClass::Device
+pub qianqian_audio_api::ports::OutputAbortClass::Panic
+impl core::clone::Clone for qianqian_audio_api::ports::OutputAbortClass
+pub fn qianqian_audio_api::ports::OutputAbortClass::clone(&self) -> qianqian_audio_api::ports::OutputAbortClass
+impl core::clone::TrivialClone for qianqian_audio_api::ports::OutputAbortClass
+impl core::cmp::Eq for qianqian_audio_api::ports::OutputAbortClass
+pub fn qianqian_audio_api::ports::OutputAbortClass::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::OutputAbortClass
+pub fn qianqian_audio_api::ports::OutputAbortClass::eq(&self, &qianqian_audio_api::ports::OutputAbortClass) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::OutputAbortClass
+pub fn qianqian_audio_api::ports::OutputAbortClass::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for qianqian_audio_api::ports::OutputAbortClass
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::OutputAbortClass
+impl core::marker::Freeze for qianqian_audio_api::ports::OutputAbortClass
+impl core::marker::Send for qianqian_audio_api::ports::OutputAbortClass
+impl core::marker::Sync for qianqian_audio_api::ports::OutputAbortClass
+impl core::marker::Unpin for qianqian_audio_api::ports::OutputAbortClass
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::OutputAbortClass
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::OutputAbortClass
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::OutputAbortClass where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::OutputAbortClass::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::OutputAbortClass where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::OutputAbortClass::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::OutputAbortClass::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::OutputAbortClass where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::OutputAbortClass::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::OutputAbortClass::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::OutputAbortClass where T: core::clone::Clone
+pub type qianqian_audio_api::ports::OutputAbortClass::Owned = T
+pub fn qianqian_audio_api::ports::OutputAbortClass::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::OutputAbortClass::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::OutputAbortClass where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputAbortClass::type_id(&self) -> core::any::TypeId
+impl<T> core::asserting::Printable for qianqian_audio_api::ports::OutputAbortClass where T: core::marker::Copy + core::fmt::Debug
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::OutputAbortClass where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputAbortClass::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::OutputAbortClass where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::OutputAbortClass::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::OutputAbortClass where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::OutputAbortClass::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::OutputAbortClass
+pub fn qianqian_audio_api::ports::OutputAbortClass::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::OutputAbortClass
 pub enum qianqian_audio_api::ports::ParkOutcome
 pub qianqian_audio_api::ports::ParkOutcome::Proceeded
 pub qianqian_audio_api::ports::ParkOutcome::TailProbeFailed
@@ -403,6 +449,49 @@ pub unsafe fn qianqian_audio_api::ports::TailProbeOutcome::clone_to_uninit(&self
 impl<T> core::convert::From<T> for qianqian_audio_api::ports::TailProbeOutcome
 pub fn qianqian_audio_api::ports::TailProbeOutcome::from(T) -> T
 impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::TailProbeOutcome
+pub struct qianqian_audio_api::ports::AbortReason
+pub qianqian_audio_api::ports::AbortReason::class: qianqian_audio_api::ports::OutputAbortClass
+pub qianqian_audio_api::ports::AbortReason::message: alloc::string::String
+impl qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::new(qianqian_audio_api::ports::OutputAbortClass, impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::clone(&self) -> qianqian_audio_api::ports::AbortReason
+impl core::cmp::Eq for qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::assert_receiver_is_total_eq(&self)
+impl core::cmp::PartialEq for qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::eq(&self, &qianqian_audio_api::ports::AbortReason) -> bool
+impl core::fmt::Debug for qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for qianqian_audio_api::ports::AbortReason
+impl core::marker::Freeze for qianqian_audio_api::ports::AbortReason
+impl core::marker::Send for qianqian_audio_api::ports::AbortReason
+impl core::marker::Sync for qianqian_audio_api::ports::AbortReason
+impl core::marker::Unpin for qianqian_audio_api::ports::AbortReason
+impl core::panic::unwind_safe::RefUnwindSafe for qianqian_audio_api::ports::AbortReason
+impl core::panic::unwind_safe::UnwindSafe for qianqian_audio_api::ports::AbortReason
+impl<T, U> core::convert::Into<U> for qianqian_audio_api::ports::AbortReason where U: core::convert::From<T>
+pub fn qianqian_audio_api::ports::AbortReason::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for qianqian_audio_api::ports::AbortReason where U: core::convert::Into<T>
+pub type qianqian_audio_api::ports::AbortReason::Error = core::convert::Infallible
+pub fn qianqian_audio_api::ports::AbortReason::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for qianqian_audio_api::ports::AbortReason where U: core::convert::TryFrom<T>
+pub type qianqian_audio_api::ports::AbortReason::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn qianqian_audio_api::ports::AbortReason::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for qianqian_audio_api::ports::AbortReason where T: core::clone::Clone
+pub type qianqian_audio_api::ports::AbortReason::Owned = T
+pub fn qianqian_audio_api::ports::AbortReason::clone_into(&self, &mut T)
+pub fn qianqian_audio_api::ports::AbortReason::to_owned(&self) -> T
+impl<T> core::any::Any for qianqian_audio_api::ports::AbortReason where T: 'static + ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AbortReason::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for qianqian_audio_api::ports::AbortReason where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AbortReason::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for qianqian_audio_api::ports::AbortReason where T: ?core::marker::Sized
+pub fn qianqian_audio_api::ports::AbortReason::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for qianqian_audio_api::ports::AbortReason where T: core::clone::Clone
+pub unsafe fn qianqian_audio_api::ports::AbortReason::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for qianqian_audio_api::ports::AbortReason
+pub fn qianqian_audio_api::ports::AbortReason::from(T) -> T
+impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::AbortReason
 pub struct qianqian_audio_api::ports::AudioOutputCapability
 impl qianqian_composition::capability::Capability for qianqian_audio_api::ports::AudioOutputCapability
 pub type qianqian_audio_api::ports::AudioOutputCapability::Service = dyn qianqian_audio_api::ports::AudioOutput
@@ -824,6 +913,7 @@ pub unsafe fn qianqian_audio_api::ports::SourceFacts::clone_to_uninit(&self, *mu
 impl<T> core::convert::From<T> for qianqian_audio_api::ports::SourceFacts
 pub fn qianqian_audio_api::ports::SourceFacts::from(T) -> T
 impl<T> core::mem::SizedTypeProperties for qianqian_audio_api::ports::SourceFacts
+pub const qianqian_audio_api::ports::ABORT_REASON_MSG_CAP: usize
 pub trait qianqian_audio_api::ports::AudioOutput
 pub fn qianqian_audio_api::ports::AudioOutput::open_stream(&self, qianqian_audio_api::ports::RenderRequest) -> core::result::Result<alloc::boxed::Box<dyn qianqian_audio_api::ports::RenderStream>, qianqian_audio_api::ports::OutputError>
 pub trait qianqian_audio_api::ports::DecodedPcmStream: core::marker::Send

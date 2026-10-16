@@ -99,7 +99,7 @@ const WORKER_TERMINALS: [(&str, Option<EdgeTerminal>); 4] = [
 const DRAIN_VERDICTS: [(&str, Option<DrainVerdict>); 3] = [
     ("None", None),
     ("Drained", Some(DrainVerdict::Drained)),
-    ("Aborted", Some(DrainVerdict::Aborted)),
+    ("Aborted", Some(DrainVerdict::Aborted { reason: None })),
 ];
 
 /// The frozen class vocabulary. `Failed.stage` naming is realization

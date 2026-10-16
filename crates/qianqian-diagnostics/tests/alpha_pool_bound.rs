@@ -84,7 +84,10 @@ fn alpha_pool_full_admission_is_the_only_loss_site() {
     // Let the drainer empty the pool, then confirm the drain boundary too.
     let deadline = Instant::now() + Duration::from_secs(5);
     while pool.outstanding() > 0 {
-        assert!(Instant::now() < deadline, "the drainer never drained the pool");
+        assert!(
+            Instant::now() < deadline,
+            "the drainer never drained the pool"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
     assert_eq!(

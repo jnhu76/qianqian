@@ -38,8 +38,8 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DecodeError, DecodeOutcome, DecodedPcmStream, DrainVerdict, PcmFormat,
-    ProviderSeekOutcome, RenderPcmInput, RenderRequest, RenderStream,
+    AbortReason, AudioOutput, DecodeError, DecodeOutcome, DecodedPcmStream, DrainVerdict,
+    OutputAbortClass, PcmFormat, ProviderSeekOutcome, RenderPcmInput, RenderRequest, RenderStream,
 };
 
 use crate::completion::{SessionCompletion, SessionOutcome, WorkerFailureOrigin, test_sync};
@@ -103,6 +103,11 @@ struct Inner {
     park_entered: Vec<u64>,
     park_released: Vec<u64>,
     read_calls: usize,
+    /// Blocks handed out by `Step::Frames`. The content TAG is this counter,
+    /// not the read-call index: the worker's zero-frame spin advances the
+    /// latter continuously, so only a Frames-step counter identifies a block
+    /// deterministically from the test side.
+    frames_blocks: u32,
     /// The steps actually EXECUTED by reads, in order — the provider-side
     /// witness for "no write pass ran with the command present" (W5b-N).
     history: Vec<Step>,
@@ -232,6 +237,17 @@ impl Script {
         self.lock().read_calls
     }
 
+    fn frames_blocks(&self) -> u32 {
+        self.lock().frames_blocks
+    }
+
+    fn wait_frames_blocks(&self, at_least: u32) {
+        assert!(
+            self.wait_for(WATCHDOG, |inner| inner.frames_blocks >= at_least),
+            "the worker never received block {at_least}"
+        );
+    }
+
     fn seek_calls(&self) -> usize {
         self.lock().seek_calls
     }
@@ -321,9 +337,11 @@ impl DecodedPcmStream for ScriptedStream {
                 Step::Frames(n) => {
                     let frames = n.min(dst.len() / CHANNELS).max(1);
                     let samples = frames * CHANNELS;
-                    // Tag = this read's index: the block's identity is
-                    // observable in the leg's content witness.
-                    self.tag = call as f32;
+                    // Tag = the number of Frames blocks handed out (see
+                    // `frames_blocks`): observable in the leg's content witness
+                    // and predictable from the test side.
+                    inner.frames_blocks += 1;
+                    self.tag = inner.frames_blocks as f32;
                     for sample in dst[..samples].iter_mut() {
                         *sample = self.tag;
                     }
@@ -333,6 +351,12 @@ impl DecodedPcmStream for ScriptedStream {
                 }
                 Step::Zero => {
                     inner.history.push(Step::Zero);
+                    // CPU courtesy only: the worker's zero-frame loop is a hot
+                    // spin by design (session.rs:831-835), and a test harness
+                    // that monopolizes a core for millions of iterations
+                    // starves the machine. A yield is NOT an ordering edge —
+                    // no trace's construction depends on it.
+                    std::thread::yield_now();
                     return Ok(DecodeOutcome::Frames(0));
                 }
                 Step::Fail(message) => {
@@ -407,6 +431,24 @@ struct Episode {
     worker: Option<std::thread::JoinHandle<()>>,
 }
 
+impl Drop for Episode {
+    /// The cleanup boundary, reachable from a FAILED assertion too: release
+    /// every park, stop the episode, join the worker, release the stream —
+    /// non-panicking throughout, so an original assertion failure is the one
+    /// that propagates and no named leg thread leaks into the rest of the
+    /// test binary (the process-wide leak oracles depend on that).
+    fn drop(&mut self) {
+        self.script.release_everything();
+        self.completion.request_stop();
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+        if let Some(stream) = self.stream.take() {
+            stream.stop_and_join();
+        }
+    }
+}
+
 impl Episode {
     /// Build the episode. `pause_before_stream` routes pause intent before
     /// the leg exists, so the leg's first loop-top gate check parks it and
@@ -422,10 +464,7 @@ impl Episode {
         if pause_before_stream {
             completion.request_pause();
         }
-        let output = TestOutput::observed(
-            OutputBehavior::Consume,
-            Arc::new(AtomicUsize::new(0)),
-        );
+        let output = TestOutput::observed(OutputBehavior::Consume, Arc::new(AtomicUsize::new(0)));
         let values = Arc::clone(&output.consumed_values);
         let stream = output
             .open_stream(RenderRequest {
@@ -511,11 +550,14 @@ impl Episode {
     /// its next observation cuts with a non-empty remainder. Returns the
     /// content tag of the cut block.
     fn plant_seek_and_cut(&self, plan: SeekPlan) -> usize {
-        let cut_tag = self.script.read_calls() + 1;
+        // The injected block is the NEXT Frames step, so its tag is
+        // predictable while the worker spins on Zero (which never advances
+        // the Frames counter).
+        let cut_tag = (self.script.frames_blocks() + 1) as usize;
         self.script
             .set_reads(vec![Step::Frames(BLOCK_FRAMES), Step::Zero], true);
         // The injected block was handed out: its write pass is running.
-        self.script.wait_read_calls(cut_tag);
+        self.script.wait_frames_blocks(cut_tag as u32);
         self.script.plan_seek(Some(PARK_SEEK), plan);
         self.completion.request_seek(TEST_TARGET);
         cut_tag
@@ -588,15 +630,8 @@ impl Episode {
 
     /// Cleanup boundary (never asserted as the success path): release every
     /// park, stop the episode, join the worker, release the stream.
-    fn teardown(mut self) {
-        self.script.release_everything();
-        self.completion.request_stop();
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
-        }
-        if let Some(stream) = self.stream.take() {
-            let _ = stream.stop_and_join();
-        }
+    fn teardown(self) {
+        drop(self);
     }
 }
 
@@ -722,9 +757,16 @@ fn w2b_refused_seek_delivers_the_retained_remainder_then_surfaces_the_latch() {
         episode.await_completion_state("the refusal's remainder flush completed", || {
             !episode.completion.seek_in_flight()
         });
-        episode.await_completion_state("the remainder's frames reached the leg", || {
-            episode.delivered_with_tag(cut_tag) > 0
-        });
+        episode.await_completion_state(
+            &format!(
+                "the remainder's frames reached the leg (tag {cut_tag}; reads {}; \
+                 edge buffered {}; leg parked {})",
+                episode.script.read_calls(),
+                episode.edge.buffered_frames(),
+                episode.completion.leg_parked_evidence()
+            ),
+            || episode.delivered_with_tag(cut_tag) > 0,
+        );
         // Only now is the old latch set: the following read surfaces it.
         episode.script.set_latch("pending decode error");
         episode.await_terminal(WATCHDOG);
@@ -774,7 +816,11 @@ fn w3_stop_during_remainder_flush_commits_stopped() {
         episode.script.release_seek();
         let (outcome, drain) = episode.await_terminal(WATCHDOG);
         assert_stopped(&outcome, "a stop with no new fault is not a decode failure");
-        assert_eq!(drain, Some(DrainVerdict::Aborted), "the leg reports the abort");
+        assert_eq!(
+            drain,
+            Some(DrainVerdict::aborted()),
+            "the leg reports the abort"
+        );
         assert_eq!(
             episode.script.read_calls(),
             reads_at_seek,
@@ -887,7 +933,7 @@ fn w5a_applied_seek_after_stop_erases_the_old_latch_and_commits_stopped() {
             &outcome,
             "with the latch erased by the Applied row, Failed{decode} has no legal source",
         );
-        assert_eq!(drain, Some(DrainVerdict::Aborted));
+        assert_eq!(drain, Some(DrainVerdict::aborted()));
         assert_eq!(
             episode.script.latch_surfaced_at(),
             None,
@@ -979,7 +1025,7 @@ fn w5b_r_refusal_with_retained_remainder_commits_stopped() {
             &outcome,
             "the retained remainder's interrupted flush is the legal stop exit",
         );
-        assert_eq!(drain, Some(DrainVerdict::Aborted));
+        assert_eq!(drain, Some(DrainVerdict::aborted()));
         assert_eq!(
             episode.script.read_calls(),
             reads_at_seek,
@@ -1105,6 +1151,123 @@ fn w6_canceled_seek_is_not_a_worker_exit() {
             episode.script.seek_calls(),
             0,
             "still no provider seek for the whole episode"
+        );
+        episode.assert_no_violation();
+        episode.teardown();
+    });
+}
+
+// --- DG-2: the abort reason rides the verdict and never adjudicates -----------
+
+/// A device-failure shape with an ARBITRARY reason on the drain verdict: the
+/// render leg is gone (the test stops the data plane), no stop was requested,
+/// and the worker exits on the stopped edge. `resolve` then classifies
+/// `Failed{device}` — and the only thing the reason may change is the
+/// PRESENTATION text.
+fn device_failure_with(reason: Option<AbortReason>) -> Episode {
+    let episode = Episode::build(false);
+    episode.start_reads(vec![Step::Zero], true);
+    // The dead render leg's own stop of the data plane: no stop intent is
+    // recorded, which is exactly the resolver's device-failure shape.
+    episode.edge.stop();
+    let verdict = match reason {
+        Some(reason) => DrainVerdict::aborted_with(reason),
+        None => DrainVerdict::aborted(),
+    };
+    episode.completion.drain_signal().complete(verdict);
+    episode
+}
+
+/// Oracle (DG-2 acceptance, control-inertness): the SAME decisive evidence
+/// with and without a reason commits the SAME terminal class — the reason
+/// cannot adjudicate. Failure signature: any class difference between the two
+/// phases.
+#[test]
+fn dg2_a_reason_cannot_change_the_committed_terminal() {
+    let _lifecycle = crate::test_common::lifecycle_lock();
+    within(Duration::from_secs(20), || {
+        let without = device_failure_with(None);
+        let (outcome_without, _) = without.await_terminal(WATCHDOG);
+        assert_eq!(
+            outcome_without,
+            SessionOutcome::Failed {
+                stage: "device".to_owned()
+            },
+            "the device-failure shape without a reason"
+        );
+        without.teardown();
+
+        let with = device_failure_with(Some(AbortReason::new(
+            OutputAbortClass::Device,
+            "endpoint invalidated (synthetic)",
+        )));
+        let (outcome_with, _) = with.await_terminal(WATCHDOG);
+        assert_eq!(
+            outcome_with, outcome_without,
+            "the reason must not change the committed terminal"
+        );
+        // ...and it IS delivered to its named consumer, the presentation
+        // surface, where it enriches the existing diagnostic field.
+        let observation = with.outcome();
+        assert_eq!(
+            observation,
+            Some(EpisodeTerminalOutcome::Failed),
+            "the public triple is unchanged"
+        );
+        let diagnostic = with.completion.observe_snapshot().failure_diagnostic;
+        let diagnostic = diagnostic.expect("a device failure carries a diagnostic");
+        assert!(
+            diagnostic.contains("endpoint invalidated (synthetic)"),
+            "the mechanism's explanation reaches the presentation surface: {diagnostic}"
+        );
+        with.assert_no_violation();
+        with.teardown();
+    });
+}
+
+/// Oracle (DG-2 late-verdict policy): a verdict that arrives AFTER the
+/// terminal was committed is dropped — never allowed to relabel, never
+/// retained as a second authority — and counted monotonically. The dropped
+/// reason is nowhere: the mirror still holds the winning evidence.
+#[test]
+fn dg2_a_late_verdict_is_dropped_and_counted() {
+    let _lifecycle = crate::test_common::lifecycle_lock();
+    within(Duration::from_secs(20), || {
+        let episode = Episode::build(false);
+        episode.start_reads(vec![Step::Fail("scripted read failure")], false);
+        let (outcome, _) = episode.await_terminal(WATCHDOG);
+        assert_failed_decode(&episode, "the worker's own failure commits first");
+        assert_eq!(outcome, episode.committed().expect("committed"));
+        // The leg's own abort verdict arrives after the commit: the terminal
+        // layer drops it and counts it.
+        episode.await_completion_state("the leg's late verdict is accounted", || {
+            episode.completion.late_drain_verdicts() >= 1
+        });
+        let late_after_leg = episode.completion.late_drain_verdicts();
+        assert_eq!(
+            episode.completion.committed().expect("still committed"),
+            SessionOutcome::Failed {
+                stage: "decode: scripted read failure".to_owned()
+            },
+            "the late verdict cannot relabel"
+        );
+        // A FURTHER verdict (with a reason) never even reaches the observer:
+        // the signal's own first-wins rule admits exactly one completion.
+        episode
+            .completion
+            .drain_signal()
+            .complete(DrainVerdict::aborted_with(AbortReason::new(
+                OutputAbortClass::Device,
+                "late explanation",
+            )));
+        assert_eq!(
+            episode.completion.late_drain_verdicts(),
+            late_after_leg,
+            "the signal admits one completion; a second call is a no-op"
+        );
+        assert!(
+            episode.completion.drain_mirror_verdict().is_none(),
+            "the dropped verdict (and its reason) is not retained as evidence"
         );
         episode.assert_no_violation();
         episode.teardown();

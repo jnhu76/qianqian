@@ -1068,7 +1068,7 @@ mod seek_record_tests {
                 let invalidations = Arc::new(AtomicUsize::new(0));
                 let position = completion.position_evidence();
                 if ending {
-                    completion.drain_signal().complete(DrainVerdict::Aborted);
+                    completion.drain_signal().complete(DrainVerdict::aborted());
                 }
                 assert!(!completion.seek_aborted());
                 assert!(completion.committed().is_none());
@@ -1102,7 +1102,7 @@ mod seek_record_tests {
                         });
                         let pull = edge.read_frames(&mut [0.0; 2]);
                         drain.complete(match pull {
-                            PcmPull::Stopped => DrainVerdict::Aborted,
+                            PcmPull::Stopped => DrainVerdict::aborted(),
                             PcmPull::Eof => DrainVerdict::Drained,
                             other => panic!("unexpected post-cut data: {other:?}"),
                         });
@@ -1256,7 +1256,7 @@ mod seek_record_tests {
                     });
                     let pull = edge.read_frames(&mut [0.0; 2]);
                     drain.complete(match pull {
-                        PcmPull::Stopped => DrainVerdict::Aborted,
+                        PcmPull::Stopped => DrainVerdict::aborted(),
                         PcmPull::Eof => DrainVerdict::Drained,
                         other => panic!("unexpected post-exit data: {other:?}"),
                     });
@@ -1472,7 +1472,7 @@ mod observation_seam_tests {
                             break;
                         }
                         PcmPull::Stopped => {
-                            drain.complete(DrainVerdict::Aborted);
+                            drain.complete(DrainVerdict::aborted());
                             break;
                         }
                     }

@@ -411,7 +411,7 @@ fn t9_wait_terminal_is_not_the_settlement_trigger() {
     );
     // The drain publication path is what completes the evidence set —
     // and it commits synchronously, waking the waiter.
-    completion.drain_signal().complete(DrainVerdict::Aborted);
+    completion.drain_signal().complete(DrainVerdict::aborted());
     assert_eq!(
         waiter.join().expect("waiter exits"),
         EpisodeTerminalOutcome::Failed,
@@ -468,7 +468,7 @@ fn m4_drain_last_decisive_evidence_commits_before_complete_returns() {
         None,
         "worker evidence alone is not decisive"
     );
-    completion.drain_signal().complete(DrainVerdict::Aborted);
+    completion.drain_signal().complete(DrainVerdict::aborted());
     // The decision boundary: once complete() returns, the decisive
     // classification must already be committed and immutable.
     assert_eq!(
@@ -494,7 +494,7 @@ fn m4_drain_last_decisive_evidence_commits_before_complete_returns() {
 #[test]
 fn m4_worker_last_decisive_evidence_commits_before_worker_exited_returns() {
     let completion = SessionCompletion::new();
-    completion.drain_signal().complete(DrainVerdict::Aborted);
+    completion.drain_signal().complete(DrainVerdict::aborted());
     assert_eq!(
         completion.committed(),
         None,
@@ -528,7 +528,7 @@ fn w4_stop_before_the_boundary_decides_stopped() {
     completion.request_stop();
     completion.worker_exited(EdgeTerminal::Stopped);
     assert_eq!(completion.committed(), None, "no verdict yet: undecided");
-    completion.drain_signal().complete(DrainVerdict::Aborted);
+    completion.drain_signal().complete(DrainVerdict::aborted());
     assert_eq!(
         completion.committed(),
         Some(SessionOutcome::Stopped),
@@ -966,7 +966,7 @@ fn a_stop_cannot_downgrade_a_processing_failure() {
 fn completion_reports_device_abort_as_failure() {
     let completion = SessionCompletion::new();
     completion.worker_exited(EdgeTerminal::Eof);
-    completion.drain_signal().complete(DrainVerdict::Aborted);
+    completion.drain_signal().complete(DrainVerdict::aborted());
     assert_eq!(
         completion.committed(),
         Some(SessionOutcome::Failed {

@@ -1046,6 +1046,7 @@ dependencies = [
  "qianqian-app",
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
  "windows",
 ]
 

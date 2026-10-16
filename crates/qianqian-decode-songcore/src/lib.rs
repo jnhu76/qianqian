@@ -130,12 +130,7 @@ impl IoContext {
     }
 
     /// Record a callback fault (first-wins inside the boundary).
-    fn record_fault(
-        &self,
-        operation: &'static str,
-        error: &std::io::Error,
-        offset: u64,
-    ) {
+    fn record_fault(&self, operation: &'static str, error: &std::io::Error, offset: u64) {
         self.fault_count.fetch_add(1, Ordering::Relaxed);
         if let Ok(mut slot) = self.fault.lock()
             && slot.is_none()
@@ -280,8 +275,9 @@ fn read_fault(handle: *mut sys::song_handle, status: u32) -> DecodeFault {
         let error = unsafe { &*err };
         native_code = error.native_code;
         if !error.message.is_null() && error.message_len > 0 {
-            let bytes =
-                unsafe { slice::from_raw_parts(error.message as *const u8, error.message_len as usize) };
+            let bytes = unsafe {
+                slice::from_raw_parts(error.message as *const u8, error.message_len as usize)
+            };
             message = Text::from_bytes(bytes);
         }
     }
@@ -535,10 +531,7 @@ impl DecodedPcmStream for SongcoreDecodeStream {
                 emit_decode_fault(&fault);
                 let io_note = host_io_note(self.io.attributable_fault(boundary));
                 Err(DecodeError {
-                    message: format!(
-                        "{}{io_note}",
-                        fault.message_string(),
-                    ),
+                    message: format!("{}{io_note}", fault.message_string(),),
                 })
             }
         }

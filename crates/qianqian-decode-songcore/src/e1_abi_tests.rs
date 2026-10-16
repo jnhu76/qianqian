@@ -55,7 +55,6 @@ impl MemFile {
             fail_seek_at: None,
         }
     }
-
 }
 
 unsafe extern "C" fn mem_read(ud: *mut c_void, dst: *mut u8, size: usize) -> i64 {
@@ -157,9 +156,8 @@ impl AbiHandle {
         let channels = self.channels();
         let mut dst = vec![0.0f32; frames as usize * channels];
         let mut produced = 0u64;
-        let status = unsafe {
-            sys::song_read_pcm(self.handle, dst.as_mut_ptr(), frames, &mut produced)
-        };
+        let status =
+            unsafe { sys::song_read_pcm(self.handle, dst.as_mut_ptr(), frames, &mut produced) };
         (status, produced)
     }
 
@@ -168,9 +166,8 @@ impl AbiHandle {
         let channels = self.channels();
         let mut dst = vec![0.0f32; frames as usize * channels];
         let mut produced = 0u64;
-        let status = unsafe {
-            sys::song_read_pcm(self.handle, dst.as_mut_ptr(), frames, &mut produced)
-        };
+        let status =
+            unsafe { sys::song_read_pcm(self.handle, dst.as_mut_ptr(), frames, &mut produced) };
         dst.truncate(produced as usize * channels);
         (status, dst)
     }
@@ -192,13 +189,13 @@ impl AbiHandle {
         let message = if e.message.is_null() || e.message_len == 0 {
             String::new()
         } else {
-            let bytes =
-                unsafe { std::slice::from_raw_parts(e.message as *const u8, e.message_len as usize) };
+            let bytes = unsafe {
+                std::slice::from_raw_parts(e.message as *const u8, e.message_len as usize)
+            };
             String::from_utf8_lossy(bytes).into_owned()
         };
         (status, e.native_code, message)
     }
-
 }
 
 impl Drop for AbiHandle {
@@ -310,7 +307,10 @@ fn healthy_control_reproduces_the_reference_pcm_identity() {
             break;
         }
         assert_eq!(status, sys::SONG_OK, "healthy reads stay SONG_OK");
-        assert!(!samples.is_empty(), "SONG_OK either carries frames or is EOF");
+        assert!(
+            !samples.is_empty(),
+            "SONG_OK either carries frames or is EOF"
+        );
         for sample in &samples {
             hasher.update(&sample.to_le_bytes());
         }
@@ -343,8 +343,7 @@ fn healthy_control_reproduces_the_reference_pcm_identity() {
 #[test]
 fn fault_configuration_yields_partial_success_then_a_latched_fatal() {
     let config = fault_config();
-    let mut handle =
-        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
+    let mut handle = AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     println!(
         "E1-ABI calibration: fixture={} bytes={} disturbed={:?} frames_before_fatal={} reads={} \
@@ -390,8 +389,7 @@ fn fault_configuration_yields_partial_success_then_a_latched_fatal() {
 #[test]
 fn applied_seek_erases_the_latch_and_matches_the_healthy_twin() {
     let config = fault_config();
-    let mut faulted =
-        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
+    let mut faulted = AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut faulted, 200);
     assert!(fatal.frames > 0, "partial success before the fatal");
     // Seek past the region (the healthy twin's own declared duration is the
@@ -444,8 +442,7 @@ fn applied_seek_erases_the_latch_and_matches_the_healthy_twin() {
 #[test]
 fn refused_seek_retains_the_latch() {
     let config = fault_config();
-    let mut handle =
-        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
+    let mut handle = AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0);
     let (refusal, _) = handle.seek_us(-1);
@@ -477,8 +474,7 @@ fn refused_seek_retains_the_latch() {
 #[test]
 fn destructive_seek_failure_is_a_post_mutation_failure() {
     let config = fault_config();
-    let mut handle =
-        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
+    let mut handle = AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0, "partial success before the fatal");
     let target_us: i64 = 750_000;
@@ -518,8 +514,7 @@ fn destructive_seek_failure_is_a_post_mutation_failure() {
 #[test]
 fn close_after_a_latched_fatal_is_a_clean_teardown() {
     let config = fault_config();
-    let mut handle =
-        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
+    let mut handle = AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0);
     drop(handle); // song_close
@@ -549,7 +544,10 @@ fn an_open_failure_publishes_no_handle_so_the_status_is_all_there_is() {
     };
     let mut handle: *mut sys::song_handle = std::ptr::null_mut();
     let status = unsafe { sys::song_open(&io, &mut handle) };
-    println!("E1-ABI open-failure: status={status} handle_null={}", handle.is_null());
+    println!(
+        "E1-ABI open-failure: status={status} handle_null={}",
+        handle.is_null()
+    );
     assert_ne!(status, sys::SONG_OK, "a damaged first frame fails the open");
     assert!(
         handle.is_null(),
@@ -576,11 +574,10 @@ fn an_open_failure_publishes_no_handle_so_the_status_is_all_there_is() {
     );
 }
 
-
 // --- DG-3: the retained fault reaches its named consumer ----------------------
 
-use std::sync::OnceLock;
 use std::sync::Mutex as StdMutex;
+use std::sync::OnceLock;
 
 use qianqian_diagnostics::{Config, Diagnostics, ExportError, Exporter, Record};
 
@@ -681,8 +678,7 @@ fn adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet() {
             .unwrap()
             .iter()
             .any(|(status, native)| {
-                *status == Some(sys::SONG_ERR_DECODE_ERROR as i32)
-                    && *native == Some(-1094995529)
+                *status == Some(sys::SONG_ERR_DECODE_ERROR as i32) && *native == Some(-1094995529)
             });
         if found {
             break;

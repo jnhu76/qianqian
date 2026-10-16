@@ -159,7 +159,9 @@ fn alpha_pool_records_reach_the_drainer_with_their_fields() {
         );
     }
     assert!(
-        lines.iter().any(|line| line.starts_with("beta-probe|marker=")),
+        lines
+            .iter()
+            .any(|line| line.starts_with("beta-probe|marker=")),
         "the class-β records arrive too: {lines:?}"
     );
 

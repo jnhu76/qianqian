@@ -149,7 +149,8 @@ impl AlphaPool {
         if c != *last {
             let released = c.wrapping_sub(*last);
             *last = c;
-            self.copied_out.fetch_add(u64::from(released), Ordering::Relaxed);
+            self.copied_out
+                .fetch_add(u64::from(released), Ordering::Relaxed);
             self.cons_gen.store(c, Ordering::Release);
         }
     }
@@ -212,7 +213,10 @@ mod tests {
         assert_eq!(pool.outstanding(), 1);
         assert!(pool.publish(record(2)), "second publish (d=1), other slot");
         assert_eq!(pool.outstanding(), 2);
-        assert!(!pool.publish(record(3)), "third publish (d=2) is the loss site");
+        assert!(
+            !pool.publish(record(3)),
+            "third publish (d=2) is the loss site"
+        );
         assert_eq!(pool.outstanding(), 2, "rejection must not advance pub_gen");
         let mut last = 0u32;
         let mut copied = Vec::new();
@@ -255,9 +259,17 @@ mod tests {
     fn r6_skip0_rule_withdrawn_counterexample() {
         let m = u32::MAX;
         let r6_next = |p: u32| if p == m { 1 } else { p + 1 };
-        assert_eq!(r6_next(m) % 2, m % 2, "same slot for consecutive generations");
+        assert_eq!(
+            r6_next(m) % 2,
+            m % 2,
+            "same slot for consecutive generations"
+        );
         let pub_after_two = 1u32;
-        assert_eq!(pub_after_two.wrapping_sub(m - 1), 3, "distance 3 escapes the check");
+        assert_eq!(
+            pub_after_two.wrapping_sub(m - 1),
+            3,
+            "distance 3 escapes the check"
+        );
     }
 
     /// Oracle (gate 3): consuming walks `last+1 ..= pub` in order with no
@@ -278,7 +290,10 @@ mod tests {
             vec![7, 8, 9],
             "no skip, no duplicate, no reorder across walks"
         );
-        assert_eq!(pool.accepted(), pool.copied_out() + u64::from(pool.outstanding()));
+        assert_eq!(
+            pool.accepted(),
+            pool.copied_out() + u64::from(pool.outstanding())
+        );
         assert_eq!(pool.accepted() + pool.rejected(), pool.attempted());
     }
 
@@ -319,7 +334,10 @@ mod tests {
         assert_eq!(accepted, 6);
         assert_eq!(copied, (1..=6).collect::<Vec<_>>());
         assert!(pool.outstanding() <= 2);
-        assert_eq!(pool.accepted(), pool.copied_out() + u64::from(pool.outstanding()));
+        assert_eq!(
+            pool.accepted(),
+            pool.copied_out() + u64::from(pool.outstanding())
+        );
     }
 
     /// Loom (gate 1): every explored schedule of one producer and one drainer

@@ -772,12 +772,24 @@ fn drainer(
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                final_sweep(&inner, &receiver, &mut cursors, &mut exporter, &mut disabled);
+                final_sweep(
+                    &inner,
+                    &receiver,
+                    &mut cursors,
+                    &mut exporter,
+                    &mut disabled,
+                );
                 break;
             }
         }
         if inner.shutdown.load(Ordering::Acquire) {
-            final_sweep(&inner, &receiver, &mut cursors, &mut exporter, &mut disabled);
+            final_sweep(
+                &inner,
+                &receiver,
+                &mut cursors,
+                &mut exporter,
+                &mut disabled,
+            );
             break;
         }
     }

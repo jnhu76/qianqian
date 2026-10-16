@@ -7,6 +7,10 @@ description = "Real WASAPI Output capability provider (shared mode, event-driven
 
 [dependencies]
 qianqian-audio-api = { path = "../qianqian-audio-api" }
+# The host-owned diagnostic outlet (error-system target contract §DG-1): the
+# render thread publishes bounded records into its own class-α pool. A
+# diagnostic sink — never a semantic authority, never a Plugin.
+qianqian-diagnostics = { path = "../qianqian-diagnostics" }
 qianqian-composition = { path = "../qianqian-composition" }
 
 [dev-dependencies]

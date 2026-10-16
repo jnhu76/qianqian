@@ -61,9 +61,9 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, OutputLevel, ParkOutcome,
-    PcmFormat, PcmPull, PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
-    SeekParkRelease, TailProbeOutcome,
+    AbortReason, AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputAbortClass, OutputError,
+    OutputLevel, ParkOutcome, PcmFormat, PcmPull, PositionEvidence, RenderGate, RenderPcmInput,
+    RenderRequest, RenderStream, SeekParkRelease, TailProbeOutcome,
 };
 
 use crate::open_abort::abort_render_thread;
@@ -97,8 +97,40 @@ const DRAIN_CAP: Duration = Duration::from_secs(5);
 /// mechanism abort already surfaces through the session's typed
 /// activation/terminal evidence. QIANQIAN_AUDIO_LOG=1 restores them for
 /// mechanism debugging.
+///
+/// The sites themselves are class-α producers of the host diagnostic outlet
+/// (DG-1): they publish a bounded record into the RENDER THREAD's own
+/// ownership-handoff pool (atomics only — no lock, no queue, no allocation,
+/// no sink call on this thread), and the host's drainer renders it. This
+/// function is the cheap producer-side gate; the sink keeps its own
+/// authoritative level filter.
 fn mechanism_log_enabled() -> bool {
     std::env::var_os("QIANQIAN_AUDIO_LOG").is_some_and(|v| v != "0")
+}
+
+/// The render thread's class-α registration with the host diagnostic outlet.
+/// Registered once at thread start (the cold path): the pool is preallocated
+/// and every later `emit` on this thread is a bounded atomics-only publish.
+fn register_render_thread_diagnostics() -> Option<qianqian_diagnostics::AlphaRegistration> {
+    Some(qianqian_diagnostics::AlphaRegistration::register())
+}
+
+/// Publish one mechanism diagnostic from the render thread. Best-effort by
+/// contract: it cannot block, cannot panic and cannot affect the episode.
+fn emit_render_diagnostic(level: qianqian_diagnostics::Level, message: qianqian_diagnostics::Text) {
+    let _ = qianqian_diagnostics::emit(
+        qianqian_diagnostics::Record::new("qianqian-wasapi", level)
+            .with_message(message)
+            .stamped(),
+    );
+}
+
+/// Render a bounded diagnostic message from a static tag + an HRESULT.
+fn hresult_text(tag: &'static str, hresult: i32) -> qianqian_diagnostics::Text {
+    let mut text = qianqian_diagnostics::Text::from_static(tag);
+    text.push_str(" hresult=");
+    text.push_i64(i64::from(hresult));
+    text
 }
 
 /// The concrete Windows Host Render Backend mechanism (ADR-PBK-003
@@ -234,7 +266,10 @@ enum LoopOutcome {
     /// EOF was pulled from the edge and the device drained to zero padding.
     Drained,
     /// Stop, edge terminal, or a device error prevented further progress.
-    Aborted { message: String },
+    Aborted {
+        class: OutputAbortClass,
+        message: String,
+    },
 }
 
 fn run_render_thread(
@@ -246,31 +281,51 @@ fn run_render_thread(
     level: OutputLevel,
     slot: OpenSlot,
 ) {
+    // The render thread is an isolation-obligated (class α) diagnostic
+    // producer: registered once here, on the cold path, so its abort/volume
+    // records are published with atomics only.
+    let _diagnostics = register_render_thread_diagnostics();
     // A panic must not leave the completion unresolved or the producer
     // wedged: it reports like any other abort.
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         open_and_run(format, &*render_input, &gate, &position, &level, &slot)
     }))
     .unwrap_or_else(|_| LoopOutcome::Aborted {
+        class: OutputAbortClass::Panic,
         message: "render thread panicked".to_owned(),
     });
-    // One terminal diagnostic per episode — never steady-state output.
-    match &outcome {
-        LoopOutcome::Aborted { message } => {
-            if mechanism_log_enabled() {
-                eprintln!("[qianqian-wasapi] render aborted: {message}");
-            }
+    // The failure-publication cone (DG-1 R3): the reliable publications —
+    // the data-plane stop and the drain verdict — come FIRST and
+    // unconditionally. The abort record is emitted only AFTER
+    // `drain.complete` returns, so the cone contains zero logging
+    // structurally rather than by relying on an enqueue being cheap.
+    let aborted_message = match outcome {
+        LoopOutcome::Drained => {
+            drain.complete(DrainVerdict::Drained);
+            None
+        }
+        LoopOutcome::Aborted { class, message } => {
             // The device leg is gone: stop the data plane so the decode
             // worker cannot wedge on a full edge against a dead consumer
             // (first-wins on the edge, so it is a no-op after natural EOF).
             render_input.stop();
+            // The verdict carries the explanation with it (DG-2 carrier B):
+            // one call, one cell, one first-wins rule — no second lifecycle.
+            drain.complete(DrainVerdict::aborted_with(AbortReason::new(
+                class,
+                message.clone(),
+            )));
+            Some(message)
         }
-        LoopOutcome::Drained => {}
+    };
+    if let Some(message) = aborted_message
+        && mechanism_log_enabled()
+    {
+        // Only now — outside the cone, after stop + complete.
+        let mut text = qianqian_diagnostics::Text::from_static("render aborted: ");
+        text.push_str(&message);
+        emit_render_diagnostic(qianqian_diagnostics::Level::Error, text);
     }
-    drain.complete(match outcome {
-        LoopOutcome::Drained => DrainVerdict::Drained,
-        LoopOutcome::Aborted { .. } => DrainVerdict::Aborted,
-    });
 }
 
 /// COM apartment ownership lives and dies on this thread, around the
@@ -293,6 +348,7 @@ fn open_and_run(
     // must not proceed into COM calls. (NATIVE-BOUNDARY-AUDIT-0 A3.2（round record：Git 历史 / PR #134）.)
     if coinit.is_err() {
         return LoopOutcome::Aborted {
+            class: OutputAbortClass::Device,
             message: format!("CoInitializeEx failed: {coinit:?}"),
         };
     }
@@ -310,6 +366,7 @@ fn open_and_run_inner(
 ) -> LoopOutcome {
     let Some(session) = open_session(format, level, slot) else {
         return LoopOutcome::Aborted {
+            class: OutputAbortClass::Device,
             message: "device open failed (see open verdict)".to_owned(),
         };
     };
@@ -322,6 +379,7 @@ fn open_and_run_inner(
     })) {
         Ok(outcome) => outcome,
         Err(_) => LoopOutcome::Aborted {
+            class: OutputAbortClass::Panic,
             message: "render loop panicked".to_owned(),
         },
     }
@@ -536,14 +594,23 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
     // format evidence; never steady-state output; silent unless
     // mechanism logging is enabled (a product TUI shares this console).
     if mechanism_log_enabled() {
-        eprintln!(
-            "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven{})",
-            format.sample_rate,
-            format.channels,
-            format.channel_mask,
-            buffer_frames,
-            if engine_src { ", engine SRC" } else { "" }
-        );
+        // Class-α diagnostic: a bounded atomics-only publish into this
+        // thread's own pool. A write-failing sink is diagnostic loss; it can
+        // no longer unwind into the open's own catch (the pre-DG-1 hazard).
+        let mut text = qianqian_diagnostics::Text::from_static("opened: ");
+        text.push_i64(i64::from(format.sample_rate));
+        text.push_str(" Hz, ");
+        text.push_i64(i64::from(format.channels));
+        text.push_str(" channels, mask ");
+        text.push_i64(format.channel_mask as i64);
+        text.push_str(", buffer ");
+        text.push_i64(i64::from(buffer_frames));
+        text.push_str(" frames (shared, event-driven");
+        if engine_src {
+            text.push_str(", engine SRC");
+        }
+        text.push_str(")");
+        emit_render_diagnostic(qianqian_diagnostics::Level::Info, text);
     }
     Some(DeviceSession {
         render,
@@ -568,6 +635,7 @@ fn steady_loop(
 ) -> LoopOutcome {
     if let Err(e) = unsafe { session.client.Start() } {
         return LoopOutcome::Aborted {
+            class: OutputAbortClass::Device,
             message: format!("stream start failed: {e}"),
         };
     }
@@ -678,10 +746,15 @@ fn steady_loop(
                     Err(e) => {
                         session.applied_bits.set(routed_bits);
                         if !session.volume_diagnosed.replace(true) && mechanism_log_enabled() {
-                            eprintln!(
-                                "[qianqian-wasapi] stream volume apply failed (recoverable; \
-                                 holding the last applied level): {e}"
+                            // Recoverable failure: the diagnostic is class α
+                            // and must not escalate the episode (the pre-DG-1
+                            // panic-in-catch hazard) nor stall the render loop
+                            // on a blocked sink.
+                            let mut text = qianqian_diagnostics::Text::from_static(
+                                "stream volume apply failed (recoverable; holding the last applied level): ",
                             );
+                            text.push_str(&hresult_text("hresult", e.code().0).render());
+                            emit_render_diagnostic(qianqian_diagnostics::Level::Warn, text);
                         }
                     }
                 }
@@ -735,6 +808,7 @@ fn steady_loop(
             PcmPull::Stopped => {
                 let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
                 break LoopOutcome::Aborted {
+                    class: OutputAbortClass::Device,
                     message: "data plane stopped".to_owned(),
                 };
             }
@@ -797,6 +871,10 @@ fn publish_consumed(
     }
 }
 
+/// A device-class abort from a message (the steady-path helper).
 fn abort_msg(message: String) -> LoopOutcome {
-    LoopOutcome::Aborted { message }
+    LoopOutcome::Aborted {
+        class: OutputAbortClass::Device,
+        message,
+    }
 }

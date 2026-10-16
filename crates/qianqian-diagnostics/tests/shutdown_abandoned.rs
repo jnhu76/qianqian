@@ -135,7 +135,10 @@ fn a_stuck_sink_is_abandoned_not_awaited() {
         elapsed < Duration::from_secs(5),
         "shutdown must be bounded by its deadline, took {elapsed:?}"
     );
-    assert!(!report.drained, "an abandoned drain is never reported drained");
+    assert!(
+        !report.drained,
+        "an abandoned drain is never reported drained"
+    );
     assert!(report.abandoned, "the abandonment is explicit");
     assert!(
         elapsed >= Duration::from_millis(100),
