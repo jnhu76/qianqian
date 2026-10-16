@@ -509,6 +509,8 @@ mod tests {
 #[cfg(test)]
 mod decode_endpoint_tests;
 #[cfg(test)]
+mod e1_abi_tests;
+#[cfg(test)]
 mod plugin_tax_tests;
 #[cfg(test)]
 #[path = "../tests/common/mod.rs"]
