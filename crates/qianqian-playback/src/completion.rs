@@ -1686,6 +1686,7 @@ pub(crate) mod test_sync {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[cfg(not(loom))]
     use super::*;
     #[cfg(not(loom))]
     use qianqian_audio_api::ports::{GateSlice, RenderGate, TailProbeOutcome};
