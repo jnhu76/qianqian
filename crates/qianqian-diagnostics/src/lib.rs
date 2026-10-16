@@ -339,12 +339,17 @@ pub trait Exporter: Send + 'static {
     /// Self-diagnostic name (used in the disable report).
     fn name(&self) -> &'static str;
 
-    /// Deliver one record. An `Err` disables this exporter for the rest of the
-    /// run; the record counts as lost and the failure is counted once.
+    /// Deliver one record. Delivery is per record and this result IS its
+    /// verdict: one `Ok` = exactly one delivered record (`exported`), one `Err`
+    /// = that record's loss (`export_failed`) and this exporter is disabled for
+    /// the rest of the run.
     fn export(&mut self, record: &Record) -> Result<(), ExportError>;
 
     /// Called once when the drainer performs its final sweep (normal or
-    /// abandoned shutdown boundary).
+    /// abandoned shutdown boundary). Its failure is a sink-level
+    /// self-diagnostic (`self_diagnostics`), NOT a record loss: a flush outcome
+    /// belongs to no record count; each record's verdict was already stated by
+    /// its own [`Exporter::export`] result.
     fn flush(&mut self) -> Result<(), ExportError> {
         Ok(())
     }
@@ -395,7 +400,9 @@ pub struct Counters {
     /// Records actually delivered to the exporter.
     pub exported: u64,
     /// Admitted records the exporter did not deliver: a failed export attempt,
-    /// or any record left after the exporter was disabled.
+    /// or any record left after the exporter was disabled. Never a flush
+    /// outcome — a flush failure has no record to be charged against and is a
+    /// self-diagnostic instead.
     pub export_failed: u64,
     /// Records still published-unconsumed in a pool at this instant.
     pub outstanding: u64,
@@ -967,18 +974,20 @@ fn final_sweep(
         return;
     };
     if let Err(error) = sink.flush() {
-        inner.export_failed.fetch_add(1, Ordering::Relaxed);
-        if !*disabled {
-            *disabled = true;
-            inner.self_diagnostics.fetch_add(1, Ordering::Relaxed);
-            // The exporter is being disabled anyway: this one bounded line is
-            // best-effort, and its own failure has nowhere left to be reported.
-            let _ = write_stderr_line(&format!(
-                "[qianqian-diagnostics] exporter {} flush failed: {}",
-                sink.name(),
-                error.message
-            ));
-        }
+        // A failed flush is a SINK-level outcome, not a record outcome: it can
+        // be attributed to no particular record count, so it is charged a
+        // self-diagnostic and never `export_failed`. The delivery contract
+        // stays with `export`: one `Ok` there is exactly one delivered record,
+        // one `Err` is that record's loss. (This branch runs only while the
+        // exporter is still live — `deliver` drops and disables together, so
+        // the `else` above already returned for a disabled one — and the
+        // drainer exits right after, so no later record can observe it.)
+        inner.self_diagnostics.fetch_add(1, Ordering::Relaxed);
+        let _ = write_stderr_line(&format!(
+            "[qianqian-diagnostics] exporter {} flush failed: {}",
+            sink.name(),
+            error.message
+        ));
     }
 }
 
@@ -1084,8 +1093,10 @@ impl Exporter for StderrExporter {
         write_stderr_line(&line).map_err(|_| STDERR_WRITE_FAILED)
     }
 
-    /// The final sweep's flush, propagated the same way: an `Err` here counts
-    /// as an export loss and reports once, exactly like a failed `export`.
+    /// The final sweep's flush, propagated as its own outcome: an `Err` here is
+    /// the SINK failing at the sweep boundary — the drainer reports it once as
+    /// a self-diagnostic, and no record is charged to it (each record's verdict
+    /// was its own `export` result).
     fn flush(&mut self) -> Result<(), ExportError> {
         use std::io::Write;
         std::io::stderr()
@@ -1406,5 +1417,86 @@ mod tests {
         drop(first_registration);
         assert!(!is_alpha_producer());
         reap_this_threads_registration();
+    }
+
+    /// An exporter that delivers every record and then fails its FLUSH: the
+    /// legitimate `Ok(export)` / `Err(flush)` pairing the delivery contract
+    /// must account correctly.
+    struct FlushFailing {
+        exports: Arc<Mutex<usize>>,
+    }
+
+    impl Exporter for FlushFailing {
+        fn name(&self) -> &'static str {
+            "flush-failing"
+        }
+
+        fn export(&mut self, _record: &Record) -> Result<(), ExportError> {
+            *self
+                .exports
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) += 1;
+            Ok(())
+        }
+
+        fn flush(&mut self) -> Result<(), ExportError> {
+            Err(ExportError {
+                message: "the test sink cannot flush",
+            })
+        }
+    }
+
+    /// Oracle: a failed FLUSH is a sink-level self-diagnostic, never a record
+    /// outcome. `Exporter::export` returning `Ok` IS the record's delivery —
+    /// one delivered record, counted once — and a flush failure cannot change
+    /// that count, because it has no record to be attributed to. Charging it to
+    /// `export_failed` breaks the drain-boundary identity
+    /// (`copied_out + beta_consumed == exported + export_failed`) at quiescence,
+    /// and the resulting over-resolution is exactly what `undelivered_now`'s
+    /// saturating subtraction would then hide.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_failed_flush_is_a_self_diagnostic_not_a_lost_record() {
+        let _serial = serialize_pool_tests();
+        let inner = detached_inner();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(4);
+        sender.try_send(record(1)).expect("the record is queued");
+        let exports = Arc::new(Mutex::new(0usize));
+        let mut exporter: Option<Box<dyn Exporter>> = Some(Box::new(FlushFailing {
+            exports: Arc::clone(&exports),
+        }));
+        let mut disabled = false;
+
+        final_sweep(&inner, &receiver, &mut exporter, &mut disabled);
+
+        assert_eq!(
+            *exports
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            1,
+            "the record was handed to the sink exactly once"
+        );
+        let consumed = inner.beta_consumed.load(Ordering::Relaxed);
+        let exported = inner.exported.load(Ordering::Relaxed);
+        let export_failed = inner.export_failed.load(Ordering::Relaxed);
+        let self_diagnostics = inner.self_diagnostics.load(Ordering::Relaxed);
+        assert_eq!(consumed, 1, "one queued record was pulled");
+        assert_eq!(
+            exported, 1,
+            "an Ok from export is that record's delivery: one record, one export"
+        );
+        assert_eq!(
+            export_failed, 0,
+            "a flush failure has no record to be charged against"
+        );
+        assert_eq!(
+            self_diagnostics, 1,
+            "the flush failure is reported once as a sink-level self-diagnostic"
+        );
+        assert_eq!(
+            exported + export_failed,
+            consumed,
+            "the drain-boundary identity holds at quiescence"
+        );
     }
 }
