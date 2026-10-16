@@ -139,6 +139,13 @@ fn run_playback(
     // — HELP/VERSION and argument-grammar refusals run no transport, produce no
     // records and pay nothing.
     let diagnostics = install_host_diagnostics();
+    // The panic-hook posture (DG-4b) is established HERE, before any transport
+    // starts: every isolation-obligated thread the transports create — the
+    // decode worker, the render leg — registers at thread start, and the
+    // posture must already be in place when it does, so a panic on such a
+    // thread never enters an unknown synchronous sink (whose default print
+    // takes the process-global stderr lock and can therefore block).
+    crate::machine_input::install_panic_hook_posture();
     // The desired Audio Processing configuration (D14.11): the App owns
     // it; each episode establishment binds its own applied snapshot, so
     // a selection made at startup applies to every track this shell
@@ -591,3 +598,4 @@ pub(crate) fn run_machine_reports_for_test(
         report,
     )
 }
+

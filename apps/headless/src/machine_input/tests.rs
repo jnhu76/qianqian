@@ -538,8 +538,8 @@ fn reader_panic_hook_subprocess_probe() {
         return;
     };
     std::panic::set_hook(Box::new(|info| eprintln!("previous-hook: {info}")));
-    install_reader_panic_hook();
-    install_reader_panic_hook(); // repeated host setup must not wrap again
+    install_panic_hook_posture();
+    install_panic_hook_posture(); // repeated host setup must not wrap again
     if phase == "unrelated" {
         assert!(
             std::thread::Builder::new()
@@ -570,6 +570,11 @@ fn reader_panic_hook_subprocess_probe() {
                 })
         },
         move || {
+            // The production reader is class α from its first statement, and
+            // the hook's isolation predicate IS that registration — the harness
+            // reader mirrors the production shape so the posture it witnesses
+            // is the production posture.
+            let _registration = qianqian_diagnostics::AlphaRegistration::register();
             read_input(
                 &reader_input,
                 &reader_handle,
@@ -779,27 +784,41 @@ const DG4B_MARKER: &str = "DG4B-PREVIOUS-HOOK";
 ///
 /// Scenarios (all deterministic: one spawned thread, panics caught inside it):
 ///
-/// * `critical` — thread named `qianqian-stdin` (the registered name) panics
-///   TWICE with a marker previous hook installed: isolation says the previous
-///   hook must never run on it, and the one-shot latch says the first panic
-///   publishes while the second is counted but does not take the pool's second
-///   slot.
+/// * `critical` — the class-α (registered) reader thread panics TWICE with a
+///   marker previous hook installed: isolation says the previous hook must never
+///   run on it, and the one-shot latch says the first panic publishes while the
+///   second is counted but does not take the pool's second slot.
 /// * `default` — the production configuration (the std default hook is the
 ///   previous one): the same thread panics once, and the default print must not
 ///   appear at all.
-/// * `non-critical` — a thread whose name is NOT in the registry panics once
-///   with the marker hook installed: chaining must reach the previous hook. This
-///   is also the harness-sight control — it proves the parent can see the
-///   previous-hook output it asserts is absent in the other scenarios.
+/// * `registered-bystander` — a REGISTERED class-α thread under a name that was
+///   never in the old name list panics once with the marker hook installed: it
+///   must be isolated. This is the scenario that witnesses the predicate being
+///   the registration fact (an unregistered thread of the same shape chains).
+/// * `named-unregistered` — a thread wearing the reader's NAME without
+///   registering panics once with the marker hook installed: it must CHAIN. A
+///   name is not an isolation obligation.
+/// * `non-critical` — an unregistered bystander panics once with the marker hook
+///   installed: chaining must reach the previous hook. This is also the
+///   harness-sight control — it proves the parent can see the previous-hook
+///   output it asserts is absent in the other scenarios.
 #[test]
 fn dg4b_child_witness() {
     let Ok(scenario) = std::env::var(DG4B_SCENARIO) else {
         return;
     };
-    let (thread_name, panics, marker_hook) = match scenario.as_str() {
-        "critical" => (READER_THREAD_NAME, 2usize, true),
-        "default" => (READER_THREAD_NAME, 1usize, false),
-        "non-critical" => ("qianqian-dg4b-bystander", 1usize, true),
+    // `registered` decides the scenario's class-α registration, `panics` the
+    // number of injected panics, `marker_hook` the previous hook. The names are
+    // deliberately mixed against the old name-list: `registered-bystander`
+    // carries a non-critical NAME while registering, and `named-unregistered`
+    // carries the reader's name while NOT registering — the pair is what pins
+    // that the posture keys on the registration fact, not on a thread name.
+    let (thread_name, registered, panics, marker_hook) = match scenario.as_str() {
+        "critical" => (READER_THREAD_NAME, true, 2usize, true),
+        "default" => (READER_THREAD_NAME, true, 1usize, false),
+        "registered-bystander" => ("qianqian-dg4b-registered", true, 1usize, true),
+        "named-unregistered" => (READER_THREAD_NAME, false, 1usize, true),
+        "non-critical" => ("qianqian-dg4b-bystander", false, 1usize, true),
         other => panic!("unknown DG-4b scenario {other:?}"),
     };
     if marker_hook {
@@ -807,15 +826,16 @@ fn dg4b_child_witness() {
         // the install captures it.
         std::panic::set_hook(Box::new(|_| eprintln!("{DG4B_MARKER}")));
     }
-    install_reader_panic_hook();
+    install_panic_hook_posture();
     let witness = std::thread::Builder::new()
         .name(thread_name.into())
         .spawn(move || {
-            let registration = qianqian_diagnostics::AlphaRegistration::register();
+            let registration = registered
+                .then(qianqian_diagnostics::AlphaRegistration::register);
             for _ in 0..panics {
                 let _ = catch_unwind(|| panic!("dg4b injected panic"));
             }
-            registration.outstanding()
+            registration.map_or(0, |registration| registration.outstanding())
         })
         .expect("spawn witness thread");
     let outstanding = witness
@@ -874,15 +894,237 @@ fn dg4b_the_hook_isolates_critical_threads_and_chains_elsewhere() {
         "one panic, one record: {default}"
     );
 
-    // Chaining off critical threads, and the harness-sight control: the marker
-    // the other scenarios assert absent is observable here.
+    // Chaining off isolation-obligated threads, and the harness-sight control:
+    // the marker the other scenarios assert absent is observable here.
     let bystander = run("non-critical");
     assert!(
         bystander.contains(DG4B_MARKER),
-        "the previous hook did not run off a critical thread: {bystander}"
+        "the previous hook did not run off an isolation-obligated thread: {bystander}"
     );
     assert!(
         bystander.contains("DG4B-PANICS=0") && bystander.contains("DG4B-OUTSTANDING=0"),
-        "a non-critical panic is not critical bookkeeping: {bystander}"
+        "an unregistered thread's panic is not isolated bookkeeping: {bystander}"
+    );
+
+    // The predicate is the REGISTRATION, not the thread name, in both
+    // directions: a registered thread whose name was never in the old name list
+    // is isolated, and a thread wearing the reader's name without registering
+    // chains.
+    let registered = run("registered-bystander");
+    assert!(
+        !registered.contains(DG4B_MARKER),
+        "a registered class-α thread was not isolated: {registered}"
+    );
+    assert!(
+        registered.contains("DG4B-PANICS=1") && registered.contains("DG4B-OUTSTANDING=1"),
+        "the registered bystander's panic is isolated bookkeeping: {registered}"
+    );
+    let named = run("named-unregistered");
+    assert!(
+        named.contains(DG4B_MARKER),
+        "a name alone granted isolation: {named}"
+    );
+    assert!(
+        named.contains("DG4B-PANICS=0"),
+        "an unregistered reader-named thread is not critical bookkeeping: {named}"
+    );
+}
+
+// --- DG-4b x blocked stderr: the isolation obligation, witnessed -----------------
+//
+// The posture's isolation predicate is the diagnostic outlet's own thread fact
+// (`is_alpha_producer`). This pair of subprocess scenarios witnesses WHY that
+// matters independently of any argument: with the process stderr FULL (a pipe
+// whose reader never reads) and the process stderr lock therefore held by a
+// thread blocked inside a write, a panic on a registered class-α thread must
+// still unwind and the thread must still end — because another thread's
+// join/completion path waits on exactly that (the session teardown joins the
+// decode worker; the render leg's catch must reach the failure-publication
+// cone). A panic that entered the previous hook instead would block on that
+// lock BEFORE `catch_unwind` and the join would never return.
+
+const DG4B_BLOCKED_SCENARIO: &str = "QIANQIAN_DG4B_BLOCKED_SCENARIO";
+/// The chaining scenario's previous hook prints this to STDOUT — explicitly not
+/// to stderr, so chaining is observable even while stderr is blocked.
+const DG4B_BLOCKED_MARKER: &str = "DG4B-BLOCKED-PREVIOUS-HOOK";
+
+/// Fill the process stderr from a helper thread until it BLOCKS inside a write,
+/// and return only once that stall is witnessed: at least one chunk completed
+/// (the pipe really swallowed data), a chunk is in flight, no chunk completes
+/// for a whole window, and no write ever failed (a failing write would mean the
+/// parent closed the pipe instead of merely not reading it).
+fn block_process_stderr() -> usize {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    let completed = std::sync::Arc::new(AtomicUsize::new(0));
+    let in_flight = std::sync::Arc::new(AtomicBool::new(false));
+    let errored = std::sync::Arc::new(AtomicBool::new(false));
+    let (entered, ready) = mpsc::channel();
+    let (c, f, e) = (
+        std::sync::Arc::clone(&completed),
+        std::sync::Arc::clone(&in_flight),
+        std::sync::Arc::clone(&errored),
+    );
+    std::thread::spawn(move || {
+        use std::io::Write;
+        // 64 KiB per write: the pipe takes at most a couple of these, so the
+        // thread sits inside a blocking write almost immediately.
+        let chunk = vec![b'.'; 64 * 1024];
+        entered.send(()).unwrap();
+        loop {
+            f.store(true, Ordering::SeqCst);
+            if std::io::stderr().write_all(&chunk).is_err() {
+                e.store(true, Ordering::SeqCst);
+                return;
+            }
+            f.store(false, Ordering::SeqCst);
+            c.fetch_add(1, Ordering::SeqCst);
+        }
+    });
+    ready.recv().expect("the filler started");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let before = completed.load(Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(250));
+        let after = completed.load(Ordering::SeqCst);
+        assert!(
+            !errored.load(Ordering::SeqCst),
+            "stderr was not writable: nothing to block"
+        );
+        if before > 0 && before == after && in_flight.load(Ordering::SeqCst) {
+            return before;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "stderr never filled (chunks completed: {after})"
+        );
+    }
+}
+
+/// Child entry. Inert without the scenario variable; otherwise runs the scenario
+/// and exits explicitly (the harness must not print to the blocked stderr).
+#[test]
+fn dg4b_blocked_stderr_child_witness() {
+    let Ok(scenario) = std::env::var(DG4B_BLOCKED_SCENARIO) else {
+        return;
+    };
+    let chunks = block_process_stderr();
+    match scenario.as_str() {
+        "isolated" => {
+            install_panic_hook_posture();
+            // The production decode-worker shape: registered at thread start,
+            // panics twice, both caught. Its unwind is what the session
+            // teardown's join waits for.
+            let caught = std::thread::Builder::new()
+                .name("qianqian-decode".into())
+                .spawn(|| {
+                    let _registration =
+                        qianqian_diagnostics::AlphaRegistration::register();
+                    let mut caught = 0usize;
+                    for _ in 0..2 {
+                        if catch_unwind(|| panic!("dg4b blocked-pipe panic")).is_err() {
+                            caught += 1;
+                        }
+                    }
+                    caught
+                })
+                .expect("spawn the registered witness thread")
+                .join()
+                .expect("an isolated panic must unwind and the thread must end");
+            println!("BLOCKED-ISOLATED-CAUGHT={caught}");
+            println!("BLOCKED-PANICS={}", qianqian_diagnostics::critical_panics());
+            println!("BLOCKED-FILLED-CHUNKS={chunks}");
+        }
+        "chaining" => {
+            // Sight control: an UNREGISTERED thread chains to the previous hook
+            // — the isolation above is the registration, not the blockage. The
+            // marker goes to stdout, so this control cannot itself hang.
+            std::panic::set_hook(Box::new(|_| println!("{DG4B_BLOCKED_MARKER}")));
+            install_panic_hook_posture();
+            let _ = std::thread::Builder::new()
+                .name("qianqian-dg4b-bystander".into())
+                .spawn(|| {
+                    let _ = catch_unwind(|| panic!("dg4b chaining panic"));
+                })
+                .expect("spawn the bystander")
+                .join();
+            println!("BLOCKED-CHAINED=1");
+        }
+        other => panic!("unknown blocked-stderr scenario {other:?}"),
+    }
+    std::process::exit(0);
+}
+
+/// Run one blocked-stderr child: its stderr read end stays OPEN and UNREAD, so
+/// the child's stderr really is a blocked sink. The child must exit on its own
+/// inside the deadline.
+fn run_blocked_stderr_child(scenario: &str) -> (std::process::ExitStatus, String) {
+    use std::io::Read;
+    let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "machine_input::tests::dg4b_blocked_stderr_child_witness",
+            "--nocapture",
+        ])
+        .env(DG4B_BLOCKED_SCENARIO, scenario)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn the blocked-stderr child");
+    let mut stdout = child.stdout.take().expect("stdout pipe");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        match child.try_wait().expect("wait on the child") {
+            Some(status) => {
+                let mut text = String::new();
+                let _ = stdout.read_to_string(&mut text);
+                return (status, text);
+            }
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!(
+                    "the blocked-stderr child ({scenario}) never exited: a panic on an \
+                     isolation-obligated thread waited on the blocked sink"
+                );
+            }
+            None => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+}
+
+#[test]
+fn dg4b_an_isolated_panic_never_waits_on_a_blocked_stderr() {
+    // The isolation leg: registered thread, full stderr, previous hook = the
+    // default (which writes to stderr). Both panics must unwind and the thread
+    // must end, promptly.
+    let (status, stdout) = run_blocked_stderr_child("isolated");
+    println!("dg4b blocked-stderr isolated leg: status={status:?} stdout={stdout:?}");
+    assert!(status.success(), "isolated leg failed: {stdout}");
+    assert!(
+        stdout.contains("BLOCKED-ISOLATED-CAUGHT=2"),
+        "the registered thread did not finish unwinding: {stdout}"
+    );
+    assert!(
+        stdout.contains("BLOCKED-PANICS=2"),
+        "both panics were counted on a non-blocked thread: {stdout}"
+    );
+    assert!(
+        stdout.contains("BLOCKED-FILLED-CHUNKS="),
+        "the filler's stall was not witnessed: {stdout}"
+    );
+
+    // The sight control: chaining still reaches the previous hook for an
+    // unregistered thread, with the same blocked stderr in place.
+    let (status, stdout) = run_blocked_stderr_child("chaining");
+    println!("dg4b blocked-stderr chaining leg: status={status:?} stdout={stdout:?}");
+    assert!(status.success(), "chaining leg failed: {stdout}");
+    assert!(
+        stdout.contains(DG4B_BLOCKED_MARKER),
+        "the previous hook did not run for an unregistered thread: {stdout}"
+    );
+    assert!(
+        stdout.contains("BLOCKED-CHAINED=1"),
+        "the chaining leg did not finish: {stdout}"
     );
 }
