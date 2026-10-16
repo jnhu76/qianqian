@@ -11,11 +11,14 @@
 //! * **class α — isolation-obligated threads** (the failure-publication cone,
 //!   render-leg sites, the decode worker, cleanup paths, any thread that
 //!   registered a pool). `emit` on such a thread performs ATOMICS ONLY: one
-//!   bounded publish into that thread's own two-record pool
-//!   ([`pool::AlphaPool`]). No lock, no queue, no CAS loop, no allocation and
-//!   no wakeup from the producer side — the pool is designed so that a
-//!   producer blocking on drainer-side synchronization is structurally
-//!   impossible.
+//!   bounded publish into that thread's own two-record ownership-handoff pool
+//!   (`pool.rs`). No lock, no queue, no CAS loop, no allocation and no wakeup
+//!   from the producer side — the pool is designed so that a producer blocking
+//!   on drainer-side synchronization is structurally impossible. The protocol
+//!   assumes exactly one producer and one consumer per pool, and the types
+//!   keep that assumption: the pool core is crate-private, the producer role
+//!   is [`AlphaRegistration`] (thread-bound, not shareable, not clonable) and
+//!   the consumer role is the facility's single drainer.
 //! * **class β — ordinary host threads** (CLI report rows, the host shutdown
 //!   report). `emit` uses the facility's bounded channel with `try_send`:
 //!   capacity-non-waiting (a full queue is an immediate drop + count), which
@@ -32,19 +35,29 @@
 //! deadline for the drainer's final sweep, and then ABANDONS the thread if it
 //! is stuck inside a blocking sink. An abandoned shutdown is reported as
 //! such — never dressed up as "drain complete" — and lost records are counted.
+//! The abandonment report itself is attempted off the exit path (a detached,
+//! never-joined writer): the sink is stuck by the abandonment rule, so the
+//! exit boundary must not synchronously enter it again.
+//!
+//! Pool lifetime: one pool per registering thread, retired when the
+//! registration drops. The drainer walks the residual records, folds the
+//! pool's counters into the facility totals and releases the pool, so the
+//! registry tracks live producers rather than the process's episode history.
 
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-pub mod pool;
+mod pool;
 
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-pub use pool::AlphaPool;
+use pool::PoolCore;
 
 /// Maximum bytes of a record's message (fixed inline storage; no heap).
 pub const MSG_CAP: usize = 192;
@@ -58,7 +71,13 @@ pub const POLL_WINDOW: Duration = Duration::from_millis(50);
 // one register read on the producer path, never a global lookup.
 thread_local! {
     static IS_DRAINER: Cell<bool> = const { Cell::new(false) };
-    static ALPHA_POOL: Cell<Option<&'static AlphaPool>> = const { Cell::new(None) };
+    /// The calling thread's own registered pool, as a non-owning pointer to a
+    /// core kept alive by [`AlphaRegistration`]. Written and cleared only by
+    /// that thread (registration / its `Drop`), so the pointer is valid for
+    /// every read on this thread and never observed by another thread; a plain
+    /// thread-local `Cell` is what keeps the fault path free of locks,
+    /// refcount traffic and lazy-init guards (the DG-4b hook reads it too).
+    static ALPHA_POOL: Cell<Option<NonNull<PoolCore>>> = const { Cell::new(None) };
 }
 
 /// Severity. Independent of disposition: even `Error` records are best-effort.
@@ -242,6 +261,10 @@ impl Record {
     }
 
     /// Stamp with the monotonic process clock (producer-side, no allocation).
+    /// A pure read: it never initializes the clock and never waits. A record
+    /// stamped before the clock's cold-path initialization carries `0`, which
+    /// is this facility's "no timestamp available" value (the panic-hook
+    /// record carries it by design).
     pub fn stamped(mut self) -> Self {
         self.ts_micros = monotonic_micros();
         self
@@ -253,10 +276,25 @@ impl Record {
     }
 }
 
+/// The facility's process clock. Initialized on COLD paths only
+/// ([`Diagnostics::install`], [`AlphaRegistration::register`]): a producer that
+/// initialized it itself would enter `OnceLock` initialization synchronization
+/// on the very path that must not synchronize, so producers only ever read.
+static PROCESS_CLOCK: OnceLock<Instant> = OnceLock::new();
+
+/// Cold-path clock initialization. Idempotent; called from installation and
+/// from every registration, so a producer is never the initializer.
+fn ensure_process_clock() {
+    let _ = PROCESS_CLOCK.get_or_init(Instant::now);
+}
+
+/// Producer-path read: a plain `OnceLock::get` with no initialization state and
+/// no wait. `0` means "the process clock was never initialized", which the
+/// record states honestly instead of stamping an arbitrary instant.
 fn monotonic_micros() -> u64 {
-    static START: OnceLock<Instant> = OnceLock::new();
-    let start = START.get_or_init(Instant::now);
-    start.elapsed().as_micros() as u64
+    PROCESS_CLOCK
+        .get()
+        .map_or(0, |start| start.elapsed().as_micros() as u64)
 }
 
 /// What happened to one emission attempt. `emit` never fails the caller and
@@ -413,58 +451,144 @@ struct Inner {
 /// Process-wide facility slot: at most one host installation.
 static FACILITY: OnceLock<Arc<Inner>> = OnceLock::new();
 
-/// Every registered class-α pool, in registration order. Producing threads
-/// never touch this: they write through their thread-local pointer only.
-static ALPHA_REGISTRY: OnceLock<Mutex<Vec<&'static AlphaPool>>> = OnceLock::new();
-
-fn alpha_registry() -> &'static Mutex<Vec<&'static AlphaPool>> {
-    ALPHA_REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
+/// The registered class-α pools. Producing threads never touch this: they
+/// write through their thread-local pointer only. Registration (cold path)
+/// appends; the drainer is the only reader and the only remover.
+///
+/// Retired pools whose residual records have already been walked are removed
+/// and their counters folded into the `retired_*` totals, so the registry
+/// holds LIVE producers rather than every thread that has ever registered.
+/// That is what keeps the drainer's per-poll cost bounded by the number of
+/// live α producers instead of growing with the process's episode history.
+#[derive(Default)]
+struct Registry {
+    pools: Vec<Arc<PoolCore>>,
+    /// Counters folded in when a pool was retired and released.
+    retired_rejected: u64,
+    retired_copied: u64,
 }
 
-/// A registered class-α producer. The pool is leaked on purpose: one
-/// preallocated two-record pool per registered thread/site for the process
-/// lifetime, with no lazy-init lock anywhere on the fault path.
+static ALPHA_REGISTRY: OnceLock<Mutex<Registry>> = OnceLock::new();
+
+fn alpha_registry() -> &'static Mutex<Registry> {
+    ALPHA_REGISTRY.get_or_init(|| Mutex::new(Registry::default()))
+}
+
+/// A snapshot of the live pools (Arc clones), so the drainer holds no registry
+/// lock while it drains or while an exporter blocks.
+fn registered_pools() -> Vec<Arc<PoolCore>> {
+    alpha_registry()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .pools
+        .clone()
+}
+
+/// The calling thread's registered pool, when it has one. The non-owning
+/// pointer is set and cleared only by this thread's own registration, so the
+/// dereference cannot race a release.
+fn with_current_pool<R>(f: impl FnOnce(&PoolCore) -> R) -> Option<R> {
+    ALPHA_POOL
+        .with(Cell::get)
+        // SAFETY: only this thread writes the cell, and it does so while the
+        // registration owning the core is alive (`register` sets it, the
+        // registration's `Drop` clears it before any reference it holds can
+        // drop), so the pointee outlives every read performed here.
+        .map(|pool| f(unsafe { pool.as_ref() }))
+}
+
+/// A registered class-α producer: the calling thread's exclusive, thread-bound
+/// handle to its own pool.
+///
+/// Not `Send` and not `Sync` (the raw-pointer marker): the handle's `Drop`
+/// clears the REGISTERING thread's fast path, so it must be dropped on the
+/// thread that created it, and no safe code can share the handle — or hand a
+/// second producer one — because the pool itself is private. The pool
+/// protocol's single-producer premise is enforced by ownership, not by
+/// documentation.
 pub struct AlphaRegistration {
-    pool: &'static AlphaPool,
+    pool: Arc<PoolCore>,
+    _thread_bound: PhantomData<*const ()>,
 }
 
 impl AlphaRegistration {
     /// Register the CALLING thread as an isolation-obligated producer.
-    /// Cold path only (thread/site startup) — this takes the registry lock.
+    /// Cold path only (thread/site startup) — this takes the registry lock and
+    /// initializes the process clock when it is not running yet.
     pub fn register() -> Self {
-        let pool: &'static AlphaPool = Box::leak(Box::new(AlphaPool::new()));
+        ensure_process_clock();
+        let pool = Arc::new(PoolCore::new());
         alpha_registry()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(pool);
-        ALPHA_POOL.with(|cell| cell.set(Some(pool)));
-        Self { pool }
+            .pools
+            .push(Arc::clone(&pool));
+        ALPHA_POOL.with(|cell| cell.set(Some(NonNull::from(pool.as_ref()))));
+        Self {
+            pool,
+            _thread_bound: PhantomData,
+        }
     }
 
-    pub fn pool(&self) -> &'static AlphaPool {
-        self.pool
+    /// This pool's admission-boundary attempts (observation only — the pool
+    /// itself stays private).
+    pub fn attempted(&self) -> u64 {
+        self.pool.attempted()
+    }
+
+    /// This pool's accepted publications.
+    pub fn accepted(&self) -> u64 {
+        self.pool.accepted()
+    }
+
+    /// This pool's rejected publications (the protocol's only loss site).
+    pub fn rejected(&self) -> u64 {
+        self.pool.rejected()
+    }
+
+    /// Generations copied out of this pool.
+    pub fn copied_out(&self) -> u64 {
+        self.pool.copied_out()
+    }
+
+    /// Published-unconsumed + drainer-held records right now (0..=2).
+    pub fn outstanding(&self) -> u32 {
+        self.pool.outstanding()
     }
 }
 
 impl Drop for AlphaRegistration {
     fn drop(&mut self) {
-        // The thread is leaving: it must not keep publishing into a pool the
-        // drainer still polls. Clear the thread-local pointer; the pool stays
-        // registered so its unpolled records are still counted/exported.
+        // Order matters twice over. (1) The thread's fast path is closed
+        // FIRST, so no publish can be in flight when the drainer observes the
+        // retirement — the drainer's Acquire load then covers every publish
+        // this producer ever made. (2) Retirement is PUBLISHED on the pool, not
+        // expressed by releasing it: this registration's reference may go away
+        // now, but the registry keeps the pool alive until the drainer has
+        // walked the residual records, folded the counters and released it.
         ALPHA_POOL.with(|cell| cell.set(None));
+        self.pool.retire();
     }
 }
 
 /// Whether the calling thread is a registered class-α producer, i.e. whether
 /// [`emit`] on this thread is a bounded atomics-only publish.
 ///
-/// This is the av_log bridge's admission predicate (DG-4c): an av_log callback
-/// runs on whatever FFmpeg-calling thread FFmpeg happens to be on, and the design
-/// admits only the class-α path there — a callback that cannot see a registered
-/// pool drops the record and counts it instead of riding the class-β channel,
-/// whose send path may take internal synchronization on a decode-side thread.
+/// This is the thread-isolation fact, and it has two consumers:
+///
+/// * the av_log bridge's admission predicate (DG-4c): an av_log callback runs
+///   on whatever FFmpeg-calling thread FFmpeg happens to be on, and the design
+///   admits only the class-α path there — a callback that cannot see a
+///   registered pool drops the record and counts it instead of riding the
+///   class-β channel, whose send path may take internal synchronization on a
+///   decode-side thread;
+/// * the host's panic-hook posture (DG-4b): a thread whose progress another
+///   thread's `join`/completion depends on must not run an unknown synchronous
+///   sink on its panic path, and "registered a pool" IS that obligation's fact
+///   — the same fact the producer classification uses, so the two cannot drift
+///   apart.
 pub fn is_alpha_producer() -> bool {
-    ALPHA_POOL.with(Cell::get).is_some()
+    with_current_pool(|_| ()).is_some()
 }
 
 /// Process-wide count of panics the DG-4b hook observed on isolation-obligated
@@ -494,15 +618,17 @@ const PANIC_MESSAGE: &str = "panic on an isolation-obligated thread";
 /// thread that initializes it.
 pub fn note_critical_panic() -> Disposition {
     CRITICAL_PANICS.fetch_add(1, Ordering::Relaxed);
-    let Some(pool) = ALPHA_POOL.with(Cell::get) else {
-        return Disposition::NoSink;
-    };
     let record =
         Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
-    if pool.publish_panic_once(record) {
-        Disposition::AlphaRecorded
-    } else {
-        Disposition::PanicAlreadyReported
+    match with_current_pool(|pool| {
+        if pool.publish_panic_once(record) {
+            Disposition::AlphaRecorded
+        } else {
+            Disposition::PanicAlreadyReported
+        }
+    }) {
+        Some(disposition) => disposition,
+        None => Disposition::NoSink,
     }
 }
 
@@ -514,12 +640,14 @@ pub fn critical_panics() -> u64 {
 /// Emit one diagnostic record. Never blocks, never panics, never allocates on
 /// the producer path, and never waits for a sink.
 pub fn emit(record: Record) -> Disposition {
-    if let Some(pool) = ALPHA_POOL.with(Cell::get) {
-        return if pool.publish(record) {
+    if let Some(disposition) = with_current_pool(|pool| {
+        if pool.publish(record) {
             Disposition::AlphaRecorded
         } else {
             Disposition::AlphaRejected
-        };
+        }
+    }) {
+        return disposition;
     }
     let Some(inner) = FACILITY.get() else {
         return Disposition::NoSink;
@@ -558,6 +686,9 @@ impl Diagnostics {
     /// drainer thread. Fails if a facility is already installed: the host owns
     /// exactly one.
     pub fn install(exporter: Box<dyn Exporter>, config: Config) -> Result<Self, InstallError> {
+        // Cold path: the process clock starts here when nothing registered
+        // before installation, so no producer ever initializes it.
+        ensure_process_clock();
         let (beta_send, beta_recv) = std::sync::mpsc::sync_channel(config.beta_capacity);
         let inner = Arc::new(Inner {
             beta_send,
@@ -673,10 +804,10 @@ fn pool_totals() -> (u64, u64, u64) {
     let registry = alpha_registry()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let mut rejected = 0u64;
-    let mut copied = 0u64;
+    let mut rejected = registry.retired_rejected;
+    let mut copied = registry.retired_copied;
     let mut outstanding = 0u64;
-    for pool in registry.iter() {
+    for pool in registry.pools.iter() {
         rejected += pool.rejected();
         copied += pool.copied_out();
         outstanding += u64::from(pool.outstanding());
@@ -741,34 +872,55 @@ pub fn write_stderr_line(line: &str) {
     let _ = stderr.flush();
 }
 
-/// Drain every registered pool once. `cursors` holds the drainer's own
-/// per-pool walk position (single-consumer by construction).
-fn poll_pools(
-    inner: &Inner,
-    cursors: &mut Vec<(&'static AlphaPool, u32)>,
-    exporter: &mut Option<Box<dyn Exporter>>,
-    disabled: &mut bool,
-) {
-    let registered: Vec<&'static AlphaPool> = alpha_registry()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .clone();
-    for pool in registered {
-        if let Some((_, last)) = cursors
-            .iter_mut()
-            .find(|(known, _)| std::ptr::eq(*known, pool))
-        {
-            pool.drain(last, &mut |record| {
+/// Drain every live pool once, then release the ones whose producer is gone.
+///
+/// There is no per-pool cursor to look up: the walk position lives in the pool
+/// core, so a poll is a single pass over the pools — and the release below is
+/// what keeps that set from growing with the process's episode history.
+fn poll_pools(inner: &Inner, exporter: &mut Option<Box<dyn Exporter>>, disabled: &mut bool) {
+    let pools = registered_pools();
+    for pool in &pools {
+        pool.drain(&mut |record| {
+            let _ = deliver(inner, exporter, disabled, record);
+        });
+        if pool.is_retired() {
+            // The retirement was observed (Acquire) AFTER the walk above, so a
+            // producer that published and then retired may have had its last
+            // record missed by that walk. Walk once more: the Acquire load has
+            // synchronized with the retirement, nothing can be published
+            // afterwards (the registration is gone and the handle is
+            // thread-bound), so this second walk IS the residual handoff and
+            // leaves the pool empty.
+            pool.drain(&mut |record| {
                 let _ = deliver(inner, exporter, disabled, record);
             });
-        } else {
-            let mut last = 0u32;
-            pool.drain(&mut last, &mut |record| {
-                let _ = deliver(inner, exporter, disabled, record);
-            });
-            cursors.push((pool, last));
         }
     }
+    reap_retired_pools();
+}
+
+/// Release every pool whose producer's registration is gone and whose records
+/// are all delivered: fold its counters into the registry totals (so "what
+/// happened" outlives "where it happened") and drop the pool. The snapshot in
+/// `poll_pools` owns a reference until it goes out of scope, so a pool reaped
+/// here is released only after the walk that used it has finished.
+fn reap_retired_pools() {
+    let mut registry = alpha_registry()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut folded_rejected = 0u64;
+    let mut folded_copied = 0u64;
+    registry.pools.retain(|pool| {
+        if pool.is_retired() && pool.outstanding() == 0 {
+            folded_rejected += pool.rejected();
+            folded_copied += pool.copied_out();
+            false
+        } else {
+            true
+        }
+    });
+    registry.retired_rejected += folded_rejected;
+    registry.retired_copied += folded_copied;
 }
 
 /// The final sweep at the shutdown boundary: one last pool poll, every record
@@ -776,11 +928,10 @@ fn poll_pools(
 fn final_sweep(
     inner: &Inner,
     receiver: &Receiver<Record>,
-    cursors: &mut Vec<(&'static AlphaPool, u32)>,
     exporter: &mut Option<Box<dyn Exporter>>,
     disabled: &mut bool,
 ) {
-    poll_pools(inner, cursors, exporter, disabled);
+    poll_pools(inner, exporter, disabled);
     while let Ok(record) = receiver.try_recv() {
         inner.beta_consumed.fetch_add(1, Ordering::Relaxed);
         let _ = deliver(inner, exporter, disabled, &record);
@@ -811,14 +962,13 @@ fn drainer(
     IS_DRAINER.with(|flag| flag.set(true));
     let mut exporter = Some(exporter);
     let mut disabled = false;
-    let mut cursors: Vec<(&'static AlphaPool, u32)> = Vec::new();
 
     // The drainer's poll obligation is a conditional FREQUENCY, not a latency
     // bound: every pool is polled after each batch and at least once per idle
     // receive window. While an exporter blocks there is no poll at all and no
     // delivery deadline — the declared residual.
     loop {
-        poll_pools(&inner, &mut cursors, &mut exporter, &mut disabled);
+        poll_pools(&inner, &mut exporter, &mut disabled);
         match receiver.recv_timeout(poll_window) {
             Ok(record) => {
                 inner.beta_consumed.fetch_add(1, Ordering::Relaxed);
@@ -830,24 +980,12 @@ fn drainer(
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                final_sweep(
-                    &inner,
-                    &receiver,
-                    &mut cursors,
-                    &mut exporter,
-                    &mut disabled,
-                );
+                final_sweep(&inner, &receiver, &mut exporter, &mut disabled);
                 break;
             }
         }
         if inner.shutdown.load(Ordering::Acquire) {
-            final_sweep(
-                &inner,
-                &receiver,
-                &mut cursors,
-                &mut exporter,
-                &mut disabled,
-            );
+            final_sweep(&inner, &receiver, &mut exporter, &mut disabled);
             break;
         }
     }
@@ -911,5 +1049,184 @@ impl Exporter for StderrExporter {
         }
         write_stderr_line(&line);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // The lifecycle oracles below run on real threads and real time; under
+    // `--cfg loom` this crate's atomics ARE loom's, so they are gated off the
+    // schedule-exploration build exactly like the pool module's arithmetic
+    // oracles.
+    use super::*;
+
+    fn record(marker: i64) -> Record {
+        let mut message = Text::from_static("marker=");
+        message.push_i64(marker);
+        Record::new("facility-test", Level::Warn).with_message(message)
+    }
+
+    /// Collects the drained markers, for the poll oracles below.
+    struct Collected {
+        sink: Arc<Mutex<Vec<i64>>>,
+    }
+
+    impl Exporter for Collected {
+        fn name(&self) -> &'static str {
+            "collected"
+        }
+
+        fn export(&mut self, record: &Record) -> Result<(), ExportError> {
+            if let Some(value) = record.message.render().strip_prefix("marker=") {
+                self.sink
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push(value.parse().expect("marker"));
+            }
+            Ok(())
+        }
+    }
+
+    /// A facility interior with no drainer thread and no process-wide
+    /// installation. The poll functions take an `&Inner`, so the pool
+    /// lifecycle can be exercised without installing a facility (which is a
+    /// process-global, once-only act).
+    fn detached_inner() -> Inner {
+        let (beta_send, beta_recv) = std::sync::mpsc::sync_channel(1);
+        Inner {
+            beta_send,
+            beta_recv: Mutex::new(Some(beta_recv)),
+            shutdown: AtomicBool::new(false),
+            drainer_exited: AtomicBool::new(false),
+            beta_queued: AtomicU64::new(0),
+            beta_rejected: AtomicU64::new(0),
+            beta_consumed: AtomicU64::new(0),
+            exported: AtomicU64::new(0),
+            export_failed: AtomicU64::new(0),
+            self_diagnostics: AtomicU64::new(0),
+        }
+    }
+
+    /// Oracle (pool retirement, both directions): a LIVE producer's pool stays
+    /// registered and is polled; a retired producer's pool has its residual
+    /// records walked, its counters folded into the facility totals, and is
+    /// then RELEASED — the registry tracks live producers, not the process's
+    /// registration history.
+    #[cfg(not(loom))]
+    #[test]
+    fn retired_pools_are_residual_drained_folded_and_released() {
+        let live_before = alpha_registry()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .pools
+            .len();
+        let inner = detached_inner();
+        let sink = Arc::new(Mutex::new(Vec::new()));
+        let mut exporter: Option<Box<dyn Exporter>> = Some(Box::new(Collected {
+            sink: Arc::clone(&sink),
+        }));
+        let mut disabled = false;
+
+        let registration = AlphaRegistration::register();
+        let pool = registered_pools()
+            .last()
+            .cloned()
+            .expect("the registration appended its pool");
+        assert!(is_alpha_producer(), "this thread is class α while registered");
+        assert_eq!(emit(record(1)), Disposition::AlphaRecorded);
+        assert_eq!(emit(record(2)), Disposition::AlphaRecorded);
+        assert_eq!(pool.outstanding(), 2, "both records wait in the pool");
+        assert_eq!(registration.accepted(), 2);
+        assert!(!pool.is_retired(), "a live producer's pool is not retired");
+
+        // A live pool is polled (its records are delivered) but NOT reaped.
+        poll_pools(&inner, &mut exporter, &mut disabled);
+        assert_eq!(
+            *sink.lock().unwrap_or_else(|poisoned| poisoned.into_inner()),
+            vec![1, 2],
+            "a live pool's records reach the drainer's sink"
+        );
+        assert_eq!(pool.outstanding(), 0);
+        assert_eq!(
+            alpha_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .pools
+                .len(),
+            live_before + 1,
+            "a live producer's pool is never reaped"
+        );
+
+        // The producer leaves, and publishes nothing further: the thread's fast
+        // path closes first, then retirement is published.
+        drop(registration);
+        assert!(!is_alpha_producer(), "the fast path is closed with the guard");
+        assert!(pool.is_retired());
+
+        poll_pools(&inner, &mut exporter, &mut disabled);
+        assert_eq!(
+            alpha_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .pools
+                .len(),
+            live_before,
+            "the retired pool is released, not accumulated"
+        );
+        assert_eq!(
+            Arc::strong_count(&pool),
+            1,
+            "the registry released the only reference it held"
+        );
+        let (_, copied, outstanding) = pool_totals();
+        assert!(
+            copied >= 2,
+            "the released pool's counters were folded into the totals, not lost with it"
+        );
+        assert_eq!(outstanding, 0);
+    }
+
+    /// Oracle: a retired pool with records still in flight is NOT released
+    /// before its residual walk — the release happens only after the drainer
+    /// has emptied it, so no record is lost to the reclamation.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_retired_pool_with_residual_records_is_released_only_after_they_are_delivered() {
+        let live_before = alpha_registry()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .pools
+            .len();
+        let inner = detached_inner();
+        let sink = Arc::new(Mutex::new(Vec::new()));
+        let mut exporter: Option<Box<dyn Exporter>> = Some(Box::new(Collected {
+            sink: Arc::clone(&sink),
+        }));
+        let mut disabled = false;
+
+        let registration = AlphaRegistration::register();
+        let pool = registered_pools().last().cloned().expect("registered");
+        assert_eq!(emit(record(11)), Disposition::AlphaRecorded);
+        assert_eq!(emit(record(12)), Disposition::AlphaRecorded);
+        // Retire WITHOUT a poll in between: the pool is retired with two
+        // records still unpublished to any sink.
+        drop(registration);
+
+        poll_pools(&inner, &mut exporter, &mut disabled);
+        assert_eq!(
+            *sink.lock().unwrap_or_else(|poisoned| poisoned.into_inner()),
+            vec![11, 12],
+            "the retirement handoff delivers the residual records"
+        );
+        assert_eq!(pool.outstanding(), 0, "and leaves nothing behind");
+        assert_eq!(
+            alpha_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .pools
+                .len(),
+            live_before,
+            "and only then is the pool released"
+        );
     }
 }

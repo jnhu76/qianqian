@@ -815,7 +815,7 @@ fn dg4b_child_witness() {
             for _ in 0..panics {
                 let _ = catch_unwind(|| panic!("dg4b injected panic"));
             }
-            registration.pool().outstanding()
+            registration.outstanding()
         })
         .expect("spawn witness thread");
     let outstanding = witness

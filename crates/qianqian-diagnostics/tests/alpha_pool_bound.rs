@@ -58,7 +58,6 @@ fn record(marker: i64) -> Record {
 fn alpha_pool_full_admission_is_the_only_loss_site() {
     let _ = facility();
     let registration = AlphaRegistration::register();
-    let pool = registration.pool();
     // Fill the pool without the drainer consuming: publish immediately after
     // the previous one. The drainer may race, so assert the INVARIANT (never
     // more than two outstanding, rejection only at the bound) rather than a
@@ -71,19 +70,19 @@ fn alpha_pool_full_admission_is_the_only_loss_site() {
             other => panic!("unexpected disposition {other:?}"),
         }
         assert!(
-            pool.outstanding() <= 2,
+            registration.outstanding() <= 2,
             "the admission invariant bounds in-flight records to 2"
         );
         assert_eq!(
-            pool.accepted() + pool.rejected(),
-            pool.attempted(),
+            registration.accepted() + registration.rejected(),
+            registration.attempted(),
             "attempted = accepted + rejected (admission boundary)"
         );
     }
     assert!(recorded > 0, "at least the first publishes are accepted");
     // Let the drainer empty the pool, then confirm the drain boundary too.
     let deadline = Instant::now() + Duration::from_secs(5);
-    while pool.outstanding() > 0 {
+    while registration.outstanding() > 0 {
         assert!(
             Instant::now() < deadline,
             "the drainer never drained the pool"
@@ -91,8 +90,8 @@ fn alpha_pool_full_admission_is_the_only_loss_site() {
         std::thread::sleep(Duration::from_millis(5));
     }
     assert_eq!(
-        pool.accepted(),
-        pool.copied_out(),
+        registration.accepted(),
+        registration.copied_out(),
         "accepted = copied_out + outstanding with nothing outstanding"
     );
 }

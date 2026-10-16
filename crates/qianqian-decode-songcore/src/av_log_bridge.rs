@@ -246,14 +246,16 @@ mod tests {
     }
 
     /// The byte copy is bounded and never runs past the cap — the property that
-    /// keeps a broken `fmt` from becoming an unbounded walk.
+    /// keeps a broken `fmt` from becoming an unbounded walk. Observed at the
+    /// outlet's sink (the drainer's delivery), with the registration's own
+    /// admission counters pinning "exactly one publish attempt".
     #[test]
     fn dg4c_the_format_copy_is_bounded() {
+        let outlet = crate::test_outlet::facility();
         let registration = AlphaRegistration::register();
         let long = vec![b'x'; MSG_CAP * 4];
         let mut terminated = long.clone();
         terminated.push(0);
-        let before = registration.pool().outstanding();
         unsafe {
             bridge(
                 std::ptr::null_mut(),
@@ -263,20 +265,18 @@ mod tests {
             )
         };
         assert_eq!(
-            registration.pool().outstanding(),
-            before + 1,
+            registration.attempted(),
+            1,
             "one record, however long the format string"
         );
-        let mut last = 0u32;
-        let mut last_record = None;
-        registration.pool().drain(&mut last, &mut |record| {
-            last_record = Some(*record);
-        });
-        let record = last_record.expect("copied");
+        assert_eq!(registration.accepted(), 1);
+        // Exact match on THIS witness's line: the binary's other witnesses
+        // publish their own records concurrently through the same outlet.
+        let expected = format!("{BRIDGE_SITE}|error|{}", "x".repeat(MSG_CAP));
+        let delivered = outlet.wait_for_line(|line| line == expected, "the bounded-copy record");
         assert_eq!(
-            record.message.len(),
-            MSG_CAP,
-            "the copy stops at the record bound"
+            delivered, expected,
+            "the copy stops at the record bound: exactly {MSG_CAP} bytes, nothing more"
         );
     }
 
@@ -319,34 +319,27 @@ mod tests {
     /// own logging output.
     #[test]
     fn dg4c_a_real_av_log_call_arrives_as_one_record() {
+        let outlet = crate::test_outlet::facility();
         let registration = AlphaRegistration::register();
         assert_eq!(
             install_bridge_callback(),
             AvLogBridgeOutcome::Installed,
             "the witness forces installation; the env gate has its own witness"
         );
-        let before = registration.pool().outstanding();
         unsafe { av_log(std::ptr::null_mut(), 16, c"dg4c witness fmt %d".as_ptr()) };
         assert_eq!(
-            registration.pool().outstanding(),
-            before + 1,
-            "one av_log call, one record"
+            registration.attempted(),
+            1,
+            "one av_log call, one publication attempt"
         );
-        let mut last = 0u32;
-        let mut site_and_message = None;
-        registration.pool().drain(&mut last, &mut |record| {
-            site_and_message = Some((
-                record.site,
-                record.level,
-                record.message.as_str().to_owned(),
-            ));
-        });
-        let (site, level, message) = site_and_message.expect("copied");
-        assert_eq!(site, BRIDGE_SITE);
-        assert_eq!(level, Level::Error);
+        let delivered = outlet.wait_for_line(
+            |line| line == format!("{BRIDGE_SITE}|error|dg4c witness fmt %d"),
+            "the av_log format string",
+        );
         assert_eq!(
-            message, "dg4c witness fmt %d",
-            "the β shape copies the format string verbatim: interpolated values are honestly absent"
+            delivered,
+            format!("{BRIDGE_SITE}|error|dg4c witness fmt %d"),
+            "site and level come from the call; the β shape copies the format string verbatim — interpolated values are honestly absent"
         );
         assert_eq!(
             emit(Record::new("dg4c-probe", Level::Info)),
@@ -360,12 +353,12 @@ mod tests {
     /// record's prefix.
     #[test]
     fn dg4c_the_av_class_name_prefixes_the_record() {
+        let outlet = crate::test_outlet::facility();
         let registration = AlphaRegistration::register();
         let named = AvClass {
             class_name: c"DG4CClass".as_ptr(),
         };
         let object_with_class: *const AvClass = &named;
-        let before = registration.pool().outstanding();
         unsafe {
             bridge(
                 &object_with_class as *const *const AvClass as *mut c_void,
@@ -374,15 +367,12 @@ mod tests {
                 std::ptr::null_mut(),
             )
         };
-        assert_eq!(registration.pool().outstanding(), before + 1);
-        let mut last = 0u32;
-        let mut copied = Vec::new();
-        registration.pool().drain(&mut last, &mut |record| {
-            copied.push(record.message.as_str().to_owned())
-        });
-        assert!(
-            copied.iter().any(|line| line == "DG4CClass: named item"),
-            "the class name prefixes the record: {copied:?}"
+        assert_eq!(registration.attempted(), 1);
+        let expected = format!("{BRIDGE_SITE}|info|DG4CClass: named item");
+        let delivered = outlet.wait_for_line(|line| line == expected, "the class-name record");
+        assert_eq!(
+            delivered, expected,
+            "the class name prefixes the record"
         );
     }
 

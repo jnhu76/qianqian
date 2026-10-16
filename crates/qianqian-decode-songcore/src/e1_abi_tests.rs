@@ -576,67 +576,7 @@ fn an_open_failure_publishes_no_handle_so_the_status_is_all_there_is() {
 
 // --- DG-3: the retained fault reaches its named consumer ----------------------
 
-use std::sync::Mutex as StdMutex;
-use std::sync::OnceLock;
-
-use qianqian_diagnostics::{Config, Diagnostics, ExportError, Exporter, Record};
-
-/// The consumer-facing fields this test observes: (status, native_code) pairs.
-type TypedFields = std::sync::Arc<StdMutex<Vec<(Option<i32>, Option<i32>)>>>;
-
-struct CollectingExporter {
-    lines: std::sync::Arc<StdMutex<Vec<String>>>,
-    statuses: TypedFields,
-}
-
-impl Exporter for CollectingExporter {
-    fn name(&self) -> &'static str {
-        "collecting"
-    }
-
-    fn export(&mut self, record: &Record) -> Result<(), ExportError> {
-        self.lines
-            .lock()
-            .unwrap()
-            .push(format!("{}|{}", record.site, record.message.render()));
-        self.statuses
-            .lock()
-            .unwrap()
-            .push((record.status, record.native_code));
-        Ok(())
-    }
-}
-
-struct Facility {
-    diagnostics: Diagnostics,
-    lines: std::sync::Arc<StdMutex<Vec<String>>>,
-    statuses: TypedFields,
-}
-
-fn facility() -> &'static Facility {
-    static FACILITY: OnceLock<Facility> = OnceLock::new();
-    FACILITY.get_or_init(|| {
-        let lines = std::sync::Arc::new(StdMutex::new(Vec::new()));
-        let statuses = std::sync::Arc::new(StdMutex::new(Vec::new()));
-        let diagnostics = Diagnostics::install(
-            Box::new(CollectingExporter {
-                lines: std::sync::Arc::clone(&lines),
-                statuses: std::sync::Arc::clone(&statuses),
-            }),
-            Config {
-                beta_capacity: 64,
-                poll_window: std::time::Duration::from_millis(5),
-            },
-        )
-        .expect("the test binary installs exactly one facility");
-        Facility {
-            diagnostics,
-            lines,
-            statuses,
-        }
-    })
-}
-
+use crate::test_outlet::facility;
 /// DG-3 acceptance: the adapter's read failure carries BOTH the public message
 /// text (unchanged shape) and the typed fault to its named consumer — the
 /// diagnostic outlet's record fields. The message TEXT is never the identity:
@@ -673,7 +613,7 @@ fn adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet() {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
         let found = facility
-            .statuses
+            .typed
             .lock()
             .unwrap()
             .iter()
@@ -687,7 +627,7 @@ fn adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet() {
             std::time::Instant::now() < deadline,
             "the typed fault never reached the outlet: {:?} / {:?}",
             facility.lines.lock().unwrap(),
-            facility.statuses.lock().unwrap()
+            facility.typed.lock().unwrap()
         );
         std::thread::sleep(std::time::Duration::from_millis(5));
     }

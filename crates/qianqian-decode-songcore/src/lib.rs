@@ -882,3 +882,6 @@ mod plugin_tax_tests;
 #[cfg(test)]
 #[path = "../tests/common/mod.rs"]
 mod test_common;
+#[cfg(test)]
+#[path = "../tests/common/outlet.rs"]
+mod test_outlet;
