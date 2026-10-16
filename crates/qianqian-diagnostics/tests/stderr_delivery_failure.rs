@@ -16,12 +16,26 @@ const DELIVERY_SCENARIO: &str = "QIANQIAN_STDERR_DELIVERY_SCENARIO";
 const MARKERS: i64 = 5;
 
 /// Child entry: the real sink, the real facility, a stderr pipe with no reader.
+///
+/// The child does NOTHING until the parent releases it on stdin: the broken
+/// read end must exist before the first write, and "the parent dropped it
+/// before the child got that far" is a schedule, not a guarantee. The gate is
+/// the synchronization seam that makes the premise true by construction.
 #[test]
 fn broken_stderr_child_witness() {
     let Ok(scenario) = std::env::var(DELIVERY_SCENARIO) else {
         return;
     };
     assert_eq!(scenario, "broken-stderr");
+    {
+        use std::io::BufRead;
+        let mut go = String::new();
+        std::io::stdin()
+            .lock()
+            .read_line(&mut go)
+            .expect("the parent releases the child after the read end is gone");
+        assert_eq!(go.trim(), "GO", "the parent's gate");
+    }
     use qianqian_diagnostics::{Config, Diagnostics, Level, Record, StderrExporter, Text};
     let diagnostics = Diagnostics::install(Box::new(StderrExporter::default()), Config::default())
         .expect("the child owns exactly one facility");
@@ -56,14 +70,22 @@ fn a_broken_stderr_descriptor_is_counted_as_a_failed_delivery() {
     let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args(["--exact", "broken_stderr_child_witness", "--nocapture"])
         .env(DELIVERY_SCENARIO, "broken-stderr")
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn the broken-stderr child");
-    // Drop the stderr read end NOW: the child's writes fail with EPIPE instead
-    // of blocking (this is the broken-descriptor case, not the blocked one).
+    let mut stdin = child.stdin.take().expect("stdin pipe");
+    // Drop the stderr read end NOW, and only then release the child: the child
+    // is gated on stdin precisely so this order cannot race. Its writes now
+    // fail with EPIPE instead of blocking (this is the broken-descriptor case,
+    // not the blocked one).
     drop(child.stderr.take());
+    {
+        use std::io::Write;
+        writeln!(stdin, "GO").expect("release the child");
+        stdin.flush().expect("flush the gate");
+    }
     let mut stdout = child.stdout.take().expect("stdout pipe");
     let deadline = std::time::Instant::now() + Duration::from_secs(60);
     let text = loop {
