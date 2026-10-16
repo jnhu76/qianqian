@@ -158,12 +158,13 @@ fn run_playback(
     exit
 }
 
-/// The bounded drain deadline the host waits at exit. The drainer's idle window
-/// is shorter, so a healthy shutdown returns well inside this; the deadline only
-/// matters when the drainer is stuck inside a blocking sink (T5-5 strategy B:
-/// the exit path may abandon, and then says so).
+/// The bound on each exit-phase diagnostic wait: the drain's bounded wait and
+/// the bounded wait for the report attempt. The drainer's idle window is
+/// shorter, so a healthy shutdown returns well inside this; the bound only
+/// matters when a sink is stuck (T5-5 strategy B: the exit path may abandon —
+/// or abandon the *attempt* — and then says so).
 #[cfg(any(feature = "playback", test))]
-const HOST_DIAGNOSTIC_DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
+const HOST_DIAGNOSTIC_EXIT_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Install the process-wide diagnostic outlet with its stderr exporter.
 /// Diagnostics are disposable (Class C): no exit code, protocol row, terminal
@@ -187,22 +188,26 @@ fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
 /// prints nothing, and the machine protocol's stdout is never touched.
 ///
 /// The exit boundary is the whole point of the bounded shutdown, so the report
-/// itself obeys it: when the drainer was ABANDONED, the sink is stuck by
-/// definition (the abandonment rule is "did not finish inside the deadline
-/// while inside a sink"), and any synchronous write attempt would re-enter that
-/// sink — usually by waiting on the very stderr lock the stuck drainer holds —
-/// and hand process exit back to the blocked sink. The abandoned report is
-/// therefore ATTEMPTED on a detached thread that nothing joins and that holds
-/// no resource the exit path needs; if the sink never drains, the attempt is
-/// lost with the process, which is honest for a Class C diagnostic. A DRAINED
-/// report needs no such care: the drainer exited, meaning every sink write it
-/// attempted completed, so the sink is not the thing that is stuck.
+/// itself obeys it — DRAINED OR NOT. A completed drain proves that every write
+/// the drainer attempted finished; it does NOT prove the sink still has room
+/// for one more line. A pipe reader that stopped has no capacity left by this
+/// point, and any other thread parked inside a write holds the process stderr
+/// lock — a synchronous report write would then re-enter that sink and hand
+/// process exit back to it, which is the one thing the exit path must never do
+/// (the drain-deadline scenario's slightly later twin). Every exit-phase report
+/// is therefore ATTEMPTED on a detached thread that nothing joins and that
+/// holds no resource the exit path needs; the drain-not-abandoned case waits
+/// only a bounded instant for that attempt (a healthy sink completes it in
+/// microseconds, so the line is not lost to process exit), while an abandoned
+/// drain — whose sink is stuck by the abandonment rule — does not wait at all.
+/// A report lost to a sink that never drains is honest for a Class C
+/// diagnostic.
 #[cfg(any(feature = "playback", test))]
 fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnostics>) {
     let Some(diagnostics) = diagnostics else {
         return;
     };
-    let report = diagnostics.shutdown(HOST_DIAGNOSTIC_DRAIN_DEADLINE);
+    let report = diagnostics.shutdown(HOST_DIAGNOSTIC_EXIT_DEADLINE);
     let counters = report.counters;
     if report.drained
         && report.undelivered_at_exit == 0
@@ -224,15 +229,45 @@ fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnosti
         counters.self_diagnostics,
         counters.critical_panics,
     );
-    if report.abandoned {
-        // Best-effort, never awaited: see the doc comment above.
-        let _ = std::thread::Builder::new()
-            .name("qianqian-diagnostics-report".into())
-            .spawn(move || {
-                let _ = qianqian_diagnostics::write_stderr_line(&line);
-            });
-    } else {
-        let _ = qianqian_diagnostics::write_stderr_line(&line);
+    attempt_exit_report(
+        line,
+        (!report.abandoned).then_some(HOST_DIAGNOSTIC_EXIT_DEADLINE),
+    );
+}
+
+/// Attempt one exit-phase diagnostic report off the host's return path: one
+/// detached writer that nothing joins, plus — only when the drain completed
+/// (`wait` is `Some`) — a bounded wait for the attempt.
+///
+/// The wait exists so a healthy sink's report is not lost to process exit; the
+/// bound exists so the attempt can never become what the host waits on. In the
+/// abandoned case the sink is stuck (a writer is parked inside it, usually
+/// holding the stderr lock), so waiting could only burn the deadline: the
+/// attempt is simply left parked and dies with the process.
+#[cfg(any(feature = "playback", test))]
+fn attempt_exit_report(line: String, wait: Option<std::time::Duration>) {
+    let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let signal = std::sync::Arc::clone(&finished);
+    let spawned = std::thread::Builder::new()
+        .name("qianqian-diagnostics-report".into())
+        .spawn(move || {
+            let _ = qianqian_diagnostics::write_stderr_line(&line);
+            signal.store(true, std::sync::atomic::Ordering::Release);
+        });
+    if spawned.is_err() {
+        // A report that cannot even get a thread is an accepted loss: nothing
+        // here decides a product outcome (Class C).
+        return;
+    }
+    let Some(bound) = wait else {
+        return;
+    };
+    let deadline = std::time::Instant::now() + bound;
+    while !finished.load(std::sync::atomic::Ordering::Acquire) {
+        if std::time::Instant::now() >= deadline {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
 
