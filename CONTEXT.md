@@ -588,6 +588,27 @@ remainder, witnessed first-command construction → Failed{decode}) and
 W5b-R (witnessed CutPoint remainder → loop-top flush meets the stopped
 edge → Stopped, old latch dropped with the old world).
 
+2026-10-16 R5 review revision (same round, PR #284, three findings): the
+R4 class α slot protocol (plain payload under a sequence tag, volatile
+copies) is withdrawn as memory-unsafe in Rust — concurrent plain
+read+write between drainer and producer is a data race the later discard
+cannot undo; redesigned as an explicit ownership handoff (per-producer
+two-record pool + pub/cons generation atomics; a record is written only
+while generation-unreachable by the drainer; acceptance gates ordered
+no-data-race first, then snapshot integrity, loss bound, producer cost;
+fences/volatile are not repairs; atomic-lane alternative retained with a
+memory-model proof burden); the "α delivery latency bounded by poll
+interval" claim is withdrawn — the drainer's obligation is a conditional
+poll-frequency convention (per β batch, ≥ once per recv_timeout window
+while idle) and delivery has NO deadline while an exporter blocks
+(declared unbounded residual); W5b-N's "first command ⇒ no remainder"
+witness is withdrawn (a read-park lets that first seek create its own
+remainder via the CutPoint arm) — rebuilt on the zero-frame read loop
+(session.rs:831-835 runs no write): whole blocks → plant command →
+zero-frames (no write path can observe it) → park latch after the last
+non-zero read → serialization point fires the parked seek with remainder
+provably None → next read surfaces the old fatal → Failed{decode}.
+
 ---
 
 # Historical evidence
