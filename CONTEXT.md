@@ -559,6 +559,20 @@ split into healthy-control + fault-configuration legs; W1–W6 rebuilt on real
 execution positions (one new test-fence arming point); M7 oracle recorded as
 time-windowed evidence. Gates and model comments unchanged by the revision.
 
+2026-10-16 R3 review revision (same round, PR #284): DG-1 split into two
+producer classes — isolation-obligated threads (cone/render/decode/cleanup)
+take no queue at all (atomics slot; #8's record moves after
+drain.complete(), making the cone logging-free structurally), ordinary host
+threads keep std sync_channel with the honest facts (fixed slots at creation,
+CAS+backoff no step bound, post-success notify takes an internal Mutex —
+P-cap without P-sync, verified against pinned 1.97.1 source); message
+composition restricted to a whitelisted segment vocabulary (arbitrary
+Display banned on producers); cone oracle N-A now requires a witnessed
+capacity wait (no-EOF fixture + produced-minus-consumed margin) and drops
+the parked-waiter precondition; W5 split into W5a/b/c by provider outcome
+with single-legal-outcome rows; DG-4a partial-success retention trade-off
+recorded as an owner-gated known loss.
+
 ---
 
 # Historical evidence
