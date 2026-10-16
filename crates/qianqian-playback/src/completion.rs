@@ -556,6 +556,14 @@ impl SessionCompletion {
             self.state.gate.set_seek_hold(false);
             guard.stop_target.clone()
         };
+        // The real window between intent recording (the hold above) and
+        // this request's OWN data-plane stop: intent is already visible
+        // to every later publication, the edge is still Open. E1-WORKER's
+        // W4 parks the real request here (test builds only; see
+        // `test_sync`), because no lock-holding fixture can populate a
+        // window whose end is this very request's next statement.
+        #[cfg(all(test, not(loom)))]
+        test_sync::pause_between_intent_and_own_edge_stop(self);
         if let Some(edge) = target {
             edge.stop();
         }
@@ -1160,6 +1168,33 @@ impl SessionCompletion {
         }
     }
 
+    /// Test-only evidence read (E1-WORKER's settlement observation): the
+    /// mirrored drain verdict, exactly the field `resolve` reads. Not a
+    /// production surface — compiled only for this crate's own non-loom
+    /// test builds, like the fence module below.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn drain_mirror_verdict(&self) -> Option<DrainVerdict> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .drain_verdict
+    }
+
+    /// Test-only evidence read (E1-WORKER): the typed origin of the FIRST
+    /// worker-side failure publication — the D14.11 discriminator, which
+    /// the `Failed` presentation stage spelling encodes only as text.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn worker_failure_origin(&self) -> Option<WorkerFailureOrigin> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .worker_failure
+            .as_ref()
+            .map(|failure| failure.origin)
+    }
+
     fn publish(&self, evidence: impl FnOnce(&mut CompletionState)) {
         publish_evidence(&self.state, evidence);
     }
@@ -1350,9 +1385,22 @@ pub(crate) mod test_sync {
         pub(crate) slot_in_flight: bool,
     }
 
+    /// Which real suspension point a fence covers. Both are windows a
+    /// lock-holding fixture cannot populate; each is keyed by its own
+    /// site so one arming never displaces the other (E1-WORKER W4).
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Site {
+        /// `request_seek`: after the Open sample, before the second hold.
+        SeekStraddle,
+        /// `request_stop`: after intent recording, before this request's
+        /// own data-plane stop.
+        StopWindow,
+    }
+
     struct Armed {
         id: u64,
         target: usize,
+        site: Site,
         parked: mpsc::Sender<()>,
         release: Arc<Mutex<mpsc::Receiver<()>>>,
     }
@@ -1441,6 +1489,19 @@ pub(crate) mod test_sync {
             }
         }
 
+        /// [`FencedRequest::spawn`] for the stop window: the real
+        /// `request_stop` parks between recording intent and running its
+        /// own data-plane stop.
+        pub(crate) fn spawn_stop(completion: &SessionCompletion) -> FencedRequest {
+            let fence = arm_stop(completion);
+            let completion = completion.clone();
+            let requester = std::thread::spawn(move || completion.request_stop());
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
         /// Block until the owned request has sampled the edge terminal
         /// Open and parked at the fence, before the second hold.
         pub(crate) fn wait_parked(&self) {
@@ -1479,19 +1540,34 @@ pub(crate) mod test_sync {
     /// Arm the fence for exactly this completion's next `request_seek`
     /// that gets past its Open sample. Other completions pass through.
     pub(crate) fn arm(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::SeekStraddle)
+    }
+
+    /// Arm the fence for exactly this completion's next `request_stop`
+    /// (E1-WORKER W4: the intent-recorded / own-edge-stop-not-yet-run
+    /// window). Other sites and other completions pass through.
+    pub(crate) fn arm_stop(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::StopWindow)
+    }
+
+    fn arm_at(completion: &SessionCompletion, site: Site) -> Fence {
         let (parked_tx, parked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let target = Arc::as_ptr(&completion.state) as usize;
         let mut registry = registry().lock().expect("fence registry lock");
         assert!(
-            registry.armed.iter().all(|armed| armed.target != target),
-            "a fence is already armed for this completion"
+            registry
+                .armed
+                .iter()
+                .all(|armed| armed.target != target || armed.site != site),
+            "a fence is already armed for this completion and site"
         );
         registry.next_id += 1;
         let id = registry.next_id;
         registry.armed.push(Armed {
             id,
             target,
+            site,
             parked: parked_tx,
             release: Arc::new(Mutex::new(release_rx)),
         });
@@ -1503,16 +1579,31 @@ pub(crate) mod test_sync {
     }
 
     /// The recorded suspension point. Inert unless a fence is armed for
-    /// this exact completion, and never called with any lock held: the
-    /// publications that must land inside the window have to be able to
-    /// run while the request parks here. The arrival send cannot block
-    /// the request; the release receive ends on an explicit release or
-    /// on the arming test dropping its handle (unwinding included).
+    /// this exact completion and site, and never called with any lock
+    /// held: the publications that must land inside the window have to
+    /// be able to run while the request parks here. The arrival send
+    /// cannot block the request; the release receive ends on an explicit
+    /// release or on the arming test dropping its handle (unwinding
+    /// included).
     pub(super) fn pause_between_open_sample_and_second_hold(completion: &SessionCompletion) {
+        pause_at(completion, Site::SeekStraddle);
+    }
+
+    /// [`pause_between_open_sample_and_second_hold`] for the
+    /// `request_stop` window (see [`Site::StopWindow`]).
+    pub(super) fn pause_between_intent_and_own_edge_stop(completion: &SessionCompletion) {
+        pause_at(completion, Site::StopWindow);
+    }
+
+    fn pause_at(completion: &SessionCompletion, site: Site) {
         let (parked, release) = {
             let registry = registry().lock().expect("fence registry lock");
             let target = Arc::as_ptr(&completion.state) as usize;
-            match registry.armed.iter().find(|armed| armed.target == target) {
+            match registry
+                .armed
+                .iter()
+                .find(|armed| armed.target == target && armed.site == site)
+            {
                 Some(armed) => (armed.parked.clone(), armed.release.clone()),
                 None => return,
             }

@@ -129,6 +129,14 @@ mod observation_tests;
 #[cfg(all(test, loom))]
 mod loom_edge_tests;
 
+// E1-WORKER (migration §7.5): the deterministic stop/pending-fatal trace
+// family on the REAL worker/completion/edge with a scripted decode
+// provider — the Rust-verified half of the §2.3.1 commit-order matrix.
+// Its W4 trace parks the real `request_stop` at the stop-window fence
+// added to completion.rs; nothing here is production code.
+#[cfg(all(test, not(loom)))]
+mod e1_worker_tests;
+
 // DG-1 class α ownership-handoff pool — design-candidate protocol
 // verification (PR #284 R7 directive): arithmetic property tests run in
 // both partitions; the loom schedule suite is inner-gated `cfg(loom)` and

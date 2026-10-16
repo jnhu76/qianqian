@@ -573,7 +573,7 @@ enum WriteStep {
 ///             data plane's own terminal) ends it without a rebase.
 ///             Then resume post-cut production.
 /// ```
-fn decode_worker<P: ProcessingRuntime>(
+pub(crate) fn decode_worker<P: ProcessingRuntime>(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
