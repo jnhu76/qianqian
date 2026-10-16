@@ -134,14 +134,83 @@ fn run_playback(
     eq: Option<EqPreset>,
     shell: Shell,
 ) -> ExitCode {
+    // The host owns the diagnostic outlet (DG-1): one installation at transport
+    // startup, one bounded drain at transport exit. The placement is deliberate
+    // — HELP/VERSION and argument-grammar refusals run no transport, produce no
+    // records and pay nothing.
+    let diagnostics = install_host_diagnostics();
     // The desired Audio Processing configuration (D14.11): the App owns
     // it; each episode establishment binds its own applied snapshot, so
     // a selection made at startup applies to every track this shell
     // starts. The machine transport selects nothing (bypass).
-    match shell {
+    let exit = match shell {
         Shell::Machine => machine_transport(start_episode(single_file(files))),
         Shell::ReferencePlayer => reference_player_transport(files, order, eq),
+    };
+    shutdown_host_diagnostics(diagnostics);
+    exit
+}
+
+/// The bounded drain deadline the host waits at exit. The drainer's idle window
+/// is shorter, so a healthy shutdown returns well inside this; the deadline only
+/// matters when the drainer is stuck inside a blocking sink (T5-5 strategy B:
+/// the exit path may abandon, and then says so).
+#[cfg(feature = "playback")]
+const HOST_DIAGNOSTIC_DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// Install the process-wide diagnostic outlet with its stderr exporter.
+/// Diagnostics are disposable (Class C): no exit code, protocol row, terminal
+/// Fact or disposal verdict depends on this succeeding, so an installation
+/// refused because the process already owns an outlet (a test harness owning
+/// one) is not a product failure.
+#[cfg(feature = "playback")]
+fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
+    use qianqian_diagnostics::{Config, Diagnostics, StderrExporter};
+    // T5-9/DG-4c: the opt-in FFmpeg av_log bridge installs here, at transport
+    // startup, BEFORE any song_open — SongCore's per-open reinstall only fires
+    // when the variable is unset, so this ordering is what keeps a bridged host
+    // from being clobbered. The outcome is diagnostics: nothing below depends on
+    // it, and an unset switch leaves SongCore's discard callback in place.
+    let _ = qianqian_decode_songcore::av_log_bridge::install_av_log_bridge();
+    // `StderrExporter::default()` admits every level: the site gates
+    // (`QIANQIAN_AUDIO_LOG`, the av_log opt-in) already decide what is produced,
+    // and the drainer is the only thing that renders.
+    Diagnostics::install(Box::new(StderrExporter::default()), Config::default()).ok()
+}
+
+/// Stop admitting records and drain with the bounded deadline above. An
+/// abandoned drainer is reported as abandoned, never as a completed drain, and
+/// the line is written only when there is something honest to report: a
+/// non-normal drain, undelivered records, an exporter self-diagnostic, or a
+/// panic the machine-input hook counted on a critical thread. A normal run
+/// prints nothing, and the machine protocol's stdout is never touched.
+#[cfg(feature = "playback")]
+fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnostics>) {
+    let Some(diagnostics) = diagnostics else {
+        return;
+    };
+    let report = diagnostics.shutdown(HOST_DIAGNOSTIC_DRAIN_DEADLINE);
+    let counters = report.counters;
+    if report.drained
+        && report.undelivered_at_exit == 0
+        && counters.self_diagnostics == 0
+        && counters.critical_panics == 0
+    {
+        return;
     }
+    qianqian_diagnostics::write_stderr_line(&format!(
+        "[qianqian-diagnostics] shutdown {}: undelivered_at_exit={} dropped={} export_failed={} self_diagnostics={} critical_panics={}",
+        if report.drained {
+            "drained"
+        } else {
+            "ABANDONED (drainer stuck in a sink; lost records are counted, never claimed as delivered)"
+        },
+        report.undelivered_at_exit,
+        counters.alpha_rejected + counters.beta_rejected,
+        counters.export_failed,
+        counters.self_diagnostics,
+        counters.critical_panics,
+    ));
 }
 
 /// The machine transport's argv is pinned to exactly one file (grammar

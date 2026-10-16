@@ -71,6 +71,12 @@ NORMAL_EDGES = {
     "qianqian-playback": {
         "qianqian-audio-api",
         "qianqian-composition",
+        # The decode worker is a class-α diagnostic producer (DG-1 thread
+        # classification) and the session owns that thread's creation, so the
+        # session registers its pool and the decode adapter's records publish
+        # with atomics only. Diagnostics is ordinary library code with no Plugin
+        # identity, no capability and no K0 noun.
+        "qianqian-diagnostics",
     },
     "qianqian-decode-songcore": {
         "qianqian-audio-api",

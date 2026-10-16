@@ -464,6 +464,13 @@ fn spawn_worker<P: ProcessingRuntime + 'static>(
     std::thread::Builder::new()
         .name("qianqian-decode".into())
         .spawn(move || {
+            // The decode worker is an isolation-obligated (class α) diagnostic
+            // producer (target-contract §DG-1 thread classification): a decode
+            // fault's record — the DG-3 typed fields' consumer — publishes with
+            // atomics only into this worker's own preallocated pool. The
+            // registration is a cold-path one-time cost taken here because this
+            // is the only place the worker thread is created.
+            let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
             decode_worker(
                 decode_stream,
                 edge,
