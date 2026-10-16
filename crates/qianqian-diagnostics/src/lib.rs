@@ -48,6 +48,12 @@
 //! stuck by the abandonment rule, so the exit boundary must not synchronously
 //! enter it again.
 //!
+//! The protocol's edge is installation, not shutdown: emission is decided
+//! against the closure only once a facility exists — an emission with none (the
+//! pre-install path) is decided by that absence, outside the admission word. A
+//! host therefore installs the facility before starting any thread that emits;
+//! concurrent emission and installation is not a supported schedule.
+//!
 //! Pool lifetime: one pool per registering thread, retired when the
 //! registration drops. The drainer walks the residual records, folds the
 //! pool's counters into the facility totals and releases the pool, so the
@@ -488,6 +494,13 @@ struct Inner {
     /// the closer after the drainer exited (Acquire): whether that sweep was
     /// ordered after publisher quiescence. `drained` requires `true`.
     sweep_quiescent: AtomicBool,
+    /// Test-only observation channel (absent from production builds): counts
+    /// the quiescence-wait iterations in which THIS interior's closing drainer
+    /// found a publication still in flight. The close-race oracles read it to
+    /// establish, by synchronization instead of by timing, that the drainer is
+    /// inside its wait for the very publication they are about to release.
+    #[cfg(all(test, not(loom)))]
+    quiescence_waits: AtomicUsize,
     /// Admission/delivery counters.
     beta_queued: AtomicU64,
     beta_rejected: AtomicU64,
@@ -553,13 +566,17 @@ fn enter_section(inner: &Inner) -> (bool, AdmissionSection<'_>) {
 /// sequence the Acquire observation reads from — makes those publications
 /// visible to the sweep that follows. `true` = quiescent; `false` = the window
 /// expired, and the sweep that follows must not be reported as a complete
-/// drain.
+/// drain. Test builds count the iterations that actually had to wait on the
+/// interior ([`Inner`]'s test-only counter): that is the signal the close-race
+/// oracles establish their premise on. Production executes no counter.
 fn wait_for_publisher_quiescence(inner: &Inner, window: Duration) -> bool {
     let started = Instant::now();
     loop {
         if in_flight(inner.admission.fetch_add(0, Ordering::Acquire)) == 0 {
             return true;
         }
+        #[cfg(all(test, not(loom)))]
+        inner.quiescence_waits.fetch_add(1, Ordering::Relaxed);
         if started.elapsed() >= window {
             return false;
         }
@@ -909,6 +926,16 @@ pub fn emit(record: Record) -> Disposition {
 /// outlive the facility's absence (registration is an earlier, independent
 /// act), and with no facility there is no closure to be ordered against, so
 /// the calling thread's own pool is the only sink a presentation can reach.
+///
+/// Startup boundary: this path bypasses the admission word by construction —
+/// there is no facility to close, so "decided before the closure" cannot be
+/// computed here. The close protocol's guarantee therefore begins at
+/// installation, and the host's installation order is what makes that a real
+/// boundary: install the facility BEFORE starting any thread that emits.
+/// Concurrent emission and [`Diagnostics::install`] is not a supported
+/// schedule — such an emission can take this path and escape the admission
+/// section the closure linearizes. The headless host installs first and starts
+/// its emitting threads afterwards.
 fn emit_without_facility(record: Record) -> Disposition {
     match with_current_pool(|pool| {
         if pool.publish(record) {
@@ -1001,6 +1028,8 @@ impl Diagnostics {
             admission: AtomicUsize::new(0),
             drainer_exited: AtomicBool::new(false),
             sweep_quiescent: AtomicBool::new(false),
+            #[cfg(all(test, not(loom)))]
+            quiescence_waits: AtomicUsize::new(0),
             beta_queued: AtomicU64::new(0),
             beta_rejected: AtomicU64::new(0),
             beta_consumed: AtomicU64::new(0),
@@ -1067,10 +1096,11 @@ impl Diagnostics {
     ///   presenting itself as a complete drain, and `abandoned` stays false
     ///   because the drainer did exit. What happens to such a presentation
     ///   afterwards is stated at its own admission boundary, never hidden: an α
-    ///   publication lands in its pool (visible as `outstanding`, and a later
-    ///   walk can still deliver it), while a β presentation finds the channel's
-    ///   receiver gone with the drainer and is counted as a `beta_rejected`
-    ///   admission loss.
+    ///   publication lands in its pool, visible there as `outstanding` and
+    ///   readable by an explicit later walk — the drainer has exited, so
+    ///   nothing delivers it automatically before process exit — while a β
+    ///   presentation finds the channel's receiver gone with the drainer and is
+    ///   counted as a `beta_rejected` admission loss.
     pub fn shutdown(&self, deadline: Duration) -> ShutdownReport {
         // The closure: ONE RMW on the admission word, ordered against every
         // admission decision (which is an RMW on the same word).
@@ -1500,6 +1530,8 @@ mod tests {
             admission: AtomicUsize::new(0),
             drainer_exited: AtomicBool::new(false),
             sweep_quiescent: AtomicBool::new(false),
+            #[cfg(all(test, not(loom)))]
+            quiescence_waits: AtomicUsize::new(0),
             beta_queued: AtomicU64::new(0),
             beta_rejected: AtomicU64::new(0),
             beta_consumed: AtomicU64::new(0),
@@ -1920,18 +1952,44 @@ mod tests {
                 .clone()
         }
 
-        /// Whether a final sweep reached the sink inside `window`.
-        fn wait_for_sweep(&self, window: Duration) -> bool {
-            let deadline = Instant::now() + window;
-            loop {
-                if self.sweeps.load(Ordering::Acquire) > 0 {
-                    return true;
-                }
-                if Instant::now() >= deadline {
-                    return false;
-                }
-                std::thread::sleep(Duration::from_millis(1));
+        /// How many final sweeps have reached the sink so far.
+        fn sweeps(&self) -> u64 {
+            self.sweeps.load(Ordering::Acquire)
+        }
+
+        /// Whether this interior's closure has been published inside `window`:
+        /// the closer's own RMW, observed on the very word every admission
+        /// decision is taken on.
+        fn wait_for_close(&self, window: Duration) -> bool {
+            wait_until(window, || is_closed(&self.inner))
+        }
+
+        /// Whether this interior's drainer has been observed inside its
+        /// quiescence wait inside `window` — it found this harness's own
+        /// in-flight publication (the only one a detached interior can have)
+        /// and is waiting for it to leave.
+        fn wait_for_quiescence_wait(&self, window: Duration) -> bool {
+            wait_until(window, || {
+                self.inner.quiescence_waits.load(Ordering::Relaxed) > 0
+            })
+        }
+    }
+
+    /// Poll `observed` every millisecond until it holds or `window` expires.
+    /// The bound is a LIVENESS valve for oracle premises, never a scheduling
+    /// premise: an oracle that cannot observe what it needs fails its own
+    /// assertion instead of proceeding.
+    #[cfg(not(loom))]
+    fn wait_until(window: Duration, mut observed: impl FnMut() -> bool) -> bool {
+        let deadline = Instant::now() + window;
+        loop {
+            if observed() {
+                return true;
             }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
         }
     }
 
@@ -1976,25 +2034,34 @@ mod tests {
         })
     }
 
-    /// How the "delivered" oracle's release was decided.
+    /// How the "delivered" oracle's release was decided. The oracle's premise
+    /// is a SYNCHRONIZED schedule — admission, then the closure, then the
+    /// drainer waiting on this very publication, and only then the release —
+    /// so a release decided by anything less is a failed premise, not a pass.
     #[cfg(not(loom))]
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum ReleaseReason {
-        /// A final sweep had already reached the sink: the drainer swept BEFORE
-        /// the release, so a producer released now publishes into a facility
-        /// whose last consumer is gone.
-        SweptFirst,
-        /// No sweep inside the valve: the drainer cannot have swept — it is the
-        /// one waiting for this producer.
+        /// The closure was observed AND the drainer was observed inside its
+        /// quiescence wait for this publication: the target interleaving is
+        /// established by the signals themselves.
+        ClosedAndWaiting,
+        /// The closure was observed, but the drainer's wait was not. Under the
+        /// protocol this cannot happen while a publication is in flight, so
+        /// the oracle's premise failed.
+        Closed,
+        /// Not even the closure was observed inside the valve. The release
+        /// still happens so the test can fail and join instead of hanging; the
+        /// premise assertion below turns it into a failure.
         Valved,
     }
 
-    /// The release valve for the "delivered" oracles. It must stay well inside
-    /// the drainer's quiescence window (`PUBLISHER_QUIESCENCE_WINDOW`), because
-    /// the release has to precede that window's expiry for the protocol to
-    /// deliver the in-flight record: 150 ms against 250 ms.
+    /// The liveness valve bounding each premise probe of the "delivered"
+    /// oracles. It is NOT a scheduling premise (the healthy schedule is
+    /// decided by the signals above); it only keeps a broken close path from
+    /// hanging the test binary, and the release still happens at its expiry —
+    /// followed by the premise assertion's failure.
     #[cfg(not(loom))]
-    const RELEASE_VALVE: Duration = Duration::from_millis(150);
+    const RELEASE_VALVE: Duration = Duration::from_secs(5);
     /// Generous: the closer only ever waits for the drainer's own bounded work.
     #[cfg(not(loom))]
     const CLOSE_RACE_DEADLINE: Duration = Duration::from_secs(30);
@@ -2003,8 +2070,13 @@ mod tests {
     /// closure — the producer has already made its admission decision and is
     /// parked before the publication — is delivered by the final sweep when the
     /// producer completes inside the quiescence window. The release is decided
-    /// by the sink's own flush signal: a release under `SweptFirst` means the
-    /// schedule the protocol must survive was actually reached.
+    /// by SYNCHRONIZATION on the close path itself: the closure must have been
+    /// published AND the drainer observed inside its quiescence wait for THIS
+    /// publication before the producer is let go. A release that could not
+    /// observe both is a FAILED PREMISE (asserted below), never a silent pass
+    /// on the drainer's ordinary poll. The one remaining assumption is
+    /// scheduling liveness, not ordering: the release lands ~1 ms of local work
+    /// after the observation, against the drainer's 250 ms wait.
     #[cfg(not(loom))]
     fn an_in_flight_publication_is_delivered_by_the_final_sweep(
         transport: seam::Transport,
@@ -2028,10 +2100,23 @@ mod tests {
                 *report.lock().unwrap_or_else(|p| p.into_inner()) = Some(outcome);
             });
             scope.spawn(|| {
-                let reason = if race.wait_for_sweep(RELEASE_VALVE) {
-                    ReleaseReason::SweptFirst
-                } else {
+                // Premise first, release second: without the closure the
+                // interleaving under test has not happened (a publication
+                // released before it is merely an open-facility emission), and
+                // without the drainer's wait the release proves nothing about
+                // the sweep that must deliver it.
+                let reason = if !race.wait_for_close(RELEASE_VALVE) {
                     ReleaseReason::Valved
+                } else if !race.wait_for_quiescence_wait(RELEASE_VALVE) {
+                    ReleaseReason::Closed
+                } else {
+                    assert_eq!(
+                        race.sweeps(),
+                        0,
+                        "the drainer is waiting for this publication: its sweep \
+                         cannot have run yet"
+                    );
+                    ReleaseReason::ClosedAndWaiting
                 };
                 *release.lock().unwrap_or_else(|p| p.into_inner()) = Some(reason);
                 seam::release();
@@ -2057,9 +2142,17 @@ mod tests {
             "a record admitted before the closure must be delivered by the final \
              sweep, exactly once (release decided by {release:?})"
         );
-        assert!(
-            release == ReleaseReason::Valved,
-            "the release must be what let the sweep proceed: {release:?}"
+        assert_eq!(
+            race.sweeps(),
+            1,
+            "the ONE final sweep is what delivered it (release decided by {release:?})"
+        );
+        assert_eq!(
+            release,
+            ReleaseReason::ClosedAndWaiting,
+            "the oracle's premise must be established by synchronization: the \
+             closure published AND the drainer inside its quiescence wait for \
+             this publication, before the release"
         );
         assert!(
             matches!(
@@ -2091,8 +2184,9 @@ mod tests {
     /// closure whose producer OUTLASTS the quiescence window makes the report
     /// say so. The report must not claim a complete drain while a presentation
     /// admitted before the closure is still in flight; the record itself is
-    /// not lost to the accounting (its boundary counters stay consistent and a
-    /// later walk still delivers it).
+    /// not lost to the accounting (its boundary counters stay consistent, and
+    /// an EXPLICIT later walk — this oracle's own `poll_pools` call — still
+    /// delivers it; the production drainer has exited, so none is automatic).
     #[cfg(not(loom))]
     fn a_publication_outlasting_the_quiescence_window_is_not_reported_drained(
         transport: seam::Transport,
@@ -2118,6 +2212,15 @@ mod tests {
             !report.abandoned,
             "the drainer exited; what failed is the ordering, not the sink: {report:?}"
         );
+        // The sweep ran — it is what looked, and on this schedule found
+        // nothing yet; its flush reaching the sink is the witness. What the
+        // report refuses to claim is that the sweep was ordered after
+        // quiescence, not that it ran.
+        assert_eq!(
+            race.sweeps(),
+            1,
+            "the incomplete close still ran its one final sweep"
+        );
 
         seam::release();
         let producer = producer.join().expect("the parked producer");
@@ -2125,9 +2228,10 @@ mod tests {
             seam::Transport::Alpha => {
                 // Admitted before the closure: the record is published into its
                 // own pool (the close does not retract an admission), where it
-                // is visible at its own boundary — never invisible — and a later
-                // walk still delivers it. The report simply did not claim to
-                // have done so.
+                // is visible at its own boundary — never invisible — and this
+                // explicit walk still delivers it. No automatic consumer
+                // remains (the production drainer exited), and the report
+                // simply did not claim to have delivered it.
                 assert_eq!(
                     producer.disposition,
                     Disposition::AlphaRecorded,
@@ -2160,7 +2264,8 @@ mod tests {
                     .count();
                 assert_eq!(
                     hits, 1,
-                    "the in-flight record was never lost: a later walk delivers it"
+                    "the in-flight record was never lost: this explicit walk \
+                     delivers it (the drainer exited; none is automatic)"
                 );
             }
             seam::Transport::Beta => {
