@@ -315,9 +315,10 @@ production APIs land only through their own review. Every code anchor is @e44aa8
 > * when that bound cannot be met, the sweep still runs (it is the last consumer there will be)
 >   but the report is NOT `drained`: the `ShutdownReport` says the accounting is incomplete
 >   instead of presenting a complete drain, and the presentation remains visible at its own
->   boundary (α: `outstanding`, and a later walk still delivers it; β: a counted admission loss,
->   because the channel's receiver drops with the drainer). `abandoned` keeps its round-2
->   meaning — the drainer did not exit inside the deadline — and is not reused for this.
+>   boundary (α: `outstanding` in its pool, readable by an explicit later walk — the drainer has
+>   exited, so none is automatic; β: a counted admission loss, because the channel's receiver
+>   drops with the drainer). `abandoned` keeps its round-2 meaning — the drainer did not exit
+>   inside the deadline — and is not reused for this.
 >
 > DG-1's acceptance reading is met exactly: bounded-or-honest shutdown without a fake "drain
 > complete" (`drained` now REQUIRES the quiescence observation), admission losses counted at the

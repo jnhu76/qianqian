@@ -3,9 +3,9 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: twenty-nine commits, each reviewable on its own;
-         the last thirteen close the owner's three #287 review rounds (§9 first round,
-         §10 second round, §11 the close protocol)
+HEAD     the implementation branch's tip: thirty-one commits, each reviewable on its own;
+         the last fifteen close the owner's four #287 review rounds (§9 first round,
+         §10 second round, §11 the close protocol, §12 the oracle premise)
 ```
 
 This document records what an implementation round actually landed against the
@@ -400,7 +400,7 @@ word's modification order.
 |---|---|---|
 | `an_in_flight_alpha_publication_is_delivered_by_the_final_sweep` | a record admitted before the closure, published while the drainer waits, is delivered exactly once | `hits 0 vs 1`, release decided by `SweptFirst` (the sweep ran before the release) |
 | `an_in_flight_beta_publication_is_delivered_by_the_final_sweep` | the same property for the channel | `hits 0 vs 1`, release `SweptFirst` |
-| `an_alpha_publication_outlasting_the_quiescence_window_is_not_reported_drained` | the report never claims a drain while such a presentation is in flight; afterwards the record is visible at its own boundary (`outstanding`) and a later walk delivers it | report `drained: true, abandoned: false, undelivered_at_exit: 0` with the presentation in flight |
+| `an_alpha_publication_outlasting_the_quiescence_window_is_not_reported_drained` | the report never claims a drain while such a presentation is in flight; afterwards the record is visible at its own boundary (`outstanding`) and an explicit later walk delivers it — the drainer exited, so none is automatic | report `drained: true, abandoned: false, undelivered_at_exit: 0` with the presentation in flight |
 | `a_beta_publication_outlasting_the_quiescence_window_is_not_reported_drained` | the same for the channel (the receiver drops with the drainer, so the presentation is counted as a `beta_rejected` admission loss — an accountable fact) | same |
 
 Construction: a `cfg(all(test, not(loom)))` rendezvous parks the producer INSIDE its admission
@@ -436,3 +436,83 @@ restored byte-identically (sha256 `de1e9627…`).
 * The close-protocol witnesses are Linux-host, real-thread evidence: the admission word, the
   drainer's bounded wait and the seams are ordinary std synchronization on real threads, but no
   Windows process/thread evidence was executed this round (acceptance pending, unchanged).
+
+## 12. Owner-review round 4 (#287 review IV, 2026-10-17) — the delivery oracles' premise
+
+The fourth review PASSED the production close protocol and the timeout honesty, and held the PR on
+ONE acceptance-oracle gap (P2) plus two wording items (P3). The gap: the two "delivered by the
+final sweep" oracles released the parked producer on the round-3 rule "no sweep inside the 150 ms
+valve" — a rule that can fire before the closer has even executed `close_admission()`. The
+review's counterexample: the closer is delayed, the valve expires, the producer is released and
+publishes into an OPEN facility, the drainer's ORDINARY poll consumes the record, the closer then
+runs to completion — and every assertion of the oracle still passes (`hits=1`, `Valved`,
+`drained=true`) while the target interleaving (admission → close → publication → sweep) never
+happened. A negative control that legitimately goes RED does not substitute for every GREEN run
+establishing its own premise.
+
+### 12.1 The pinned premise (test-only; production bytes unchanged)
+
+* The releaser waits for two SYNCHRONIZATION signals before releasing: (1) the closure published
+  on the admission word (`CloseRace::wait_for_close` — the closer's own RMW), and (2) this
+  interior's drainer observed inside its quiescence wait for this very publication
+  (`CloseRace::wait_for_quiescence_wait`), read from the new `cfg(all(test, not(loom)))` counter
+  `Inner::quiescence_waits`, bumped by `wait_for_publisher_quiescence` on each iteration that
+  actually waited. The strict signal SUBSUMES the mandatory one: the drainer only reaches that
+  wait through its `is_closed` branch, so the closure provably precedes the drainer's wait; the
+  explicit close probe additionally names which premise is missing when one is.
+* A premise that cannot be observed is a FAILURE, not a silent pass: the release still happens at
+  the valve's expiry (5 s liveness net, so the test can fail and join) and
+  `assert_eq!(release, ReleaseReason::ClosedAndWaiting)` reports it. The release rule is otherwise
+  unchanged in kind — the same oracle, a stricter premise.
+* One residual assumption remains and is named as scheduling LIVENESS, not ordering: after the
+  observation, the release lands ~1 ms of local work later, against the drainer's 250 ms wait.
+* The delivery oracle additionally witnesses the sweep's ordering: `race.sweeps() == 0` at the
+  premise (the drainer cannot have swept while waiting for this publication) and `sweeps() == 1`
+  after the close (the ONE final sweep is what delivered the record).
+
+### 12.2 Controls and experiments (all executed)
+
+| Run | Construction | Result |
+|---|---|---|
+| Targeted control: the drainer's quiescence wait REMOVED (sweep immediately after the closure; report keeps `sweep_quiescent=false`) | `controls/make-control.py` on the pinned tree | both delivery oracles RED — `hits 0 vs 1`, release decided by `Closed`; both honesty oracles PASS (this control removes the ORDERING only, so exactly the ordering oracles flip) |
+| Vacuity experiment A (the review's schedule): closer delayed 600 ms past a 150 ms release valve, round-3 release rule restored | `controls/vacuity-experiment.py A` + `--nocapture` | both oracles PASS with `[vacuity-A] old 150 ms rule decides; closure published at release: false` — the counterexample reproduced executably |
+| Vacuity experiment B: the same 600 ms delayed closer with the pinned rule | `controls/vacuity-experiment.py B` | both oracles PASS with the premise assertion in force (`ClosedAndWaiting`) |
+| Restore | byte-identical | sha256 `98891d1d…` (pre/post every control and experiment run) |
+
+### 12.3 Wording fixes (P3)
+
+* `Diagnostics::shutdown`'s doc and the honesty oracle's own comments no longer let a "later walk"
+  deliver the post-timeout α record by itself: the record remains in its pool as `outstanding` and
+  is readable by an EXPLICIT later walk — the production drainer has exited, so none is
+  automatic. The target contract's close-protocol bullet carries the same correction.
+* `emit_without_facility` (and the module doc) now state the installation boundary: that path
+  bypasses the admission word by construction, so the close protocol's guarantee begins at
+  installation — a host installs the facility before starting any thread that emits, and
+  concurrent emission with `Diagnostics::install` is not a supported schedule. (No host change:
+  the headless host already installs first, then starts its threads.)
+
+### 12.4 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| Diagnostics crate (pinned oracles) | `cargo test -p qianqian-diagnostics --lib` | 16 passed / 0 failed; the delivery oracles assert `ClosedAndWaiting` (the premise really fired) | Linux only |
+| Targeted control | the same command under `make-control.py` | 2 RED (documented signatures) / 2 PASS | Linux only |
+| Vacuity A / B | both variants, `--nocapture` | A: pass with `closure published at release: false`; B: pass with the premise assertion | Linux only |
+| Whole workspace | `cargo test --workspace --no-fail-fast` | 940 passed / 0 failed over 57 test targets | Linux only; not device evidence |
+| Decode chain | `cargo test --manifest-path crates/qianqian-decode-songcore/Cargo.toml --lib` | 36 passed / 0 failed | Linux only |
+| Pool protocol (Loom) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | 2 passed (SCHEDULE-CLEAN) | explored-schedule bound |
+| Pool protocol (Miri) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | clean; all 24 seeds attempted, rc = 0 | Miri samples one schedule per seed |
+| Close-race oracles (Miri, new this round) | `cargo +nightly miri test -p qianqian-diagnostics --lib publication -- --test-threads=1` | 4 passed / 0 failed (real threads through the seam, the counter and the admission word; no UB, no race) | single seed per oracle |
+| Playback-concurrency lane | `specs/check.sh rust` | `RESULT matrices(native) BOUNDED-CLEAN`, `RESULT matrices(miri) MIRI-CLEAN`, §G.6 TEST-PASS, M-K1/K2/K3 COUNTEREXAMPLE-WITNESSED, `RESULT native BOUNDED-CLEAN`, loom + pool-loom SCHEDULE-CLEAN, M-L1 COUNTEREXAMPLE-WITNESSED | bounds as before |
+| Host exit boundary | `cargo test -p qianqian-headless --lib entry::` | 4 passed / 0 failed | Linux only |
+| Full local gate | `lefthook run pre-push --all-files` | green (8/8) | proves the working tree, not Windows/formal lanes |
+
+### 12.5 Still NOT_RUN (unchanged from §11.5)
+
+* O-CONE-NECESSITY / O-CONE-ORDER runtime runs and their mutations (Linux host; acceptance
+  pending).
+* E-7 tier 1 writer-swap controls (needs the Windows endpoint; acceptance pending).
+* Windows runtime evidence for the carrier B reason (acceptance pending).
+* Windows runtime evidence for the close protocol and the pinned oracles — the round-4 witnesses
+  are Linux-host real-thread runs; the mechanism is ordinary std synchronization, but no Windows
+  execution was performed (acceptance pending, unchanged).
