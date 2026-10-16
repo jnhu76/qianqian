@@ -1,5 +1,11 @@
 # Error-system decision record — owner directions + design-round recommendations
 
+> **Implementation round (2026-10-16)**: the DG-1..DG-4c recommendations and the approved
+> directions this round could implement without a new ruling have landed; the round's
+> mechanism choices, executed evidence, NOT_RUN items and the still-open rulings (D-C above
+> all) are indexed in `error-system-implementation-record.md`. This record's classifications
+> are unchanged, and an OPEN item stays un-authorized.
+
 > **Truth class: DECISION RECORD / ROUTING INDEX. NOT AUTHORITY.**
 > This file records (a) directions the owner has approved, (b) mechanism
 > recommendations produced by design rounds, (c) authority-amendment

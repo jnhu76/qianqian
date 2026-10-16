@@ -224,6 +224,12 @@ implemented, and the owner-approved directions (A–J, recorded in
 direction-level constraints, not these mechanisms. Candidate interfaces are illustrative;
 production APIs land only through their own review. Every code anchor is @e44aa80.
 
+> **Implementation status (2026-10-16)**: LANDED — `crates/qianqian-diagnostics` (α pool, β queue,
+> one drainer, bounded-or-honest shutdown, App install/drain; the failure-publication cone is
+> structurally log-free). Round-local representation choices — bounds, drain deadline, and the
+> Loom/Miri duty split for the payload cell — plus the executed evidence are indexed in
+> `error-system-implementation-record.md` §2/§4. This design text remains the target.
+
 ### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
 
 **Goal.** A host-owned diagnostic logging facility where (1) producers on sensitive
@@ -644,6 +650,12 @@ class β channel — an explicit, mode-scoped T5-2 contract discussion (the inte
 waker-mutex wait would sit on the render thread); default recommendation: no, keep
 even diagnostic-mode class α sites on the atomics slot.**
 
+> **Implementation status (2026-10-16)**: LANDED — carrier B on the existing completion seam;
+> `resolve` still matches the discriminant only. The class enumeration was settled at
+> implementation review: only `Device` and `Panic` are constructible, so `Cone` and `Open` are
+> documented absences rather than published names; the message bound is 512 bytes. See
+> `error-system-implementation-record.md` §2.3.
+
 ### DG-2 — Output-reason lifecycle (T2-5; D-10/D-9)
 
 **Goal.** Deliver a bounded, owned explanation of an output-backend abort to the
@@ -757,6 +769,12 @@ stays a log record, not a reason — it is not an abort); the `QIANQIAN_AUDIO_LO
 aborted-line print at wasapi.rs:258-262 is then redundant with the delivered reason and
 can be deleted or kept as the logging-site twin (DG-1 migration row).
 
+> **Implementation status (2026-10-16)**: LANDED — retention is crate-internal and consumed at the
+> diagnostic seam plus the App-facing message text; no public field was added, so the T1-3
+> admission gate was not engaged. A `song_open` failure exposes the status only: the ABI publishes
+> no handle on failure, so no diagnostic is queryable there (witnessed in E1-ABI). See
+> `error-system-implementation-record.md` §1/§4.
+
 ### DG-3 — Adapter reason retention and consumers (T1-1/T1-2; ties CC-4; D-2)
 
 **Goal.** Retain the SongCore diagnostic (status + native_code + message) at the error
@@ -808,6 +826,12 @@ DecodeFault's class is ever surfaced in the failure diagnostic (D-9).
 shape (a); the binding-architecture NOTE (migration §3.5) rides along; nothing public
 deleted; `last_error()`'s ignored-`native_code` gap closes by feeding the field into
 the retained copy.
+
+> **Implementation status (2026-10-16)**: LANDED — `IoContext` records the first fault (kind,
+> raw OS error, boundary, offset) and the call count; the adapter clears the slot at each
+> operation start and attributes only on a boundary match. E1-ABI exercises the surrounding
+> latch behaviour at the real ABI; the io-fault seam itself is unit-witnessed. See
+> `error-system-implementation-record.md` §1.
 
 ### DG-4a — File-I/O callback fault retention (T1-6; E-3 is its evidence vehicle)
 
@@ -896,6 +920,12 @@ leak/reclaim discipline); no ABI change; CC-4/DG-3's DecodeFault and this slot r
 separate (decode-status vs host-io origin) with a stated precedence rule for
 presentation only.
 
+> **Implementation status (2026-10-16)**: LANDED — the critical-thread registry is a static name
+> list (the reader today); on a critical thread the hook counts and publishes at most one α record
+> and never chains; off it, chaining is unchanged. Witnessed by a subprocess test, with an
+> executed isolation-removal negative control. See `error-system-implementation-record.md`
+> §2.5/§4.
+
 ### DG-4b — Rust panic hook posture (T5-8)
 
 **Goal.** One process-level panic-hook policy: a single installer, isolation for
@@ -970,6 +1000,12 @@ proven-non-blocking-write option is ever admitted.
 rule); if DG-1 lands, the hook's counter/slot are read by the drainer or shutdown
 report on a non-critical thread — the hook itself never writes and never becomes a
 facade producer.
+
+> **Implementation status (2026-10-16)**: LANDED at tier β, with the default discard unchanged.
+> Install point: the decode plugin's activation — the decode chain's public surface is frozen by
+> the plugin-boundary gate (audit §7.5 / MAJOR-3), so the host owns the decision through the
+> existing `QIANQIAN_FFMPEG_LOG` switch, and activation precedes every `song_open` this provider
+> can serve. Tier α stays unadmitted. See `error-system-implementation-record.md` §2.6/§6.
 
 ### DG-4c — FFmpeg av_log posture (T5-9)
 
