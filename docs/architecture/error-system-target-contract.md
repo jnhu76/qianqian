@@ -324,20 +324,95 @@ therefore splits by producer class:
   threads via DG-4b): the shared channel is **not admitted** — its admission
   here was withdrawn. Accepting an internal-synchronization wait on these
   threads would be an explicit T5-2/direction-E target-contract change, and
-  this design does not make it; "cold-path" frequency never waives an
-  isolation obligation. Class α records go to an **atomics-only slot** (the
-  DG-4b family: fixed-capacity plain-data record, last-wins atomic swap,
-  loss counted). For the cone the obligation is additionally met
-  **structurally**: the abort record's emission point moves **after
-  `drain.complete()`** (catch → stop → complete → record), so the cone
-  contains zero logging and no enqueue cost of any kind can sit between the
-  catch and the reliable publications.
+this design does not make it; "cold-path" frequency never waives an
+isolation obligation. Class α records go to an **atomics-only slot** — the
+single-writer sequence-tagged slot protocol below (the earlier "last-wins
+atomic swap" phrasing is withdrawn, R4 review: a fixed-capacity plain-data
+record fits no single atomic exchange, and unmanaged multi-field atomics
+yield no consistent snapshot). For the cone the obligation is additionally
+met **structurally**: the abort record's emission point moves **after
+`drain.complete()`** (catch → stop → complete → record), so the cone
+contains zero logging and no enqueue cost of any kind can sit between the
+catch and the reliable publications.
 - **Class β — ordinary host threads** (CLI report rows #1–#4/#7, the App
   shutdown report): std `sync_channel` + `try_send` **remains recommended** —
   P-cap holds, per-record allocation is none, and the internal waker-mutex
   wait is acceptable **here** because no isolation obligation attaches to
-  these threads. This scoping is not a T5-2 relaxation: T5-2 governs class α,
-  which does not use the queue.
+these threads. This scoping is not a T5-2 relaxation: T5-2 governs class α,
+which does not use the queue.
+
+**Class α slot protocol (single-writer, sequence-tagged; specified R4 review
+2026-10-16 — replaces the withdrawn "one atomic swap / last-wins" phrasing).**
+A fixed-capacity plain-data record is *not* a value any single atomic
+operation can exchange, and splitting it into atomic fields without a
+protocol yields no consistent snapshot. The protocol:
+
+```text
+Slot layout (one slot per registered class α producer):
+    seq    : AtomicU32      // even = quiescent, odd = mid-write
+    record : FixedRecord    // plain data, the same shape as the queue's
+                             // records: inline message buffer, whitelisted
+                             // composition only
+
+Publish (fault path — wait-free: no loop, no CAS, no lock, no alloc):
+    seq.store(s+1, Relaxed)         // inhibit: readers skip odd slots
+    <plain writes of the record>    // bounded store count
+    seq.store(s+2, Release)         // publish
+
+Consume (drainer, the only reader — bounded):
+    s1 = seq.load(Acquire)
+    if s1 is odd          → mid-write: skip this poll, re-read next poll
+    copy the record
+    if seq.load(Acquire) == s1 → consistent snapshot consumed
+    else                  → overwritten mid-copy: retry ≤ N, then drop+count
+```
+
+**Ownership.** One slot per **registered** α producer (per critical thread /
+critical site). Registration happens on the cold path (thread/site startup),
+never on the fault path; the panic hook's thread→slot lookup is a
+const-initialized thread-local pointer read, not a lazy-init lock. No two α
+producers ever touch the same slot, so every payload has exactly one writer
+— the "who owns the payload under concurrent producers" question does not
+arise (the DG-4b hook's slots are per registered critical thread; a panic
+on an unregistered thread is a class β event that chains and never touches
+a slot).
+
+**Tearing and loss.** A torn or half-overwritten copy can never be
+consumed: the sequence check certifies the whole snapshot or discards it —
+exporters never see a mixed record. Loss is bounded and per-slot: between
+two drainer pickups at most one unconsumed record per slot is overwritten
+(per-slot last-wins), observed by the drainer as a sequence-number gap and
+counted.
+
+**Drainer discovery.** An α publish has no wake event — a wake *from* the α
+thread would itself be the forbidden synchronization dependency. The
+drainer therefore polls slots (a) opportunistically after every β-channel
+batch and (b) on a bounded `recv_timeout` poll interval. Contract
+consequence, stated rather than hidden: **α record delivery latency is
+bounded by the poll interval, not by the publish** — the explicit cost of
+atomics-only isolation; the exit boundary B performs one final poll+flush
+attempt, and abandon may still lose a just-published record (T5-5 honesty).
+
+**Platform note.** The protocol needs only atomic load/store with
+Release/Acquire pairing — no CAS, no LL/SC loop — available and lock-free on
+every tier-1 target (x86_64/aarch64; Windows/Linux/macOS). Concurrent
+access to the plain payload under the sequence tag uses the standard
+single-writer seqlock technique (volatile-address copies); a `u32` sequence
+wraps only after 2^31 publications per slot — α faults are rare — and a
+wrap-safe variant is an implementation-review representation choice, not a
+semantics change.
+
+| Slot mechanism alternative | Verdict |
+|---|---|
+| record split into atomic fields, no protocol | rejected: no consistent snapshot — exactly the R4 finding |
+| one shared slot for all α producers | rejected: a multi-writer seqlock is invalid (two writers' interleavings defeat any single sequence tag); a CAS-claim slot array reintroduces a retry loop on the fault path — a bounded-attempt claim+drop variant is retained only as a fallback if the slot count ever becomes untenable |
+| `AtomicPtr` swap of preallocated records | rejected: safe node reuse requires reader-done acknowledgement or epochs — a second reclamation protocol — plus pointer churn; the inline fixed record needs neither |
+
+Residual `MECHANISM_OPEN` (representation-level, no semantics change): slot
+enumeration (per critical thread vs per site — settled by the α-site census
+at implementation), `MSG_CAP` and record field widths, the poll interval,
+whether per-slot loss counters stay separate or fold into the global
+dropped counter.
 
 | Mechanism | Producer path facts | Assessment |
 |---|---|---|
@@ -347,14 +422,16 @@ therefore splits by producer class:
 
 Capacity: 256 records of the fixed record bound (MSG_CAP + ~40 B of plain
 data) — preallocated constant memory, sized to cover one episode's diagnostic
-burst; overflow policy below. The class α slot uses the same drop+count
-policy (last-wins overwrite counted as loss).
+burst; overflow policy below. The class α slots use the same drop+count
+policy (per-slot last-wins overwrite counted as loss — slot protocol above;
+they are preallocated with registration, outside the fixed queue capacity).
 
 **Full queue / consumer stopped / exporter failure / reentry / self-diagnosis.**
 Class β queue: full → `try_send` returns `Err(Full)` → drop the record,
 increment a monotonic dropped counter (AtomicU64, relaxed), enqueue nothing
-else (no retry loop on the producer). Class α slot: last-wins overwrite, the
-overwritten record counted as loss. Consumer stopped (shutdown entered): same
+else (no retry loop on the producer). Class α slot: per-slot last-wins
+overwrite (slot protocol), the overwritten record counted as loss. Consumer
+stopped (shutdown entered): same
 drop+count path; a late producer never blocks or revives the drainer. Exporter
 failure (drainer side): the exporter is disabled for the rest of the run (or
 of that record batch), its failure counted once in the self-diagnostic
@@ -377,12 +454,14 @@ The trilemma stands as stated: arbitrary sink + zero loss + bounded exit cannot 
 simultaneously; the design claims only "bounded producer paths + bounded-or-abandoned
 drainer + counted losses".
 
-**Cost.** Class α producer: whitelisted composition into the fixed record + one
-atomic swap (last-wins). Class β producer: whitelisted composition + one
-P-cap enqueue whose honest worst case is a CAS retry loop and an internal
-waker-mutex wait (no step bound claimed). Drainer: one thread, all rendering.
-Memory: capacity × fixed record bound, preallocated. No realtime-path cost
-(no steady-path logging exists to move).
+**Cost.** Class α producer: whitelisted composition into the fixed record +
+the slot protocol's bounded store sequence (inhibit-tag, plain stores,
+publish-tag — no loop, no lock; per-slot last-wins). Class β producer:
+whitelisted composition + one P-cap enqueue whose honest worst case is a CAS
+retry loop and an internal waker-mutex wait (no step bound claimed). Drainer:
+one thread, all rendering, plus bounded slot polls. Memory: capacity × fixed
+record bound + one slot per registered α producer, all preallocated. No
+realtime-path cost (no steady-path logging exists to move).
 
 **Migration and deletions.** Landing order is owner's (D-3: correctness-equal):
 either the narrow non-panicking writer lands first and the facility later replaces it
@@ -681,7 +760,7 @@ three seams (:119 → `HostFailure::Panic` :142-145; :253-255; :277 → :288-291
 | Posture | Assessment |
 |---|---|
 | status quo (filter-only hook) | chains everything except the reader thread; suppresses the default print on the reader thread only |
-| **critical-thread isolation + conditional chaining elsewhere (recommended)** | the hook maintains a registered set of critical thread names (`qianqian-stdin` today; render/decode names if their default prints ever need suppression): on a critical thread the hook performs **atomic bookkeeping only** (relaxed counter increment per panic, at most one fixed-size atomic-slot swap — last-wins, bounded loss) and **never calls the previous hook** (an unknown synchronous sink must not run on a thread whose timing/allocations are load-bearing); on any other context it chains to the captured previous hook (preserves host/user tooling — today's behavior) | 
+| **critical-thread isolation + conditional chaining elsewhere (recommended)** | the hook maintains a registered set of critical thread names (`qianqian-stdin` today; render/decode names if their default prints ever need suppression): on a critical thread the hook performs **atomic bookkeeping only** (relaxed counter increment per panic, at most one publication into DG-1's single-writer sequence-tagged slot — the panicking thread's own registered slot; per-slot last-wins, bounded loss; no swap of the record itself is claimed) and **never calls the previous hook** (an unknown synchronous sink must not run on a thread whose timing/allocations are load-bearing); on any other context it chains to the captured previous hook (preserves host/user tooling — today's behavior) | 
 | full-process replacement (never chain) | Rejected without evidence: silently breaks debuggers/tracers/hosts that installed meaningful hooks; no failure class on record demands it |
 
 **Context identification.** Thread names registered at spawn
@@ -700,8 +779,10 @@ an unconditional obligation" R1.2 wording becomes: the condition is
 
 **Reentry / allocation / blocking / recording failure (atomics-only; R2 review
 2026-10-16).** The critical-thread path performs **atomic operations only**: a
-relaxed counter increment per panic and, at most, one swap of a fixed-size atomic
-slot (last-wins; a lost earlier record is bounded, accepted loss). No `write(2)`
+relaxed counter increment per panic and, at most, one publication into the
+thread's own DG-1 slot — the sequence-tagged store triple of the slot
+protocol (no loop, no lock, no allocation; a lost earlier record is bounded,
+accepted per-slot loss). No `write(2)`
 of any kind, no DG-1 queue push, no lock, no allocation — a non-panicking
 synchronous write is *not* a non-blocking exit: on a full pipe it blocks without
 panicking, and a blocked panic hook is exactly the hazard this design exists to
@@ -790,12 +871,15 @@ no handle identity (process-level diagnostic; per-handle attribution is explicit
 provided).
 
 **Copy/queue cost and error handling.** β per callback: one bounded memcpy of the
-static fmt string + one write into DG-1's class α atomics slot (FFmpeg-calling
+static fmt string + one publication into DG-1's class α slot protocol via the
+calling thread's registered slot (FFmpeg-calling
 threads are decode-side, isolation-obligated — the shared class β channel is not
-admitted here) + overwrite-counted loss. α per callback: one shim `vsnprintf`
-into the fixed buffer (variable, output-bounded) + the same slot write. No line
-above the record bound is realloc-ated; truncation happens at the copy (β) / in
-the shim (α).
+admitted here; an av_log callback on an unregistered thread drops+counts — the
+bridge is diagnostic, loss is counted) + overwrite-counted loss. α per callback:
+one shim `vsnprintf`
+into the fixed buffer (variable, output-bounded) + the same slot publication. No
+line above the record bound is realloc-ated; truncation happens at the copy (β) /
+in the shim (α).
 
 **E-3 is not acceptance for this package.** E-3 exercises song_io callbacks at the ABI
 level; av_log behavior under the pinned FFmpeg build needs its own runtime observation

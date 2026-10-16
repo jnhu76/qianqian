@@ -573,6 +573,21 @@ the parked-waiter precondition; W5 split into W5a/b/c by provider outcome
 with single-legal-outcome rows; DG-4a partial-success retention trade-off
 recorded as an owner-gated known loss.
 
+2026-10-16 R4 review revision (same round, PR #284, three findings): the
+class α slot is now a specified single-writer sequence-tagged per-producer
+protocol (seq-tag inhibit/publish triple, plain payload stores, drainer
+Acquire-verify copy, per-slot last-wins with bounded loss, poll-interval
+delivery latency stated as the isolation cost; the "one atomic swap /
+last-wins" phrasing withdrawn — a fixed record fits no single atomic
+exchange); the cone oracle N-A precondition witness r−(k−1) ≥ C_blocks is
+withdrawn (unit mismatch, difference ≠ edge occupancy, full edge ≠ worker
+in wait_for_space) — necessity is re-proven at the outcome level by exit
+enumeration under the frozen-consumer/no-EOF/no-fault regime, with no
+parked-at-injection claim; W5b split by remainder state into W5b-N (no
+remainder, witnessed first-command construction → Failed{decode}) and
+W5b-R (witnessed CutPoint remainder → loop-top flush meets the stopped
+edge → Stopped, old latch dropped with the old world).
+
 ---
 
 # Historical evidence

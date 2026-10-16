@@ -484,33 +484,67 @@ for any host-backend claim. The TestOutput-based never-draining teardown oracle
 remains session-level coverage that cannot speak for wasapi.rs (unchanged from the
 REV.2 withdrawal).
 
-**Precondition witnesses (no sleep-based guessing; corrected set — R3 review
+**Precondition witnesses (no sleep-based guessing; corrected set — R4 review
 2026-10-16).** (i) The wrapper's k-th read has actually been entered and
 panicked: the wrapper sets a test-visible flag immediately before `panic!`
-(same thread, happens-before the catch). (ii) **The producer is actually in
-the target capacity wait** (added — without this the deletion experiment can
-land on an unrelated path: worker already EOF'd, already exited, or not yet
-filling): the fixture has **no reachable EOF** within the test budget, and the
-script provider counts produced blocks `r` while the wrapper counts consumed
-slices `k-1`; the panic is armed only once `r − (k−1) ≥ C_blocks` (the edge's
-capacity in staging blocks) — at that point the worker is necessarily blocked
-in `edge.wait_for_space`, mid-production, with no EOF in sight. Both counters
-are script/wrapper state: real synchronization seams, no new production seam,
-no timer. (iii) No external stop/dispose during measurement: structural — the
-test body between (i)/(ii) and settlement contains no
-`request_stop`/`dispose`/`edge.stop` call (asserted by the harness's single
-code path; the authoring record cites the lines). **Withdrawn precondition**
-(R3): the earlier "(ii) the host is parked in `wait_terminal`, witnessed by an
-unsettled snapshot" — unsettled does not prove a waiter has entered the call,
-and the oracle does not need it: the detection is "settlement becomes decisive
+(same thread, happens-before the catch). (ii) The k−1 prior deliveries
+completed: the wrapper's own call counter (a real observation on the
+consumer thread). (iii) The frozen-consumer / no-EOF / no-fault regime, each
+element a script or fixture fact cited in the authoring record: the provider
+never returns `Eof`, never returns a decode error, never returns the
+zero-frame stall response, no seek command exists anywhere in the trace, and
+the test body between (i) and settlement contains no
+`request_stop`/`dispose`/`edge.stop` call (structural — the harness's single
+code path).
+**Withdrawn precondition** (R4): the R3 form of (ii) — "the producer is in
+the target capacity wait, witnessed by produced blocks r minus consumed
+slices k−1 ≥ C_blocks". Three objections, all correct against the real
+pipeline: staging-block frame counts and render-pull frame counts are
+different units, so the two counters cannot be subtracted; the difference
+also contains produced-but-unwritten staging and any retained remainder, so
+even same-unit frame arithmetic would not be edge occupancy; and a
+genuinely full edge still would not prove the worker has executed into
+`wait_for_space`. The R3-withdrawn "unsettled ⇒ parked in `wait_terminal`"
+precondition stays withdrawn: the detection is "settlement becomes decisive
 without external stop", observed by a harness thread whose `wait_terminal`
-call (issued before or after the injection, both covered by the bound) returns
-only if the outcome committed.
+call (issued before or after the injection, both covered by the bound)
+returns only if the outcome committed.
 
-**Schedule construction.** Tier N-A: activate on Windows → confirm `Opened` verdict
-via the open slot (witness) → the wrapper consumes while the script produces
-until the capacity-witness condition (ii) holds → k-th read panics (flag) →
-cone → settlement. Tier N-B: drive
+**Necessity proof — outcome level, no parked-at-injection claim (R4).** The
+oracle no longer proves *where* the worker stands at injection; it proves
+that under the constructed regime the worker has **no legal exit unless the
+edge is terminalized**:
+
+- The injection **is** the consumer freeze (program order on the render
+  thread, not a scheduling assumption): the k-th `read_frames` panics inside
+  the render thread, the panic unwinds into the cone's `catch_unwind`, the
+  render loop is dead — edge consumption stays frozen at the k−1 completed
+  calls for the rest of the run.
+- The decode worker's exits are enumerable (`decode_worker`,
+  session.rs:576-931): the read-Err arm (:889-893), the EOF arm (:885-888),
+  the two processing-failure arms (:820-824/:849-860), the panic path
+  (:897-910), the MutatedThenFailed seek arm (:656-668), and the
+  terminal-observed exits — mid-block `WriteStep::Stopped` (:986-987),
+  mid-remainder return (:798-801), the zero-frame terminal check (:831-835),
+  and the two Applied-loop terminal returns (:718-728/:746-765). The regime
+  excludes every non-terminal exit (no decode fault, no EOF, default no-op
+  processor, healthy fixture, no seek command ⇒ the MutatedThenFailed and
+  Applied arms are unreachable), and every terminal-observed exit requires
+  `edge.terminal() != Open`.
+- Therefore: with the cone's `render_input.stop()` deleted and no external
+  stop, nothing ever makes the edge terminal ⇒ the worker cannot exit ⇒
+  `worker_exited(...)` is never published ⇒ the settle never becomes
+  decisive ⇒ `wait_terminal` never returns within the harness bound.
+
+The proof deliberately does not use the edge's occupancy or the worker's
+position at injection: mid-write, in `wait_for_space`, or between
+operations — the exit enumeration forbids exit in all three cases.
+
+**Schedule construction.** Tier N-A: activate on Windows → confirm `Opened`
+verdict via the open slot (witness) → the wrapper delivers k−1 healthy
+slices (real consumption; the edge fills against the eventually-frozen
+consumer, but the proof above never uses its occupancy) → k-th read panics
+(flag) → cone → settlement. Tier N-B: drive
 an open failure/timeout and observe at the activation boundary only (its own
 ordering assertion; never `wait_terminal`).
 
@@ -525,12 +559,14 @@ the harness bound; outcome ≠ `Failed{device}`; drain mirror ≠ `Aborted`; the
 flag never set (injection misfire — TOOLING-FAIL, not a pass).
 
 **Negative control — deletion of `render_input.stop()` (wasapi.rs:266) must be
-caught.** The mutation is executed **only under the witnessed capacity-wait
-condition** (precondition (ii)): at panic time the worker is blocked in
-`edge.wait_for_space` on a full edge with no EOF reachable — not already-EOF'd,
-not already-exited, not pre-fill, so the experiment cannot land on a different
-path (R3 review). Why it must go red: without the cone's stop, the decode worker
-blocked on a full edge never receives an edge terminal, so `worker_exited(...)`
+caught.** The mutation is executed under the same frozen-consumer / no-EOF /
+no-fault regime as the healthy run (witnesses (i)–(iii)); the R3 gating
+"witnessed capacity-wait condition" is withdrawn with the arithmetic it stood
+on. Why it must go red — by the exit enumeration above, not by any
+parked-ness claim: with the
+cone's stop deleted and no external stop, the worker has no legal exit (only
+terminal-observed exits remain, and nothing terminalizes the edge), so
+`worker_exited(...)`
 is never published; `Aborted + worker=None` is outside the decisive domain (the
 decision contract returns None — model EvidenceConsistent corner, README
 "activation 失败下无证据"), and with no external stop the settle never becomes
@@ -757,7 +793,8 @@ the seek serialization point (`MutatedThenFailed` with `remainder.is_some()`).
 | W3 stop during remainder flush | remainder flushing into a full edge (capacity-wait park, session.rs:786-805); `request_stop` → edge terminal ≠ Open → the mid-remainder exit returns | flush interruption is terminal-observed: `write_some` == 0 ∧ `edge.terminal() != Open`; worker-exit publication | `Stopped` — one of the two true stop exits |
 | W4 stop-intent recorded, request_stop's own edge stop not yet executed | the real window: completion lock released, `edge.stop()` (its own, completion.rs:552-562) not yet run — constructed by parking the real request at the new fence arming point (seam inventory above) | at the fence park, `stop_requested == true` ∧ `edge.terminal() == Open` holds by construction (the fence IS inside the window) | worker continues to its next boundary; commit per §2.3.1 precedence (`Failed{decode}` if a pending fatal is decisive first, `Stopped` at a mid-write capacity-wait exit) |
 | W5a stop during provider call — `Applied` | shared setup: an OLD pending-fatal latch is latched (script state); script parks inside the serialization-point `seek`; test issues stop (drain `Aborted` publishes, non-decisive while the worker sits in the provider); release → `Applied` → **old latch erased** (the ABI's Applied row; real-latch proof belongs to E1-ABI — here the script emulates it) → cutover decision sees stop → `Aborted` (completion.rs:856-869 `episode_ending` → `CutoverDecision::Aborted`) → fall-through; the next read observes the stopped edge terminal → exit | script park flag; `stop_requested` sampled before release; script's post-cut script hands the leg a healthy slice (never a fault) | **`Stopped`** — and `Failed{decode}` here has NO legal source (no new fault, latch erased): it would prove a script protocol violation or an implementation defect, and must fail the oracle, not widen the allowed set |
-| W5b stop during provider call — `RefusedUnchanged` | same park+stop; release → refusal → **latch retained** (ABI row) → leg released → fall-through; the next `read_frames` returns the OLD latched fatal (the refusal-preserved latch resurfacing — the script's emulation of the ABI row) → `decode_failed` | script park flag; refusal recorded; fatal-read queued in the script | **`Failed{decode}`** — the old latch resurfaces and `worker_failure` takes precedence; stop cannot relabel a failure that publishes before exit |
+| W5b-N stop during provider call — `RefusedUnchanged`, **no remainder** | construction: the parked seek is the **first** seek command the trace ever issues, planted while the worker sits at a script-witnessed pre-write position (the W5 park itself or a park inside the provider read) — a `remainder` can only be created by an actionable seek observed during a block write (`write_observing_seek`'s CutPoint arm, session.rs:977-981), so with no earlier seek command `remainder` is provably `None` (no worker white-box exists for the worker-local tail; the witness is the script-side first-command fact plus the provider call history); release → refusal → **latch retained** (ABI row) → leg released → `remainder` `None`, flush skipped → no processing update → the next `read_frames` returns the OLD latched fatal (the refusal-preserved latch resurfacing — the script's emulation of the ABI row) → `decode_failed` (session.rs:889-893) | script park flag; refusal recorded; fatal-read queued in the script; first-command fact | **`Failed{decode}`** — single legal outcome; `Stopped` here would mean the fatal read never ran (script protocol violation or an implementation defect, not a widened allowed set) |
+| W5b-R stop during provider call — `RefusedUnchanged`, **retained remainder** | construction (W2's first half, then the park): seek #1 becomes observable during a mid-flight block write with the leg parked → `WriteStep::CutPoint` → the unwritten tail preserved as `remainder`; the loop top promotes it into the serialization point; script parks inside the provider `seek`; test issues stop — `request_stop`'s own `edge.stop()` (completion.rs:552-562) terminalizes the edge before the release; release → refusal → latch retained but never reached → the loop-top remainder flush runs first (session.rs:786-804): `write_some` == 0 ∧ terminal ≠ Open → the mid-remainder `return` (:798-801) | script park flag; CutPoint observed (the block was split); `stop_requested` sampled before release | **`Stopped`** — the same terminal-observed exit shape as W3; the retained old latch is dropped with the old world (like W2's remainder, it never surfaces) |
 | W5c stop during provider call — `MutatedThenFailed` | same park+stop; release → destructive outcome → the serialization point's destructive arm fires immediately (session.rs:655-663) | script park flag + destructive outcome | **`Failed{decode}`** |
 | W6 canceled seek is not an exit | issue seek, then stop before the worker picks it up; the serialization point's `seek_aborted` branch releases the canceled seek (session.rs:625-630) and **falls through** to production | worker still alive at the next script park point | no worker exit; final class from the actual decisive evidence |
 
@@ -771,10 +808,18 @@ the scripts are plain test code with barriers.
 worker position/decisive evidence; a canceled-seek path that exits the worker; a
 worker exit with no `worker_exited` publication.
 
-**Negative control (design-level).** The pre-R1.1 oracle shape ("stop in window ⇒
-Stopped" asserted unconditionally) must fail on W5b/W5c (a stop was issued, the
-episode still commits `Failed{decode}` — the old retained latch / the destructive
-arm are legitimate decisive evidence). W4's own expectation is proven by W4's
+**Negative control (design-level).** Both one-directional over-strong oracle
+shapes must fail on the split family. "Stop in window ⇒ `Stopped`" asserted
+unconditionally fails on W5b-N/W5c (a stop was issued, the episode still
+commits `Failed{decode}` — the old retained latch / the destructive arm are
+legitimate decisive evidence). "Stop during provider call ⇒ `Failed{decode}`"
+fails on W5b-R (R4: after a refusal the worker flushes a preserved remainder
+BEFORE any new read — session.rs:786-804 — and a stop that terminalized the
+edge turns that flush into the legal mid-remainder `Stopped` exit; the old
+latch never surfaces). Each subcase's precondition is what separates them:
+W5b-N's first-command construction witnesses "no remainder"; W5b-R's CutPoint
+construction witnesses "remainder present" — neither may borrow the other's
+outcome. W4's own expectation is proven by W4's
 fence-position construction alone (R3 review: one trace's broad outcome set may
 not serve as another's proof); W5a's single-legal-outcome row (`Stopped`, with
 `Failed{decode}` a signature) is what pins it from the Applied side.
