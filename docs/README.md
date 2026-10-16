@@ -25,6 +25,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Error system — 目标设计（representation/propagation/handling/lifecycle/logging 候选目标 + DG-1..DG-4c 设计） | `architecture/error-system-target-contract.md` — DESIGN_CANDIDATE / NOT AUTHORITY；含 DeepSeek-harness 参考映射 |
 | Error system — 冻结事实（U1–U40 边界账本、GAP-01 latch 矩阵、catch/漏斗覆盖、14 行宿主输出账本） | `architecture/error-system-reconciliation.md` — INVESTIGATION RECORD / DESIGN INPUT（账本行为 current fact authority） |
 | Error system — 逐边界迁移 + 验收设计（含 §7 真实发布锥 oracle / E-7 / E-1 harness 设计 + F5 扩展裁定） | `architecture/error-system-migration.md` — DESIGN_CANDIDATE / NOT AUTHORITY |
+| Error system — 实现轮记录（六模块落地、轮内机制选择、已执行证据/NOT_RUN、未决 owner 裁定） | `architecture/error-system-implementation-record.md` — **IMPLEMENTATION RECORD / NOT AUTHORITY**（记录落地与证据，不定义语义；权威仍归四份设计正文与 PBK-001/002/003） |
 | Error system — R0 disposition contract（四维推理模型、stage 矩阵、反例义务） | `architecture/error-disposition-contract.md` — DESIGN_CANDIDATE / NOT AUTHORITY（其 §6 logging 防火墙为 reconciliation §4 账本的历史子集） |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |
 | Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |

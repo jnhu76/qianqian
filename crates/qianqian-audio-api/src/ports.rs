@@ -94,14 +94,98 @@ impl std::fmt::Debug for DrainInner {
     }
 }
 
+/// The backend-neutral class of an output abort (DG-2). These are the abort
+/// SITES the Output mechanism can report, never a product classification:
+/// the Session's terminal vocabulary is unchanged and this value never
+/// reaches the resolver.
+///
+/// Deliberately absent (implementation review of the design's candidate
+/// enumeration): an "open" class and a "cone" class. An open failure reaches
+/// the session as `OutputError` / `activation_error` long before any drain
+/// verdict exists (DG-2 scope (iv)), so no drain-carried reason can describe
+/// it. The failure-publication cone has no fallible step that could construct
+/// a reason: its `stop()` is infallible and its `complete()` publishes the
+/// verdict before the observer runs, so a cone-class abort has no site.
+/// Admitting either variant would be an unconsumed name rather than a
+/// description of something the mechanism can do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputAbortClass {
+    /// The steady render path, a device close, or a drain deadline ended the
+    /// leg (a real device/mechanism abort).
+    Device,
+    /// The render leg's own panic was caught and reported as an abort.
+    Panic,
+}
+
+/// A bounded, owned explanation delivered WITH an `Aborted` verdict (DG-2
+/// carrier B). Content is Class-C diagnostic: it explains, it never
+/// adjudicates — no resolver or App branch may read it, and its ABSENCE is
+/// always legal (a mechanism that cannot construct one delivers `Aborted`
+/// with `reason: None`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AbortReason {
+    pub class: OutputAbortClass,
+    /// Bounded owned text (the mechanism's own message, capped here so a
+    /// backend cannot put an unbounded payload on the publication path).
+    pub message: String,
+}
+
+/// The message cap for [`AbortReason`]: bounded so the cold publication path
+/// performs one bounded clone, not an unbounded copy.
+pub const ABORT_REASON_MSG_CAP: usize = 512;
+
+impl AbortReason {
+    /// Construct with the message truncated to the cap on a character
+    /// boundary.
+    pub fn new(class: OutputAbortClass, message: impl Into<String>) -> Self {
+        let mut message = message.into();
+        if message.len() > ABORT_REASON_MSG_CAP {
+            let mut end = ABORT_REASON_MSG_CAP;
+            while end > 0 && !message.is_char_boundary(end) {
+                end -= 1;
+            }
+            message.truncate(end);
+        }
+        Self { class, message }
+    }
+}
+
 /// Render drain/abort evidence. Publication does not acknowledge thread
 /// return/join or commit a D11 outcome; the Session interprets this evidence.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// The `Aborted` variant carries an OPTIONAL bounded reason (DG-2 carrier B:
+/// the explanation rides the verdict's own completion seam, so no second cell
+/// and no second lifecycle exists to specify). The reason is Class-C only:
+/// `resolve` matches the discriminant, and the verdict's absence/presence of a
+/// reason cannot change any terminal.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DrainVerdict {
     /// EOF was reached and every submitted frame played out.
     Drained,
     /// The stream aborted before draining (stop, failure).
-    Aborted,
+    Aborted { reason: Option<AbortReason> },
+}
+
+impl DrainVerdict {
+    /// `Aborted` with no reason — the always-legal shape.
+    pub fn aborted() -> Self {
+        Self::Aborted { reason: None }
+    }
+
+    /// `Aborted` carrying the mechanism's explanation.
+    pub fn aborted_with(reason: AbortReason) -> Self {
+        Self::Aborted {
+            reason: Some(reason),
+        }
+    }
+
+    /// The carried reason, if the mechanism delivered one.
+    pub fn reason(&self) -> Option<&AbortReason> {
+        match self {
+            Self::Aborted { reason } => reason.as_ref(),
+            Self::Drained => None,
+        }
+    }
 }
 
 impl DrainSignal {
@@ -133,24 +217,31 @@ impl DrainSignal {
     /// observer — if any — has finished running before this call
     /// returns.
     pub fn complete(&self, verdict: DrainVerdict) {
-        let observer = {
+        let (observer, delivered) = {
             let mut guard = self.inner.verdict.lock().expect("drain verdict lock");
             if guard.is_some() {
                 return;
             }
+            // The verdict now owns a bounded payload, so the observer gets a
+            // clone (one enum + at most one capped message: the stated cost of
+            // carrying data on the cold publication path).
+            let delivered = verdict.clone();
             *guard = Some(verdict);
             // Invoke outside the verdict lock: the observer may acquire
             // other locks, and no path may hold a drain lock while doing
             // so (lock-order safety).
             drop(guard);
-            self.inner
-                .on_complete
-                .lock()
-                .expect("drain observer lock")
-                .clone()
+            (
+                self.inner
+                    .on_complete
+                    .lock()
+                    .expect("drain observer lock")
+                    .clone(),
+                delivered,
+            )
         };
         if let Some(observer) = observer {
-            observer(verdict);
+            observer(delivered);
         }
     }
 }

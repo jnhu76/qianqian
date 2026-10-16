@@ -60,8 +60,8 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{
-    DrainSignal, DrainVerdict, GateEvent, OutputLevel, PcmFormat, PositionEvidence, RenderGate,
-    SeekParkRelease,
+    DrainSignal, DrainVerdict, GateEvent, OutputAbortClass, OutputLevel, PcmFormat,
+    PositionEvidence, RenderGate, SeekParkRelease,
 };
 
 use crate::edge::{EdgeTerminal, PcmEdge};
@@ -274,6 +274,14 @@ pub(crate) struct SessionCompletion {
 struct CompletionArc {
     state: Mutex<CompletionState>,
     signal: Condvar,
+    /// DG-2 late-verdict accounting: drain verdicts that arrived AFTER the
+    /// terminal was committed and were therefore dropped at
+    /// `publish_evidence`'s settled early-return. A verdict losing the
+    /// first-wins race carries an optional reason; the policy is drop +
+    /// count (bounded, honest) with no consumer today — a bounded
+    /// last-late-reason side slot stays the growth path should a consumer be
+    /// named. Atomic so the counter never needs the completion lock.
+    late_drain_verdicts: std::sync::atomic::AtomicU64,
     drain: DrainSignal,
     /// The episode's render pause gate (D14.7), created here with the
     /// evidence observer so it is in place before activation can hand it
@@ -383,6 +391,7 @@ impl SessionCompletion {
                         cut_committed: false,
                     }),
                     signal: Condvar::new(),
+                    late_drain_verdicts: std::sync::atomic::AtomicU64::new(0),
                     drain: DrainSignal::with_on_complete({
                         // Weak on purpose: the completion owns the signal,
                         // so a strong observer reference would be a
@@ -393,11 +402,20 @@ impl SessionCompletion {
                         let core = core.clone();
                         move |verdict| {
                             if let Some(core) = core.upgrade() {
-                                publish_evidence(&core, |state| {
+                                let delivered = publish_evidence(&core, |state| {
                                     if state.drain_verdict.is_none() {
                                         state.drain_verdict = Some(verdict);
                                     }
                                 });
+                                if !delivered {
+                                    // The terminal was already committed: the
+                                    // verdict (and any reason it carried) is
+                                    // dropped and counted — never allowed to
+                                    // relabel, never retained as a second
+                                    // authority.
+                                    core.late_drain_verdicts
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                }
                             }
                         }
                     }),
@@ -556,6 +574,14 @@ impl SessionCompletion {
             self.state.gate.set_seek_hold(false);
             guard.stop_target.clone()
         };
+        // The real window between intent recording (the hold above) and
+        // this request's OWN data-plane stop: intent is already visible
+        // to every later publication, the edge is still Open. E1-WORKER's
+        // W4 parks the real request here (test builds only; see
+        // `test_sync`), because no lock-holding fixture can populate a
+        // window whose end is this very request's next statement.
+        #[cfg(all(test, not(loom)))]
+        test_sync::pause_between_intent_and_own_edge_stop(self);
         if let Some(edge) = target {
             edge.stop();
         }
@@ -1084,13 +1110,30 @@ impl SessionCompletion {
     /// clamps, or settles anything.
     pub(crate) fn observe_snapshot(&self) -> PlaybackSessionObservation {
         let guard = self.state.state.lock().expect("completion lock");
-        let (terminal_outcome, failure_diagnostic) = match &guard.outcome {
+        let (terminal_outcome, mut failure_diagnostic) = match &guard.outcome {
             Some(outcome) => {
                 let (semantic, diagnostic) = outcome.clone().split();
                 (Some(semantic), diagnostic)
             }
             None => (None, None),
         };
+        // DG-2 presentation enrichment ONLY: when the committed terminal is
+        // the device failure the drain verdict explained, the abort reason
+        // rides beside the diagnostic text. It is read here, on the
+        // presentation path, from the mirrored evidence — the resolver never
+        // reads it, and its absence changes nothing. The public observation
+        // vocabulary is unchanged (the same `failure_diagnostic: Option<String>`).
+        if matches!(terminal_outcome, Some(EpisodeTerminalOutcome::Failed))
+            && let Some(reason) = guard.drain_verdict.as_ref().and_then(DrainVerdict::reason)
+            && reason.class == OutputAbortClass::Device
+        {
+            let mut text = failure_diagnostic.take().unwrap_or_default();
+            if !text.is_empty() {
+                text.push_str(": ");
+            }
+            text.push_str(&reason.message);
+            failure_diagnostic = Some(text);
+        }
         PlaybackSessionObservation {
             terminal_outcome,
             failure_diagnostic,
@@ -1158,6 +1201,44 @@ impl SessionCompletion {
                 .wait(guard)
                 .expect("completion wait poisoned");
         }
+    }
+
+    /// Test-only evidence read (E1-WORKER's settlement observation): the
+    /// mirrored drain verdict, exactly the field `resolve` reads. Not a
+    /// production surface — compiled only for this crate's own non-loom
+    /// test builds, like the fence module below.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn drain_mirror_verdict(&self) -> Option<DrainVerdict> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .drain_verdict
+            .clone()
+    }
+
+    /// Test-only evidence read (DG-2): how many drain verdicts arrived after
+    /// the terminal was committed and were dropped at the settled
+    /// early-return.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn late_drain_verdicts(&self) -> u64 {
+        self.state
+            .late_drain_verdicts
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Test-only evidence read (E1-WORKER): the typed origin of the FIRST
+    /// worker-side failure publication — the D14.11 discriminator, which
+    /// the `Failed` presentation stage spelling encodes only as text.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn worker_failure_origin(&self) -> Option<WorkerFailureOrigin> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .worker_failure
+            .as_ref()
+            .map(|failure| failure.origin)
     }
 
     fn publish(&self, evidence: impl FnOnce(&mut CompletionState)) {
@@ -1235,10 +1316,10 @@ fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
 /// only on the unsettled→committed transition. Only session-owned
 /// execution paths call this — the worker wrapper, the decode failure
 /// reporter, and the drain observer. No consumer call reaches it.
-fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionState)) {
+fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionState)) -> bool {
     let mut guard = core.state.lock().expect("completion lock");
     if guard.outcome.is_some() {
-        return; // settled: first-wins, later evidence cannot relabel
+        return false; // settled: first-wins, later evidence cannot relabel
     }
     evidence(&mut guard);
     if let Some(outcome) = resolve(&guard) {
@@ -1246,6 +1327,7 @@ fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionS
         drop(guard);
         core.signal.notify_all();
     }
+    true
 }
 
 /// The terminal contract, pure function of the lock-protected evidence
@@ -1275,7 +1357,7 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
                 return Some(SessionOutcome::Completed);
             }
         }
-        Some(DrainVerdict::Aborted) => {
+        Some(DrainVerdict::Aborted { .. }) => {
             match state.worker_terminal {
                 // Until the worker has exited, the outcome is not
                 // decidable: an aborted render alone happens on every
@@ -1350,9 +1432,22 @@ pub(crate) mod test_sync {
         pub(crate) slot_in_flight: bool,
     }
 
+    /// Which real suspension point a fence covers. Both are windows a
+    /// lock-holding fixture cannot populate; each is keyed by its own
+    /// site so one arming never displaces the other (E1-WORKER W4).
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Site {
+        /// `request_seek`: after the Open sample, before the second hold.
+        SeekStraddle,
+        /// `request_stop`: after intent recording, before this request's
+        /// own data-plane stop.
+        StopWindow,
+    }
+
     struct Armed {
         id: u64,
         target: usize,
+        site: Site,
         parked: mpsc::Sender<()>,
         release: Arc<Mutex<mpsc::Receiver<()>>>,
     }
@@ -1441,6 +1536,19 @@ pub(crate) mod test_sync {
             }
         }
 
+        /// [`FencedRequest::spawn`] for the stop window: the real
+        /// `request_stop` parks between recording intent and running its
+        /// own data-plane stop.
+        pub(crate) fn spawn_stop(completion: &SessionCompletion) -> FencedRequest {
+            let fence = arm_stop(completion);
+            let completion = completion.clone();
+            let requester = std::thread::spawn(move || completion.request_stop());
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
         /// Block until the owned request has sampled the edge terminal
         /// Open and parked at the fence, before the second hold.
         pub(crate) fn wait_parked(&self) {
@@ -1479,19 +1587,34 @@ pub(crate) mod test_sync {
     /// Arm the fence for exactly this completion's next `request_seek`
     /// that gets past its Open sample. Other completions pass through.
     pub(crate) fn arm(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::SeekStraddle)
+    }
+
+    /// Arm the fence for exactly this completion's next `request_stop`
+    /// (E1-WORKER W4: the intent-recorded / own-edge-stop-not-yet-run
+    /// window). Other sites and other completions pass through.
+    pub(crate) fn arm_stop(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::StopWindow)
+    }
+
+    fn arm_at(completion: &SessionCompletion, site: Site) -> Fence {
         let (parked_tx, parked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let target = Arc::as_ptr(&completion.state) as usize;
         let mut registry = registry().lock().expect("fence registry lock");
         assert!(
-            registry.armed.iter().all(|armed| armed.target != target),
-            "a fence is already armed for this completion"
+            registry
+                .armed
+                .iter()
+                .all(|armed| armed.target != target || armed.site != site),
+            "a fence is already armed for this completion and site"
         );
         registry.next_id += 1;
         let id = registry.next_id;
         registry.armed.push(Armed {
             id,
             target,
+            site,
             parked: parked_tx,
             release: Arc::new(Mutex::new(release_rx)),
         });
@@ -1503,16 +1626,31 @@ pub(crate) mod test_sync {
     }
 
     /// The recorded suspension point. Inert unless a fence is armed for
-    /// this exact completion, and never called with any lock held: the
-    /// publications that must land inside the window have to be able to
-    /// run while the request parks here. The arrival send cannot block
-    /// the request; the release receive ends on an explicit release or
-    /// on the arming test dropping its handle (unwinding included).
+    /// this exact completion and site, and never called with any lock
+    /// held: the publications that must land inside the window have to
+    /// be able to run while the request parks here. The arrival send
+    /// cannot block the request; the release receive ends on an explicit
+    /// release or on the arming test dropping its handle (unwinding
+    /// included).
     pub(super) fn pause_between_open_sample_and_second_hold(completion: &SessionCompletion) {
+        pause_at(completion, Site::SeekStraddle);
+    }
+
+    /// [`pause_between_open_sample_and_second_hold`] for the
+    /// `request_stop` window (see [`Site::StopWindow`]).
+    pub(super) fn pause_between_intent_and_own_edge_stop(completion: &SessionCompletion) {
+        pause_at(completion, Site::StopWindow);
+    }
+
+    fn pause_at(completion: &SessionCompletion, site: Site) {
         let (parked, release) = {
             let registry = registry().lock().expect("fence registry lock");
             let target = Arc::as_ptr(&completion.state) as usize;
-            match registry.armed.iter().find(|armed| armed.target == target) {
+            match registry
+                .armed
+                .iter()
+                .find(|armed| armed.target == target && armed.site == site)
+            {
                 Some(armed) => (armed.parked.clone(), armed.release.clone()),
                 None => return,
             }
@@ -1548,6 +1686,7 @@ pub(crate) mod test_sync {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[cfg(not(loom))]
     use super::*;
     #[cfg(not(loom))]
     use qianqian_audio_api::ports::{GateSlice, RenderGate, TailProbeOutcome};
@@ -1720,7 +1859,7 @@ pub(crate) mod tests {
         // The ending render's Aborted evidence alone is not terminal
         // truth. B remains unpicked, so the sole worker has executed no
         // B provider operation. Its exiting path clears, not executes it.
-        completion.drain_signal().complete(DrainVerdict::Aborted);
+        completion.drain_signal().complete(DrainVerdict::aborted());
         assert_eq!(completion.committed(), None);
         completion.worker_exited(EdgeTerminal::Stopped);
         completion.abort_stranded_seek();

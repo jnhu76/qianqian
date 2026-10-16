@@ -7,6 +7,9 @@ description = "Real Decode capability provider over the SongCore C ABI v1"
 
 [dependencies]
 qianqian-audio-api = { path = "../qianqian-audio-api" }
+# The host-owned diagnostic outlet (error-system target contract §DG-1/DG-3):
+# a diagnostic sink for the retained typed fault, never a semantic authority.
+qianqian-diagnostics = { path = "../qianqian-diagnostics" }
 qianqian-composition = { path = "../qianqian-composition" }
 qianqian-songcore-sys = { path = "../qianqian-songcore-sys" }
 

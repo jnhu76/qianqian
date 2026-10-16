@@ -221,7 +221,15 @@ candidate, not an implementation approval.
 
 ## 6. Diagnostic contract for future logging (candidate, no logger yet)
 
-**No new logging mechanism is implemented or authorized here.** Logging
+> **Implementation status (2026-10-16)**: the firewall's sites are now realized by the
+> host diagnostic outlet (class-α records on the render leg and decode worker; the
+> failure-publication cone structurally log-free; the volume-apply diagnostic isolated
+> from the episode's outcome). The firewall rule itself is unchanged. See
+> `error-system-implementation-record.md` §7.
+
+**No logging mechanism is authorized by THIS contract, and none is defined here.** A host
+outlet has since landed under the target contract (§DG-1) — the note above records that
+realization; this section stays the candidate contract it was. Logging
 is evidence, not a Fact, a recovery command, or an owner of termination.
 When actually captured, a local record might include component, operation
 and stage; typed source status/native code; known offset/produced-frame

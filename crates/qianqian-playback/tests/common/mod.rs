@@ -801,8 +801,8 @@ fn spawn_test_leg(
                     },
                 )
             }))
-            .unwrap_or(DrainVerdict::Aborted);
-            if verdict == DrainVerdict::Aborted {
+            .unwrap_or(DrainVerdict::aborted());
+            if verdict == DrainVerdict::aborted() {
                 // Mirror the real mechanism: a dead render leg stops
                 // the data plane.
                 input.stop();
@@ -954,7 +954,7 @@ fn consume_loop(
             // Device died mid-stream: the render loop exits on its own.
             // The caller mirrors the real mechanism by stopping the data
             // plane before completing the drain.
-            return DrainVerdict::Aborted;
+            return DrainVerdict::aborted();
         }
         // Mirror the real mechanism's ONE loop-top gate (D14.7 pause
         // park + D14.5 cut park, unified): the gate parks before the
@@ -1018,13 +1018,13 @@ fn consume_loop(
             ParkOutcome::TailProbeFailed
         );
         if park_failed {
-            return DrainVerdict::Aborted;
+            return DrainVerdict::aborted();
         }
         // Mirror the real loop's per-iteration padding observation:
         // publish the consumed estimate as of THIS instant, from the
         // handed-off total as it stands BEFORE the submission below.
         let Some(tail) = device.tail.observe() else {
-            return DrainVerdict::Aborted;
+            return DrainVerdict::aborted();
         };
         publish_consumed(position, basis, handed_off, tail, publishing);
         match input.read_frames(&mut dst) {
@@ -1057,7 +1057,7 @@ fn consume_loop(
                 }
             }
             PcmPull::Eof => return DrainVerdict::Drained,
-            PcmPull::Stopped => return DrainVerdict::Aborted,
+            PcmPull::Stopped => return DrainVerdict::aborted(),
         }
     }
 }

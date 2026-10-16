@@ -442,6 +442,12 @@ cleanup-timeout evidence boundary) so the implementing round writes tests, not
 rediscovery. The real-cone oracles share their fault-injection machinery with E-7
 tier 1 (build them together, per #283 CC-1/D-E).
 
+> **Implementation status (2026-10-16)**: BUILT, NOT RUN AT RUNTIME — the oracle lives in
+> `crates/qianqian-output-wasapi/src/cone_oracle_tests.rs` (Windows-only, real endpoint),
+> compile-checked for `x86_64-pc-windows-gnu`; its two negative-control mutations are
+> documented there and not executed (no Windows host in this round). See
+> `error-system-implementation-record.md` §5.
+
 ### 7.1 O-CONE-NECESSITY — the real failure-publication cone must prove itself without external help
 
 **Property authority.** D11 settlement ownership (PBK-002 §17): the cone's own
@@ -691,6 +697,9 @@ see the hazard it claims to guard). Cleanup: child processes are reaped by the
 parent; the evidence boundary is the recorded per-configuration transcript.
 
 ### 7.4 E1-ABI — real SongCore latch calibration at the ABI boundary
+> **Implementation status (2026-10-16)**: EXECUTED — 8 tests green including both gate
+> legs; recorded in `error-system-implementation-record.md` §4.
+
 
 **Property authority.** The ABI's partial-success/pending-fatal freeze (songcore.h;
 reconciliation §2.1) — not any D11 claim. E1-ABI witnesses what the C core actually
@@ -745,6 +754,11 @@ excluded binding crate's existing native linkage; **no test-side native support
 beyond linking is required** (no new C symbols, no fixture hooks in SongCore).
 
 ### 7.5 E1-WORKER — deterministic interleavings on the real Session/worker
+> **Implementation status (2026-10-16)**: EXECUTED — W1–W6 plus the DG-2 pair, 12 tests,
+> every trace in its predicted §2.3.1 cell. The fence the design required landed inside
+> `request_stop` (`completion.rs`), one arming point, test-only. See
+> `error-system-implementation-record.md` §4.
+
 
 **Property authority.** Reconciliation §2.3.1 (commit ordering, exit-surface
 enumeration) + PBK-002 D11/D14.5: which terminal class a stop-in-window episode
@@ -827,6 +841,13 @@ not serve as another's proof); W5a's single-legal-outcome row (`Stopped`, with
 `Failed{decode}` a signature) is what pins it from the Applied side.
 
 ### 7.6 F5 model-extension recommendation (GAP-01, D-C)
+> **Implementation status (2026-10-16)**: GATE SATISFIED, EXTENSION NOT BUILT — the
+> acceptance-gated trigger now holds (E1-ABI green on both legs; W1–W6 all in their
+> predicted cells, verified this round). The extension itself stays with the owner's D-C
+> weighing (residual interleaving risk vs harness adequacy vs model maintenance cost);
+> no model action was changed and the F5 suite passes unchanged. See
+> `error-system-implementation-record.md` §6.
+
 
 **Recommendation: EXTEND_EXISTING_MODEL** — extend `f5-seek-discontinuity` with the
 pending-fatal latch variables per #283 FORMAL-PLAN §3.1 (Q5 minimal variables, Q6

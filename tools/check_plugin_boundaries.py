@@ -71,19 +71,36 @@ NORMAL_EDGES = {
     "qianqian-playback": {
         "qianqian-audio-api",
         "qianqian-composition",
-    },  # provider-agnostic session (D6)
+        # The decode worker is a class-α diagnostic producer (DG-1 thread
+        # classification) and the session owns that thread's creation, so the
+        # session registers its pool and the decode adapter's records publish
+        # with atomics only. Diagnostics is ordinary library code with no Plugin
+        # identity, no capability and no K0 noun.
+        "qianqian-diagnostics",
+    },
     "qianqian-decode-songcore": {
         "qianqian-audio-api",
         "qianqian-composition",
         "qianqian-songcore-sys",
+        "qianqian-diagnostics",
     },
-    "qianqian-output-wasapi": {"qianqian-audio-api", "qianqian-composition"},
+    "qianqian-output-wasapi": {
+        "qianqian-audio-api",
+        "qianqian-composition",
+        "qianqian-diagnostics",
+    },
+    # The host-owned diagnostic outlet (error-system target contract §DG-1):
+    # ordinary library code — no Plugin identity, no capability, no K0 noun.
+    # Producers reach it for a bounded, non-blocking record; the host App owns
+    # the drainer and the shutdown report.
+    "qianqian-diagnostics": set(),
     # The composition root: explicit Plugin-constructor admission only.
     # A future provider MUST update this allowlist on purpose (MAJOR-2).
     "qianqian-headless": {
         "qianqian-app",
         "qianqian-composition",
         "qianqian-playback",
+        "qianqian-diagnostics",
         "qianqian-decode-songcore",  # optional, feature = playback
         "qianqian-output-wasapi",  # optional, feature = playback
     },
@@ -93,7 +110,10 @@ NORMAL_EDGES = {
 DEV_EDGES = {
     "qianqian-playback": {"qianqian-app"},  # admission tests
     "qianqian-decode-songcore": {"qianqian-app"},  # admission tests
-    "qianqian-output-wasapi": {"qianqian-app"},  # admission tests
+    "qianqian-output-wasapi": {
+        "qianqian-app",  # admission tests
+        "qianqian-playback",  # real-cone oracles: drive a real episode
+    },
     "qianqian-headless": {"qianqian-audio-api"},  # H-b: TEST ADMISSION ONLY
 }
 
@@ -484,8 +504,9 @@ EDGE_RULE_PROSE = {
     "qianqian-audio-api": "shared contracts may depend on composition only",
     "qianqian-app": "the App abstraction may depend on composition only",
     "qianqian-playback": "playback may depend on audio-api and composition only",
-    "qianqian-decode-songcore": "decode provider may depend on audio-api, composition and songcore-sys only",
-    "qianqian-output-wasapi": "the stable Output Plugin provider may depend on audio-api and composition only (its Host Render Backend is an owned mechanism, ADR-PBK-003)",
+    "qianqian-decode-songcore": "decode provider may depend on audio-api, composition, songcore-sys and the host diagnostic outlet (a diagnostic sink, never a semantic authority)",
+    "qianqian-output-wasapi": "the stable Output Plugin provider may depend on audio-api, composition and the host diagnostic outlet (its Host Render Backend is an owned mechanism, ADR-PBK-003; the outlet is ordinary library code, not a Plugin)",
+    "qianqian-diagnostics": "the host-owned diagnostic outlet depends on nothing internal: it is ordinary library code with no composition identity",
     "qianqian-headless": "composition root admits app, composition, playback and explicitly admitted providers only",
     "qianqian-songcore-sys": "the sys binding crate depends on no qianqian crate",
 }

@@ -884,7 +884,7 @@ pub(crate) mod tests {
                 }),
                 ParkOutcome::TailProbeFailed
             ) {
-                return DrainVerdict::Aborted;
+                return DrainVerdict::aborted();
             }
             match input.read_frames(&mut dst) {
                 PcmPull::Frames(_) => {
@@ -892,7 +892,7 @@ pub(crate) mod tests {
                     std::thread::sleep(Duration::from_millis(1));
                 }
                 PcmPull::Eof => return DrainVerdict::Drained,
-                PcmPull::Stopped => return DrainVerdict::Aborted,
+                PcmPull::Stopped => return DrainVerdict::aborted(),
             }
         }
     }

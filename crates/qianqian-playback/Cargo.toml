@@ -9,12 +9,23 @@ description = "Playback Session: composes Decode + Output capabilities into one 
 realfft = "3.5"
 qianqian-audio-api = { path = "../qianqian-audio-api" }
 qianqian-composition = { path = "../qianqian-composition" }
+# The host-owned diagnostic outlet (error-system target contract §DG-1): the
+# decode worker is an isolation-obligated (class α) producer, and the session is
+# the only place that thread is created, so the session registers its pool.
+# Disposable diagnostics — never an authority, never a capability, never a Plugin.
+qianqian-diagnostics = { path = "../qianqian-diagnostics" }
 # FV-CONC-0: selected only under `--cfg loom` + `--features loom` so the
 # loom model checker explores the real PcmEdge synchronization code.
 loom = { version = "0.7", optional = true }
 
 [features]
-loom = ["dep:loom"]
+# FV-CONC-0: RUSTFLAGS is global — every crate in a `--cfg loom` build sees
+# the cfg — while --features is package-scoped, so the feature has to travel
+# the same dependency path. The session registers the class-α pool
+# (session.rs), which puts qianqian-diagnostics inside this loom build;
+# without this edge its cfg(loom) selection in pool.rs has no loom crate to
+# resolve against (E0433) under `-p qianqian-playback --features loom`.
+loom = ["dep:loom", "qianqian-diagnostics/loom"]
 
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }

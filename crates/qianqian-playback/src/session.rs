@@ -464,6 +464,13 @@ fn spawn_worker<P: ProcessingRuntime + 'static>(
     std::thread::Builder::new()
         .name("qianqian-decode".into())
         .spawn(move || {
+            // The decode worker is an isolation-obligated (class α) diagnostic
+            // producer (target-contract §DG-1 thread classification): a decode
+            // fault's record — the DG-3 typed fields' consumer — publishes with
+            // atomics only into this worker's own preallocated pool. The
+            // registration is a cold-path one-time cost taken here because this
+            // is the only place the worker thread is created.
+            let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
             decode_worker(
                 decode_stream,
                 edge,
@@ -573,7 +580,7 @@ enum WriteStep {
 ///             data plane's own terminal) ends it without a rebase.
 ///             Then resume post-cut production.
 /// ```
-fn decode_worker<P: ProcessingRuntime>(
+pub(crate) fn decode_worker<P: ProcessingRuntime>(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
@@ -1068,7 +1075,7 @@ mod seek_record_tests {
                 let invalidations = Arc::new(AtomicUsize::new(0));
                 let position = completion.position_evidence();
                 if ending {
-                    completion.drain_signal().complete(DrainVerdict::Aborted);
+                    completion.drain_signal().complete(DrainVerdict::aborted());
                 }
                 assert!(!completion.seek_aborted());
                 assert!(completion.committed().is_none());
@@ -1102,7 +1109,7 @@ mod seek_record_tests {
                         });
                         let pull = edge.read_frames(&mut [0.0; 2]);
                         drain.complete(match pull {
-                            PcmPull::Stopped => DrainVerdict::Aborted,
+                            PcmPull::Stopped => DrainVerdict::aborted(),
                             PcmPull::Eof => DrainVerdict::Drained,
                             other => panic!("unexpected post-cut data: {other:?}"),
                         });
@@ -1256,7 +1263,7 @@ mod seek_record_tests {
                     });
                     let pull = edge.read_frames(&mut [0.0; 2]);
                     drain.complete(match pull {
-                        PcmPull::Stopped => DrainVerdict::Aborted,
+                        PcmPull::Stopped => DrainVerdict::aborted(),
                         PcmPull::Eof => DrainVerdict::Drained,
                         other => panic!("unexpected post-exit data: {other:?}"),
                     });
@@ -1472,7 +1479,7 @@ mod observation_seam_tests {
                             break;
                         }
                         PcmPull::Stopped => {
-                            drain.complete(DrainVerdict::Aborted);
+                            drain.complete(DrainVerdict::aborted());
                             break;
                         }
                     }

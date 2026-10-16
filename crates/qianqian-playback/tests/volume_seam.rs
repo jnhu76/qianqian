@@ -53,7 +53,7 @@ impl AudioOutput for CapturingOutput {
                         }),
                         ParkOutcome::TailProbeFailed
                     ) {
-                        drain.complete(DrainVerdict::Aborted);
+                        drain.complete(DrainVerdict::aborted());
                         return;
                     }
                     match input.read_frames(&mut dst) {
@@ -63,7 +63,7 @@ impl AudioOutput for CapturingOutput {
                             return;
                         }
                         PcmPull::Stopped => {
-                            drain.complete(DrainVerdict::Aborted);
+                            drain.complete(DrainVerdict::aborted());
                             return;
                         }
                     }

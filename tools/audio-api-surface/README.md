@@ -8,7 +8,7 @@ Baseline audit: `6e991a6ae37427491a8d79d0095f7c0d0a05ff6c`.
 ## Public surface inventory and rights
 
 The crate root exposes **`pub mod ports`**, with no root re-export.
-All 12 structs, 9 enums and 5 traits below are reachable through it.
+All 14 structs, 10 enums and 5 traits below are reachable through it.
 [admitted-api.txt](admitted-api.txt) is the exact compiler-extracted structural
 inventory, including method receivers, arguments, returns, bounds, enum payloads,
 associated items, explicit/derived/auto **and blanket** implementations. None of
@@ -34,7 +34,8 @@ standard-library method is normative playback authority.
 | `OutputLevel` | `new`, `route(&self, f32)`, `load(&self) -> f32` | MECHANISM_PUBLIC_FOR_PROVIDER; D14.9 desired stream factor; no acoustic readback |
 | `PcmPull` | `Frames(usize)`, `Eof`, `Stopped` | NORMATIVE_SHARED_CONTRACT; bounded PCM edge outcomes, D6/D8 |
 | `DecodeOutcome` | `Frames(usize)`, `Eof` | NORMATIVE_SHARED_CONTRACT; decode mechanism outcome, D1/D6 |
-| `DrainVerdict` | `Drained`, `Aborted` | MECHANISM_PUBLIC_FOR_PROVIDER; D11/D14.3 evidence, not semantic settlement |
+| `DrainVerdict` | `Drained`, `Aborted { reason: Option<AbortReason> }`; own methods `aborted`, `aborted_with`, `reason` | MECHANISM_PUBLIC_FOR_PROVIDER; D11/D14.3 evidence, not semantic settlement. DG-2 carrier B (2026-10-16 error-system implementation round): the abort variant carries an OPTIONAL bounded explanation on the SAME single completion seam, so the explanation cannot travel decoupled from the fact. The verdict lost `Copy` (one bounded clone on the cold publication path) — the recorded cost of carrying data. `resolve` matches the discriminant only: the reason is Class-C diagnostic, absence is legal, and the PBK-003 interpretation note (error-system-migration §3.4) covers the handoff |
+| `AbortReason`, `OutputAbortClass` | `AbortReason { class: OutputAbortClass, message: String }`, own method `new` (truncates to the published cap); `OutputAbortClass` = `Device` \| `Panic`; `ABORT_REASON_MSG_CAP` | MECHANISM_PUBLIC_FOR_PROVIDER for the abort reason only; DG-2/T2-5. Class-C diagnostic content: it explains, never adjudicates, and never reaches the resolver. Two classes are deliberately absent (implementation review of the design's candidate enumeration): "open" — an open failure is `OutputError`/`activation_error`, outside every drain verdict (DG-2 scope (iv)) — and "cone" — the publication cone has no fallible step left to classify, since `stop()` is infallible and `complete()` publishes before its observer runs |
 | `GateEvent` | `Engaged`, `TailQuiesced`, `Disengaged`, `SeekEngaged`, `SeekTailQuiesced`, `SeekDisengaged` | MECHANISM_PUBLIC_FOR_PROVIDER; D14.5/.7, attribution kept separate |
 | `SeekParkRelease` | `Committed { landing: Option<u64> }`, `Aborted` | MECHANISM_PUBLIC_FOR_PROVIDER; D14.5 commit release, actual/unknown landing |
 | `TailProbeOutcome` | `Pending`, `Quiesced`, `Failed` | MECHANISM_PUBLIC_FOR_PROVIDER; D14.5/.7, failure is not quiescence |

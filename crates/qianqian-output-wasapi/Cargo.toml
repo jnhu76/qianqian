@@ -7,10 +7,18 @@ description = "Real WASAPI Output capability provider (shared mode, event-driven
 
 [dependencies]
 qianqian-audio-api = { path = "../qianqian-audio-api" }
+# The host-owned diagnostic outlet (error-system target contract §DG-1): the
+# render thread publishes bounded records into its own class-α pool. A
+# diagnostic sink — never a semantic authority, never a Plugin.
+qianqian-diagnostics = { path = "../qianqian-diagnostics" }
 qianqian-composition = { path = "../qianqian-composition" }
 
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }
+# Test admission only: the real-cone oracles (O-CONE-NECESSITY / O-CONE-ORDER)
+# drive a REAL episode so the cone's own stop/complete can be observed at the
+# session's settlement boundary. The mechanism itself keeps no such edge.
+qianqian-playback = { path = "../qianqian-playback" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

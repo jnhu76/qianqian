@@ -11,6 +11,11 @@ autobins = false
 qianqian-composition = { path = "../../crates/qianqian-composition" }
 qianqian-playback = { path = "../../crates/qianqian-playback" }
 qianqian-app = { path = "../../crates/qianqian-app" }
+# The host-owned diagnostic outlet (error-system target contract §DG-1): the
+# App installs it and owns its shutdown drain boundary; the machine-input hook
+# publishes its panic bookkeeping through it (DG-4b). Disposable diagnostics —
+# never an authority, never a Plugin, never in the machine protocol.
+qianqian-diagnostics = { path = "../../crates/qianqian-diagnostics" }
 qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore", optional = true }
 qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optional = true }
 # Presentation-only dependencies of the reference-player TUI shell. They

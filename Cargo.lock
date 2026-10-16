@@ -1013,7 +1013,15 @@ version = "0.1.0"
 dependencies = [
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
  "qianqian-songcore-sys",
+]
+
+[[package]]
+name = "qianqian-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "loom",
 ]
 
 [[package]]
@@ -1025,6 +1033,7 @@ dependencies = [
  "qianqian-audio-api",
  "qianqian-composition",
  "qianqian-decode-songcore",
+ "qianqian-diagnostics",
  "qianqian-output-wasapi",
  "qianqian-playback",
  "ratatui",
@@ -1038,6 +1047,8 @@ dependencies = [
  "qianqian-app",
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
+ "qianqian-playback",
  "windows",
 ]
 
@@ -1049,6 +1060,7 @@ dependencies = [
  "qianqian-app",
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
  "realfft",
 ]
 
