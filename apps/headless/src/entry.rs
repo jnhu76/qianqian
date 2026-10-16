@@ -159,10 +159,12 @@ fn run_playback(
 }
 
 /// The bound on each exit-phase diagnostic wait: the drain's bounded wait and
-/// the bounded wait for the report attempt. The drainer's idle window is
-/// shorter, so a healthy shutdown returns well inside this; the bound only
-/// matters when a sink is stuck (T5-5 strategy B: the exit path may abandon —
-/// or abandon the *attempt* — and then says so).
+/// the bounded wait for the report attempt. The drainer's idle window and its
+/// publisher-quiescence window (250 ms, `PUBLISHER_QUIESCENCE_WINDOW`) are both
+/// shorter than this, so a healthy shutdown returns well inside it even when the
+/// close has to wait for an in-flight publication; the bound only matters when a
+/// producer stalls or a sink is stuck (T5-5 strategy B: the exit path may
+/// abandon — or abandon the *attempt* — and then says so).
 #[cfg(any(feature = "playback", test))]
 const HOST_DIAGNOSTIC_EXIT_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
 
@@ -181,11 +183,13 @@ fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
 }
 
 /// Stop admitting records and drain with the bounded deadline above. An
-/// abandoned drainer is reported as abandoned, never as a completed drain, and
-/// the line is written only when there is something honest to report: a
-/// non-normal drain, undelivered records, an exporter self-diagnostic, or a
-/// panic the machine-input hook counted on a critical thread. A normal run
-/// prints nothing, and the machine protocol's stdout is never touched.
+/// abandoned drainer is reported as abandoned, and a drain that could not be
+/// ordered after publisher quiescence is reported as INCOMPLETE — neither is
+/// ever dressed up as a completed drain. The line is written only when there is
+/// something honest to report: a non-normal drain, undelivered records, an
+/// exporter self-diagnostic, or a panic the machine-input hook counted on a
+/// critical thread. A normal run prints nothing, and the machine protocol's
+/// stdout is never touched.
 ///
 /// The exit boundary is the whole point of the bounded shutdown, so the report
 /// itself obeys it — DRAINED OR NOT. A completed drain proves that every write
@@ -216,13 +220,16 @@ fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnosti
     {
         return;
     }
+    let verdict = if report.drained {
+        "drained"
+    } else if report.abandoned {
+        "ABANDONED (drainer stuck in a sink; lost records are counted, never claimed as delivered)"
+    } else {
+        "INCOMPLETE (a presentation admitted before the close outlasted the drainer's quiescence window: \
+         the final sweep did not wait for it, and the accounting below is not a complete drain)"
+    };
     let line = format!(
-        "[qianqian-diagnostics] shutdown {}: undelivered_at_exit={} dropped={} export_failed={} self_diagnostics={} critical_panics={}",
-        if report.drained {
-            "drained"
-        } else {
-            "ABANDONED (drainer stuck in a sink; lost records are counted, never claimed as delivered)"
-        },
+        "[qianqian-diagnostics] shutdown {verdict}: undelivered_at_exit={} dropped={} export_failed={} self_diagnostics={} critical_panics={}",
         report.undelivered_at_exit,
         counters.alpha_rejected + counters.beta_rejected,
         counters.export_failed,
@@ -236,8 +243,9 @@ fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnosti
 }
 
 /// Attempt one exit-phase diagnostic report off the host's return path: one
-/// detached writer that nothing joins, plus — only when the drain completed
-/// (`wait` is `Some`) — a bounded wait for the attempt.
+/// detached writer that nothing joins, plus — only when the drainer EXITED
+/// (`wait` is `Some`, i.e. the drain is not abandoned) — a bounded wait for the
+/// attempt.
 ///
 /// The wait exists so a healthy sink's report is not lost to process exit; the
 /// bound exists so the attempt can never become what the host waits on. In the
