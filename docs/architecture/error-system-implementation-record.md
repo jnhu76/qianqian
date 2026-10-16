@@ -3,9 +3,9 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: twenty-five commits, each reviewable on its own;
-         the last nine close the owner's two #287 review rounds (§9 first round,
-         §10 second round)
+HEAD     the implementation branch's tip: twenty-nine commits, each reviewable on its own;
+         the last thirteen close the owner's three #287 review rounds (§9 first round,
+         §10 second round, §11 the close protocol)
 ```
 
 This document records what an implementation round actually landed against the
@@ -340,3 +340,99 @@ retained under `/tmp/errlog/rev3/` (controls subdirectory) for re-checking.
   rely on (the process stderr lock; buffered/unbuffered behavior; the exit path touching stdout
   only) were verified against the pinned toolchain's source, and the pipe capacity/slot-release
   semantics were measured on this host (65536 bytes; whole-slot release) — not on Windows.
+
+## 11. Owner-review round 3 (#287 review III, 2026-10-16) — the close protocol
+
+The third review (`HOLD`, frozen at `b018d8f`) accepted the round-2 fixes and named ONE remaining
+production boundary: shutdown and the final sweep were not linearized. Two counterexamples were
+given (A: a class-α producer whose shutdown check passes and which then publishes while — or
+after — the final sweep; B, not covered by the round-2 report: the same window on the class-β
+channel between its second check and `try_send`). The review rejected closing this by declaring
+a residual, because DG-1's acceptance clause requires a bounded-or-honest shutdown with
+admission losses counted at the admission boundary and accountable counters. Path A (tighten the
+closing protocol) was chosen; the DAG below was produced BEFORE the protocol was selected, and
+every witness was executed RED against `b018d8f` first. The residual DECLARED in §10 (and in the
+target contract's round-2 bullet) is CLOSED here; those rows remain as the record of what round 2
+landed.
+
+### 11.1 Minimal execution DAG (the landed order, at `b018d8f`)
+
+| Step | Operation | Thread |
+|---|---|---|
+| D1 | `shutdown.store(true, Release)` | closer |
+| P0a / P0b | `shutdown.load(Acquire) == false` — the α terminal check / the β second check | producer |
+| P1 / P2 | `pool.publish()` (slot write, `pub_gen`, `accepted`) / `beta_send.try_send()` + `beta_queued` | producer |
+| D2 | final sweep: pool walk (+ retired residual, reap), channel drain to empty, exporter flush | drainer |
+| D3 | `drainer_exited` → `shutdown()` snapshots `counters_of(...)` into the report | closer |
+
+Counterexample A: `P0a` reads false at t0; D1..D3 run to completion; `P1` publishes at t4. The
+record is `accepted` at its pool, `copied_out` never advances, no rejection fact exists, and the
+report built at t3 — already returned — says `drained: true, undelivered_at_exit: 0`. No walker
+remains for the pool. Counterexample B: `P0b` false at t0; D1..D3; `P2` `try_send`s at t4 — the
+`SyncSender` lives in the process-global facility, so the channel is NOT disconnected;
+`beta_queued` advances after the snapshot and the record stays in the channel forever. One more
+check cannot close either window: the check and the publication are two separate atomic
+operations, and the drainer may interleave between them at will.
+
+### 11.2 The protocol (one admission word, one RMW per side)
+
+`Inner.admission: AtomicUsize` — bit 0 `CLOSED`, remaining bits `IN_FLIGHT`. Producer: one
+`fetch_add(IN_FLIGHT, AcqRel)` whose returned word's closed bit IS the admission decision
+(`AdmissionSection`'s `Drop` performs the single `Release` `fetch_sub` after the publication, on
+every path — including the rejection path and the panic-hook publication). Closer: one
+`fetch_or(CLOSED, AcqRel)`. Drainer: a bounded RMW observation
+(`fetch_add(0, Acquire)`) until `IN_FLIGHT == 0`, then the sweep, then it records whether that
+observation succeeded. `ShutdownReport::drained` requires the observation.
+
+Why the argument holds: an RMW reads the value written by the latest modification before it in
+the word's modification order. If the producer's `fetch_add` precedes the closer's `fetch_or`,
+its word has CLOSED clear (it holds a count) and the drainer's observation cannot read 0 until
+that producer's `fetch_sub`, whose Release is in the release sequence the observation's Acquire
+reads from — so that publication's writes are visible to the sweep. If the `fetch_add` follows
+the `fetch_or`, the RMW reads the closed word and the producer never publishes (it counts the
+presentation at its class's boundary instead). A plain (non-RMW) observation would not be enough:
+a load may read a stale 0 concurrent with a `fetch_add` that already precedes the closure in the
+word's modification order.
+
+### 11.3 Witnesses and controls (all executed)
+
+| Oracle (in `crates/qianqian-diagnostics/src/lib.rs`) | Property | RED at `b018d8f` and under the control |
+|---|---|---|
+| `an_in_flight_alpha_publication_is_delivered_by_the_final_sweep` | a record admitted before the closure, published while the drainer waits, is delivered exactly once | `hits 0 vs 1`, release decided by `SweptFirst` (the sweep ran before the release) |
+| `an_in_flight_beta_publication_is_delivered_by_the_final_sweep` | the same property for the channel | `hits 0 vs 1`, release `SweptFirst` |
+| `an_alpha_publication_outlasting_the_quiescence_window_is_not_reported_drained` | the report never claims a drain while such a presentation is in flight; afterwards the record is visible at its own boundary (`outstanding`) and a later walk delivers it | report `drained: true, abandoned: false, undelivered_at_exit: 0` with the presentation in flight |
+| `a_beta_publication_outlasting_the_quiescence_window_is_not_reported_drained` | the same for the channel (the receiver drops with the drainer, so the presentation is counted as a `beta_rejected` admission loss — an accountable fact) | same |
+
+Construction: a `cfg(all(test, not(loom)))` rendezvous parks the producer INSIDE its admission
+section — after the closure decision, before the publication — a `Mutex` + `Condvar` seam that
+does not exist in production builds. Each oracle establishes its premise through a signal, never
+a sleep: the seam's Paused state, the release valve compared against the sink's own flush signal,
+and the `ShutdownReport` itself (the release in the honesty oracles is ordered strictly AFTER the
+report). Negative control: revert `enter_section` to a plain-load decision plus an uncounted
+section (the landed shape) → all four oracles RED again with exactly the signatures above;
+restored byte-identically (sha256 `de1e9627…`).
+
+### 11.4 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| RED-first oracles (before the fix, at `b018d8f`, one at a time) | the four oracles above | each RED with the documented signature | Linux only |
+| Diagnostics crate | `cargo test -p qianqian-diagnostics` | green: 16 lib unit tests (the four oracles included) + 9 integration binaries | Linux only |
+| Whole workspace | `cargo test --workspace --no-fail-fast` | 940 passed / 0 failed over 57 test targets | Linux only; not device evidence |
+| Decode chain | `cargo test --manifest-path crates/qianqian-decode-songcore/Cargo.toml --lib` | 36 passed / 0 failed | Linux only |
+| Pool protocol (Loom) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | 2 passed (SCHEDULE-CLEAN) | explored-schedule bound |
+| Pool protocol (Miri) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | clean; all 24 seeds attempted, rc = 0 | Miri samples one schedule per seed |
+| Playback-concurrency lane | `specs/check.sh rust` | `RESULT matrices(native) BOUNDED-CLEAN`, `RESULT matrices(miri) MIRI-CLEAN`, §G.6 TEST-PASS, M-K1/K2/K3 COUNTEREXAMPLE-WITNESSED, `RESULT native BOUNDED-CLEAN`, loom + pool-loom SCHEDULE-CLEAN, M-L1 COUNTEREXAMPLE-WITNESSED | bounds as before |
+| Host exit boundary | `cargo test -p qianqian-headless --lib entry::` | 4/4 green, including the drained-report and abandoned-drainer child witnesses | Linux only |
+| Full local gate | `lefthook run pre-push --all-files` | green | proves the working tree, not Windows/formal lanes |
+
+### 11.5 Still NOT_RUN (unchanged from §10.2 unless stated)
+
+* O-CONE-NECESSITY / O-CONE-ORDER runtime runs and their mutations — Linux host, `wasapi.rs` is
+  `#[cfg(windows)]` (unchanged).
+* E-7 tier 1 writer-swap controls — needs the Windows endpoint and the volume-apply fault seam
+  (unchanged; acceptance pending).
+* Windows runtime evidence for the carrier B reason (unchanged).
+* The close-protocol witnesses are Linux-host, real-thread evidence: the admission word, the
+  drainer's bounded wait and the seams are ordinary std synchronization on real threads, but no
+  Windows process/thread evidence was executed this round (acceptance pending, unchanged).

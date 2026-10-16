@@ -297,6 +297,34 @@ production APIs land only through their own review. Every code anchor is @e44aa8
 >   bounded instant for the attempt (a healthy sink completes it in microseconds, so the line is
 >   not lost to process exit), and the abandoned case does not wait at all.
 
+> **Owner-review amendment, round 3 (2026-10-16, #287 review III; recorded, not a second
+> design).** The round-2 bullet above DECLARED one residual: a publication racing the final
+> sweep. The third review rejected the declaration as a closure of DG-1's acceptance clause, and
+> the residual is now closed by a protocol, not by a note. One admission word per facility
+> (`AtomicUsize`: bit 0 = CLOSED, the remaining bits = publications in flight) carries both
+> decisions as single RMWs: a producer's `fetch_add` is its admission decision AND its claim on
+> the final sweep, and the closer's `fetch_or` publishes the closure. The drainer therefore
+> orders its final sweep after the last in-flight publication
+> (`PUBLISHER_QUIESCENCE_WINDOW`, bounded), so:
+>
+> * a presentation ADMITTED before the closure is delivered by that sweep or charged as an
+>   export loss — it can no longer land after the sweep, in either class;
+> * a presentation DECIDED after the closure is never published: dropped and counted at its own
+>   class's admission boundary (the presenting pool's counters for α, `beta_rejected` for β);
+> * producers never wait (two RMWs, no loop); the DRAINER is the side that waits, bounded;
+> * when that bound cannot be met, the sweep still runs (it is the last consumer there will be)
+>   but the report is NOT `drained`: the `ShutdownReport` says the accounting is incomplete
+>   instead of presenting a complete drain, and the presentation remains visible at its own
+>   boundary (α: `outstanding`, and a later walk still delivers it; β: a counted admission loss,
+>   because the channel's receiver drops with the drainer). `abandoned` keeps its round-2
+>   meaning — the drainer did not exit inside the deadline — and is not reused for this.
+>
+> DG-1's acceptance reading is met exactly: bounded-or-honest shutdown without a fake "drain
+> complete" (`drained` now REQUIRES the quiescence observation), admission losses counted at the
+> admission boundary, and the pool's accepted/copied-out/outstanding plus the exporter results
+> remaining accountable at the report — a drained report is the boundary at which the
+> drain-boundary identity holds over the whole run and `undelivered_at_exit` is zero.
+
 ### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
 
 **Goal.** A host-owned diagnostic logging facility where (1) producers on sensitive
