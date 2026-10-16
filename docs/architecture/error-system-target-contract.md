@@ -215,6 +215,846 @@ exception flow inside Rust.
 
 ---
 
+## DG target designs (2026-10-16 design round, BASE_SHA e44aa80)
+
+Boundary-first target designs for the DESIGN_GAP work packages (#283 CODE-CHANGE-MAP §5).
+Each design is a **candidate mechanism recommendation** — none is adopted, none is
+implemented, and the owner-approved directions (A–J, recorded in
+[error-system-decision-record.md](error-system-decision-record.md)) fix only the
+direction-level constraints, not these mechanisms. Candidate interfaces are illustrative;
+production APIs land only through their own review. Every code anchor is @e44aa80.
+
+### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
+
+**Goal.** A host-owned diagnostic logging facility where (1) producers on sensitive
+threads never block, allocate unboundedly, or panic on logging — enforced per
+producer class: isolation-obligated threads (class α below) take **no lock and no
+queue** on their logging path (atomics only), while ordinary host threads (class β)
+get a capacity-non-waiting enqueue; (2) exporters/sinks execute only on a dedicated
+drainer thread, never on producer call stacks and never under a
+reliable-publication or resource-progress lock; (3) shutdown is bounded-or-honest
+(no fake "drain complete"); (4) the machine protocol stdout never passes through it.
+
+**Consumers and obligations.** Records are Class C diagnostics (candidate T2-1): no
+terminal outcome, resource release, join, or Discharge may depend on a record being
+delivered (direction A). Named consumers: (i) the human operator reading stderr/a file
+(presentation); (ii) the App's shutdown report (dropped-count + self-diagnostic
+counters); (iii) DG-3's typed fields (status/native_code) whose concrete consumer is
+this record shape. No control-flow consumer exists or is proposed (C-6 re-verified).
+
+**Owner.** The host App: installs the facade + drainer at startup, owns exporter
+registration/withdrawal as ordinary owned effects (direction D), and tears down at
+exit. Not a Plugin, not a K0 primitive, no EventBus (D13: no independent composition
+identity needed — one process-lifetime resource).
+
+**Execution-path / thread classification.**
+
+| Thread class | Sites (ledger §4 rows) | May emit | Discipline |
+|---|---|---|---|
+| render (realtime leg) | #8 (post-catch abort line, wasapi.rs:258-262), #9 (opened line, :538-547), #10 (volume, :678-686) | mechanism diagnostics, gated (QIANQIAN_AUDIO_LOG default off stays) | class α: record into the atomics slot (whitelisted composition only); **#8's emission point moves after `drain.complete()`**; never sink/exporter rendering, never an exporter call |
+| decode worker | (future decode-site diagnostics) | mechanism diagnostics | class α: same atomics-slot discipline |
+| failure-publication cone (post-catch stop+complete region) | the #8 cone around wasapi.rs:263-273 | the abort record | **the cone contains zero logging** (R3): #8's record is emitted only after `drain.complete()` returns — nothing sits between the catch and the reliable publications (direction E/A), met structurally rather than by a "bounded enqueue" |
+| cleanup / teardown (session fiber effects, K0 `run_unwind`) | (future) | cleanup-failure diagnostics | class α atomics slot; teardown progress never waits on the drainer |
+| normal host threads (main, stdin reader) | #1–#4, #7 (CLI report lines) | presentation diagnostics | class β: may use the facade's shared channel; protocol rows #5/#6 NEVER (T5-7: protocol stdout stays direct `print!`+flush — its failure is a host-operation failure, not a log loss) |
+
+Forbidden everywhere: exporter/sink invocation on a producer thread; logging inside the
+completion/verdict/edge locks; per-quantum logging on the steady render path (the three
+gated sites are cold-path events: abort, opened-once, volume-once — `volume_diagnosed`
+first-wins already bounds #10 to once per episode).
+
+**Record shape and message construction/destruction (T5-1; fixed-capacity strategy).**
+Bounded owned plain-data record — no `String`, no heap per record, on any path:
+
+```text
+{ site: Site (static enum — no runtime strings), level, class: Option<DiagnosticClass>,
+  message: { bytes: [u8; MSG_CAP], len: u16 }   // inline fixed buffer, not String
+  status: Option<i32>, native_code: Option<i32>, seq: u64, ts }
+```
+
+The status/native_code fields are the DG-3 consumer target. **Construction —
+whitelisted segment vocabulary (R3 review 2026-10-16).** A fixed buffer bounds
+*storage*, not *execution*: a `Display::fmt` may compute, allocate, block or
+panic before and between writer calls, and a full adapter cannot terminate the
+formatter's work. The producer therefore accepts only: (i) `&'static str` tags
+(plain bounded copy); (ii) primitive integer fields rendered by `core::fmt`'s
+integer impls (terminating digit loops — no allocation, no panic:
+site/level/status/native_code/seq/ts); (iii) bounded byte copies from
+site-provided `&[u8]`. Arbitrary `Display` values are **banned on producer
+paths**; a site needing richer rendering either sends structured fields and
+renders on the drainer, or must separately prove its formatter's cost bound,
+failure behavior and termination-on-full — "output length is bounded" never
+implies "arbitrary formatting is bounded". The capacity-dropping adapter
+remains as a safety net, not as the bound. **Destruction:** records are plain
+data — dropping one is a no-op, and storage is preallocated. A `String`-based
+record is rejected (R2): construct-then-truncate bounds only the final length,
+not the transient allocation/drop cost.
+
+**Producer path — corrected std facts and the two-class admission (R3 review
+2026-10-16; supersedes the R2 wording, which was itself wrong).** Verified
+against the pinned toolchain's own source (rustc 1.97.1, `library/std`
+`sync/mpmc`):
+
+- The bounded **array** flavor allocates its fixed `cap` slots **at channel
+  creation** (`array.rs` `with_capacity`) — the R2 "cached blocks allocated as
+  the ring advances" description belonged to a different flavor and is
+  withdrawn. Per-record allocation: none.
+- The send path is a `compare_exchange_weak` loop with `Backoff::spin_*`
+  (array.rs:158-189): **no per-operation step bound exists**.
+- After a successful write, `receivers.notify()` runs (array.rs:210), and
+  `SyncWaker::notify` **takes an internal Mutex** (waker.rs:171-176): a
+  producer can **wait on internal synchronization**, so "never parks" is
+  false as previously stated.
+
+Two properties, no longer conflated:
+
+```text
+P-cap   capacity-non-waiting:        a full queue returns Err(Full)
+                                     immediately — the producer never
+                                     waits for space
+P-sync  internal-sync-non-waiting:   the producer never waits on a lock
+                                     or wakeup path shared with other
+                                     parties (drainer included)
+```
+
+std `sync_channel` + `try_send` provides **P-cap only**. The admission
+therefore splits by producer class:
+
+- **Class α — isolation-obligated producers** (the failure-publication cone,
+  render-leg sites, the decode worker, cleanup/teardown paths, critical
+  threads via DG-4b): the shared channel is **not admitted** — its admission
+  here was withdrawn. Accepting an internal-synchronization wait on these
+  threads would be an explicit T5-2/direction-E target-contract change, and
+this design does not make it; "cold-path" frequency never waives an
+isolation obligation. Class α records go to an **atomics-only slot** — the
+ownership-handoff pool protocol below (history: the R2 "last-wins atomic
+swap" phrasing was withdrawn in R4 — a fixed record fits no single atomic
+exchange; the R4 sequence-tagged plain-payload form was withdrawn in R5 —
+a Rust data race; the R5 redesign excludes concurrent record access by
+ownership). For the cone the obligation is additionally
+met **structurally**: the abort record's emission point moves **after
+`drain.complete()`** (catch → stop → complete → record), so the cone
+contains zero logging and no enqueue cost of any kind can sit between the
+catch and the reliable publications.
+- **Class β — ordinary host threads** (CLI report rows #1–#4/#7, the App
+  shutdown report): std `sync_channel` + `try_send` **remains recommended** —
+  P-cap holds, per-record allocation is none, and the internal waker-mutex
+  wait is acceptable **here** because no isolation obligation attaches to
+these threads. This scoping is not a T5-2 relaxation: T5-2 governs class α,
+which does not use the queue.
+
+**Class α slot protocol (ownership handoff; redesigned R5, corrected R6
+review 2026-10-16).** The R4 form — plain (non-atomic) payload stores under a
+sequence tag, read back with "volatile-address copies" — is **withdrawn as
+memory-unsafe in Rust**: while the drainer copies the record, the producer
+may lawfully begin overwriting the same plain memory (the tag only
+instructs the reader to discard the copy afterwards); that concurrent
+plain read+write is a data race — undefined behavior that discarding the
+copy cannot undo — and volatile is not a synchronization mechanism. A
+single *writer* does not exclude the reader. The R5 redesign excluded
+concurrent record access "structurally" — that conclusion was itself
+withdrawn in R6 (the recycle direction loaded `cons_gen` Relaxed, so the
+drainer's copy was not ordered against the producer's overwrite) and the
+protocol below is the corrected form: exclusivity is **asserted here and
+established only by the acceptance gates at the end of this block**:
+
+```text
+Per registered class α producer — a private two-record pool:
+    pub_gen : AtomicU32     // last PUBLISHED generation; 0 = none yet
+    cons_gen: AtomicU32     // last generation the drainer FINISHED copying;
+                            // 0 = none yet
+    record[2]: FixedRecord  // plain data (inline message buffer, whitelisted
+                            // composition) — owned by exactly one party at a
+                            // time
+
+Generation numbering (R7 — the R6 skip-0 cycle is withdrawn): plain u32
+counters wrapping NATURALLY through 0; empty is COUNTER EQUALITY
+(pub == cons means nothing in flight) — no sentinel value exists. Slot =
+generation % 2: parity alternates unbroken through the natural wrap (…,
+u32::MAX−1 even, u32::MAX odd, 0 even, 1 odd, …). The R6 cycle skipped 0,
+which executed with real u32 values maps u32::MAX (odd) and 1 (odd) to
+the SAME slot — overwriting an unconsumed record — and lets a third
+publish measure distance 3, past the `== 2` full check, because
+generations cycled mod 2^32−1 while `wrapping_sub` works mod 2^32. The
+admission rule keeps pub − cons ∈ {0, 1, 2} forever, so every
+`wrapping_sub` distance the protocol uses is exact modular arithmetic and
+no ABA is possible (the drainer's equality check against its own
+last_consumed always sits within distance ≤ 2).
+
+Publish (fault path — bounded, single attempt; no loop, no CAS, no lock,
+no alloc):
+    p = pub_gen.load(Acquire)
+    if p.wrapping_sub(cons_gen.load(Acquire)) == 2:
+        drop + count                  // pool full: one record
+                                      // published-unconsumed + one
+                                      // drainer-held. ALL loss happens
+                                      // here, on the producer, counted.
+                                      // (R6: the R5 `wrapping(n−2) > cons`
+                                      // form rejected the very FIRST fault
+                                      // on an empty pool — withdrawn.)
+    n = p.wrapping_add(1)                // natural wrap through 0
+    write record[n % 2]               // fully owned: plain stores
+    pub_gen.store(n, Release)         // ownership of this record passes
+                                      // to the drainer
+
+Consume (drainer, the only reader — bounded, IN ORDER, no skips; R6: the
+R5 latest-only sketch silently skipped an intermediate generation with no
+count anywhere — withdrawn):
+    g = pub_gen.load(Acquire)         // snapshot
+    c = last_consumed
+    while c != g:                     // ≤ 2 iterations
+        c = c.wrapping_add(1)             // natural wrap through 0
+        copy record[c % 2]            // safe: the producer's admission
+                                      // blocks gen c+2 until it has
+                                      // Acquire-confirmed cons ≥ c
+    if c != last_consumed:
+        last_consumed = c
+        cons_gen.store(c, Release)    // ONE recycle store releases every
+                                      // record copied in this walk
+```
+
+**Why there is no data race — two synchronization directions (corrected
+R6; the R5 "structurally excluded" conclusion is withdrawn pending the
+gates).** The ownership invariant needs BOTH directions, each a
+Release/Acquire pair on one of the two counters; neither direction's
+counter may be loaded Relaxed by its consumer side:
+
+- *Publish:* payload stores → `pub_gen.store(n, Release)`; the drainer's
+  `pub_gen.load(Acquire)` reading that value synchronizes-with it, so all
+  payload writes of the copied generation happen-before the copy
+  (textbook message passing; the R5 form was already correct here).
+- *Recycle (the R6 fix):* copy reads → `cons_gen.store(c, Release)`;
+  the producer's `cons_gen.load(Acquire)` reading a value ≥ c
+  synchronizes-with that store — and because the drainer's earlier
+  copies are sequenced-before its later stores, synchronizing with any
+  later store also orders every earlier copy. The producer writes slot
+  `n % 2` only when `pub − cons ≤ 1`, i.e. only after an
+  Acquire-confirmed release of generation n − 2's copy. The R5 form
+  loaded `cons_gen` Relaxed: it observed the value without the
+  synchronization, the recycle direction established no happens-before,
+  and the producer's overwrite was not ordered against the drainer's
+  copy — a residual data race the ordering of the admission check alone
+  could not repair (Rust `Ordering` contract: Relaxed provides no
+  inter-thread ordering).
+
+No fence tricks and no volatile accesses are involved — but "no race" is
+a property this design OBLIGATES the gates below to establish, not one it
+claims done.
+
+**Pool state machine (the unit the gates verify).** With d =
+`pub_gen.wrapping_sub(cons_gen)` ∈ {0, 1, 2} by the admission rule:
+
+| d | pool state | publish attempt | consume walk |
+|---|---|---|---|
+| 0 | empty (nothing in flight) | accepted — slot n%2, n = next(p). Initial state: pub = cons = 0, d = 0 — **the first fault on an empty pool is accepted** (the R5 arithmetic rejected it; withdrawn) | nothing new |
+| 1 | one published-unconsumed | accepted — writes the OTHER record | copies 1 generation, releases it |
+| 2 | full: one published-unconsumed + one drainer-held | **dropped + counted (the only loss site)** | copies 2 generations in order, releases both via one `cons_gen` store |
+
+Transitions: publish d→min(d+1, 2) (write, then Release publish; at d = 2
+the publish is refused and d stays 2); consume releases everything the
+walk copied and lands at d = pub_at_release − released — a publish that
+races the walk leaves d = 1, not 0 (the `consume d→0` arrow of the R6
+table was an abstraction only valid without concurrent publishes; the
+verification model preserves the snapshot/copy/release interleavings).
+
+**Loss accounting (pool boundaries — corrected R7).** Two identities,
+each at its own boundary; the R6 form "written = delivered +
+producer-side drops" was wrong twice over (a full-pool rejection happens
+BEFORE any write, so it never enters "written"; and it ignored
+outstanding records — a fully drained pool with 2 written+consumed and 1
+rejected would read `2 = 2 + 1`):
+
+```text
+attempted = accepted    + rejected      (admission boundary)
+accepted  = copied_out  + outstanding   (drain boundary)
+```
+
+"Copied out of the pool" and "delivered to a sink" are distinct events,
+accounted separately: copied_out = exported_ok + exporter_failed +
+abandoned_at_exit, each counted at its own site. Consumption remains in
+order with no skips — the drainer walks last_consumed+1 … snapshot(pub)
+and delivers EVERY generation in that range, both
+records of a full pool included; loss occurs only at the producer
+admission check. No tearing exists by the ownership
+discipline: the drainer copies only whole published records.
+
+**Ownership and registration.** One pool per **registered** α producer
+(per critical thread / critical site). Registration happens on the cold
+path (thread/site startup), never on the fault path; the panic hook's
+thread→pool lookup is a const-initialized thread-local pointer read, not a
+lazy-init lock. No two α producers ever touch the same pool, so every
+payload has exactly one writer (the DG-4b hook's pools are per registered
+critical thread; a panic on an unregistered thread is a class β event that
+chains and never touches a pool).
+
+**Drainer discovery (a poll-frequency convention, not a latency bound).**
+An α publish has no wake event — a wake *from* the α thread would itself
+be the forbidden synchronization dependency. The drainer's obligation is
+therefore stated as a conditional poll frequency: it polls every pool
+(a) after each β-channel batch it processes and (b) at least once per
+`recv_timeout` window **while idle**. Three distinct notions, not one:
+`recv_timeout` is an idle-receive wait parameter; slot *discovery* latency
+additionally depends on drainer scheduling and β traffic; and *delivery*
+has **no deadline** while the drainer is blocked inside an exporter —
+admission A explicitly allows sinks with a declared unbounded residual
+(e.g. a stalled disk file), and while stuck there the drainer performs no
+poll and no `recv_timeout`. An α record may then remain undelivered for
+the rest of the run, and exit-abandon boundary B may lose it (T5-5
+honesty). The R4 sentence "delivery latency is bounded by the poll
+interval" is withdrawn.
+
+**Platform note.** Two `AtomicU32` loads/stores with Release/Acquire
+pairing plus ordinary indexed array access — no CAS, no LL/SC, no fence
+intrinsics — available and lock-free on every tier-1 target
+(x86_64/aarch64; Windows/Linux/macOS). Wraparound is handled by
+construction, not by the R5 assertion "wrapping therefore harmless"
+(withdrawn): counters wrap naturally through 0, empty is counter
+equality (no sentinel to collide with), parity alternation survives the
+wrap, and the admission rule bounds every modular distance the protocol
+uses to ≤ 2 — the R6 skip-0 cycle that motivated the sentinel is the
+withdrawn rule (R7).
+
+| Payload-access mechanism | Verdict |
+|---|---|
+| plain payload under a sequence tag, volatile copies (the R4 form) | **withdrawn (R5): data race — concurrent plain read+write is UB regardless of the later discard; adding fences or switching to volatile is not a repair** |
+| all-atomic record lanes + sequence-tag snapshot | without a protocol: rejected (no consistent snapshot — the R4 finding); with the protocol: sound only if the payload is stored entirely in atomics AND snapshot consistency is proven in the memory model (Loom/Kani/Miri evidence at implementation) — retained as the alternative if single-record memory ever matters; not recommended: it substitutes a formal argument to carry for a structural property |
+| one shared slot/pool for all α producers | rejected: two writers defeat any single ownership/generation pair; per-producer pools need no arbitration at all |
+| `AtomicPtr` node exchange with a free list | subsumed: the two-record pool is the bounded, pointer-free special case of this idea |
+
+**Acceptance gates (binding, in this order — no α slot lands without all
+four; the enumerated pool states are part of gate 1, R6).** (1) *No data
+race*: the two-direction ownership invariant (publish happens-before +
+recycle happens-before) is verified exhaustively — Loom over one producer
++ one drainer interleaving model, Kani/Miri on the cyclic arithmetic —
+covering the enumerated pool states: **first publish on an empty pool,
+two consecutive publishes, full-pool rejection, reuse after consumption,
+and cross-wrap generation sequences**; a fence-only or
+volatile-only "fix" does not satisfy this gate, and neither does a
+Relaxed recycle load. (2) *Snapshot integrity*: every record
+an exporter sees is a complete publication (structural here; for the
+atomic-lane alternative this gate is the memory-model proof). (3) *Loss
+accounting*: attempted = accepted + rejected and accepted = copied_out +
+outstanding (pool boundaries; exporter outcome accounted separately);
+consumption walks last_consumed+1 … `pub` in order with no
+skips. (4) *Producer cost*: a fixed store count — no loop, CAS, lock, or
+allocation on the fault path.
+
+**Executed verification of the design-candidate model (R7 review
+directive: verify first, then sync the docs).**
+`crates/qianqian-playback/src/error_pool_model_tests.rs` — a test-only
+model of this exact protocol (no production code): the deterministic
+arithmetic suite is green including the R6/R7 counterexample values at
+the u32::MAX boundary; the loom suite (2 threads, 3 publish attempts /
+2 drain walks) is SCHEDULE-CLEAN within those bounds and is picked up by
+the existing playback-concurrency lane; local Miri is race-clean on the
+default schedule AND across 33 many-seed schedules. Negative controls,
+executed in an isolated scratch worktree against the committed model:
+(a) the R6 skip-0 rule goes RED through two independent oracles
+(first-publish rejection + cross-wrap slot alternation); (b) a Relaxed
+recycle load goes RED under many-seed Miri with the exact data-race
+signature (`publish` slot write vs the drainer's record read) — the
+single-schedule run was green because the default schedule never entered
+the recycle window (premise-by-scheduling, diagnosed before the control
+was accepted; the model's real-thread test now yields through rejected
+retries so the window is exercised). Evidence: dist X15. These runs
+verify the MODEL — the gates above still bind the production landing.
+
+Residual `MECHANISM_OPEN` (representation-level, no semantics change): pool
+enumeration (per critical thread vs per site — settled by the α-site census
+at implementation), `MSG_CAP` and record field widths, the `recv_timeout`
+value and per-pool poll cadence, whether per-pool loss counters stay
+separate or fold into the global dropped counter.
+
+| Mechanism | Producer path facts | Assessment |
+|---|---|---|
+| (a) `std::sync::mpsc::sync_channel` (std 1.97.1) + `SyncSender::try_send` + one drainer `recv` loop | fixed slots at creation (no per-record allocation); CAS loop + backoff (no step bound); post-success `notify()` takes an internal Mutex (**P-cap yes, P-sync no**); full → `Err(Full)` immediately | **Recommended for class β only**; no new dependency |
+| (b) `crossbeam_queue::ArrayQueue` `try_push` | CAS push only, no waker mutex (no blocking receive — the drainer parks on its own); P-sync would hold for the push itself; still no step bound | Rejected for now: new dependency, no contention datum; revisit only if class α ever needs a queue rather than the atomics slot |
+| (c) hand-rolled `Mutex<VecDeque> + Condvar + capacity` | explicit lock acquire + notify on every push | Rejected: P-sync fails by construction; more verification surface |
+
+Capacity: 256 records of the fixed record bound (MSG_CAP + ~40 B of plain
+data) — preallocated constant memory, sized to cover one episode's diagnostic
+burst; overflow policy below. The class α pools use the same drop+count
+policy (bounded two-record in-flight per producer, further faults dropped
+and counted at the publish check — pool protocol above; preallocated with
+registration, outside the fixed queue capacity).
+
+**Full queue / consumer stopped / exporter failure / reentry / self-diagnosis.**
+Class β queue: full → `try_send` returns `Err(Full)` → drop the record,
+increment a monotonic dropped counter (AtomicU64, relaxed), enqueue nothing
+else (no retry loop on the producer). Class α pool: publish-check drop when
+two generations remain unconsumed (pool protocol), the dropped record
+counted as loss. Consumer
+stopped (shutdown entered): same
+drop+count path; a late producer never blocks or revives the drainer. Exporter
+failure (drainer side): the exporter is disabled for the rest of the run (or
+of that record batch), its failure counted once in the self-diagnostic
+counter, and at most one bounded line is written via the non-panicking stderr
+writer — the drainer never calls back into the facade (no reentry: the
+facade's producer entry is a no-op when `thread::current()` is the drainer,
+enforced by a drainer thread-flag). Resource retirement: records hold only
+owned bounded data — no handles, no `Arc` cycles; the queue and the slots are
+dropped after the drainer join.
+
+**Shutdown strategies (compared).**
+
+| Strategy | Contract | Assessment |
+|---|---|---|
+| A — admit only exporters with a verifiable bound | every exporter must implement and document its own progress bound (e.g. deadline `poll(2)` on a nonblocking stderr pipe; plain regular-file writes get an explicit unbounded-residual declaration) | **Recommended as the admission rule.** Honest boundary: even under A, a stalled disk on a file sink is environment-unbounded — each exporter states its residual; A is a contract, not a physics proof |
+| B — allow blocking sinks with an explicit abandon boundary | drainer joined with a deadline; at process exit the App may stop waiting (abandon) — threads may still be alive, resources they own are NOT released early, logs are lost, and the boundary is exactly process exit | **Recommended for the exit path only (not adopted — decision-record §2; R2 review wording fix)**: the App's shutdown reports the abandon (dropped/self-diagnostic counters), never claiming "drain complete" (T5-5 honesty). 适用边界 = 进程退出; not applicable to per-episode teardown |
+| C — separate-process isolation | logger in a child process, IPC transport | Rejected without evidence: no failure class on record requires it; introducing it would add a lifecycle/transport surface the razor forbids |
+
+The trilemma stands as stated: arbitrary sink + zero loss + bounded exit cannot hold
+simultaneously; the design claims only "bounded producer paths + bounded-or-abandoned
+drainer + counted losses".
+
+**Cost.** Class α producer: whitelisted composition into the fixed record +
+the pool protocol's bounded publish (two loads, one bound check, plain
+owned stores, one Release publish; drop+count when the pool is exhausted).
+Class β producer:
+whitelisted composition + one P-cap enqueue whose honest worst case is a CAS
+retry loop and an internal waker-mutex wait (no step bound claimed). Drainer:
+one thread, all rendering, plus conditional slot polls. Memory: capacity ×
+fixed record bound + one two-record pool per registered α producer, all
+preallocated. No
+realtime-path cost (no steady-path logging exists to move).
+
+**Migration and deletions.** Landing order is owner's (D-3: correctness-equal):
+either the narrow non-panicking writer lands first and the facility later replaces it
+(diff-baseline visibility), or the facility lands first and absorbs #8/#9/#10 directly
+(CC-1 subsumed). In both cases the landing PR must state the residual full-pipe
+blocking (a synchronous stderr/file exporter still blocks the drainer — producers are
+isolated, the drainer is not) in the same row that marks the panic class resolved
+(H), and must move #8's emission point after `drain.complete()` (the structural cone
+guarantee above). The `QIANQIAN_AUDIO_LOG` gate maps to a site/level filter on the
+stderr exporter.
+
+**Evidence.** Reference facts @5719020 (logger.ts): named facade + structured record +
+per-exporter thresholds + sink-side formatting + exporter lifetime = registering fiber
+→ adopt; its **synchronous inline exporter loop** (`Logger._method`, logger.ts:154-159:
+no queue, no isolation, exporter throw propagates to the producer call site) and its
+process-crash admission (fiber.ts:287-292) are the documented anti-pattern (direction E:
+that implementation cannot serve as Qianqian's isolation evidence). Current-tree facts:
+three gated sites and their catch structure (wasapi.rs:251/:320/:258-262/:538-547/:678-686);
+protocol/diagnostic separation (machine_input.rs:230-234).
+
+**Remaining decisions (owner).** Capacity number; record message bound; whether the
+dropped/self-diagnostic counters are surfaced beyond the shutdown report; exporter
+admission texts for file sinks; install point (App startup vs first use); **whether
+an opt-in diagnostic mode may ever relax class α's render-leg sites onto the shared
+class β channel — an explicit, mode-scoped T5-2 contract discussion (the internal
+waker-mutex wait would sit on the render thread); default recommendation: no, keep
+even diagnostic-mode class α sites on the atomics slot.**
+
+### DG-2 — Output-reason lifecycle (T2-5; D-10/D-9)
+
+**Goal.** Deliver a bounded, owned explanation of an output-backend abort to the
+consumer that already receives the verdict — without letting the reason participate in
+terminal adjudication (direction F) and without bending the backend→playback dependency.
+
+**Consumers and obligations.** The App presentation surface (`failure_diagnostic`
+text for a `Failed` episode; handle.rs:87 keeps the public terminal enum three-variant)
+is the concrete consumer; programmatic consumers: none (C-6/D-9 re-verified). Obligation:
+when the backend knows why it aborted, that explanation is delivered with the verdict;
+absence never changes classification or control flow (F), but "control-invariant under
+absence" does not discharge the delivery obligation — the producer must attempt
+delivery on every abort.
+
+**Owner.** The Output Plugin (backend) produces the reason at the abort site; the
+backend-neutral `AudioOutput`/port types carry it; the Playback Session mirrors it
+beside the drain verdict; the App reads it via the observation surface only.
+
+**Scope (which aborts carry a reason).** (i) normal device abort
+(`LoopOutcome::Aborted { message }` — the reason source exists today and is discarded at
+wasapi.rs:270-273); (ii) caught render panic (the two `Aborted{"…panicked"}` shapes,
+wasapi.rs:254-256/:323-326); (iii) post-catch failure (the #8 cone's own failure path);
+(iv) open failure — **out of scope for the drain carrier**: `OpenVerdict::Failed{message}`
+already reaches `OutputError{message}` → `activation_failed` (wasapi.rs:168-171 →
+session.rs:418 → completion.rs:442-447), which is a diagnostic, not a D11 terminal —
+unchanged by this design.
+
+**Compared carriers.**
+
+| Carrier | Shape | Assessment |
+|---|---|---|
+| A — RenderRequest diagnostic slot (the `level`/`position` pattern; ports.rs:962-985) | session allocates a cell in the request; backend writes it at abort | Rejected as primary: adds a second per-episode mutable cell whose read/clear lifecycle, retirement and double-write rules must be specified beside the verdict it explains; the reason then travels decoupled from the fact (载体关联 cost); no realtime-path advantage (abort is cold-path in both) |
+| **B — reason rides the verdict completion interface (recommended)** | `DrainVerdict::Aborted` gains a bounded owned payload (e.g. `AbortReason { class: OutputAbortClass (static enum), message: String≤N }`); the existing single `DrainSignal::complete(verdict)` seam (ports.rs:135-155), first-wins cell, observer-outside-verdict-lock — all unchanged; the payload is constructed at wasapi.rs:270-273 where `LoopOutcome::Aborted{message}` is currently discarded | Recommended: the explanation is delivered atomically with the fact it explains (one call, one cell, one first-wins rule — no separate late/duplicate/retirement semantics to invent); observer signature `Fn(DrainVerdict)` is unchanged; classification still reads only the verdict shape |
+
+**Publication point and ordering.** The reason is published exactly with the verdict
+(single `complete` call) — before any observer runs (observers fire after the verdict
+lock, ports.rs:145-154) and before the resolver can see `drain_verdict`. Duplicate:
+impossible (first-wins at the signal). Missing: a backend that cannot construct a
+payload (e.g. message allocation failure) delivers `Aborted` with an empty/class-only
+reason — verdict adjudication unchanged. **Late relative to the terminal is NOT
+impossible** (R2 review 2026-10-16): the mirror is not the signal. The session's drain
+observer publishes through `publish_evidence`, which returns immediately when an
+outcome is already committed (completion.rs:1240-1242) — a decode failure that
+settles first drops the later-arriving verdict **and its reason** entirely. The two
+obligations are therefore designed separately:
+
+- *Terminal immutability (D11)* — unchanged. `resolve` never reads the reason; late
+  evidence cannot relabel; the drop above is the mechanism, not a defect.
+- *Diagnostic retention* — what MUST be presented is the reason correlated with the
+  winning publication: when `Aborted` is the decisive evidence, its reason rides the
+  mirror (the normal path above). A verdict that loses the first-wins race carries an
+  optional reason; the recommended policy is **drop + monotonic late-verdict counter**
+  (bounded, honest; no consumer exists today — C-6), with a bounded last-late-reason
+  side-slot (one first-wins cell outside the adjudicating lock, presentation-labeled
+  "late, non-authoritative") reserved as the growth path should D-9 name a consumer.
+  Withholding settlement to wait for a possible verdict is rejected: it delays the
+  terminal (D14.3 synchronous settle) for evidence that may never arrive.
+
+Receiver retirement: the payload lives in the mirrored completion state for the
+episode's lifetime; retirement follows the episode, no extra rule.
+
+**Rust-side mirror and presentation.** `SessionCompletion`'s drain observer
+(completion.rs:386-403) mirrors the payload beside `drain_verdict`; `resolve` does not
+read it (the `Failed{stage:"device"}` classification path, completion.rs:1302-1310, is
+untouched — direction F); the presentation diagnostic for device failures may include
+the reason text (presentation-only enrichment of `failure_diagnostic`). Whether that
+enrichment is exposed publicly is the T1-3/D-9 exposure question (owner).
+
+**Owned-payload mechanics — what carrying data actually changes (R2 review).** Today
+`DrainVerdict` is `Copy` (ports.rs:100) and flows by value through the verdict cell
+(`Option<DrainVerdict>` under the drain lock, ports.rs:86), the observer type
+(`Fn(DrainVerdict)`, ports.rs:82), the session mirror, and the matchers in `resolve`,
+`decision_table_oracle`, `settlement_contract_tests` and the seam tests. With an owned
+payload the verdict loses `Copy`; the mechanical migration: (i) payload construction
+at the abort site, **before** `complete()` is called — no payload work under any lock;
+(ii) `complete()` stores the verdict once and hands the observer a bounded clone (one
+`AbortReason` clone — enum + short message — on the cold publication path; "observer
+signature unchanged" holds at the type level but buys nothing by itself: the value now
+owns data, and the clone cost is stated, not assumed away); (iii) the session mirror
+copies the bounded payload into completion state under the completion lock — a
+bounded cold-path bytes-copy inside the lock, stated as such; (iv) `resolve` and the
+oracle match the discriminant only (`Aborted { .. }`) — classification text and
+decision-table cells unchanged; (v) test-side constructors updated mechanically at
+landing. No `PartialEq`/`Hash` consumer beyond tests is introduced.
+
+**PBK-003.** No verdict-semantics change: the AudioOutput obligations keep "abort ⇒
+Aborted verdict" exactly; the payload is explanatory. The interpretation note (migration
+§3.4 candidate) is still required and its concrete text should describe carrier B —
+see the updated candidate in migration §3.4 (this round). Backend never learns playback
+types; the payload is audio-api-typed.
+
+**Rejected alternatives.** Reason-as-`retryable`-style policy field (forbidden,
+direction C); reason consulted by the resolver (forbidden, F); per-request slot A
+(above); a new observation channel beside the verdict (duplicates B's job with a second
+lifecycle).
+
+**Evidence.** wasapi.rs:233-238 (`LoopOutcome::Aborted{message}` exists),
+:270-273 (discarded today); ports.rs:82/:122/:135-155 (single-arg seam, observer
+outside lock); completion.rs:386-403 (mirror), :1302-1310 (device classification),
+handle.rs:87-97 (public terminal + separate diagnostic). DeepSeek reference R1
+(code/message split — class enum + message text mirrors it).
+
+**Remaining decisions (owner).** D-10 (carrier adoption — this design recommends B);
+D-9 (whether presentation enrichment counts as the concrete consumer); message bound N;
+the `OutputAbortClass` enumeration (candidate: `Device`, `Panic`, `Cone`, `Open` —
+final names at implementation review).
+
+**Migration and deletions.** On adoption: the three gated print sites' information
+moves into the payload (#8's abort message becomes the reason; #9's opened-line context
+stays a log record, not a reason — it is not an abort); the `QIANQIAN_AUDIO_LOG`-gated
+aborted-line print at wasapi.rs:258-262 is then redundant with the delivered reason and
+can be deleted or kept as the logging-site twin (DG-1 migration row).
+
+### DG-3 — Adapter reason retention and consumers (T1-1/T1-2; ties CC-4; D-2)
+
+**Goal.** Retain the SongCore diagnostic (status + native_code + message) at the error
+site as a bounded owned copy, deliver it to its named consumers, and read it in `probe`
+before close — without adding an unread long-lived `last_fault` field (direction G) and
+without changing the public `DecodeError`/`DecodeOpenError` shapes.
+
+**Consumers and obligations.** (i) DG-1's record fields `status`/`native_code`
+(the logging facility is the concrete programmatic consumer — T5-1's typed fields);
+(ii) the App presentation surface via the failure-diagnostic text (message). No
+control-flow consumer (C-6). T1-3 admission: public field NOT required — retention is
+crate-internal + consumed at the logging seam; if a public field is ever requested it
+re-enters T1-3 with its own obligation proof.
+
+**Compared retention shapes.**
+
+| Shape | Assessment |
+|---|---|
+| (a) copy-at-error-point + immediate emission | at the `_` arm (lib.rs:288-290) construct `DecodeFault{status, native_code, message: bounded}` from the borrowed `song_error` before any next same-handle call (T2-3 discipline), emit via DG-1's class α producer path (atomics slot — the decode worker is an isolation-obligated thread), drop | **Recommended**: no idle state, bounded by construction, consumed at the point of maximal information |
+| (b) long-lived `self.last_fault: Option<DecodeFault>` | Rejected as primary: an idle field with no reader obligation between errors — exactly the "future use" shape direction G forbids; stale-fault attribution rules would have to be invented; the disposition-contract §5 warning applies |
+| (c) status-only (today) | the confirmed loss (U-ledger / #231 L1/L2) — baseline being replaced |
+
+**Probe read-before-close (direction G, explicit design goal).** Current:
+lib.rs:189-200 closes the handle without reading the diagnostic the C side already
+latched (`fail(h, …)` on the probe path). Design: `song_probe` failure → read
+`song_last_error` on the handle **before** `song_close` → embed the owned bounded copy
+into the `DecodeOpenError` message text (public shape unchanged; CC-4 shape (i)). The
+C-side probe `fail()` paths (e.g. songcore_ffmpeg.c:877 region) make the read
+available — no ABI change.
+
+**Operation-result vs diagnostic-export independence.** The `DecodeFault` copy never
+feeds the `Err(DecodeError{message})` construction beyond the message text that already
+flows; classification (`classify_seek_status`, lib.rs:254-260) is untouched; the
+emission is best-effort (DG-1 drop policy) — a logging failure can never turn a decode
+result into a different decode result (A).
+
+**Evidence.** lib.rs:283-292 (`_` arm), :188-200 (probe), :213-226 (last_error copies
+message, ignores `native_code`); C:1111-1113 (latch republish keeps status + native,
+generic text), C:1155-1156 + `ok(h)` (partial-success clears the message text — the
+first-failure text is lost at the latch; if preserving it is ever required that is a
+C-side change and a separate D-5-class ruling, not assumed here); songcore.h ABI
+(borrowed-diagnostic lifetime ≤ next same-handle call).
+
+**Remaining decisions (owner).** D-2 adoption (this design is the DG-3 bundle the
+CC-4 REV.2 shape (i) requires: the consumer is named); message bound; whether the
+DecodeFault's class is ever surfaced in the failure diagnostic (D-9).
+
+**Migration and deletions.** CC-4's `DecodeFault` internal retention = this design's
+shape (a); the binding-architecture NOTE (migration §3.5) rides along; nothing public
+deleted; `last_error()`'s ignored-`native_code` gap closes by feeding the field into
+the retained copy.
+
+### DG-4a — File-I/O callback fault retention (T1-6; E-3 is its evidence vehicle)
+
+**Goal.** Retain the host `io::Error` class behind the `song_io` callbacks as bounded
+owned data, attributed as **correlated evidence**, and keep the callbacks panic-free
+across the C ABI.
+
+**Owner and lifetime.** The binding crate owns the userdata context:
+`IoContext { file: File, fault: IoFaultSlot }` with
+`IoFaultSlot = Mutex<Option<BoundedIoFault>>` (first-failure-wins + an AtomicU64 count
+of subsequent failures). Today's userdata is the leaked `Box<File>`
+(lib.rs:158-168, reclaimed via `Box::from_raw` on error paths :172/:179/:192, moved
+back into the stream struct on success :209) — the context wraps the same ownership
+pattern; operation boundary = the handle lifetime (FFmpeg's avio keeps calling
+read/seek during decode, so the slot spans open+reads, not just open).
+
+**Multi-callback-failure policy (compared).** first-wins + bounded count
+(recommended: preserves the origin, O(1) memory, matches the everywhere-else
+first-wins discipline) vs last-wins (loses the origin — rejected) vs bounded summary
+list (more state, no consumer — rejected).
+
+**Attribution rules — call-boundary model (R2 review 2026-10-16).** The slot never
+attributes by handle lifetime alone: a first-wins slot spanning every later operation
+would let one operation's transient callback failure "explain" a different, later
+failure (the review's counterexample: a read whose callback failed but whose call
+succeeded, followed by an unrelated media-error failure — the slot would still hold
+the old io error). The slot therefore records `{fault, boundary}`, where `boundary`
+is the `IoContext`'s top-level call-sequence id (the AtomicU64 the context already
+carries, incremented at each `song_*` operation entry). Three layers stay distinct:
+
+- *Callback-call result* (record): a failing callback writes its fault tagged with
+  the current boundary id — first-wins **within that boundary**; later callback
+  failures in the same boundary only bump the count.
+- *Enclosing-call outcome* (attribution gate): a fault may be attached to an
+  operation's diagnostic only if `slot.boundary == that operation's id`. A
+  successful operation renders its boundary's record non-attributable (the
+  open-completion clear below is the special case); no later operation can inherit
+  it. A failing operation's own status/classification is always the root; a
+  matching-boundary io fault is reported as correlated evidence only — never the
+  auto root cause.
+- *Delayed fatal* (C-side latch): the pending-fatal latch belongs to the C core's
+  lifecycle and is read through the C-side status; the io slot contributes to a
+  later fatal read's diagnostic only under the same boundary match.
+
+Consequences, per shape: successful `song_open` after internally-retried transient
+callback errors — the record is marked non-attributable at open completion (may
+appear only if an operator asks, never automatically). Failed open — the
+matching-boundary fault rides the `DecodeOpenError` diagnostic (host-side slot
+works even where the C side leaves no usable latch — songcore.h:216-219; no ABI
+change, the R1.1 flip). `read_frames` Err — correlated evidence beside the C-side
+status, attribution stays with the operation result. Partial success — the fault
+stays recorded but permanently non-attributable (a real io fact about a call that
+ultimately succeeded), never attached to any later failure and never modifying the
+partial-success/pending-fatal distinction (ABI-frozen). Neither per-read clearing
+(loses the origin inside a legitimately failing read) nor permanent first-wins
+(pollutes later failures) survives this model.
+
+**Panic-freedom across the C ABI.** The callbacks (`file_read/file_seek/file_size`,
+lib.rs:70-104) are `unsafe extern "C"`: the design constraint is panic-free by
+construction — callback bodies contain only io operations + a bounded slot write; no
+unwraps, no formatting, no allocation beyond the bounded fault struct. E-3's harness
+exercises fault-injecting callbacks at the ABI level (C-side mapping: callback −1 →
+AVERROR(EIO), io_read C:200-208 / io_seek C:210-242); the adapter-side slot is covered
+by binding-crate unit tests per synthesized (kind, errno) pairs — E-3 accepts DG-4a
+and nothing else in the DG-4 family.
+
+**What E-3 can and cannot prove.** Can: the C side's mapping of failing callbacks
+(EIO propagation, latch interaction, open-failure reachability), deterministically, on
+any platform with the native lib built. Cannot: real-disk stall classes, the FFmpeg
+retry behavior under every callback failure shape (bounded fixture set), and anything
+about DG-4b/4c (explicitly out of E-3's acceptance).
+
+**Remaining decisions (owner).** T1-6 adoption; the `BoundedIoFault` fields
+(kind-enum + raw_os_error + offset — final set at implementation review); whether the
+slot is ever surfaced beyond open-failure diagnostics; **the partial-success
+retention trade-off (R3 sync item): a callback fault recorded inside a call that
+ultimately succeeds stays in the slot but is permanently non-attributable — an
+explicit information-retention trade-off recorded as a known loss, surfaced only on
+explicit operator request. This design does NOT claim delayed-fatal cause fidelity:
+if a later fatal operation ever needs its true io origin and that origin lived in an
+earlier successful boundary, it is already lost. The owner accepts or rejects this
+loss knowingly (rejecting it would require per-boundary retention, not a slot).**
+
+**Migration and deletions.** `Box<File>` userdata → `Box<IoContext>` (same
+leak/reclaim discipline); no ABI change; CC-4/DG-3's DecodeFault and this slot remain
+separate (decode-status vs host-io origin) with a stated precedence rule for
+presentation only.
+
+### DG-4b — Rust panic hook posture (T5-8)
+
+**Goal.** One process-level panic-hook policy: a single installer, isolation for
+critical threads, conditional chaining elsewhere, never-restore on exit — and no panic
+recovery is granted by any of it.
+
+**Current fact.** Single installer `install_reader_panic_hook`
+(machine_input.rs:192-207): `Once`-guarded install, `take_hook()` captures previous,
+chaining condition = `thread::current().name() != Some("qianqian-stdin")`
+(:200-202), never restored after the host returns (:205-207 — rationale: a detached
+reader must not late-print after seal). Reader-side panics are separately caught at
+three seams (:119 → `HostFailure::Panic` :142-145; :253-255; :277 → :288-291).
+
+**Compared postures.**
+
+| Posture | Assessment |
+|---|---|
+| status quo (filter-only hook) | chains everything except the reader thread; suppresses the default print on the reader thread only |
+| **critical-thread isolation + conditional chaining elsewhere (recommended)** | the hook maintains a registered set of critical thread names (`qianqian-stdin` today; render/decode names if their default prints ever need suppression): on a critical thread the hook performs **atomic bookkeeping only** (relaxed counter increment per panic, at most one publication into DG-1's ownership-handoff pool — the panicking thread's own registered pool; bounded in-flight loss at the publish check; no concurrent record access exists to race) and **never calls the previous hook** (an unknown synchronous sink must not run on a thread whose timing/allocations are load-bearing); on any other context it chains to the captured previous hook (preserves host/user tooling — today's behavior) | 
+| full-process replacement (never chain) | Rejected without evidence: silently breaks debuggers/tracers/hosts that installed meaningful hooks; no failure class on record demands it |
+
+**Context identification.** Thread names registered at spawn
+(`Builder::name(...)` — machine_input.rs:215-218 already names the reader). Cost ~zero
+(a lock-free read of the registered static set). Reliability limits: unnamed threads
+and name collisions resolve to the chaining branch (fail-open to today's behavior —
+the isolation is opt-in per named critical thread, so a miss cannot create a new
+hazard, only fail to suppress a print).
+
+**Previous-hook admission.** Chaining is allowed only off critical threads (above).
+The hook cannot introspect what the previous hook is; the design therefore does not
+claim unknown sinks are safe — it confines them to non-critical contexts and records
+that confinement as the T5-8 ruling point (the "chain-to-previous is a condition, not
+an unconditional obligation" R1.2 wording becomes: the condition is
+`!critical_thread(current)`).
+
+**Reentry / allocation / blocking / recording failure (atomics-only; R2 review
+2026-10-16).** The critical-thread path performs **atomic operations only**: a
+relaxed counter increment per panic and, at most, one publication into the
+thread's own DG-1 pool — the ownership-handoff publish of the pool protocol
+(no loop, no lock, no allocation; bounded in-flight loss at the publish
+check). No `write(2)`
+of any kind, no DG-1 queue push, no lock, no allocation — a non-panicking
+synchronous write is *not* a non-blocking exit: on a full pipe it blocks without
+panicking, and a blocked panic hook is exactly the hazard this design exists to
+remove. The earlier "static pre-formatted line via the non-panicking writer"
+critical-path option is withdrawn; rendering is inverted — the counter/slot are
+read by the drainer or shutdown report on a non-critical thread, which emits the
+line. If visible synchronous output from the critical thread itself is ever
+demanded, it requires a **proven** non-blocking exit (e.g. a pre-opened
+`O_NONBLOCK` descriptor, one fixed-size write, `EAGAIN`→count) — an OS-specific
+mechanism listed as an option only, not part of this recommendation. The hook
+never calls the logging facade (a panic inside the hook must not recurse). Exit
+recovery: none (never-restore stays, documented rationale above).
+
+**Hook isolation grants no recovery.** Catching/suppressing a default print is not
+catching the panic: unwinding still proceeds into the thread's own catch_unwind seams
+(render: wasapi.rs:251/:320; reader: machine_input.rs:119/:253/:277) or, on the main
+thread, exits the process (D-7 unchanged).
+
+**Evidence.** machine_input.rs:190-207/:209-240 (facts above); render-thread catches
+(wasapi.rs:251-256/:320-327); main-thread zero `catch_unwind` (#283 AF-7 re-verified).
+A dedicated reentry/isolation witness test belongs to this package (not E-3): inject a
+panic on a named critical thread in a subprocess, assert no previous-hook output and
+process behavior otherwise unchanged.
+
+**Remaining decisions (owner).** T5-8 adoption; the critical-thread registry
+membership (reader-only vs reader+render+decode names); whether anything is rendered
+from the counters (pure silence + counter is the recommended default); whether the
+proven-non-blocking-write option is ever admitted.
+
+**Migration and deletions.** The install site stays machine_input (single installer
+rule); if DG-1 lands, the hook's counter/slot are read by the drainer or shutdown
+report on a non-critical thread — the hook itself never writes and never becomes a
+facade producer.
+
+### DG-4c — FFmpeg av_log posture (T5-9)
+
+**Goal.** Keep av_log discard-by-default; design an optional, opt-in, process-level
+bridge into DG-1 with bounded, lock-honest callback discipline; no per-handle routing.
+
+**Current facts (C, @e44aa80).** Discard callback `songcore_discard_av_log` (C:50-56);
+`songcore_quiet_ffmpeg_logging` (C:58-61): when `QIANQIAN_FFMPEG_LOG` is **unset** it
+installs the discarder; when set it leaves the callback untouched (FFmpeg's default
+logger remains). Re-installed on every `song_open` (C:822 — same-value pointer store,
+off any realtime path). The callback is process-global: concurrent handles share it
+(discarder is stateless). SongCore asserts it is the process's only FFmpeg user
+(C:43-44). **Not knowable from this tree**: which FFmpeg-internal locks are held while
+the callback runs — FFmpeg is pinned (native/ffmpeg/pin.json) but not vendored; this
+is a stated assumption to verify, not a fact (see EVIDENCE_PENDING).
+
+**Compared mechanisms (corrected: no owned line exists at callback time — R2 review
+2026-10-16).** The av_log callback signature is
+`(avcl, level, fmt: *const c_char, va_list)` (pinned FFmpeg, `libavutil/log.h`): the
+callback receives a format string plus a `va_list` whose referents are valid only
+for the callback's own invocation. Rust cannot portably consume a C `va_list`, and
+no copy can preserve the varargs' pointees past the callback — the earlier
+"copy each line into a fixed buffer, format on the drainer" bridge shape is
+therefore **impossible and withdrawn**. What remains:
+
+| Mechanism | Assessment |
+|---|---|
+| **γ — default discard (baseline, unchanged)** | discard stays the default (T5-9 PRESERVE); every option below is opt-in via `QIANQIAN_FFMPEG_LOG` (existing switch — SongCore then never touches the callback) |
+| **β — structured-only bridge (recommended first tier)** | the bridge callback records what needs no varargs: level, a bounded copy of the `fmt` string (a static C string — plain memcpy), and the av_class/item name when present; no formatting, no varargs risk, no native shim. Interpolated values (filenames, error numbers) are honestly absent |
+| α — in-callback bounded formatting via a C shim | a small SongCore-native C function runs `vsnprintf` into a fixed buffer **inside the callback** and hands owned bytes + level to the Rust side (DG-1 fixed-record producer discipline) — the only way to keep interpolated values. Costs: a C shim in native/, and bounded-but-variable formatting cost on the FFmpeg-calling thread (`vsnprintf` cost varies by conversions/locale — no constant-time claim) |
+| per-handle routing | Rejected: `av_log_set_callback` is process-global; per-handle routing would require an avctx→context map locked inside the callback — cost and fragility with no consumer today |
+| always-on bridge | Rejected: default-on diagnostics contradict the quiet-by-default posture and put callback cost on every FFmpeg call |
+
+Recommendation: γ default; opt-in bridge starts at **β**; α is admitted only when a
+named diagnostic consumer demonstrates that interpolated values are required (and
+then the shim lives in SongCore native behind the same env switch).
+
+**Callback discipline (the load-bearing constraints).** Inside the bridge: no FFmpeg
+API re-entry; no allocation; no unbounded lock (a DG-1 enqueue is attempt-bounded per
+its corrected producer-path facts; the queue is never held across an FFmpeg call by
+construction, so self-deadlock is structurally excluded). β performs no formatting at
+all; α's `vsnprintf` runs in the shim, inside the callback, bounded by the fixed
+buffer. The design does **not** assume which FFmpeg lock is held at callback time
+(direction: no presupposition): the discipline above is chosen so that the answer to
+that question cannot change correctness — only the pending source-verification can
+state what actually holds.
+
+**Install/reinstall/concurrency.** Bridge installs once at host startup, before any
+`song_open`; SongCore's per-open reinstall only fires when the env var is unset, so a
+bridged host (env set) is never clobbered — the ordering constraint is documented as
+part of the T5-9 ruling text. Concurrent handles all share the bridge; records carry
+no handle identity (process-level diagnostic; per-handle attribution is explicitly not
+provided).
+
+**Copy/queue cost and error handling.** β per callback: one bounded memcpy of the
+static fmt string + one publication into DG-1's class α ownership-handoff pool
+via the
+calling thread's registered pool (FFmpeg-calling
+threads are decode-side, isolation-obligated — the shared class β channel is not
+admitted here; an av_log callback on an unregistered thread drops+counts — the
+bridge is diagnostic, loss is counted) + bounded in-flight loss at the publish
+check. α per callback:
+one shim `vsnprintf`
+into the fixed buffer (variable, output-bounded) + the same pool publication. No
+line above the record bound is realloc-ated; truncation happens at the copy (β) /
+in the shim (α).
+
+**E-3 is not acceptance for this package.** E-3 exercises song_io callbacks at the ABI
+level; av_log behavior under the pinned FFmpeg build needs its own runtime observation
+(belonging to this package, Windows/FFmpeg-runtime bound), and the Rust panic hook
+(DG-4b) likewise has its own witness. No acceptance is claimed here beyond static
+facts.
+
+**Remaining decisions (owner).** T5-9 adoption of a bridge tier at all (vs
+discard-forever); β-first vs α-from-the-start; bridge buffer bound; whether the
+bridge is compiled in behind a cargo feature or always available but env-gated.
+
+**Migration and deletions.** None forced: discard path unchanged; the bridge is
+additive and off by default. If the bridge is adopted, `QIANQIAN_FFMPEG_LOG`'s
+documented meaning extends from "keep FFmpeg's default logger" to "host owns the av_log
+callback" for bridged hosts — a doc note in the binding architecture, not an ABI
+change.
+
+---
+
 ## Owner decision points (each with options; nothing decided here)
 
 | ID | Question | Options | Recommendation (non-binding) |

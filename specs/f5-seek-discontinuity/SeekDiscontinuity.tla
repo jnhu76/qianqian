@@ -11,7 +11,10 @@
 (*   本模型只回答一个问题：冻结的 same-resource discontinuity protocol      *)
 (*   （render leg 持有设备缓冲即不许 park；worker 在串行化点上先 song_seek、 *)
 (*   成功后才自行 purge 并持有产量；session 在 landing ∧ edge 干净 ∧         *)
-(*   设备尾排空 ∧ leg parked ∧ unsettled 时 commit；terminal stop 恒赢）     *)
+(*   设备尾排空 ∧ leg parked ∧ unsettled 时 commit；terminal stop 恒赢——    *)
+(*   本模型只在 seek 协议域内说"恒赢"：stop 使协议夭折，committed 永不成立。 *)
+(*   它**不判定 D11 终局**：窗口内 stop 的 episode 终局由 terminal contract *)
+(*   另行裁决（生产侧 worker_failure 优先，见 reconciliation §2.3.1））      *)
 (*   在其显式抽象内能否保证冻结不变式，并且 mutation 证明每条护栏承重。      *)
 (*                                                                         *)
 (* 模型词 -> current production reality 映射（完整表见 README.md）：          *)
@@ -49,7 +52,11 @@
 (*                             触发点）                                     *)
 (*   DrainOld/DrainNew         设备消费（audible truth 的抽象；不变式关注     *)
 (*                             的正是 DrainOld 在 commit 之后发生）          *)
-(*   Stop                      terminal stop（D11/D14.4；恒赢，协议夭折）     *)
+(*   Stop                      seek 协议的夭折动作（协议域：committed 永不   *)
+(*                             成立；**不是 D11 Stopped 的判定**——窗口内    *)
+(*                             stop 的 episode 终局由 terminal contract 裁决 *)
+(*                             （生产侧 worker_failure 优先；reconciliation  *)
+(*                             §2.3.1），D14.4 只约束 stop 命令的接受面）     *)
 (*   WritePartial              bounded-slice 写的前缀落队（余量仍在 staging； *)
 (*                             E2 abandon+resume 形状的模型对应物）          *)
 (*   episodeFailed             SeekMutatedThenFailed 后的既有 decode-failure *)
@@ -120,7 +127,7 @@ VARIABLES
     seekFailed,       \* 最近一次 seek 被「证毕 pre-mutation 拒绝」
                       \* （RefusedUnchanged；pre-cut，惰性）
     episodeFailed,    \* SeekMutatedThenFailed 后走既有 decode-failure 路线
-    stopped,          \* terminal stop（D11 族；恒赢）
+    stopped,          \* seek 协议夭折位（协议域；不承载 D11 终局语义）
     \* —— verifier-only 见证变量（ghost，非 production representation）——
     oldDrainEver,     \* 是否发生过旧 PCM 的 audible drain（合法，pre-commit）
     oldAfterCommit,   \* 不变式靶：commit 之后旧 PCM 被 drain
@@ -426,7 +433,9 @@ CommitCut ==
                    posMixAfterCommit, seekFromPartial, remainderLost,
                    producedAfterFailure>>
 
-\* terminal stop：恒赢。协议夭折（committed 永不成立），两腿退出。
+\* seek 协议的夭折动作：本模型域内"恒赢"（committed 永不成立），两腿退出。
+\* 不判 D11 终局——窗口内 stop 的 episode 终局归 terminal contract
+\* （reconciliation §2.3.1）。
 Stop ==
     /\ stopped = FALSE
     /\ stopped' = TRUE

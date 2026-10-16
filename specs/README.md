@@ -59,7 +59,7 @@ CI 列的 **formal-semantic-gate** = `.github/workflows/formal-semantic-gate.yml
 | Realtime publication P1–P5（coherent acquisition / retired 闭门 / quiescence 先于回收 / Retired≠Reclaimable≠Released / 条件回收进展） | `docs/adr/ADR-PBK-001.md` §6（normative 协议本体在 ADR） | **production realization 尚不存在**（多代 publication 机制未进任何 production crate；ADR §6/§12：production representation OPEN）。当前 production surface = episode-scoped 单代 teardown（`crates/qianqian-playback` edge/session/completion 的 join-quiescence），协议上不得违反 P1–P5；可执行机制证据是 **test-local candidate harness**（`realtime_view_publication/`，非 lib API） | publication N→N+1 与旧 reader overlap；多代退休记账提前回收；split publication；stale entry liveness | CHECKED-IN-MODEL（TLA）+ candidate-mechanism harness（Rust，test-local） | `realtime-publication/` | M1 ReleaseBeforeQuiesce / M2 SplitPublication / M3 StaleEntry（safety+liveness）/ M4 ForgetsOlderRetirement + 4 可达性探针 | ≤2 readers、bounded publication 链、WF(ReaderExit)+WF(MarkReclaimable)；不建模 PCM/线程/内存序 | BOUNDED-CLEAN；M1–M4 全部 COUNTEREXAMPLE-WITNESSED | production 机制 realization（OPEN，ADR Phase D）；PCM/线程/内存序 | formal-semantic-gate |
 | episode terminal settlement（D11 current-spec conformance：单次提交不可改写、writer identity=authority（transition 级性质）、Observe/Wait 纯性、late-command stability（决策边界 ghost）、teardown settlement 边界（全形状触发域）、activation failure firewall、Completed/Stopped 命题必要条件、条件性 settlement 进度） | `docs/adr/ADR-PBK-002.md` §17 D11（normative authority）+ ADR-PBK-001 §2.2–§2.3 | `crates/qianqian-playback/src/completion.rs` resolver / `session.rs`（current realization；F2 已把 settlement 迁回 evidence-publication 触发的 authority-owned 路径，pre-F2 consumer-triggered differential 已闭合——模型表达 accepted contract） | observe/wait/证据发布者/晚到 stop 偷偷写 terminal Fact；teardown 跑在决定性证据未提交之前；无边界 stop intent 判 Stopped；触发域收窄逃逸 C5 | CHECKED-IN-MODEL | `episode-terminal-settlement/` | M1 ObserveCommits / M2 WaitCommits / M3 TerminalRewritable / M4 LateStopReadsCurrentIntent / M5 TeardownBeforeSettlement / M6 ActivationFailureBecomesFailed / M7 FalseCompleted / M8 FalseStopped / M9 EvidenceProducerSpoofsAuthority / M10 NarrowDecisiveDomain + 5 overclaim 反向控制（带 WF 最强让步）+ fairness 承重控制 + 7 可达性 witness | 652 distinct states（穷举）；WF(AuthoritySettle) 仅承载条件性进度 | BOUNDED-CLEAN（safety 无 fairness 双跑 PASS）；10 mutation 全部 COUNTEREXAMPLE-WITNESSED（writer 类为纯 temporal 反例：状态不变式全绿）；7 witness 可达 | 判决值表 precedence（current realization，非 D11 冻结；触发域全覆盖是 normative）；Rust refinement 层（verification-rust-gate 承载） | formal-semantic-gate |
 
-| F5 seek cutover 协议（commit 之后旧 PCM 不可能成为 output；位置发布不混 pre/post basis；commit 前置：landing ∧ edge 干净 ∧ 尾排空 ∧ parked；stop 恒赢） | `docs/adr/ADR-PBK-002.md` §20 D14.5 + D14.8 seek 规则（normative authority；F5-GATE amendment 为拟冻结文本） | production realization 在 `feat/f5-seek-1` 实现待审（F5-IMPLEMENTATION-1）。模型对象 = F5-GATE 选定的 same-resource discontinuity protocol 抽象 | commit 后旧 PCM 复活（三库：edge/held/设备尾）；commit 后 stale position writer | CHECKED-IN-MODEL | `f5-seek-discontinuity/` | M1 CommitBeforeTailPurge / M2 SeekMidWrite / M3 ParkWhileHeld / M4 StalePositionWriter / M5 CommitBeforeLanding + 4 可达性 witness | MAX_TAIL=2；布尔化三库；safety-only 无 fairness；无 WASAPI 流状态机/请求语法/多 seek | BOUNDED-CLEAN（426 distinct states 穷举）；5 mutation 全部 COUNTEREXAMPLE-WITNESSED；4 witness 可达 | 物理 gate（audible cutover）属实现 PR 的 Windows 冒烟门；本模型不预授权任何 production 表示 | formal-semantic-gate |
+| F5 seek cutover 协议（commit 之后旧 PCM 不可能成为 output；位置发布不混 pre/post basis；commit 前置：landing ∧ edge 干净 ∧ 尾排空 ∧ parked；stop 恒赢——**协议域夭折语义，不判定 D11 终局**，见 reconciliation §2.3.1） | `docs/adr/ADR-PBK-002.md` §20 D14.5 + D14.8 seek 规则（normative authority；F5-GATE amendment 为拟冻结文本） | `crates/qianqian-playback/src/{completion,session}.rs` + `crates/qianqian-audio-api/src/ports.rs` 的 seek 协议抽象（实现侧 guardrail 证据 = `f5-seek-implementation/`，§B 行） | commit 后旧 PCM 复活（三库：edge/held/设备尾）；commit 后 stale position writer | CHECKED-IN-MODEL | `f5-seek-discontinuity/` | M1 CommitBeforeTailPurge / M2 SeekMidWrite / M3 ParkWhileHeld / M4 StalePositionWriter / M5 CommitBeforeLanding / M6 RefusalDropsRemainder / M7 ResumeAfterMutatedSeek + 6 可达性 witness | MAX_TAIL=2；布尔化三库；safety-only 无 fairness；无 WASAPI 流状态机/请求语法/多 seek；无 pending-fatal latch（GAP-01 扩展候选见 #283 FORMAL-PLAN §3.1） | BOUNDED-CLEAN（672 distinct states 穷举）；7 mutation 全部 COUNTEREXAMPLE-WITNESSED；6 witness 可达 | 物理 gate（audible cutover）属实现 PR 的 Windows 冒烟门；本模型不预授权任何 production 表示 | formal-semantic-gate |
 
 ### B. Implementation / concurrency verification（Rust）
 
@@ -71,7 +71,7 @@ CI 列的 **verification-rust-gate** = `.github/workflows/verification-rust-gate
 | K0 Rust refinement：stale FiberId、relied provision 可解析、inverse-once + LIFO + tombstone 保留、移除纪律（clean+violation 格）、quiet truth、single-source 含 #126 withheld-mount | K0 design + `composition-kernel-0-implementation-adr.md`（representation） | 真实 `kernel.rs` 全部合法 step 序列（62 distinct-behavior 场景矩阵，K2/K6 每 step 后断言） | 真实实现上的全部矩阵场景 | REFINEMENT-CHECKED-IN-RUST | `composition-kernel-0-rust/`（harness：`crates/qianqian-composition/src/kernel_verify.rs`） | M-K1/M-K2/M-K3 production mutation patches | 场景矩阵 bounds（RESULTS.md）+ ≤14 step drain | BOUNDED-CLEAN（native）+ MIRI-CLEAN；Kani symbolic = TOOLING-INSUFFICIENT（如实记录） | Kani 符号层未挣得 | verification-rust-gate |
 | 当前 PCM 边并发：FIFO ring 完整性、**edge 机制 terminal 单调**（EOF×stop、failure×stop 且 Failed 身份不降级）、阻塞 producer/consumer 唤醒 | **架构边界权威：PBK-002 D8**（PCM data plane firewall）；edge 行为契约属 production（`crates/qianqian-playback` 代码与契约为 production referent，非 architecture authority） | 真实 `PcmEdge`（仅 `cfg(loom)` 换 Mutex/Condvar） | 真实 edge 的全部调度（stop×write/read/EOF/fail、blocked wake） | REFINEMENT-CHECKED-IN-RUST | `playback-concurrency/`（harness：`crates/qianqian-playback/tests/loom_edge.rs`） | M-L1 drop data_ready notify | ≤3 threads / ≤2 samples / ≤3 ops；loom Arc refcount 不在 modeled slice | SCHEDULE-CLEAN + native/stress | settlement core（completion.rs）未 loom（native + crate-internal settlement contract tests 承载；F2 起 wait_terminal 为纯 condvar wait） | verification-rust-gate |
 | **episode 语义终局**（Completed/Stopped/Failed 单写、precedence、不可改写） | **语义权威：PBK-002 D11**（Playback Session 为 designated authority）——edge 机制 terminal state ≠ episode semantic terminal outcome，两者不得互相冒认 | `crates/qianqian-playback/src/completion.rs` resolver（production realization，非 authority） | stop×EOF×failure 交错下的终局归属 | REFINEMENT-CHECKED-IN-RUST（机制层）+ REGRESSION-ONLY（resolver 决策表） | `crates/qianqian-playback/src/settlement_contract_tests.rs`（crate-internal resolver/settlement oracle，F2 起）+ `tests/`（session_activation、stop_seam、read_seam） | —（resolver oracle 为方向性断言；无 mutation 负控制，如实声明） | 原生时序 + CPU 压力（CAMPAIGN-1 B4） | TEST-PASS + stress PASS | loom 未覆盖（settlement core） | verification-rust-gate（native 部分）|
-| **F5 seek 实现 guardrail**（M1–M7 与 gate 模型突变一一对应：commit 无 park∧quiesce 证据、purge 先于 provider 结果、cut hold 未路由、position cell 无 backward rebase、commit 先于 landing、refusal 丢 remainder、destructive 后复跑；M8–M11 为实现 corrective 自证：cut evidence 跨轮复用、applied cut 等待忽略 data plane 终态、证据缺口被降级成 abort、probe 观测失败被掩成 not-yet-quiesced） | PBK-002 §20 D14.5（语义权威）；模型侧对应 `f5-seek-discontinuity/` 的 TLA+ 突变 | 生产代码：`completion.rs` / `session.rs` / `ports.rs`（`feat/f5-seek-1`） | 同名 guardrail 在生产实现中被拆掉 | MUTATION-CAUGHT-IN-RUST（fail-closed runner） | `f5-seek-implementation/`（M1–M11 .patch + `check.sh`） | 十一个生产补丁本身；被 `tests/seek_seam.rs`（含 never-draining-device teardown oracle 与 device-failure-in-park oracle）、crate-internal white-box、`position_evidence` 捕获 | 每突变一个定向 suite；native regression 前置 | 11/11 COUNTEREXAMPLE-WITNESSED（native BOUNDED-CLEAN） | 不覆盖 Windows 物理路径（属实现 PR 的物理冒烟门） | 无（本 PR gate；可后接 verification-rust-gate） |
+| **F5 seek 实现 guardrail**（M1–M7 与 gate 模型突变一一对应：commit 无 park∧quiesce 证据、purge 先于 provider 结果、cut hold 未路由、position cell 无 backward rebase、commit 先于 landing、refusal 丢 remainder、destructive 后复跑；M8–M11 为实现 corrective 自证：cut evidence 跨轮复用、applied cut 等待忽略 data plane 终态、证据缺口被降级成 abort、probe 观测失败被掩成 not-yet-quiesced） | PBK-002 §20 D14.5（语义权威）；模型侧对应 `f5-seek-discontinuity/` 的 TLA+ 突变 | 生产代码：`crates/qianqian-playback/src/{completion,session}.rs` + `crates/qianqian-audio-api/src/ports.rs` | 同名 guardrail 在生产实现中被拆掉 | MUTATION-CAUGHT-IN-RUST（fail-closed runner） | `f5-seek-implementation/`（M1–M11 .patch + `check.sh`） | 十一个生产补丁本身；被 `tests/seek_seam.rs`（含 never-draining-device teardown oracle 与 device-failure-in-park oracle）、crate-internal white-box、`position_evidence` 捕获 | 每突变一个定向 suite；native regression 前置 | 11/11 COUNTEREXAMPLE-WITNESSED（native BOUNDED-CLEAN） | 不覆盖 Windows 物理路径（属实现 PR 的物理冒烟门）；M7 定向 oracle 为终态后 300ms 有界等待 + 消费计数比较——**时间窗证据**，非 producer/worker 结束见证（2026-10-16 记录；强化方向：producer-exit witness） | verification-rust-gate（`f5-implementation-mutations` job 直接调 runner，不重跑 F5 TLA）|
 | 每层结果与工具选择的 single-writer | — | — | — | — | `playback-concurrency/CAMPAIGN-1.md`（VERIFICATION-CAMPAIGN-1 轮次记录；Miri per-crate 与 integration stress 结果的唯一 canonical owner） | — | — | PASS_WITH_LIMITATIONS（轮次判据） | — | —（历史轮次记录） |
 
 ### C. Ordinary regression evidence（不在 specs/，`cargo test --workspace` 承载）
@@ -127,7 +127,7 @@ fail-closed 的当前证据，只是结论用途不同。
 
 ```bash
 # 全部当前形式化验证（缺省 = current = K0 + realtime publication +
-# episode terminal settlement）
+# episode terminal settlement + f5 seek discontinuity）
 specs/check.sh
 
 # 显式当前集
@@ -137,6 +137,10 @@ specs/check.sh current
 specs/check.sh k0         # K0 控制面 TLA+ 套件
 specs/check.sh realtime   # realtime publication TLA+ 套件
 specs/check.sh terminal   # episode terminal settlement 套件（D11 conformance）
+specs/check.sh f5         # f5 TLA + f5-implementation mutation gate（本地全量）
+specs/f5-seek-implementation/check.sh   # 仅实现 mutation gate（CI 的
+                                        #   f5-implementation-mutations job
+                                        #   直接调用此入口，不重跑 TLA）
 specs/f2-terminal-commit-boundary/check.sh   # campaign artifact（见 §D，非 CI gate，historical）
 
 # Rust 侧当前验证（cargo 矩阵 + Miri + production mutation 负控制 +
@@ -158,23 +162,35 @@ invariant/temporal property PASS；每个 mutation 必须被抓住
 ```text
 formal-semantic-gate     specs/check.sh current
     触发：specs/{composition-kernel-0,realtime-publication,
-          episode-terminal-settlement}/**、specs/check.sh、
-          K0 design/implementation ADR、ADR-PBK-001、ADR-PBK-002、
-          crates/qianqian-composition/**
+          episode-terminal-settlement,f5-seek-discontinuity}/**、
+          specs/check.sh、K0 design/implementation ADR、ADR-PBK-001、
+          ADR-PBK-002、crates/qianqian-composition/**、completion.rs /
+          decision_table_oracle.rs（refinement seam）
 verification-rust-gate   specs/check.sh rust
-    触发：crates/qianqian-{composition,playback}/**、specs/{composition-kernel-0-rust,
-          playback-concurrency}/**、specs/check.sh
+             + f5-implementation-mutations job
+               （specs/f5-seek-implementation/check.sh 直接调用，
+                不重跑 F5 TLA）
+    触发：crates/qianqian-{composition,playback,audio-api}/**、
+          specs/{composition-kernel-0-rust,playback-concurrency,
+          f5-seek-implementation}/**、CurrentDecisionTable.tla、
+          specs/check.sh、K0 design/implementation ADR、ADR-PBK-002
     （含 §G.6 cross-locus refinement oracle —— 见 composition rust runner）
 ```
 
 Trigger paths 按仓库现实划定：多代 publication 机制**尚无 production
 realization**（唯一可执行机制证据是 audio-api 的 test-local candidate
-harness），audio-api src 仅 ports；`crates/qianqian-playback` 承载的是
+harness），audio-api src 的 ports.rs 现承载 RenderGate /
+TailProbeOutcome / PositionEvidence——即 f5-impl M4/M11 突变靶点——
+故 audio-api 触发 rust gate（P1–P5 test-local harness 本身仍由
+rust-regression 承载）；`crates/qianqian-playback` 承载的是
 当前 episode-scoped 单代 teardown surface（PcmEdge/session/completion），
 其变更由 verification-rust-gate 承载。TLA 模型检查语义协议，不随实现
-diff 失效，故 playback 实现变更不触发 TLA 重跑。Miri 在 CI 上仅跑
-composition 7 矩阵（约分钟级），不是全仓 Miri campaign；更大范围
-Miri/真机/FFI 证据仍为 local/manual（见 CAMPAIGN-1）。
+diff 失效，故 playback 实现变更不触发 TLA 重跑；**例外**：completion.rs /
+decision_table_oracle.rs 是判决表 refinement seam，触发 formal gate。
+Miri 在 CI 上仅跑 composition 7 矩阵（约分钟级），不是全仓 Miri
+campaign；f5-impl mutation job 为 1 次 native regression + 11 次有界
+定向突变轮（每轮 900 s 上限，由 runner 自身 fail-closed）；
+更大范围 Miri/真机/FFI 证据仍为 local/manual（见 CAMPAIGN-1）。
 
 ## 结果词汇与声明边界
 

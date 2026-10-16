@@ -524,6 +524,139 @@ all are mounted by K0 as Fibers
 
 This is why the old “Playback Session is Component but not Plugin” taxonomy was corrected (Issue #138 basis; PBK-002 D12) without a production runtime redesign.
 
+## Error-system design round status (derived projection; routing in docs/README.md)
+
+The #231/#280/#283 error-system line is a DESIGN_CANDIDATE track, not
+authority and not implemented:
+
+```text
+frozen facts + boundary ledger -> docs/architecture/error-system-reconciliation.md
+target designs (DG-1..DG-4c)   -> docs/architecture/error-system-target-contract.md
+migration + acceptance designs -> docs/architecture/error-system-migration.md
+decision record (A–J directions,
+recommendations, amendment
+candidates, pending evidence)  -> docs/architecture/error-system-decision-record.md
+```
+
+2026-10-16 round (BASE e44aa80): CC-2 gate wiring landed (F5 TLA now triggers
+the formal gate; the f5-implementation mutation gate runs in CI as the
+`f5-implementation-mutations` job — during that wiring the M7 targeted oracle
+was found blinded by 8542386 and re-pinned to the stateful continuation
+probe); CC-3 model-comment corrections landed (comment-only, machine content
+byte-identical); owner directions A–J recorded; DG-1..DG-4c / real-cone
+oracle / E-1 harness designs delivered; F5 GAP-01 recommendation =
+EXTEND_EXISTING_MODEL behind acceptance-gated triggers. Production
+error/logging refactor: NOT STARTED (owner-gated via D-2..D-11).
+
+2026-10-16 R2 review revision (same round, PR #284): seven design findings
+corrected in the two design docs — DG-1 queue fixed-step/no-syscall claim
+withdrawn (full producer path re-compared; fixed-capacity inline record);
+DG-2 late-vs-terminal policy + owned-payload mechanics; DG-4a call-boundary
+attribution; DG-4b hook path atomics-only; DG-4c av_log tiered β/α (no
+copy-the-line); cone oracle T1 withdrawn (wasapi cfg(windows); open failure
+is activation-stage) with program-order A/B witnesses; E1-ABI calibration
+split into healthy-control + fault-configuration legs; W1–W6 rebuilt on real
+execution positions (one new test-fence arming point); M7 oracle recorded as
+time-windowed evidence. Gates and model comments unchanged by the revision.
+
+2026-10-16 R3 review revision (same round, PR #284): DG-1 split into two
+producer classes — isolation-obligated threads (cone/render/decode/cleanup)
+take no queue at all (atomics slot; #8's record moves after
+drain.complete(), making the cone logging-free structurally), ordinary host
+threads keep std sync_channel with the honest facts (fixed slots at creation,
+CAS+backoff no step bound, post-success notify takes an internal Mutex —
+P-cap without P-sync, verified against pinned 1.97.1 source); message
+composition restricted to a whitelisted segment vocabulary (arbitrary
+Display banned on producers); cone oracle N-A now requires a witnessed
+capacity wait (no-EOF fixture + produced-minus-consumed margin) and drops
+the parked-waiter precondition; W5 split into W5a/b/c by provider outcome
+with single-legal-outcome rows; DG-4a partial-success retention trade-off
+recorded as an owner-gated known loss.
+
+2026-10-16 R4 review revision (same round, PR #284, three findings): the
+class α slot is now a specified single-writer sequence-tagged per-producer
+protocol (seq-tag inhibit/publish triple, plain payload stores, drainer
+Acquire-verify copy, per-slot last-wins with bounded loss, poll-interval
+delivery latency stated as the isolation cost; the "one atomic swap /
+last-wins" phrasing withdrawn — a fixed record fits no single atomic
+exchange); the cone oracle N-A precondition witness r−(k−1) ≥ C_blocks is
+withdrawn (unit mismatch, difference ≠ edge occupancy, full edge ≠ worker
+in wait_for_space) — necessity is re-proven at the outcome level by exit
+enumeration under the frozen-consumer/no-EOF/no-fault regime, with no
+parked-at-injection claim; W5b split by remainder state into W5b-N (no
+remainder, witnessed first-command construction → Failed{decode}) and
+W5b-R (witnessed CutPoint remainder → loop-top flush meets the stopped
+edge → Stopped, old latch dropped with the old world).
+
+2026-10-16 R5 review revision (same round, PR #284, three findings): the
+R4 class α slot protocol (plain payload under a sequence tag, volatile
+copies) is withdrawn as memory-unsafe in Rust — concurrent plain
+read+write between drainer and producer is a data race the later discard
+cannot undo; redesigned as an explicit ownership handoff (per-producer
+two-record pool + pub/cons generation atomics; a record is written only
+while generation-unreachable by the drainer; acceptance gates ordered
+no-data-race first, then snapshot integrity, loss bound, producer cost;
+fences/volatile are not repairs; atomic-lane alternative retained with a
+memory-model proof burden); the "α delivery latency bounded by poll
+interval" claim is withdrawn — the drainer's obligation is a conditional
+poll-frequency convention (per β batch, ≥ once per recv_timeout window
+while idle) and delivery has NO deadline while an exporter blocks
+(declared unbounded residual); W5b-N's "first command ⇒ no remainder"
+witness is withdrawn (a read-park lets that first seek create its own
+remainder via the CutPoint arm) — rebuilt on the zero-frame read loop
+(session.rs:831-835 runs no write): whole blocks → plant command →
+zero-frames (no write path can observe it) → park latch after the last
+non-zero read → serialization point fires the parked seek with remainder
+provably None → next read surfaces the old fatal → Failed{decode}.
+
+2026-10-16 R6 review revision (same round, PR #284, three findings, all
+on the α pool protocol; R5-2 zero-frame construction and R5-3 poll
+convention accepted): (1) recycle direction corrected — the R5 producer
+loaded cons_gen Relaxed, so the drainer's copy was never ordered against
+the producer's overwrite (residual data race); both directions are now
+Release/Acquire pairs (publish: payload → Release pub_gen → Acquire →
+copy; recycle: copy → Release cons_gen → producer Acquire), and the
+"already structurally excluded" conclusion is withdrawn — exclusivity is
+asserted and obligated to the Loom/Kani gates; (2) admission arithmetic
+rewritten — the R5 `wrapping(n−2) > cons` form rejected the FIRST fault
+on an empty pool and plain `>` is not a modular order; now
+`pub.wrapping_sub(cons) == 2` → drop (empty pool d=0 accepts), 0 is the
+reserved none-sentinel skipped by the generation cycle, distances bounded
+to ≤ 2 by the admission rule itself; (3) consumption is in-order with no
+skips — the R5 latest-only copy silently skipped an intermediate
+generation with no count anywhere; the drainer now walks
+last_consumed+1 … pub (both records of a full pool delivered), loss
+occurs only at the producer admission check, accounting identity:
+written = delivered + producer drops. Protocol presented as an explicit
+pool state machine {d=0/1/2} whose enumerated states (first publish, two
+consecutive publishes, full-pool rejection, reuse after consumption,
+cross-wrap) are part of the binding no-data-race gate.
+
+2026-10-16 R7 review revision (same round, PR #284, two findings on the α
+pool arithmetic; the R6 two-direction Acquire and in-order consumption
+were accepted): (1) the R6 skip-0 generation cycle is withdrawn —
+executed at real u32 values it maps u32::MAX and 1 (both odd) to the
+SAME slot, overwriting an unconsumed record, and lets distance 3 past
+the ==2 full check (generations cycled mod 2^32−1 while wrapping_sub
+works mod 2^32); counters now wrap NATURALLY through 0, empty = counter
+equality, slot = generation % 2 (parity alternates through the wrap);
+(2) the loss identity is corrected to pool boundaries: attempted =
+accepted + rejected and accepted = copied_out + outstanding (the R6
+"written = delivered + drops" was wrong twice: rejections precede
+writes; outstanding was missing), with exporter outcome
+(ok/failed/abandoned) accounted separately from pool copy-out. Per the
+review directive (verify first, then sync docs), the design-candidate
+protocol now has EXECUTED evidence before the doc sync: a test-only
+model (qianqian-playback error_pool_model_tests.rs — no production
+code) with arithmetic tests at the reviewer's exact counterexample
+values, a loom schedule suite (picked up by the playback-concurrency
+lane), and local Miri clean across 33 seeds; negative controls in an
+isolated worktree: the R6 rule RED through two oracles, a Relaxed
+recycle load RED under many-seed Miri with the exact publish-vs-read
+race signature (the first single-schedule control run was green —
+premise-by-scheduling, diagnosed and fixed by yield-driven retries
+before the control was accepted).
+
 ---
 
 # Historical evidence
