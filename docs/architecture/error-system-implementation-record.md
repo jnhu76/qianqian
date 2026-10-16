@@ -3,7 +3,7 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: eleven commits, each reviewable on its own
+HEAD     the implementation branch's tip: fourteen commits, each reviewable on its own
 ```
 
 This document records what an implementation round actually landed against the
@@ -81,6 +81,15 @@ priority, recovery strategy, public semantics, the SongCore ABI, or K0 authority
    explanation; one bounded clone on the cold publication path. The public
    contract change went through the audio-api surface gate's own regeneration
    procedure with a reviewed diff.
+10. **loom feature propagation across the new dependency edge** — `RUSTFLAGS`
+    is global (every crate in a `--cfg loom` build sees the cfg) while
+    `--features` is package-scoped, so the playback `loom` feature now carries
+    `qianqian-diagnostics/loom`. Without it, the pool crate — reached from the
+    playback session — compiled under `--cfg loom` with no loom crate to link
+    against (E0433), which is what the first CI run of the Rust gate caught;
+    the same edge also added `crates/qianqian-diagnostics/**` to that gate's
+    trigger paths, and the playback-concurrency lane now plays back the pool's
+    own two schedule tests.
 
 ## 3. Deletions and replacements (no dual tracks)
 
@@ -112,8 +121,9 @@ priority, recovery strategy, public semantics, the SongCore ABI, or K0 authority
 | Windows compile | `cargo check --target x86_64-pc-windows-gnu -p qianqian-output-wasapi --tests` | mingw target, Linux host | exit 0; a `compile_error!` sight control proved the test target was really compiled | compilation is not runtime evidence |
 | Loom (final pool) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | same | 2/2 schedule-clean (base + cross-wrap states) | explored-schedule bound, not a general proof |
 | Miri (final pool) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | nightly Miri, real threads | clean over the seeds | Miri's scheduling is still a sample per seed |
+| playback-concurrency lane (CI fix) | `bash specs/playback-concurrency/check.sh` | rustc 1.97.1, Linux, `/tmp/errlog/lane-postfix-20261016T170540.log` | native BOUNDED-CLEAN; loom SCHEDULE-CLEAN (12/12, 158.2 s); pool-loom SCHEDULE-CLEAN (production α pool, 2/2); M-L1 COUNTEREXAMPLE-WITNESSED | bounded schedules; this is the lane the Rust gate job runs |
 | Full local gate | `lefthook run pre-push --all-files` | same | 8/8 steps green (commit-convention, vocabulary, plugin-boundary incl. its negative controls, rust-fmt, rust-clippy, rust-test, release-policy, docs-verify); 918 tests passed / 0 failed | the gate proves the working tree, not the Windows/formal/concurrency lanes |
-| Commit convention | `python3 tools/check_commit_convention.py --range 79c6d78 HEAD` | same | 11/11 PASS | header grammar only |
+| Commit convention | `python3 tools/check_commit_convention.py --range 79c6d78 HEAD` | same | 14/14 PASS | header grammar only |
 
 Negative controls executed this round, each reverted byte-identically and each
 re-verified on the final tree: the DG-1 Relaxed-recycle pool control (Miri RED with
@@ -184,7 +194,8 @@ review can move them deliberately.
 ## 8. Evidence correspondence (design clause → instrument)
 
 ```text
-DG-1 (facility, isolation, shutdown)     qianqian-diagnostics src/tests + Loom + Miri + the
+DG-1 (facility, isolation, shutdown)     qianqian-diagnostics src/tests + Loom (played back
+                                         by the playback-concurrency lane) + Miri + the
                                          App install/shutdown wiring in apps/headless/src/entry.rs
 DG-2 (carrier B)                         ports.rs surface (+ audio-api snapshot), wasapi abort
                                          sites, e1_worker_tests dg2_* pair, completion.rs mirror

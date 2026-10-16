@@ -3,7 +3,9 @@
 # QIANQIAN-VERIFICATION-CAMPAIGN-1, Phase B2).
 #
 # Fail-closed contract:
-#   - the loom model suite must come back green, else exit != 0;
+#   - the two loom model suites (the real PcmEdge, and the production
+#     class-α pool that the playback loom build already compiles) must
+#     come back green, else exit != 0;
 #   - the negative control (dropped data_ready notify) MUST be caught by
 #     a loom deadlock/failed schedule — a clean mutated run is
 #     TOOLING-FAIL and exits != 0;
@@ -54,6 +56,25 @@ else
   echo "RESULT loom FAILED"
   fail=1
 fi
+
+echo "== loom model suite (production class-α pool, --cfg loom) =="
+# The session registers the pool (session.rs) for the decode worker, so the
+# pool crate is inside the playback loom build above; this runs its own two
+# schedule explorations (base + cross-wrap) over the production type. The
+# cfg(not(loom)) arithmetic-oracle partition stays in the ordinary suite.
+# Same emptied-suite guard as the native step: a silent no-op green is a
+# failure, not a pass.
+POOL_LOG="$(mktemp)"
+if RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib > "$POOL_LOG" 2>&1 \
+  && ! grep -q "test result: FAILED" "$POOL_LOG" \
+  && grep -qE "test result: ok\. [1-9][0-9]* passed" "$POOL_LOG"; then
+  echo "RESULT pool-loom SCHEDULE-CLEAN"
+else
+  echo "RESULT pool-loom FAILED"
+  tail -5 "$POOL_LOG"
+  fail=1
+fi
+rm -f "$POOL_LOG"
 
 echo "== negative control: drop data_ready notify (M-L1) =="
 if ! git apply --whitespace=nowarn "$PATCH"; then

@@ -29,12 +29,16 @@ name: Verification Rust Gate
 # restore byte-exact — a green mutated run is TOOLING-FAIL there.
 #
 # Trigger paths are repository-reality scoped: the verified production
-# crates (kernel + playback + audio-api), the suite definitions
-# themselves, and the authority documents the Rust refinement evidence
-# is checked against (K0 design/implementation ADRs — the composition
-# refinement matrix claims them; ADR-PBK-002 D8/D11 — the PCM data-plane
-# boundary and the episode terminal-outcome authority realized by
-# qianqian-playback). crates/qianqian-audio-api IS listed: its src/
+# crates (kernel + playback + audio-api + the diagnostics pool), the suite
+# definitions themselves, and the authority documents the Rust refinement
+# evidence is checked against (K0 design/implementation ADRs — the
+# composition refinement matrix claims them; ADR-PBK-002 D8/D11 — the PCM
+# data-plane boundary and the episode terminal-outcome authority realized
+# by qianqian-playback). crates/qianqian-diagnostics IS listed: the
+# playback session registers its class-α pool (the decode worker's only
+# creation site), so the pool crate is compiled by this gate's playback
+# partition — under `--cfg loom` too — and the playback-concurrency lane
+# runs its two schedule tests. crates/qianqian-audio-api IS listed: its src/
 # ports.rs hosts the F5 implementation mutation targets RenderGate /
 # TailProbeOutcome / PositionEvidence (M4/M11 patch set), and the P1–P5
 # test-local candidate harness under its tests/ stays covered by the
@@ -65,6 +69,11 @@ on:
       - "crates/qianqian-composition/**"
       - "crates/qianqian-playback/**"
       - "crates/qianqian-audio-api/**"
+      # The host diagnostic outlet (error-system target contract §DG-1):
+      # compiled inside the playback partition and its loom build (the
+      # session registers the class-α pool), so pool changes can break
+      # this gate and must re-trigger it.
+      - "crates/qianqian-diagnostics/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
       # F5 implementation mutation gate: the patch set itself and the
@@ -85,6 +94,8 @@ on:
       - "crates/qianqian-composition/**"
       - "crates/qianqian-playback/**"
       - "crates/qianqian-audio-api/**"
+      # The host diagnostic outlet (see pull_request above).
+      - "crates/qianqian-diagnostics/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
       # F5 implementation mutation gate (see pull_request above).

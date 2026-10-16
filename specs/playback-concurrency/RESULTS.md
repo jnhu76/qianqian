@@ -97,3 +97,31 @@ C6 (failure × completion publication authority) and the
 `session_activation`/`edge_lifecycle` suites under CPU pressure (Phase
 B4 stress) and by the Miri pass; they are recorded there, not claimed
 as loom results.
+
+## Lane extension — production class-α pool (2026-10-16, PR #287 CI fix)
+
+The error-system implementation landed the production class-α
+ownership-handoff pool in `qianqian-diagnostics`, registered from the
+playback session (the decode worker's only creation site). That dependency
+edge puts the pool crate inside this lane's playback loom build
+(`RUSTFLAGS` is global; the playback `loom` feature now carries
+`qianqian-diagnostics/loom`), so the lane also runs the pool's own two
+schedule explorations over the production type:
+
+```text
+pool-loom-base       2 threads (producer × drainer), ≤ 2 records, 3 publish
+                     attempts × 2 drains. Asserts exclusivity (each copied
+                     record whole), order (no skip/duplicate), the admission
+                     bound and both accounting identities — under every
+                     explored schedule.
+pool-loom-cross-wrap same protocol with counters at u32::MAX-1: slot parity
+                     and the modular admission distance are explored through
+                     the natural wrap.
+```
+
+Duty split (implementation record §2): loom verifies the synchronizes-with
+structure of the protocol (which the Release/Acquire loads control); the
+`UnsafeCell` payload data race is Miri's duty — the Relaxed-recycle negative
+control is red under Miri, not here. The `cfg(not(loom))` arithmetic-oracle
+partition of `pool.rs` stays in the ordinary (non-loom) diagnostics suite.
+A clean run is SCHEDULE-CLEAN within the stated bounds, not a general proof.
