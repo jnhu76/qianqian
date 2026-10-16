@@ -3,9 +3,10 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: thirty-one commits, each reviewable on its own;
-         the last fifteen close the owner's four #287 review rounds (§9 first round,
-         §10 second round, §11 the close protocol, §12 the oracle premise)
+HEAD     the implementation branch's tip: thirty-three commits, each reviewable on its own;
+         fifteen of them close the owner's four #287 review rounds (§9 first round,
+         §10 second round, §11 the close protocol, §12 the oracle premise); the tip adds the
+         loom-lane test-hygiene fix surfaced by the round-4 CI log (§12.6)
 ```
 
 This document records what an implementation round actually landed against the
@@ -516,3 +517,17 @@ establishing its own premise.
 * Windows runtime evidence for the close protocol and the pinned oracles — the round-4 witnesses
   are Linux-host real-thread runs; the mechanism is ordinary std synchronization, but no Windows
   execution was performed (acceptance pending, unchanged).
+
+### 12.6 Follow-up: the loom lane's unused test import (surfaced by the round-4 CI log)
+
+The round-4 CI log showed one warning in the loom lane: `unused import: super::*` at
+`crates/qianqian-playback/src/completion.rs:1689`. The import belongs to the E1-WORKER test module
+whose every item is itself `not(loom)`-gated, so under `--cfg loom` the module is empty and the
+glob has no user — a test-hygiene defect introduced with that family, invisible to the
+debug-profile gate (where every item is active and the import is used). The import is now gated
+under the same cfg as its users; no production code changed.
+
+Verified on the fixed tree: the loom suite 12 passed / 0 failed with **zero warnings** (previously
+12 passed + 1 warning); `cargo test -p qianqian-playback --lib` 207 passed / 0 failed; clippy
+`--all-targets -- -D warnings` clean; `cargo fmt --all --check` clean; `specs/check.sh rust`
+re-run — LANE_RC=0 with the unchanged `RESULT` set and no warnings in the lane log.
