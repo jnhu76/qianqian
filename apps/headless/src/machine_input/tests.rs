@@ -830,8 +830,7 @@ fn dg4b_child_witness() {
     let witness = std::thread::Builder::new()
         .name(thread_name.into())
         .spawn(move || {
-            let registration = registered
-                .then(qianqian_diagnostics::AlphaRegistration::register);
+            let registration = registered.then(qianqian_diagnostics::AlphaRegistration::register);
             for _ in 0..panics {
                 let _ = catch_unwind(|| panic!("dg4b injected panic"));
             }
@@ -1017,8 +1016,7 @@ fn dg4b_blocked_stderr_child_witness() {
             let caught = std::thread::Builder::new()
                 .name("qianqian-decode".into())
                 .spawn(|| {
-                    let _registration =
-                        qianqian_diagnostics::AlphaRegistration::register();
+                    let _registration = qianqian_diagnostics::AlphaRegistration::register();
                     let mut caught = 0usize;
                     for _ in 0..2 {
                         if catch_unwind(|| panic!("dg4b blocked-pipe panic")).is_err() {

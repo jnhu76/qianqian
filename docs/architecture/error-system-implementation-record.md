@@ -3,7 +3,8 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: fourteen commits, each reviewable on its own
+HEAD     the implementation branch's tip: twenty-one commits, each reviewable on its own;
+         the last five close the owner's #287 review round (§9)
 ```
 
 This document records what an implementation round actually landed against the
@@ -170,9 +171,14 @@ interpolated values are required; none exists today.
 (rather than through activation), the decode chain's frozen public surface needs
 its own amendment. Not requested here.
 
-**DG-4b registry membership** — the reader is the only registered critical thread.
-Adding render/decode names is a one-line registry change *if* their default prints
-ever need suppression; today they do not.
+**DG-4b registry membership — SETTLED by the owner's #287 review (§9).** The
+predicate is the outlet's own thread fact (`is_alpha_producer`), not a name list, and
+the posture installs at transport startup. The review's finding showed the
+"reader-only" reading was wrong in principle: a render/decode panic that chains to
+the previous hook can block on the process stderr lock (the default hook prints
+through it) BEFORE its `catch_unwind`, and the threads that `join` those legs — the
+session teardown's worker join, the render cone that must run after the catch —
+would then wait on a diagnostic sink.
 
 **Residual representation parameters** — record message bound (192 bytes), β
 capacity (256), drain deadline (500 ms), and the abort-reason message cap (512
@@ -207,3 +213,66 @@ DG-4c (av_log)                           decode-songcore av_log_bridge tests (6)
 §7.5 E1-WORKER                           qianqian-playback e1_worker_tests (12)
 §7.6 F5 extension                        gate verified here; model unchanged (§6 D-C)
 ```
+
+## 9. Owner-review round (#287 review, 2026-10-16) — production boundaries closed
+
+The review verdict accepted the CI fix and listed six production findings (3 P1, 3 P2)
+against the frozen head `68111ab`. All six were adjudicated VALID against the code and
+the design set; none of them required a semantics change, and none was answered by a
+documentation note. What changed, and how each one is witnessed:
+
+| Finding | What was actually wrong | Change | Witness (executed) |
+|---|---|---|---|
+| P1 — pool roles not enforced by the API | `AlphaPool` was `Sync` with public safe `publish(&self)`/`drain(&self, …)` and a public `AlphaRegistration::pool() -> &'static AlphaPool`: safe code could put two producers (or two consumers) on one pool — a data race in safe Rust | The core is crate-private; the producer role is the thread-bound `AlphaRegistration` (not `Send`/`Sync`/`Clone`) via that thread's TLS pointer; the consumer role is the drainer's walk with the position inside the core | protocol suites unchanged and green (arithmetic, Loom, Miri); `pool()` gone from the public surface; the av_log/exit witnesses now observe at the drainer's sink |
+| P1 — abandonment report re-entered the stuck sink | `shutdown_host_diagnostics` wrote its report synchronously after `shutdown` returned `abandoned`; for stderr that means waiting on the process stderr lock the stuck drainer holds — exit handed back to the sink | Abandoned reports are attempted by a detached, never-joined writer; drained reports stay synchronous (the sink is proven not stuck) | `apps/headless/src/entry/shutdown_tests.rs`: child with an unread stderr pipe, drainer stalled at `consumed=1263` with a 256-record backlog (the pipe is objectively full), child printed `SHUTDOWN-RETURNED` and exited 0 |
+| P1 — `previous(info)` on render/decode panics | The hook's isolation predicate was a thread-NAME list (`qianqian-stdin`), so a panic on a registered decode/render thread chained into an unknown hook — the default one prints through the global stderr lock and blocks BEFORE `catch_unwind`, so the join/completion paths that wait on those threads were gated on a diagnostic sink | The predicate is the outlet's own registration fact (`is_alpha_producer`); the posture installs at transport startup, before any decode worker/render thread exists | `machine_input/tests.rs` DG-4b witness: registered-noncritical-name isolated, reader-named-unregistered chains, and a registered thread panicking twice with a FULL stderr still unwinds and ends |
+| P2 — real sink write failures counted as delivered | `write_stderr_line` swallowed the I/O result and `StderrExporter::export` returned `Ok(())` unconditionally: a closed descriptor (EPIPE) incremented `exported` | The writer returns its I/O result; the exporter maps a failure to an export failure (counted lost, exporter disabled, one self-diagnostic); `flush` likewise; blocked-vs-failed is now explicit | `crates/qianqian-diagnostics/tests/stderr_delivery_failure.rs`: child whose stderr read end is dropped — `exported=0`, `export_failed=5`, identity holds, `self_diagnostics=1` |
+| P2 — producer path could wait on clock init | `Record::stamped` called `OnceLock::get_or_init`, so the first producer on a fresh clock entered initialization synchronization | The clock is started on cold paths (installation, registration); `stamped` only reads and reports `0` = no timestamp | `crates/qianqian-diagnostics/tests/clock_cold_path.rs` (own process): two stamps with a 5 ms gap stay 0; registration and installation each start it |
+| P2 — per-episode pools leaked and poll cost grew | Every registration `Box::leak`ed a pool into an append-only registry; `poll_pools` searched a cursor per pool, so cost grew with the process's episode history (decode/render threads are per-episode) | Registration `Drop` publishes `retired` (Release); the drainer walks the residual records ordered behind its Acquire load, folds the counters into the facility totals, and releases the pool; the drain cursor lives in the core (no lookup) | `crates/qianqian-diagnostics/src/lib.rs` unit oracles: live pool never reaped, retired pool residual-drained then released (`Arc::strong_count == 1`), counters folded |
+
+Round-local representation notes (no semantics): the fold-into-totals choice is the
+target contract's residual `MECHANISM_OPEN` item ("whether per-pool loss counters stay
+separate or fold into the global dropped counter") — the review's retirement protocol
+makes the fold the only way to keep the totals across a release. The tests that used to
+reach into a pool now observe at the drainer's sink
+(`crates/qianqian-decode-songcore/tests/common/outlet.rs`), which is the honest
+observation boundary the role enforcement leaves.
+
+### 9.1 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| Diagnostics crate | `cargo test -p qianqian-diagnostics` | green (8 unit + 7 integration binaries) | Linux only |
+| Decode chain | `cargo test --manifest-path crates/qianqian-decode-songcore/Cargo.toml --lib` | green incl. the re-pointed DG-4c witnesses | corpus-limited as before |
+| App + machine input | `cargo test -p qianqian-headless --lib machine_input` | green (23) incl. the extended DG-4b witness and the blocked-stderr legs | Linux only |
+| Host exit boundary | `cargo test -p qianqian-headless --lib entry::shutdown_tests -- --nocapture` | green; child evidence `SINK-BLOCKED consumed=1263 backlog=256`, `SHUTDOWN-RETURNED`, exit 0 | Linux only; stderr pipe semantics |
+| Clock | `cargo test -p qianqian-diagnostics --test clock_cold_path` | green (own process) | — |
+| Broken sink | `cargo test -p qianqian-diagnostics --test stderr_delivery_failure` | green; `exported=0 export_failed=5` | EPIPE path; not a full-disk path |
+| Pool protocol (Loom) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | SCHEDULE-CLEAN (same two models; protocol unchanged) | explored-schedule bound |
+| Pool protocol (Miri) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | clean over the seeds | Miri samples one schedule per seed |
+| Whole workspace | `cargo test --workspace --no-fail-fast` | 928 passed / 0 failed over 56 test binaries | Linux only |
+| Playback-concurrency lane | `specs/check.sh rust` (the CI invocation) | green: `RESULT matrices(native) BOUNDED-CLEAN`, `matrices(miri) MIRI-CLEAN`, M-K1/K2/K3 witnessed, `RESULT native BOUNDED-CLEAN`, loom 12/12 (155.77 s), `RESULT pool-loom SCHEDULE-CLEAN`, `RESULT M-L1 COUNTEREXAMPLE-WITNESSED`; both `SUITE:` lines clean | bounds as before |
+| Full local gate | `lefthook run pre-push --all-files` | green | proves the working tree, not Windows/formal lanes |
+
+Negative controls executed for this round (each reverted byte-identically afterwards,
+each RED with the documented signature): the synchronous abandonment report (the F2
+child never exits), the name-based hook predicate (the F3 isolated leg never exits), the
+swallowing stderr writer (F4 reports `exported=5`), the `get_or_init` clock (F5's second
+stamp is non-zero), and the disabled pool reaping (F6's release oracle fails).
+
+Commit hygiene note: `cargo fmt` reflowed a few of the round's own lines
+(assert-argument wrapping, two `.then(...)` calls) after the four fix commits were
+written; the reflow rides in this documentation commit rather than being rewritten
+into them. The final tree is fmt-clean and the pre-push gate is authoritative.
+
+### 9.2 Still NOT_RUN (unchanged from §5 unless stated)
+
+* O-CONE-NECESSITY / O-CONE-ORDER runtime runs and their mutations — Linux host,
+  `wasapi.rs` is `#[cfg(windows)]` (unchanged).
+* E-7 tier 1 writer-swap controls — needs the Windows endpoint and the volume-apply
+  fault seam (unchanged).
+* Windows runtime evidence for the new carrier B reason (unchanged).
+* The F2/F3 witnesses above are Linux-process evidence: the std facts they rely on
+  (stderr's global lock; the exit path touching stdout only; the default hook printing
+  through that lock) were verified against the pinned toolchain's own source, but the
+  runs themselves are Linux.

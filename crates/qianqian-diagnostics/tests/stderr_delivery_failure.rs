@@ -54,11 +54,7 @@ fn broken_stderr_child_witness() {
 #[test]
 fn a_broken_stderr_descriptor_is_counted_as_a_failed_delivery() {
     let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
-        .args([
-            "--exact",
-            "broken_stderr_child_witness",
-            "--nocapture",
-        ])
+        .args(["--exact", "broken_stderr_child_witness", "--nocapture"])
         .env(DELIVERY_SCENARIO, "broken-stderr")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

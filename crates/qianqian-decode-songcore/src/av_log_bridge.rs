@@ -370,10 +370,7 @@ mod tests {
         assert_eq!(registration.attempted(), 1);
         let expected = format!("{BRIDGE_SITE}|info|DG4CClass: named item");
         let delivered = outlet.wait_for_line(|line| line == expected, "the class-name record");
-        assert_eq!(
-            delivered, expected,
-            "the class name prefixes the record"
-        );
+        assert_eq!(delivered, expected, "the class name prefixes the record");
     }
 
     /// The env gate: without the opt-in the bridge is not installed and the

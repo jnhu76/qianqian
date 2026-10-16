@@ -1159,7 +1159,10 @@ mod tests {
             .last()
             .cloned()
             .expect("the registration appended its pool");
-        assert!(is_alpha_producer(), "this thread is class α while registered");
+        assert!(
+            is_alpha_producer(),
+            "this thread is class α while registered"
+        );
         assert_eq!(emit(record(1)), Disposition::AlphaRecorded);
         assert_eq!(emit(record(2)), Disposition::AlphaRecorded);
         assert_eq!(pool.outstanding(), 2, "both records wait in the pool");
@@ -1187,7 +1190,10 @@ mod tests {
         // The producer leaves, and publishes nothing further: the thread's fast
         // path closes first, then retirement is published.
         drop(registration);
-        assert!(!is_alpha_producer(), "the fast path is closed with the guard");
+        assert!(
+            !is_alpha_producer(),
+            "the fast path is closed with the guard"
+        );
         assert!(pool.is_retired());
 
         poll_pools(&inner, &mut exporter, &mut disabled);

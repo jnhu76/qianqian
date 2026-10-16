@@ -92,14 +92,14 @@ impl Outlet {
     /// The wait is the drainer's poll cadence, not a delivery deadline: the
     /// poll contract is a conditional frequency, so a bounded wait is the test
     /// harness's, never the facility's.
-    pub(crate) fn wait_for_line(
-        &self,
-        matches: impl Fn(&str) -> bool,
-        what: &str,
-    ) -> String {
+    pub(crate) fn wait_for_line(&self, matches: impl Fn(&str) -> bool, what: &str) -> String {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
-            if let Some(line) = self.delivered_lines().into_iter().find(|line| matches(line)) {
+            if let Some(line) = self
+                .delivered_lines()
+                .into_iter()
+                .find(|line| matches(line))
+            {
                 return line;
             }
             assert!(

@@ -229,6 +229,39 @@ production APIs land only through their own review. Every code anchor is @e44aa8
 > structurally log-free). Round-local representation choices — bounds, drain deadline, and the
 > Loom/Miri duty split for the payload cell — plus the executed evidence are indexed in
 > `error-system-implementation-record.md` §2/§4. This design text remains the target.
+>
+> **Owner-review amendments (2026-10-16, #287 review round; recorded, not a second design).**
+> Five production boundaries were closed on the landed implementation; each one keeps this
+> design's semantics and tightens how the code holds it:
+>
+> * **Roles are enforced by types, not by the register convention.** The pool core is
+>   crate-private; the producer role is the registering thread's `AlphaRegistration`
+>   (not `Send`, not `Sync`, not clonable) reached through that thread's TLS pointer, and the
+>   consumer role is the facility's single drainer (the walk position lives in the pool core,
+>   so there is no caller-supplied cursor to duplicate). The "one pool per registered α
+>   producer / no two α producers ever touch the same pool" invariant below is therefore a
+>   property of the API rather than an assumption about callers — the landed form had exposed
+>   a safe `publish(&self)` on a `Sync` pool, i.e. a safe-Rust data race for any caller that
+>   shared it.
+> * **Producer exit is part of the ownership handoff** (the design's per-registered-producer
+>   pool statement made concrete): registration `Drop` closes the thread's fast path and then
+>   Release-publishes `retired`; the drainer walks the residual records ordered behind an
+>   Acquire load of it, folds the pool's counters into the facility totals (the residual
+>   `MECHANISM_OPEN` below), and releases the pool. The registry therefore tracks LIVE
+>   producers, which also bounds the per-poll cost by the number of live α producers instead of
+>   the process's episode history, and it satisfies "the slots are dropped" without waiting for
+>   the drainer join.
+> * **The process clock is a cold-path setting** (installation, registration); `Record::stamped`
+>   only reads it and reports `ts_micros = 0` when it was never started. A producer that
+>   initialized it would enter `OnceLock` initialization synchronization on the class-α path.
+> * **Sink failure and sink blockage are different outcomes**: the built-in stderr exporter
+>   propagates a real write error (`EPIPE`, a bad descriptor, a full disk) as an export
+>   failure — counted as a loss, never as delivered — while a write that is still in progress
+>   keeps its declared unbounded residual and the bounded-or-honest shutdown above.
+> * **The host's abandoned-drainer report obeys the exit boundary**: when the drainer was
+>   abandoned the sink is stuck by definition, so the report is attempted on a detached,
+>   never-joined writer instead of synchronously re-entering the sink. (std's own exit cleanup
+>   touches stdout only, so nothing else at exit can wait on stderr.)
 
 ### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
 
@@ -1006,6 +1039,25 @@ facade producer.
 > the plugin-boundary gate (audit §7.5 / MAJOR-3), so the host owns the decision through the
 > existing `QIANQIAN_FFMPEG_LOG` switch, and activation precedes every `song_open` this provider
 > can serve. Tier α stays unadmitted. See `error-system-implementation-record.md` §2.6/§6.
+
+> **Implementation status (2026-10-16, #287 review round)**: LANDED — the single installer
+> lives in `machine_input` and the posture is installed by the host at TRANSPORT STARTUP
+> (`entry.rs`), before any decode worker or render thread exists; `spawn_reader` also calls it,
+> so a reader-only test still gets the production posture.
+>
+> The owner-review amendment settles the registry-membership question below: the isolation
+> predicate is the DIAGNOSTIC OUTLET'S OWN thread fact — `is_alpha_producer()`, i.e. "this
+> thread registered a class-α pool" — not a name list. That is the same fact the producer
+> classification uses (DG-1's "class α = isolation-obligated producers"), so the two cannot
+> drift, and the render leg, the decode worker and the stdin reader are all covered by
+> construction. Rationale made explicit: each of those threads' progress is awaited by another
+> thread (the session teardown joins the decode worker; the render leg's catch must reach the
+> failure-publication cone; the machine transport seals on the reader), and std's default hook
+> prints through the process-global stderr lock — so chaining it from such a thread would let a
+> diagnostic sink decide when a join or a completion happens. Witnessed on real threads: a
+> registered thread with a non-critical name is isolated, a reader-NAMED thread that never
+> registered chains, and a registered thread panicking twice while stderr is a full pipe still
+> unwinds and ends (`apps/headless/src/machine_input/tests.rs`).
 
 ### DG-4c — FFmpeg av_log posture (T5-9)
 
