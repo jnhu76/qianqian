@@ -24,6 +24,8 @@ use qianqian_composition::{ActivationError, ComponentSpec};
 use qianqian_diagnostics::{Level, Record, Text, emit};
 use qianqian_songcore_sys as sys;
 
+pub mod av_log_bridge;
+
 /// The adapter's diagnostic site tag (DG-3's consumer-facing identity).
 const DIAGNOSTIC_SITE: &str = "qianqian-decode-songcore";
 
