@@ -33,7 +33,10 @@
 //!
 //! Shutdown is bounded-or-honest: the host stops admission, waits a bounded
 //! deadline for the drainer's final sweep, and then ABANDONS the thread if it
-//! is stuck inside a blocking sink. An abandoned shutdown is reported as
+//! is stuck inside a blocking sink. Admission stops for BOTH producer classes,
+//! and a late presentation is dropped and counted at its own class's admission
+//! boundary ([`Diagnostics::shutdown`] declares the one race residual that
+//! producer quiescence cannot remove). An abandoned shutdown is reported as
 //! such — never dressed up as "drain complete" — and lost records are counted.
 //! The abandonment report itself is attempted off the exit path (a detached,
 //! never-joined writer): the sink is stuck by the abandonment rule, so the
@@ -311,8 +314,10 @@ pub enum Disposition {
     BetaQueued,
     /// The class-β channel was full: dropped + counted, no retry.
     BetaRejected,
-    /// Shutdown has begun: dropped + counted (a late producer never revives
-    /// the drainer).
+    /// Shutdown has begun: dropped + counted, never published (a late producer
+    /// never revives the drainer). Checked first, for both classes: a class-α
+    /// thread's presentation is counted at its own pool's admission boundary, a
+    /// class-β presentation at the channel's.
     Shutdown,
     /// Called from the drainer thread itself: dropped (no reentry).
     Reentry,
@@ -629,7 +634,8 @@ const PANIC_MESSAGE: &str = "panic on an isolation-obligated thread";
 /// The DG-4b panic-hook entry point: ATOMICS ONLY.
 ///
 /// Per panic: one relaxed counter increment, always. Then, on a thread that
-/// registered a class-α pool, at most ONE bounded publication into that pool
+/// registered a class-α pool AND while the facility still admits (see
+/// [`Diagnostics::shutdown`]), at most ONE bounded publication into that pool
 /// ([`pool::AlphaPool::publish_panic_once`]); a thread with no registered pool
 /// gets the count only — the hook never touches the class-β channel, whose
 /// send path may take internal synchronization.
@@ -641,6 +647,16 @@ const PANIC_MESSAGE: &str = "panic on an isolation-obligated thread";
 /// thread that initializes it.
 pub fn note_critical_panic() -> Disposition {
     CRITICAL_PANICS.fetch_add(1, Ordering::Relaxed);
+    // Terminal admission, the same first check `emit` makes: after shutdown the
+    // pool has no consumer, so the one-shot publication is not attempted. The
+    // increment above — taken unconditionally — is the authoritative fact, and
+    // it is already recorded.
+    if FACILITY
+        .get()
+        .is_some_and(|inner| inner.shutdown.load(Ordering::Acquire))
+    {
+        return Disposition::Shutdown;
+    }
     let record =
         Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
     match with_current_pool(|pool| {
@@ -663,6 +679,24 @@ pub fn critical_panics() -> u64 {
 /// Emit one diagnostic record. Never blocks, never panics, never allocates on
 /// the producer path, and never waits for a sink.
 pub fn emit(record: Record) -> Disposition {
+    let inner = FACILITY.get();
+    // TERMINAL admission is checked first, for BOTH classes: once shutdown has
+    // begun, the drainer's final sweep has run (or is about to), and a record
+    // admitted now would be stranded with no consumer left — counted as
+    // nothing, because "accepted" claimed it would be delivered. The check
+    // narrows the window rather than closing it: a producer cannot be required
+    // to be quiescent (the host's stdin reader is detached), so a publication
+    // that races the final sweep of its own pool is still possible and is
+    // declared on `Diagnostics::shutdown` (neither delivered nor counted).
+    if inner.is_some_and(|inner| inner.shutdown.load(Ordering::Acquire)) {
+        let counted = with_current_pool(|pool| pool.reject_presentation()).is_some();
+        // No pool on this thread: the class-β admission-loss counter is the
+        // only home for the presentation.
+        if !counted && let Some(inner) = inner {
+            inner.beta_rejected.fetch_add(1, Ordering::Relaxed);
+        }
+        return Disposition::Shutdown;
+    }
     if let Some(disposition) = with_current_pool(|pool| {
         if pool.publish(record) {
             Disposition::AlphaRecorded
@@ -672,12 +706,14 @@ pub fn emit(record: Record) -> Disposition {
     }) {
         return disposition;
     }
-    let Some(inner) = FACILITY.get() else {
+    let Some(inner) = inner else {
         return Disposition::NoSink;
     };
     if IS_DRAINER.with(Cell::get) {
         return Disposition::Reentry;
     }
+    // The class-β path keeps its own check: this call may have raced the flag
+    // between the terminal check above and here.
     if inner.shutdown.load(Ordering::Acquire) {
         inner.beta_rejected.fetch_add(1, Ordering::Relaxed);
         return Disposition::Shutdown;
@@ -760,6 +796,17 @@ impl Diagnostics {
     /// Stop admitting records, wait a BOUNDED deadline for the drainer's final
     /// sweep, then abandon if it is stuck in a blocking sink. An abandoned
     /// shutdown is reported honestly and its records are counted as lost.
+    ///
+    /// Terminal admission: once the flag this sets is observed, [`emit`] and
+    /// [`note_critical_panic`] reject further presentations — dropped and
+    /// counted, never published — because the final sweep is the last consumer
+    /// there will be. Producer quiescence is neither required by this method
+    /// nor enforceable (the host's stdin reader has a detached lifetime), so
+    /// one residual is DECLARED rather than hidden: a publication that races
+    /// the final sweep of its own pool can still land after that pool was
+    /// walked, and such a record is neither delivered nor counted (the facility
+    /// is closed; the process that shut it down is exiting). A presentation
+    /// made after this call returned is always observed and always counted.
     pub fn shutdown(&self, deadline: Duration) -> ShutdownReport {
         self.inner.shutdown.store(true, Ordering::Release);
         let started = Instant::now();

@@ -170,6 +170,16 @@ impl PoolCore {
         true
     }
 
+    /// Account one presentation the FACILITY rejected before any publication
+    /// attempt — its shutdown admission loss. Same boundary semantics as a
+    /// full-pool rejection (`attempted`/`rejected` advance, `accepted` does
+    /// not), but decided by the facility's terminal state, not by the pool's
+    /// own admission check; no slot and no generation counter is touched.
+    pub(crate) fn reject_presentation(&self) {
+        self.attempted.fetch_add(1, Ordering::Relaxed);
+        self.rejected.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// One-shot publish for the DG-4b panic path. A panic hook may fire more
     /// than once on the same thread (a caught panic, then another); the FIRST
     /// fire publishes, later ones return `false` and are counted by the hook
