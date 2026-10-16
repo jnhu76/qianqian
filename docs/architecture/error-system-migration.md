@@ -458,16 +458,31 @@ teardown oracle binds `TestOutput`, whose own test leg calls `input.stop()` /
 while teardown's decode-relation `edge.stop()` ends the episode independently — no
 line of wasapi.rs executes. A new oracle must execute the real cone.
 
-**Real-cone drive — two tiers compared.**
+**Real-cone drive — corrected platform facts (R2 review 2026-10-16).** The earlier
+"T1 — platform-neutral open-failure cone via the real `run_render_thread` on
+non-Windows" tier is **withdrawn as unexecutable**: the whole `wasapi` module is
+`#[cfg(windows)]` (output-wasapi lib.rs:35-36), so on every other platform the cone
+code does not exist in the binary at all — the Output Plugin's activation refuses
+at `selected_backend()` with an explicit platform error (lib.rs:67-75), an
+*activation* failure (K0 `activation_error`), never a live episode. Equally, an
+open failure — even on Windows, `OpenVerdict::Failed`/timeout →
+`abort_render_thread` + `Err(OutputError)` (wasapi.rs:168-179) — is
+activation-stage evidence: it must never be asserted as a live episode's
+`wait_terminal → Failed{device}`. No platform-neutral real-cone tier exists; an
+oracle on non-Windows would verify nothing. The corrected tiers:
 
 | Tier | How the abort is produced | What is real | Cost / limit |
 |---|---|---|---|
-| T1 — platform-neutral open-failure cone | spawn the real `run_render_thread` through the real `open_stream` handshake on non-Windows: `CoInitializeEx` fails → catch #1 → `LoopOutcome::Aborted` → the real post-catch print + `render_input.stop()` + `drain.complete()` + join all execute | the cone code, the open handshake (`OpenSlot`/`OPEN_TIMEOUT`), the verdict publication, the join | no steady_loop classes; the abort class is "open failure" (site #9's neighborhood), not volume/write failures |
-| T2 — Windows-gated steady-loop abort | open succeeds on a real device; a `RenderPcmInput` **wrapper** (test-owned, wrapping the session's real edge-backed input) panics on its k-th `read_frames` → catch #2 → `Aborted{"render loop panicked"}` → real cone | everything in T1 plus the steady loop, the volume/write paths, the device release | needs a Windows host; the injected fault is at the input-trait boundary — the cone itself is unmodified production code |
+| **N-A — Windows real-path steady-loop abort (the necessity oracle)** | open succeeds on a real device; a `RenderPcmInput` **wrapper** (test-owned, wrapping the session's real edge-backed input) panics on its k-th `read_frames` → the real catch → `Aborted` → the real post-catch `render_input.stop()` + `drain.complete()` + join all execute | the entire production cone: catch, stop, complete, steady loop, device release, join | needs a Windows host; the injected fault is at the input-trait boundary — the cone itself is unmodified production code |
+| **N-B — activation-abort ordering (separate property, optional)** | on Windows, force `OpenVerdict::Failed`/timeout and pin `abort_render_thread`'s own ordering (input stop + gate release before join, wasapi.rs:168-179) | the open-abort path only | **not a D11 property**: observed at the activation boundary (`Err(OutputError)` / activation error), never via `wait_terminal` |
 
-Both tiers inject **at the data boundary** (the input trait object the backend already
-consumes), never inside the cone: program order and ownership inside wasapi.rs stay
-exactly production. No copy of the cone exists for the test to satisfy itself with.
+If off-Windows schedule control for the ordering *discipline* (catch→stop→complete
+shape, not backend integration) is ever wanted, the only honest route is an
+explicitly-marked mechanism-extraction seam — a copy of the cone shape — which this
+design does not recommend and which AGENTS.md's real-path rules exclude as evidence
+for any host-backend claim. The TestOutput-based never-draining teardown oracle
+remains session-level coverage that cannot speak for wasapi.rs (unchanged from the
+REV.2 withdrawal).
 
 **Precondition witness (no sleep-based guessing).** (i) The wrapper's k-th read has
 actually been entered and panicked: the wrapper sets a test-visible flag immediately
@@ -480,11 +495,11 @@ measurement: structural — the test body between (i) and settlement contains no
 `request_stop`/`dispose`/`edge.stop` call (asserted by the harness's single code path;
 the authoring record cites the lines).
 
-**Schedule construction.** Tier T1: activate on non-Windows → open handshake returns
-`Failed` (witness via `open_stream`'s `Result`) → the render thread runs the cone →
-settlement. Tier T2: activate on Windows → confirm `Opened` verdict via the open slot
-(witness) → let the wrapper deliver k-1 healthy slices (edge fills, worker runs) →
-k-th read panics (flag) → cone → settlement.
+**Schedule construction.** Tier N-A: activate on Windows → confirm `Opened` verdict
+via the open slot (witness) → let the wrapper deliver k-1 healthy slices (edge
+fills, worker runs) → k-th read panics (flag) → cone → settlement. Tier N-B: drive
+an open failure/timeout and observe at the activation boundary only (its own
+ordering assertion; never `wait_terminal`).
 
 **Settlement observation points.** `wait_terminal` returns; outcome is
 `Failed{device}`; the drain mirror holds `Aborted`; the worker-exit evidence arrived
@@ -532,29 +547,46 @@ symptom is an unbounded settle latency window plus a semantically awkward
 "settled-verdict + live-producer" overlap that no current invariant forbids but no
 current authority licenses.
 
-**Observation of the two production events (deterministic, no sleep).** Two monotonic
-sequence counters owned by the test: (a) **edge-cut witness** — the test's
-`RenderPcmInput` wrapper observes the edge stop directly: its blocked `read_frames`
-returns/errors because `render_input.stop()` stops the edge the wrapper reads from;
-the wrapper's return path bumps counter A (the wrapper IS the reader whose wakeup the
-stop causes); (b) **verdict witness** — a `DrainSignal` observer (the existing
-`with_on_complete` seam, ports.rs:122) bumps counter B. After `wait_terminal` returns
-(the settlement boundary), assert `A < B` (the edge cut was observed before the
-verdict observer ran). Both counters are bumped on identifiable threads with the
-production happens-before edges (stop → wrapper wakeup; complete → observer), so the
-comparison is a real ordering observation, not a timestamp race.
+**Observation of the two production events (program-order counters; R2 review
+2026-10-16).** The earlier witness — "the wrapper's blocked `read_frames` returns,
+and its return path bumps counter A" — is **withdrawn**: in the panic tier the
+panicking read never returns (the panic unwound it), and any *other* reader's
+wakeup order relative to the verdict observer is a scheduling fact, not program
+order — legal code could bump B first. The corrected witnesses:
 
-**Mutation and its specific failure criterion.** Swap the two lines (complete before
-stop): the verdict observer runs while the wrapper is still parked — counter B bumps
-before counter A can → `A < B` fails. **Deleting a call is not order verification**
-(necessity and ordering are two controls — §7.1 covers deletion).
+- **A — edge-cut witness, recorded where the real stop completes.** The test's
+  `RenderPcmInput` wrapper implements `stop()` as *forward to the real input's
+  `stop()`, then bump counter A* — on whichever thread invoked it. In the cone the
+  invoker is the render thread itself, in the post-catch arm, strictly before
+  `drain.complete()` (wasapi.rs:263-273): A's increment happens-before the verdict
+  observer by same-thread program order — no scheduling dependence at all.
+- **B — verdict witness.** A `DrainSignal` observer (the existing
+  `with_on_complete` seam, ports.rs:122-133) runs synchronously inside
+  `complete()`, before it returns (ports.rs:135-155): it snapshots counter A and
+  bumps B.
 
-**Authoring record.** Precondition witness: activation settled + wrapper parked in
-read (flag before park). Schedule: same T2 drive as §7.1 (Windows) or T1
-(open-failure abort: note — in T1 the abort precedes any steady read, so the wrapper
-may never park; the order oracle is therefore **T2-only**, honestly scoped).
-Settlement observation: `wait_terminal` return, then compare counters. Failure
-signature: `A ≥ B` after settlement. Negative control: the line-swap mutation (isolated
+Assertion at the settlement boundary (after `wait_terminal` returns): on an
+Aborted-class outcome, **B's snapshot of A must be ≥ 1** — the verdict became
+visible only after the edge cut completed. Counter A is monotonic and shared with
+the other legitimate stop callers (`stop_and_join` forwards through the same
+wrapper, wasapi.rs:206-213), so later extra increments cannot weaken the
+assertion.
+
+**Mutation and its specific failure criterion.** Swap the two lines (complete
+before stop): the observer runs while the cone's stop arm has not executed — B
+snapshots A == 0 → red. Deleting the stop call: A never increments on the render
+thread — B snapshots A == 0 → red (the same assertion also covers deletion;
+§7.1's wedge-based control additionally catches the producer-stranding
+consequence). **Deleting a call is not order verification** — necessity and
+ordering remain two controls.
+
+**Authoring record.** Precondition witness: activation settled + wrapper's k-th read
+entered (flag before panic). Schedule: the N-A drive (§7.1, Windows) — the order
+oracle is **N-A-only, honestly scoped**: the injected panic is what forces the
+post-catch stop arm, and only the real Windows path executes the cone.
+Settlement observation: `wait_terminal` return, then compare the snapshot recorded
+by witness B. Failure signature: B's snapshot of A is 0 on an Aborted-class
+outcome. Negative control: the line-swap and line-deletion mutations (isolated
 environment). Cleanup boundary: as §7.1.
 
 ### 7.3 E-7 tier 1 — writer-swap negative controls per cone site (#8/#9/#10)
@@ -563,7 +595,7 @@ environment). Cleanup boundary: as §7.1.
 M5): a diagnostic-write failure must never change the terminal class, the exit path,
 or the wakeup ordering — measured per site × {`QIANQIAN_AUDIO_LOG` on, off}.
 
-**Site-reached proof (#8/#9/#10 each).** #8: T2 abort drive (§7.1) — the post-catch
+**Site-reached proof (#8/#9/#10 each).** #8: the N-A abort drive (§7.1) — the post-catch
 print executes because the catch ran (witness: abort flag). #9: the opened-line print
 executes only after the `Opened` verdict publishes (witness: open-slot verdict read);
 forcing it requires a successful Windows open. #10: the volume branch executes only
@@ -616,12 +648,16 @@ serve crafted bytes from an in-memory fixture — the injection seam is the io-c
 boundary the ABI already defines (the same seam E-3 uses). Determinism: the fixture
 is a byte vector; "corruption" is a chosen offset range; no real filesystem.
 
-**Calibration step (mandatory precondition).** The crafted fixture must actually
-produce **partial success** — frames > 0 returned with `SONG_OK`, then a latched
-fatal on the next read — not a whole-call failure. This is decoder-dependent
-(R1.2 precondition (iii)); the harness therefore first runs the no-injection control
-and asserts the partial-success shape before any experiment row is recorded. The
-chosen container/codec + fixture hash are part of the evidence artifact.
+**Calibration step (mandatory precondition; corrected logic — R2 review
+2026-10-16).** A healthy control proves only the healthy path; the partial-success
+shape is established by the **fault configuration**, never asserted beside it. Both
+legs must be green before any experiment row is recorded: (i) *healthy control* —
+the same container/codec with **no** corrupted region decodes to clean EOF with
+`SONG_OK` throughout (proves the fixture and harness are sound); (ii) *fault
+configuration* — the corrupted-region fixture yields the partial-success shape:
+frames > 0 returned with `SONG_OK`, then a latched fatal on the next read
+(decoder-dependent — R1.2 precondition (iii)). The chosen container/codec plus both
+fixture hashes are part of the evidence artifact.
 
 **Independent latch proof (three separate observations, not message-text
 identification).** (i) *latch exists*: read#2 hits the corrupt region and fails;
@@ -669,16 +705,41 @@ implementation whose `read_frames`/`seek` follow a script with park points
 distinguished from the real C latch validation (E1-ABI): the two harnesses
 together cover both halves; neither substitutes for the other.
 
-**Trace family (each with its sync points and observability).**
+**Seam inventory — what exists vs what must be added (R2 review 2026-10-16).**
+Exists today: the scripted decode provider (the stateful-probe pattern), completion
+white-box snapshots (the settlement-contract seam), `with_on_complete`, edge
+terminal reads, and the established **test-only fence pattern** (completion.rs
+`test_sync`, `#[cfg(all(test, not(loom)))]`, built for the seek straddle window —
+armed for one completion, inert everywhere else, absent from production builds).
+Must be added (the only addition this design requires): one fence arming point
+covering the window inside `request_stop` between the completion-lock release and
+its **own** `edge.stop()` (completion.rs:552-562) — the same pattern, not a new
+mechanism. Nothing is added for remainder observability: `remainder` is a
+**worker-local** variable (session.rs:607), not session state — the earlier W2
+witness "session white-box remainder state" named a position that does not exist
+and is withdrawn; the traces below witness it through provider-script state and
+edge content instead.
 
-| Trace | Construction | Witnesses | Expected commit |
+**Real execution positions the traces must respect (all verified at HEAD).**
+(a) `request_stop` records intent under the completion lock, releases the gate,
+drops the lock, and then calls **its own** `edge.stop()` before returning
+(completion.rs:552-562) — there is no "request_stop returns while deferring the
+teardown relation's edge stop" position (withdrawn). (b) The worker finishes a
+preserved remainder **before** any new decode (session.rs:775-805, "Finish a
+preserved remainder BEFORE any new decode") — a read-time error never coexists
+with a held remainder; the only failure-with-retained-remainder position is inside
+the seek serialization point (`MutatedThenFailed` with `remainder.is_some()`).
+
+**Trace family (each rebuilt on a real position; sync points and observability).**
+
+| Trace | Real position × injected event | Witnesses | Expected commit |
 |---|---|---|---|
-| W1 loop-top fatal | script parks before first read; test releases; read returns Err | park flag; completion white-box `decode_failure` set before worker exit | `Failed{decode}` |
-| W2 mid-write fatal | script returns a partial slice then errors on the next read while the remainder is in staging | staging remainder observable via the session's white-box remainder state | `Failed{decode}`; remainder never surfaces |
-| W3 stop during remainder-flush | issue `request_stop` while the worker is between the interrupted write and the flush (:786-804) | stop-requested flag read at the flush's interruption check | `Stopped` (the :798-802 exit) — one of the two true stop exits |
-| W4 stop-intent published, edge not yet stopped | `request_stop` returns while deferring the teardown relation's `edge.stop()` — constructed by parking the test between the completion-lock release and the teardown relation run (session seam: the relation is a registered effect the test schedules) | completion `stop_requested` true + `edge.terminal() == Open` sampled atomically at the witness point | worker continues to its next boundary; commit per §2.3.1 precedence (`Failed{decode}` if the pending fatal is decisive first, `Stopped` at a mid-write capacity-wait exit) |
-| W5 stop during provider call | script parks inside `seek`; test issues stop; release | script park flag + `stop_requested` sampled | Applied → cut protocol continues; commit `Failed{decode}`/`Stopped` per which evidence is decisive at the boundary — **not** every stop yields `Stopped` (the pre-R1.1 over-read, frozen out) |
-| W6 canceled seek is not an exit | issue seek, then stop before the worker picks it up; the pickup path releases the canceled seek (:613-618) and **falls through to read** | worker still alive at the next park point | no worker exit; final class from the actual decisive evidence |
+| W1 loop-top fatal | script parks before first read; release; `read_frames` returns Err → `decode_failed` + `edge.fail()` + return (session.rs:864-870) | script park flag; completion white-box `decode_failure` set before worker exit | `Failed{decode}` |
+| W2 destructive-seek failure with retained remainder | script produces a cut point (write parks the leg mid-block, remainder retained), then the serialization-point `seek` returns `MutatedThenFailed` → `decode_failed` + return, remainder discarded with the pre-cut world (session.rs:655-663) | provider script state (it returned MutatedThenFailed after the cut); post-exit edge content — no remainder white-box exists (worker-local) | `Failed{decode}`; the retained remainder never surfaces |
+| W3 stop during remainder flush | remainder flushing into a full edge (capacity-wait park, session.rs:786-805); `request_stop` → edge terminal ≠ Open → the mid-remainder exit returns | flush interruption is terminal-observed: `write_some` == 0 ∧ `edge.terminal() != Open`; worker-exit publication | `Stopped` — one of the two true stop exits |
+| W4 stop-intent recorded, request_stop's own edge stop not yet executed | the real window: completion lock released, `edge.stop()` (its own, completion.rs:552-562) not yet run — constructed by parking the real request at the new fence arming point (seam inventory above) | at the fence park, `stop_requested == true` ∧ `edge.terminal() == Open` holds by construction (the fence IS inside the window) | worker continues to its next boundary; commit per §2.3.1 precedence (`Failed{decode}` if a pending fatal is decisive first, `Stopped` at a mid-write capacity-wait exit) |
+| W5 stop during provider call | script parks inside the serialization-point `seek`; test issues stop; release | script park flag + `stop_requested` sampled | Applied → cut protocol continues; commit `Failed{decode}`/`Stopped` per which evidence is decisive at the boundary — **not** every stop yields `Stopped` (the pre-R1.1 over-read, frozen out) |
+| W6 canceled seek is not an exit | issue seek, then stop before the worker picks it up; the serialization point's `seek_aborted` branch releases the canceled seek (session.rs:625-630) and **falls through** to production | worker still alive at the next script park point | no worker exit; final class from the actual decisive evidence |
 
 **No-sleep discipline.** Every schedule is constructed through real synchronization
 seams (script parks, completion white-box snapshots, edge terminal reads); the
@@ -718,12 +779,17 @@ sufficient to decide — the interleaving is finite-state, the atomicity split i
 derivable from the lock map (FORMAL-PLAN §3.1 Q6), and E-1's role is calibration,
 not coverage.
 
-**Acceptance-gated trigger (verifiable conditions).** Build the extension when
-**both** hold: (1) E1-ABI's calibration step has run green (the real latch behaves
-as §2's static matrix predicts — the model's ground truth is confirmed, or the
-differential is resolved and the model freezes the corrected matrix); and (2) the
-E1-WORKER trace family W1–W6 has executed with every trace landing in its predicted
-§2.3.1 cell (no divergence). If any E-1 trace diverges from the static matrix, the
+**Acceptance-gated trigger (verifiable conditions; corrected references — R2
+review).** Build the extension when **both** hold: (1) E1-ABI's calibration has run
+green **on both legs** — the healthy control (clean EOF, `SONG_OK` throughout) and
+the fault configuration (partial success then latched fatal) — establishing that
+the real latch behaves as §2's static matrix predicts (or the differential is
+resolved and the model freezes the corrected matrix); and (2) the E1-WORKER trace
+family W1–W6 — rebuilt on the real execution positions above, with the one new
+fence arming point — has executed with every trace landing in its predicted §2.3.1
+cell (no divergence). Until the W4/W2 rebuild, this gate was **not executable**
+(the earlier traces referenced non-existent positions); it is now defined against
+positions verified at HEAD. If any E-1 trace diverges from the static matrix, the
 extension is deferred and the differential is resolved first — the model must never
 be frozen against a falsified ground truth. This makes D-C's weighing concrete:
 coverage (TLC cross product vs six traces) argues for the extension; calibration
