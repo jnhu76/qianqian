@@ -846,9 +846,11 @@ fn deliver(
             if !*disabled {
                 *disabled = true;
                 inner.self_diagnostics.fetch_add(1, Ordering::Relaxed);
-                // One bounded line, non-panicking (a write error is ignored,
-                // never unwrapped), and reported from the DRAINER thread.
-                write_stderr_line(&format!(
+                // One bounded line, non-panicking, reported from the DRAINER
+                // thread. Its own write result is deliberately dropped: the
+                // sink just failed, and a failure *of the failure report* has
+                // nowhere left to be counted.
+                let _ = write_stderr_line(&format!(
                     "[qianqian-diagnostics] exporter {} disabled: {}",
                     sink.name(),
                     error.message
@@ -862,15 +864,24 @@ fn deliver(
     }
 }
 
-/// Non-panicking stderr line writer. `writeln!` returns `Err` on a broken or
-/// blocked-descendant pipe; it never panics and the result is deliberately
-/// ignored — a diagnostic write failure is a diagnostic loss, nothing else.
-pub fn write_stderr_line(line: &str) {
+/// Non-panicking stderr line writer. It returns the write result instead of
+/// swallowing it: "did not panic" and "was delivered" are different facts, and
+/// a caller that accounts delivery (an exporter, the host) needs the second
+/// one. `writeln!`/`flush` return `Err` on a closed or broken descriptor; they
+/// never panic. A blocked descriptor is not an error — it blocks this caller,
+/// which is the declared residual of any blocking sink.
+pub fn write_stderr_line(line: &str) -> std::io::Result<()> {
     use std::io::Write;
     let mut stderr = std::io::stderr().lock();
-    let _ = writeln!(stderr, "{line}");
-    let _ = stderr.flush();
+    writeln!(stderr, "{line}")?;
+    stderr.flush()
 }
+
+/// The stderr exporter's failure report (the exporter is disabled and the
+/// record counted as lost when a write fails).
+const STDERR_WRITE_FAILED: ExportError = ExportError {
+    message: "stderr write failed",
+};
 
 /// Drain every live pool once, then release the ones whose producer is gone.
 ///
@@ -944,7 +955,9 @@ fn final_sweep(
         if !*disabled {
             *disabled = true;
             inner.self_diagnostics.fetch_add(1, Ordering::Relaxed);
-            write_stderr_line(&format!(
+            // The exporter is being disabled anyway: this one bounded line is
+            // best-effort, and its own failure has nowhere left to be reported.
+            let _ = write_stderr_line(&format!(
                 "[qianqian-diagnostics] exporter {} flush failed: {}",
                 sink.name(),
                 error.message
@@ -1006,6 +1019,11 @@ fn drainer(
 /// isolated (class α) and the drainer is not, which is exactly why shutdown is
 /// bounded-or-honest — the host abandons a stuck drainer at its deadline and
 /// reports lost records instead of claiming a completed drain.
+///
+/// Blocked and FAILED are different outcomes, and this sink reports them
+/// differently: a failed write (`EPIPE` on a closed reader, a bad descriptor, a
+/// full disk) returns `Err`, so the record is counted as an export loss and
+/// never as delivered. Only a write that is still in progress blocks.
 pub struct StderrExporter {
     /// Minimum level admitted by this sink (the authoritative filter).
     pub min_level: Level,
@@ -1047,8 +1065,17 @@ impl Exporter for StderrExporter {
             line.push(' ');
             line.push_str(&record.message.render());
         }
-        write_stderr_line(&line);
-        Ok(())
+        write_stderr_line(&line).map_err(|_| STDERR_WRITE_FAILED)
+    }
+
+    /// The final sweep's flush, propagated the same way: an `Err` here counts
+    /// as an export loss and reports once, exactly like a failed `export`.
+    fn flush(&mut self) -> Result<(), ExportError> {
+        use std::io::Write;
+        std::io::stderr()
+            .lock()
+            .flush()
+            .map_err(|_| STDERR_WRITE_FAILED)
     }
 }
 
