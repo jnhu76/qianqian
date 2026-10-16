@@ -1,0 +1,18 @@
+[package]
+name = "qianqian-diagnostics"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Host-owned diagnostic outlet: bounded, non-blocking producer paths and one drainer thread"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# FV-CONC-0: selected only under `--cfg loom` + `--features loom` so the
+# loom model checker explores the REAL class-α pool protocol.
+loom = { version = "0.7", optional = true }
+
+[features]
+loom = ["dep:loom"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }

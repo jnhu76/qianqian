@@ -4,6 +4,7 @@ members = [
     "apps/headless",
     "crates/qianqian-audio-api",
     "crates/qianqian-composition",
+    "crates/qianqian-diagnostics",
     "crates/qianqian-output-wasapi",
     "crates/qianqian-playback",
     "crates/qianqian-app",

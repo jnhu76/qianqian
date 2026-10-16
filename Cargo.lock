@@ -1017,6 +1017,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qianqian-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "loom",
+]
+
+[[package]]
 name = "qianqian-headless"
 version = "0.1.0"
 dependencies = [
