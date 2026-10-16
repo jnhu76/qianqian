@@ -162,7 +162,7 @@ fn run_playback(
 /// is shorter, so a healthy shutdown returns well inside this; the deadline only
 /// matters when the drainer is stuck inside a blocking sink (T5-5 strategy B:
 /// the exit path may abandon, and then says so).
-#[cfg(feature = "playback")]
+#[cfg(any(feature = "playback", test))]
 const HOST_DIAGNOSTIC_DRAIN_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Install the process-wide diagnostic outlet with its stderr exporter.
@@ -170,7 +170,7 @@ const HOST_DIAGNOSTIC_DRAIN_DEADLINE: std::time::Duration = std::time::Duration:
 /// Fact or disposal verdict depends on this succeeding, so an installation
 /// refused because the process already owns an outlet (a test harness owning
 /// one) is not a product failure.
-#[cfg(feature = "playback")]
+#[cfg(any(feature = "playback", test))]
 fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
     use qianqian_diagnostics::{Config, Diagnostics, StderrExporter};
     // `StderrExporter::default()` admits every level: the site gates
@@ -185,7 +185,19 @@ fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
 /// non-normal drain, undelivered records, an exporter self-diagnostic, or a
 /// panic the machine-input hook counted on a critical thread. A normal run
 /// prints nothing, and the machine protocol's stdout is never touched.
-#[cfg(feature = "playback")]
+///
+/// The exit boundary is the whole point of the bounded shutdown, so the report
+/// itself obeys it: when the drainer was ABANDONED, the sink is stuck by
+/// definition (the abandonment rule is "did not finish inside the deadline
+/// while inside a sink"), and any synchronous write attempt would re-enter that
+/// sink — usually by waiting on the very stderr lock the stuck drainer holds —
+/// and hand process exit back to the blocked sink. The abandoned report is
+/// therefore ATTEMPTED on a detached thread that nothing joins and that holds
+/// no resource the exit path needs; if the sink never drains, the attempt is
+/// lost with the process, which is honest for a Class C diagnostic. A DRAINED
+/// report needs no such care: the drainer exited, meaning every sink write it
+/// attempted completed, so the sink is not the thing that is stuck.
+#[cfg(any(feature = "playback", test))]
 fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnostics>) {
     let Some(diagnostics) = diagnostics else {
         return;
@@ -199,7 +211,7 @@ fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnosti
     {
         return;
     }
-    qianqian_diagnostics::write_stderr_line(&format!(
+    let line = format!(
         "[qianqian-diagnostics] shutdown {}: undelivered_at_exit={} dropped={} export_failed={} self_diagnostics={} critical_panics={}",
         if report.drained {
             "drained"
@@ -211,7 +223,17 @@ fn shutdown_host_diagnostics(diagnostics: Option<qianqian_diagnostics::Diagnosti
         counters.export_failed,
         counters.self_diagnostics,
         counters.critical_panics,
-    ));
+    );
+    if report.abandoned {
+        // Best-effort, never awaited: see the doc comment above.
+        let _ = std::thread::Builder::new()
+            .name("qianqian-diagnostics-report".into())
+            .spawn(move || {
+                let _ = qianqian_diagnostics::write_stderr_line(&line);
+            });
+    } else {
+        let _ = qianqian_diagnostics::write_stderr_line(&line);
+    }
 }
 
 /// The machine transport's argv is pinned to exactly one file (grammar
@@ -599,3 +621,8 @@ pub(crate) fn run_machine_reports_for_test(
     )
 }
 
+/// The host exit boundary (F2 of the #287 review): the abandoned-drainer report
+/// must not make the exit path wait on the stuck sink. Subprocess witness —
+/// see the module docs.
+#[cfg(test)]
+mod shutdown_tests;
