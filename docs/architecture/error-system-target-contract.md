@@ -262,6 +262,40 @@ production APIs land only through their own review. Every code anchor is @e44aa8
 >   abandoned the sink is stuck by definition, so the report is attempted on a detached,
 >   never-joined writer instead of synchronously re-entering the sink. (std's own exit cleanup
 >   touches stdout only, so nothing else at exit can wait on stderr.)
+>
+> **Owner-review amendments, round 2 (2026-10-16, #287 review round II; recorded, not a second
+> design).** Four further production boundaries were closed; each keeps this design's semantics
+> and removes one way a diagnostic sink could still decide something the host owns:
+>
+> * **One registration per thread.** The producer role is a per-thread fact (the TLS fast path),
+>   so `AlphaRegistration::register` REJECTS a second registration on a thread that already holds
+>   one (a loud panic; production registers once per thread), and re-registering after a drop
+>   stays legal. Two live registrations on one thread cannot both be valid: the second would
+>   overwrite the first's fast path and the first's `Drop` would clear the second's — silently
+>   returning an isolation-obligated thread to the class-β path, and its panic back to an unknown
+>   synchronous sink.
+> * **Shutdown is terminal admission for BOTH classes.** Once the flag is observed, `emit` and
+>   `note_critical_panic` reject further presentations — dropped and counted at their own class's
+>   admission boundary (the presenting pool's counters for α, `beta_rejected` for β) — because the
+>   drainer's final sweep is the last consumer there will be. Producer quiescence is neither
+>   required nor enforceable (the host's stdin reader has a detached lifetime), so the one
+>   residual that leaves is DECLARED on `Diagnostics::shutdown`: a publication that races the
+>   final sweep of its own pool can still land after that pool was walked, and such a record is
+>   neither delivered nor counted. The landed α paths had published into the thread's pool even
+>   after shutdown began — into a pool with no consumer left, accounted as delivered-ready.
+> * **The delivery contract is per record.** `Exporter::export` returning `Ok` IS exactly one
+>   delivered record, and a failed `flush` is a SINK-level self-diagnostic — never a record loss,
+>   because a flush outcome belongs to no record count. The landed flush path charged a record
+>   loss for it, which broke the drain-boundary identity (`copied_out + beta_consumed = exported +
+>   export_failed`) at quiescence; `undelivered_now`'s clamp then hid the disagreement.
+> * **Every exit-phase report is attempted off the exit path — including after a DRAINED drain.**
+>   "Drained" proves every write the drainer attempted completed; it does NOT prove the sink still
+>   has room for one more line — a pipe whose reader stopped is saturated to its last byte by
+>   other writers, and a writer parked inside one holds the process stderr lock, so a synchronous
+>   report write would hand process exit back to the sink even on the drained path. The report is
+>   therefore always attempted on a detached, never-joined writer: the drained case waits only a
+>   bounded instant for the attempt (a healthy sink completes it in microseconds, so the line is
+>   not lost to process exit), and the abandoned case does not wait at all.
 
 ### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
 
@@ -952,12 +986,6 @@ loss knowingly (rejecting it would require per-boundary retention, not a slot).*
 leak/reclaim discipline); no ABI change; CC-4/DG-3's DecodeFault and this slot remain
 separate (decode-status vs host-io origin) with a stated precedence rule for
 presentation only.
-
-> **Implementation status (2026-10-16)**: LANDED — the critical-thread registry is a static name
-> list (the reader today); on a critical thread the hook counts and publishes at most one α record
-> and never chains; off it, chaining is unchanged. Witnessed by a subprocess test, with an
-> executed isolation-removal negative control. See `error-system-implementation-record.md`
-> §2.5/§4.
 
 ### DG-4b — Rust panic hook posture (T5-8)
 

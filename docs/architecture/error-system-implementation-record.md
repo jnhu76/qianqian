@@ -3,8 +3,9 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
-HEAD     the implementation branch's tip: twenty-one commits, each reviewable on its own;
-         the last five close the owner's #287 review round (§9)
+HEAD     the implementation branch's tip: twenty-five commits, each reviewable on its own;
+         the last nine close the owner's two #287 review rounds (§9 first round,
+         §10 second round)
 ```
 
 This document records what an implementation round actually landed against the
@@ -58,10 +59,14 @@ priority, recovery strategy, public semantics, the SongCore ABI, or K0 authority
    is documented on the exporter itself, with its environment residual stated:
    producers are isolated, the drainer is not, and that is why shutdown may
    abandon with counted losses.
-5. **DG-4b critical-thread registry** — a static registry of thread names (the
-   reader today), consulted on every panic; unnamed/unregistered threads chain
-   (fail-open). The hook's critical path is atomics-only and never renders: the
-   counter and the one-shot pool record are read by non-critical threads.
+5. **DG-4b isolation predicate** — the predicate is the outlet's own thread fact
+   (`is_alpha_producer()`: this thread registered a class-α pool), consulted on every
+   panic, with the posture installed at transport startup (the #287 review round
+   replaced the first landed reading — a static registry of thread NAMES — after the
+   review showed a render/decode panic could chain into the default hook and block on
+   the stderr lock before its `catch_unwind`; §9). A thread that never registered chains
+   (fail-open). The hook's critical path is atomics-only and never renders: the counter
+   and the one-shot pool record are read by non-critical threads.
 6. **DG-4c install point** — the bridge is crate-private and installs from the
    decode plugin's activation. The reason is authority-backed, not convenience:
    the decode chain's public surface is frozen by the plugin-boundary gate
@@ -206,7 +211,8 @@ DG-1 (facility, isolation, shutdown)     qianqian-diagnostics src/tests + Loom (
 DG-2 (carrier B)                         ports.rs surface (+ audio-api snapshot), wasapi abort
                                          sites, e1_worker_tests dg2_* pair, completion.rs mirror
 DG-3 / DG-4a (retention, attribution)    decode-songcore unit tests + e1_abi_tests typed-fault test
-DG-4b (panic hook)                       machine_input.rs registry + tests.rs subprocess witness
+DG-4b (panic hook)                       machine_input.rs posture + the registration fact
+                                         (`is_alpha_producer`) + tests.rs subprocess witness
 DG-4c (av_log)                           decode-songcore av_log_bridge tests (6)
 §7.1/§7.2 real cone                      qianqian-output-wasapi cone_oracle_tests (Windows-only)
 §7.4 E1-ABI                              decode-songcore e1_abi_tests (8)
@@ -224,9 +230,9 @@ documentation note. What changed, and how each one is witnessed:
 | Finding | What was actually wrong | Change | Witness (executed) |
 |---|---|---|---|
 | P1 — pool roles not enforced by the API | `AlphaPool` was `Sync` with public safe `publish(&self)`/`drain(&self, …)` and a public `AlphaRegistration::pool() -> &'static AlphaPool`: safe code could put two producers (or two consumers) on one pool — a data race in safe Rust | The core is crate-private; the producer role is the thread-bound `AlphaRegistration` (not `Send`/`Sync`/`Clone`) via that thread's TLS pointer; the consumer role is the drainer's walk with the position inside the core | protocol suites unchanged and green (arithmetic, Loom, Miri); `pool()` gone from the public surface; the av_log/exit witnesses now observe at the drainer's sink |
-| P1 — abandonment report re-entered the stuck sink | `shutdown_host_diagnostics` wrote its report synchronously after `shutdown` returned `abandoned`; for stderr that means waiting on the process stderr lock the stuck drainer holds — exit handed back to the sink | Abandoned reports are attempted by a detached, never-joined writer; drained reports stay synchronous (the sink is proven not stuck) | `apps/headless/src/entry/shutdown_tests.rs`: child with an unread stderr pipe, drainer stalled at `consumed=1263` with a 256-record backlog (the pipe is objectively full), child printed `SHUTDOWN-RETURNED` and exited 0 |
+| P1 — abandonment report re-entered the stuck sink | `shutdown_host_diagnostics` wrote its report synchronously after `shutdown` returned `abandoned`; for stderr that means waiting on the process stderr lock the stuck drainer holds — exit handed back to the sink | Abandoned reports are attempted by a detached, never-joined writer without a wait; the drained case still wrote synchronously here and was corrected in round 2 (§10: a drained drain does not prove the sink has room for one more line) | `apps/headless/src/entry/shutdown_tests.rs`: child with an unread stderr pipe, drainer stalled at `consumed=1263` with a 256-record backlog (the pipe is objectively full), child printed `SHUTDOWN-RETURNED` and exited 0 |
 | P1 — `previous(info)` on render/decode panics | The hook's isolation predicate was a thread-NAME list (`qianqian-stdin`), so a panic on a registered decode/render thread chained into an unknown hook — the default one prints through the global stderr lock and blocks BEFORE `catch_unwind`, so the join/completion paths that wait on those threads were gated on a diagnostic sink | The predicate is the outlet's own registration fact (`is_alpha_producer`); the posture installs at transport startup, before any decode worker/render thread exists | `machine_input/tests.rs` DG-4b witness: registered-noncritical-name isolated, reader-named-unregistered chains, and a registered thread panicking twice with a FULL stderr still unwinds and ends |
-| P2 — real sink write failures counted as delivered | `write_stderr_line` swallowed the I/O result and `StderrExporter::export` returned `Ok(())` unconditionally: a closed descriptor (EPIPE) incremented `exported` | The writer returns its I/O result; the exporter maps a failure to an export failure (counted lost, exporter disabled, one self-diagnostic); `flush` likewise; blocked-vs-failed is now explicit | `crates/qianqian-diagnostics/tests/stderr_delivery_failure.rs`: child whose stderr read end is dropped — `exported=0`, `export_failed=5`, identity holds, `self_diagnostics=1` |
+| P2 — real sink write failures counted as delivered | `write_stderr_line` swallowed the I/O result and `StderrExporter::export` returned `Ok(())` unconditionally: a closed descriptor (EPIPE) incremented `exported` | The writer returns its I/O result; the exporter maps a failure to an export failure (counted lost, exporter disabled, one self-diagnostic); a failed `flush` went to `export_failed` here and was corrected in round 2 (§10: a flush outcome is a sink-level self-diagnostic, not a record loss); blocked-vs-failed is now explicit | `crates/qianqian-diagnostics/tests/stderr_delivery_failure.rs`: child whose stderr read end is dropped — `exported=0`, `export_failed=5`, identity holds, `self_diagnostics=1` |
 | P2 — producer path could wait on clock init | `Record::stamped` called `OnceLock::get_or_init`, so the first producer on a fresh clock entered initialization synchronization | The clock is started on cold paths (installation, registration); `stamped` only reads and reports `0` = no timestamp | `crates/qianqian-diagnostics/tests/clock_cold_path.rs` (own process): two stamps with a 5 ms gap stay 0; registration and installation each start it |
 | P2 — per-episode pools leaked and poll cost grew | Every registration `Box::leak`ed a pool into an append-only registry; `poll_pools` searched a cursor per pool, so cost grew with the process's episode history (decode/render threads are per-episode) | Registration `Drop` publishes `retired` (Release); the drainer walks the residual records ordered behind its Acquire load, folds the counters into the facility totals, and releases the pool; the drain cursor lives in the core (no lookup) | `crates/qianqian-diagnostics/src/lib.rs` unit oracles: live pool never reaped, retired pool residual-drained then released (`Arc::strong_count == 1`), counters folded |
 
@@ -276,3 +282,61 @@ into them. The final tree is fmt-clean and the pre-push gate is authoritative.
   (stderr's global lock; the exit path touching stdout only; the default hook printing
   through that lock) were verified against the pinned toolchain's own source, but the
   runs themselves are Linux.
+
+## 10. Owner-review round 2 (#287 review II, 2026-10-16) — the remaining exit and lifecycle boundaries
+
+The second review verdict (`REVISE_BEFORE_MERGE`, frozen at `33c9e25`) accepted the first round's
+direction and named four further production findings (2 P1, 2 P2) plus one documentation drift.
+All four were adjudicated VALID against the code; none needed a semantics change, none was
+answered by a note, and each was closed RED-first: the new oracle was written against the landed
+code, executed RED with its documented signature, and only then was the mechanism changed.
+
+| Finding | What was actually wrong | Change | Witness (executed) |
+|---|---|---|---|
+| P1 — the DRAINED exit report could still block the host | The round-1 fix moved only the ABANDONED report off the exit path; the drained case kept a synchronous `write_stderr_line`. "Drained" proves the drainer's own writes finished, not that the sink still has room for one more line: a pipe reader that stopped leaves a full sink, and a parked writer holds the process stderr lock | `attempt_exit_report`: EVERY exit-phase report is attempted on a detached, never-joined writer; the drained case waits a bounded instant for that attempt (so a healthy sink still delivers the line), the abandoned case waits not at all | `apps/headless/src/entry/shutdown_tests.rs` `a_drained_report_never_makes_the_host_exit_path_wait_on_its_sink`: child verifies `DRAINED undelivered=0`, an independent writer then saturates the unread stderr pipe (`SATURATED bytes=65230`), the mandatory report (a counted critical panic) runs through the production exit path — child prints `SHUTDOWN-RETURNED` and exits 0. RED signature at `33c9e25`: the child never returns from `shutdown_host_diagnostics` (the 60 s deadline kills it) |
+| P1 — duplicate registration broke the isolation fact | `AlphaRegistration::register()` allowed a second registration on one thread: the second overwrote the TLS fast path and the FIRST handle's `Drop` then cleared the live second's — a registered thread silently fell back to the class-β path and its panic back to chaining | `register()` rejects a second live registration on a thread (loud panic, production registers once per thread); re-registering after a drop stays legal | `crates/qianqian-diagnostics/src/lib.rs` unit oracles: the duplicate is rejected and the first handle stays intact (fast path, accepted counts); drop-then-register-again works; cross-thread lifetimes are independent with the later-created dropped first (the non-LIFO order that remains legal) |
+| P2 — a failed `flush` was charged a record loss | `final_sweep` did `export_failed += 1` on a flush `Err`. `export_failed` counts records the exporter did not deliver; a flush outcome belongs to no record count, so the drain-boundary identity (`copied_out + beta_consumed = exported + export_failed`) broke at quiescence and `undelivered_now`'s clamp hid it | A failed flush is a SINK-level self-diagnostic (`self_diagnostics`) and never a record loss; both `Exporter` methods now state their delivery contract (one `Ok` from `export` = one delivered record; `flush` failure = sink-level) | `a_failed_flush_is_a_self_diagnostic_not_a_lost_record` (in-crate): an exporter that delivers one record and then fails its flush yields `consumed=1, exported=1, export_failed=0, self_diagnostics=1` and the identity holds. RED signature at `33c9e25`: `export_failed=1` |
+| P2 — class α still admitted records after shutdown | `emit` consulted the thread-local pool BEFORE the facility's shutdown state, so a registered thread's record was published into a pool whose drainer had already exited — stranded and accounted as admitted | `emit` checks terminal admission FIRST, for both classes: a late α presentation advances its own pool's admission counters (`reject_presentation`), a late β presentation `beta_rejected`, and neither is published. `note_critical_panic` applies the same first check (the panic is still counted: the counter is the authoritative fact). Producer quiescence is DECLARED as not a precondition, with the one residual (a publication racing the final sweep of its own pool) named on `Diagnostics::shutdown` | `crates/qianqian-diagnostics/tests/shutdown_admission.rs`: child installs, registers, delivers one record, shuts down, then presents one more on the SAME registered thread — `first=AlphaRecorded after=Shutdown accepted=1 rejected=1 attempted=2 outstanding=0` with `drained=true`. RED signature at `33c9e25`: `after=AlphaRecorded accepted=2 outstanding=1` (stranded in a dead pool) |
+| P3 — documentation drift | `implementation-record` §2 still described DG-4b's predicate as a static thread-NAME registry, contradicting §9 and the landed code; the target contract carried the same stale sentence, in the wrong section | §2 rewritten to the registration fact; the stale target-contract status block deleted (§8's evidence line corrected too) | textual; verified by reading the landed `machine_input.rs` posture and its witnesses |
+
+Construction note for the drained-report witness (why it looks the way it does): the sink must
+have room for every record the drainer writes and no room for the report. The oracle therefore
+establishes `drained` FIRST (the child verifies the `ShutdownReport`), and only then lets an
+independent writer consume the remaining capacity. Two earlier constructions were discarded
+after direct measurement on this host: pipe space is freed to writers in whole buffer slots
+(reading N bytes with N < the head slot's remainder frees ZERO writable space — measured), so a
+"free exactly N bytes" arithmetic construction is not portable, and `Stderr`'s write path makes
+byte-exact packing by a competing writer unobservable. The landed witness uses no byte
+arithmetic at all: the writer's parked state IS "the sink is full", and the child asserts the
+premise (`DRAINED`, then `SATURATED`) before the exit path runs.
+
+### 10.1 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| RED-first oracles (before the fixes, at `33c9e25`) | the four oracles above, one at a time | each RED with the documented signature (duplicate accepted; `export_failed=1`; `after=AlphaRecorded outstanding=1`; child hanging past 60 s) | Linux only |
+| Diagnostics crate | `cargo test -p qianqian-diagnostics` | green (12 unit tests; 8 integration binaries incl. the new `shutdown_admission`; doc-tests) | Linux only |
+| Whole workspace | `cargo test --workspace --no-fail-fast` | 936 passed / 0 failed over 57 test targets | Linux only; not device evidence |
+| App exit boundary | `cargo test -p qianqian-headless --lib entry::shutdown_tests` | 4/4 green: drained-report child `BULK-EXPORTED 9 / DRAINED undelivered=0 / SATURATED bytes=65230 / SHUTDOWN-RETURNED exported=9`, exit 0; abandoned-drainer child unchanged | Linux only; stderr pipe semantics |
+| Pool protocol (Loom) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | SCHEDULE-CLEAN (protocol unchanged; the new pool method is a counter-only path) | explored-schedule bound |
+| Pool protocol (Miri) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | clean over the seeds | Miri samples one schedule per seed |
+| Playback-concurrency lane | `specs/check.sh rust` (the CI invocation) | green: `RESULT matrices(native) BOUNDED-CLEAN`, `matrices(miri) MIRI-CLEAN`, M-K1/K2/K3 witnessed, §G.6 TEST-PASS, `RESULT native BOUNDED-CLEAN`, loom `SCHEDULE-CLEAN`, `RESULT pool-loom SCHEDULE-CLEAN`, `RESULT M-L1 COUNTEREXAMPLE-WITNESSED`; both `SUITE:` lines clean | bounds as before |
+| Full local gate | `lefthook run pre-push --all-files` | green | proves the working tree, not Windows/formal lanes |
+
+Negative controls for this round (each executed against the FIXED tree by reverting the single
+mechanism, then restored byte-identically with `sha256` verification): the synchronous drained
+report (the child hangs again), the accepted duplicate registration, the flush counted as
+`export_failed`, and the pre-shutdown-check α publication. Raw logs, commands and hashes are
+retained under `/tmp/errlog/rev3/` (controls subdirectory) for re-checking.
+
+### 10.2 Still NOT_RUN (unchanged from §9.2 unless stated)
+
+* O-CONE-NECESSITY / O-CONE-ORDER runtime runs and their mutations — Linux host,
+  `wasapi.rs` is `#[cfg(windows)]` (unchanged).
+* E-7 tier 1 writer-swap controls — needs the Windows endpoint and the volume-apply fault seam
+  (unchanged; acceptance pending).
+* Windows runtime evidence for the carrier B reason (unchanged).
+* The exit-boundary witnesses above are Linux-process evidence, as in §9.2: the std facts they
+  rely on (the process stderr lock; buffered/unbuffered behavior; the exit path touching stdout
+  only) were verified against the pinned toolchain's source, and the pipe capacity/slot-release
+  semantics were measured on this host (65536 bytes; whole-slot release) — not on Windows.
