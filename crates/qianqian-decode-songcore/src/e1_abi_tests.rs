@@ -36,9 +36,6 @@ use crate::test_common as common;
 /// harness's own injection record.
 struct MemFile {
     bytes: Vec<u8>,
-    /// Byte ranges the harness deliberately disturbed (the injection
-    /// record: the only legitimate fault identity).
-    disturbed: Vec<(usize, usize)>,
     pos: u64,
     reads: u32,
     seeks: u32,
@@ -48,10 +45,9 @@ struct MemFile {
 }
 
 impl MemFile {
-    fn new(bytes: Vec<u8>, disturbed: Vec<(usize, usize)>) -> Self {
+    fn new(bytes: Vec<u8>) -> Self {
         Self {
             bytes,
-            disturbed,
             pos: 0,
             reads: 0,
             seeks: 0,
@@ -120,8 +116,8 @@ impl AbiHandle {
     /// Construct exactly the production open sequence: `song_open` over the
     /// test's `song_io` callbacks, then `song_probe`. `Err(status)` carries
     /// the raw status so a caller can distinguish open from probe refusal.
-    fn open(bytes: Vec<u8>, disturbed: Vec<(usize, usize)>) -> Result<Self, (u32, String)> {
-        let source = Box::into_raw(Box::new(MemFile::new(bytes, disturbed)));
+    fn open(bytes: Vec<u8>) -> Result<Self, (u32, String)> {
+        let source = Box::into_raw(Box::new(MemFile::new(bytes)));
         let io = sys::song_io {
             userdata: source as *mut c_void,
             read: Some(mem_read),
@@ -203,9 +199,6 @@ impl AbiHandle {
         (status, e.native_code, message)
     }
 
-    fn source(&self) -> &MemFile {
-        unsafe { &*self.source }
-    }
 }
 
 impl Drop for AbiHandle {
@@ -240,6 +233,10 @@ const FAULT_LEN: usize = 16;
 
 /// The calibration legs' read capacity (frames per `song_read_pcm`).
 const CALIB_BLOCK: u64 = 1024;
+
+/// Offset of the first FLAC frame in the committed reference fixture: right
+/// after the `fLaC` marker plus the single streaminfo metadata block.
+const FLAC_FIRST_FRAME_OFFSET: usize = 42;
 
 struct FaultConfig {
     healthy: Vec<u8>,
@@ -302,7 +299,7 @@ fn read_until_fatal(handle: &mut AbiHandle, limit: u32) -> ReadUntilFatal {
 #[test]
 fn healthy_control_reproduces_the_reference_pcm_identity() {
     let config = fault_config();
-    let mut handle = AbiHandle::open(config.healthy.clone(), Vec::new()).expect("healthy open");
+    let mut handle = AbiHandle::open(config.healthy.clone()).expect("healthy open");
     assert_eq!(handle.channels(), 2, "the fixture is stereo");
     let mut hasher = common::Sha256::new();
     let mut total = 0u64;
@@ -347,7 +344,7 @@ fn healthy_control_reproduces_the_reference_pcm_identity() {
 fn fault_configuration_yields_partial_success_then_a_latched_fatal() {
     let config = fault_config();
     let mut handle =
-        AbiHandle::open(config.corrupted.clone(), config.disturbed.clone()).expect("faulted open");
+        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     println!(
         "E1-ABI calibration: fixture={} bytes={} disturbed={:?} frames_before_fatal={} reads={} \
@@ -394,7 +391,7 @@ fn fault_configuration_yields_partial_success_then_a_latched_fatal() {
 fn applied_seek_erases_the_latch_and_matches_the_healthy_twin() {
     let config = fault_config();
     let mut faulted =
-        AbiHandle::open(config.corrupted.clone(), config.disturbed.clone()).expect("faulted open");
+        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut faulted, 200);
     assert!(fatal.frames > 0, "partial success before the fatal");
     // Seek past the region (the healthy twin's own declared duration is the
@@ -408,7 +405,7 @@ fn applied_seek_erases_the_latch_and_matches_the_healthy_twin() {
     // is downstream of them).
     // The twin IS the healthy byte vector: restoring the disturbed range
     // from the reference fixture reproduces it exactly.
-    let mut twin = AbiHandle::open(config.healthy.clone(), Vec::new()).expect("twin open");
+    let mut twin = AbiHandle::open(config.healthy.clone()).expect("twin open");
     let mut drained = 0u64;
     while drained < fatal.frames {
         let (status, produced) = twin.read(CALIB_BLOCK);
@@ -448,7 +445,7 @@ fn applied_seek_erases_the_latch_and_matches_the_healthy_twin() {
 fn refused_seek_retains_the_latch() {
     let config = fault_config();
     let mut handle =
-        AbiHandle::open(config.corrupted.clone(), config.disturbed.clone()).expect("faulted open");
+        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0);
     let (refusal, _) = handle.seek_us(-1);
@@ -481,7 +478,7 @@ fn refused_seek_retains_the_latch() {
 fn destructive_seek_failure_is_a_post_mutation_failure() {
     let config = fault_config();
     let mut handle =
-        AbiHandle::open(config.corrupted.clone(), config.disturbed.clone()).expect("faulted open");
+        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0, "partial success before the fatal");
     let target_us: i64 = 750_000;
@@ -522,8 +519,185 @@ fn destructive_seek_failure_is_a_post_mutation_failure() {
 fn close_after_a_latched_fatal_is_a_clean_teardown() {
     let config = fault_config();
     let mut handle =
-        AbiHandle::open(config.corrupted.clone(), config.disturbed.clone()).expect("faulted open");
+        AbiHandle::open(config.corrupted.clone()).expect("faulted open");
     let fatal = read_until_fatal(&mut handle, 200);
     assert!(fatal.frames > 0);
     drop(handle); // song_close
+}
+
+// --- DG-3 / T1-1, T1-2 (adapter retention and its consumers) ------------------
+
+/// The OPEN failure exposes the typed status and nothing else — the ABI fact
+/// the design's T1-2 premise rests on. `song_open` nulls its out-handle on
+/// every failure path (verified at the pinned closure AND re-verified here
+/// from the outside), so no handle exists to read a diagnostic from:
+/// `song_last_error` requires one. The retained-diagnostic work therefore
+/// belongs to the `song_probe` path, which runs on a live handle.
+#[test]
+fn an_open_failure_publishes_no_handle_so_the_status_is_all_there_is() {
+    let (_, path) = common::load_fixture("flac-16-44-stereo");
+    let healthy = std::fs::read(&path).expect("fixture bytes");
+    // The FLAC frame region starts right after the streaminfo metadata block;
+    // zeroing it damages the FIRST frame, which the native open walks.
+    let disturbed = disturb(&healthy, FLAC_FIRST_FRAME_OFFSET, 64);
+    let source = Box::into_raw(Box::new(MemFile::new(disturbed.clone())));
+    let io = sys::song_io {
+        userdata: source as *mut c_void,
+        read: Some(mem_read),
+        seek: Some(mem_seek),
+        size: Some(mem_size),
+    };
+    let mut handle: *mut sys::song_handle = std::ptr::null_mut();
+    let status = unsafe { sys::song_open(&io, &mut handle) };
+    println!("E1-ABI open-failure: status={status} handle_null={}", handle.is_null());
+    assert_ne!(status, sys::SONG_OK, "a damaged first frame fails the open");
+    assert!(
+        handle.is_null(),
+        "no handle survives an open failure, so no diagnostic is queryable"
+    );
+    unsafe { drop(Box::from_raw(source)) };
+
+    // The adapter's own open path reports exactly that: the typed status,
+    // with no diagnostic claim (the message must not imply one).
+    let temp = std::env::temp_dir().join("qianqian-dg3-open-failure.flac");
+    std::fs::write(&temp, &disturbed).expect("temp fixture");
+    let error = crate::probe_media(&temp).expect_err("damaged first frame");
+    let _ = std::fs::remove_file(&temp);
+    println!("E1-ABI open-failure adapter message: {}", error.message);
+    assert!(
+        error.message.contains("decoder status"),
+        "the typed status rides the message: {}",
+        error.message
+    );
+    assert!(
+        !error.message.contains("diagnostic:"),
+        "the open path must not claim a diagnostic it cannot read: {}",
+        error.message
+    );
+}
+
+
+// --- DG-3: the retained fault reaches its named consumer ----------------------
+
+use std::sync::OnceLock;
+use std::sync::Mutex as StdMutex;
+
+use qianqian_diagnostics::{Config, Diagnostics, ExportError, Exporter, Record};
+
+/// The consumer-facing fields this test observes: (status, native_code) pairs.
+type TypedFields = std::sync::Arc<StdMutex<Vec<(Option<i32>, Option<i32>)>>>;
+
+struct CollectingExporter {
+    lines: std::sync::Arc<StdMutex<Vec<String>>>,
+    statuses: TypedFields,
+}
+
+impl Exporter for CollectingExporter {
+    fn name(&self) -> &'static str {
+        "collecting"
+    }
+
+    fn export(&mut self, record: &Record) -> Result<(), ExportError> {
+        self.lines
+            .lock()
+            .unwrap()
+            .push(format!("{}|{}", record.site, record.message.render()));
+        self.statuses
+            .lock()
+            .unwrap()
+            .push((record.status, record.native_code));
+        Ok(())
+    }
+}
+
+struct Facility {
+    diagnostics: Diagnostics,
+    lines: std::sync::Arc<StdMutex<Vec<String>>>,
+    statuses: TypedFields,
+}
+
+fn facility() -> &'static Facility {
+    static FACILITY: OnceLock<Facility> = OnceLock::new();
+    FACILITY.get_or_init(|| {
+        let lines = std::sync::Arc::new(StdMutex::new(Vec::new()));
+        let statuses = std::sync::Arc::new(StdMutex::new(Vec::new()));
+        let diagnostics = Diagnostics::install(
+            Box::new(CollectingExporter {
+                lines: std::sync::Arc::clone(&lines),
+                statuses: std::sync::Arc::clone(&statuses),
+            }),
+            Config {
+                beta_capacity: 64,
+                poll_window: std::time::Duration::from_millis(5),
+            },
+        )
+        .expect("the test binary installs exactly one facility");
+        Facility {
+            diagnostics,
+            lines,
+            statuses,
+        }
+    })
+}
+
+/// DG-3 acceptance: the adapter's read failure carries BOTH the public message
+/// text (unchanged shape) and the typed fault to its named consumer — the
+/// diagnostic outlet's record fields. The message TEXT is never the identity:
+/// the assertion on (status, native_code) is.
+#[test]
+fn adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet() {
+    let facility = facility();
+    let config = fault_config();
+    // The adapter opens real paths by contract, so the crafted bytes go to a
+    // temp file (the in-memory harness above covers the ABI itself).
+    let temp = std::env::temp_dir().join("qianqian-dg3-latched-alac.m4a");
+    std::fs::write(&temp, &config.corrupted).expect("temp fixture");
+    let mut stream = crate::SongcoreDecodeStream::open(&temp).expect("the faulted file opens");
+    let _ = std::fs::remove_file(&temp);
+
+    let mut read_error_message = None;
+    for _ in 0..200 {
+        let mut block = vec![0.0f32; CALIB_BLOCK as usize * 2];
+        if let Err(error) = stream.read_frames(&mut block) {
+            read_error_message = Some(error.message);
+            break;
+        }
+    }
+    let message = read_error_message.expect("the latched fatal surfaces on a read");
+    println!("E1-ABI adapter read failure message: {message:?}");
+    // The public shape is unchanged: the C side's own first-failure text for
+    // this class ("pending decode error" is what a SUBSEQUENT read
+    // re-publishes, and the adapter never makes one).
+    assert_eq!(
+        message, "decode error",
+        "the public message keeps the C-side text (presentation, never identity)"
+    );
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let found = facility
+            .statuses
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(status, native)| {
+                *status == Some(sys::SONG_ERR_DECODE_ERROR as i32)
+                    && *native == Some(-1094995529)
+            });
+        if found {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the typed fault never reached the outlet: {:?} / {:?}",
+            facility.lines.lock().unwrap(),
+            facility.statuses.lock().unwrap()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let counters = facility.diagnostics.counters();
+    assert!(
+        counters.export_failed == 0,
+        "the outlet delivered every record: {counters:?}"
+    );
 }

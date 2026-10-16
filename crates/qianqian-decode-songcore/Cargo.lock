@@ -48,9 +48,14 @@ dependencies = [
  "qianqian-app",
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
  "qianqian-songcore-sys",
  "serde_json",
 ]
+
+[[package]]
+name = "qianqian-diagnostics"
+version = "0.1.0"
 
 [[package]]
 name = "qianqian-songcore-sys"
