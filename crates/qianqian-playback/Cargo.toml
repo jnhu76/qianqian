@@ -19,7 +19,13 @@ qianqian-diagnostics = { path = "../qianqian-diagnostics" }
 loom = { version = "0.7", optional = true }
 
 [features]
-loom = ["dep:loom"]
+# FV-CONC-0: RUSTFLAGS is global — every crate in a `--cfg loom` build sees
+# the cfg — while --features is package-scoped, so the feature has to travel
+# the same dependency path. The session registers the class-α pool
+# (session.rs), which puts qianqian-diagnostics inside this loom build;
+# without this edge its cfg(loom) selection in pool.rs has no loom crate to
+# resolve against (E0433) under `-p qianqian-playback --features loom`.
+loom = ["dep:loom", "qianqian-diagnostics/loom"]
 
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }
