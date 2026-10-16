@@ -497,7 +497,8 @@ pub fn note_critical_panic() -> Disposition {
     let Some(pool) = ALPHA_POOL.with(Cell::get) else {
         return Disposition::NoSink;
     };
-    let record = Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
+    let record =
+        Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
     if pool.publish_panic_once(record) {
         Disposition::AlphaRecorded
     } else {

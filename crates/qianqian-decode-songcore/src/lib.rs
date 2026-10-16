@@ -24,7 +24,12 @@ use qianqian_composition::{ActivationError, ComponentSpec};
 use qianqian_diagnostics::{Level, Record, Text, emit};
 use qianqian_songcore_sys as sys;
 
-pub mod av_log_bridge;
+// DG-4c: the opt-in FFmpeg av_log bridge. Crate-private on purpose — the decode
+// chain's public surface is frozen by the boundary gate (audit §7.5 / MAJOR-3)
+// to the plugin constructor and the D14.6 probe query, so the bridge is
+// installed from inside the plugin's activation (the host-facing startup moment
+// that precedes every song_open) and exposes no new public item.
+mod av_log_bridge;
 
 /// The adapter's diagnostic site tag (DG-3's consumer-facing identity).
 const DIAGNOSTIC_SITE: &str = "qianqian-decode-songcore";
@@ -631,6 +636,12 @@ pub fn songcore_decode_plugin() -> ComponentSpec {
     ComponentSpec::new("songcore_decode_plugin")
         .provides::<PcmDecodeCapability>()
         .on_activate(|ctx| {
+            // T5-9/DG-4c ordering: the opt-in av_log bridge installs on
+            // activation — before this provider can serve any `open_media`, and
+            // therefore before any `song_open`. SongCore's per-open reinstall
+            // only fires when the opt-in is unset, so a bridged host is never
+            // clobbered. Diagnostics only: nothing below depends on the outcome.
+            av_log_bridge::install_av_log_bridge();
             let service = SongcoreDecode::new().map_err(|e| ActivationError::new(e.message))?;
             ctx.provide::<PcmDecodeCapability>(Rc::new(service))
                 .map_err(|e| ActivationError::new(format!("provision refused: {e:?}")))?;

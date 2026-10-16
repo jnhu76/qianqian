@@ -166,12 +166,6 @@ const HOST_DIAGNOSTIC_DRAIN_DEADLINE: std::time::Duration = std::time::Duration:
 #[cfg(feature = "playback")]
 fn install_host_diagnostics() -> Option<qianqian_diagnostics::Diagnostics> {
     use qianqian_diagnostics::{Config, Diagnostics, StderrExporter};
-    // T5-9/DG-4c: the opt-in FFmpeg av_log bridge installs here, at transport
-    // startup, BEFORE any song_open — SongCore's per-open reinstall only fires
-    // when the variable is unset, so this ordering is what keeps a bridged host
-    // from being clobbered. The outcome is diagnostics: nothing below depends on
-    // it, and an unset switch leaves SongCore's discard callback in place.
-    let _ = qianqian_decode_songcore::av_log_bridge::install_av_log_bridge();
     // `StderrExporter::default()` admits every level: the site gates
     // (`QIANQIAN_AUDIO_LOG`, the av_log opt-in) already decide what is produced,
     // and the drainer is the only thing that renders.

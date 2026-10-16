@@ -26,11 +26,17 @@
 //! assumption is made about which FFmpeg-internal lock is held at callback
 //! time; the discipline above is chosen so that the answer cannot change it.
 //!
-//! **Install ordering.** The bridge installs once, at host startup, before any
-//! `song_open`; SongCore's per-open reinstall only fires when the variable is
-//! unset, so a bridged host is never clobbered. Concurrent handles share the
-//! one callback and records carry no handle identity: this is a process-level
-//! diagnostic, and per-handle attribution is explicitly not provided.
+//! **Install ordering and surface.** The bridge installs once, from the decode
+//! plugin's activation — the host-facing startup moment that precedes every
+//! `song_open` that this provider can serve. SongCore's per-open reinstall only
+//! fires when the variable is unset, so a bridged host is never clobbered. The
+//! module is crate-private and adds NO public item: the decode chain's public
+//! surface is frozen by the plugin-boundary gate to the plugin constructor and
+//! the D14.6 probe query, so the host owns this decision through the
+//! environment variable rather than through a new exported function. Concurrent
+//! handles share the one callback and records carry no handle identity: this is
+//! a process-level diagnostic, and per-handle attribution is explicitly not
+//! provided.
 
 use std::ffi::c_char;
 use std::os::raw::c_void;
@@ -43,7 +49,7 @@ use qianqian_diagnostics::{Level, MSG_CAP, Record, Text, emit, is_alpha_producer
 /// for a bridged host extends from "keep FFmpeg's default logger" to "the host
 /// owns the av_log callback" (a documentation change in the binding
 /// architecture, never an ABI change).
-pub const FFMPEG_LOG_ENV: &str = "QIANQIAN_FFMPEG_LOG";
+const FFMPEG_LOG_ENV: &str = "QIANQIAN_FFMPEG_LOG";
 
 /// The bridge records' site tag.
 const BRIDGE_SITE: &str = "ffmpeg";
@@ -92,7 +98,7 @@ static BRIDGE_DROPPED: AtomicU64 = AtomicU64::new(0);
 
 /// What one host-startup bridge attempt did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AvLogBridgeOutcome {
+enum AvLogBridgeOutcome {
     /// `QIANQIAN_FFMPEG_LOG` is unset (or "0"): the bridge was NOT installed and
     /// SongCore's discard callback stays the process posture (T5-9 PRESERVE).
     NotRequested,
@@ -100,8 +106,12 @@ pub enum AvLogBridgeOutcome {
     Installed,
 }
 
-/// Records the bridge dropped at its admission check.
-pub fn bridge_dropped() -> u64 {
+/// Reads the bridge's drop count. The count itself is maintained in production
+/// (the design's "drops+counts" rule for an unregistered calling thread); the
+/// reader is the witness, because no operator-facing consumer exists today — a
+/// host that wants bridge loss in its shutdown report would have to name one.
+#[cfg(test)]
+fn bridge_dropped() -> u64 {
     BRIDGE_DROPPED.load(Ordering::Relaxed)
 }
 
@@ -121,7 +131,13 @@ fn bridge_requested(value: Option<&std::ffi::OsStr>) -> bool {
 /// No error is possible on this path: a host that opted into FFmpeg diagnostics
 /// either owns the callback or the opt-in was not requested. Nothing else in the
 /// program may depend on the outcome — this is diagnostics.
-pub fn install_av_log_bridge() -> AvLogBridgeOutcome {
+pub(crate) fn install_av_log_bridge() {
+    let _ = install_av_log_bridge_decision();
+}
+
+/// The same call, returning the decision — the module-level witness's entry, kept
+/// separate so the activation call site does not name a type it has no use for.
+fn install_av_log_bridge_decision() -> AvLogBridgeOutcome {
     if bridge_requested(std::env::var_os(FFMPEG_LOG_ENV).as_deref()) {
         install_bridge_callback()
     } else {
@@ -218,7 +234,11 @@ mod tests {
         assert_eq!(bridge_level(AV_LOG_PANIC), Some(Level::Error), "PANIC 0");
         assert_eq!(bridge_level(8), Some(Level::Error), "FATAL 8");
         assert_eq!(bridge_level(16), Some(Level::Error), "ERROR 16");
-        assert_eq!(bridge_level(AV_LOG_WARNING), Some(Level::Warn), "WARNING 24");
+        assert_eq!(
+            bridge_level(AV_LOG_WARNING),
+            Some(Level::Warn),
+            "WARNING 24"
+        );
         assert_eq!(bridge_level(AV_LOG_INFO), Some(Level::Info), "INFO 32");
         assert_eq!(bridge_level(40), Some(Level::Info), "VERBOSE 40");
         assert_eq!(bridge_level(AV_LOG_DEBUG), None, "DEBUG 48");
@@ -306,13 +326,7 @@ mod tests {
             "the witness forces installation; the env gate has its own witness"
         );
         let before = registration.pool().outstanding();
-        unsafe {
-            av_log(
-                std::ptr::null_mut(),
-                16,
-                c"dg4c witness fmt %d".as_ptr(),
-            )
-        };
+        unsafe { av_log(std::ptr::null_mut(), 16, c"dg4c witness fmt %d".as_ptr()) };
         assert_eq!(
             registration.pool().outstanding(),
             before + 1,
@@ -321,7 +335,11 @@ mod tests {
         let mut last = 0u32;
         let mut site_and_message = None;
         registration.pool().drain(&mut last, &mut |record| {
-            site_and_message = Some((record.site, record.level, record.message.as_str().to_owned()));
+            site_and_message = Some((
+                record.site,
+                record.level,
+                record.message.as_str().to_owned(),
+            ));
         });
         let (site, level, message) = site_and_message.expect("copied");
         assert_eq!(site, BRIDGE_SITE);
@@ -359,9 +377,9 @@ mod tests {
         assert_eq!(registration.pool().outstanding(), before + 1);
         let mut last = 0u32;
         let mut copied = Vec::new();
-        registration
-            .pool()
-            .drain(&mut last, &mut |record| copied.push(record.message.as_str().to_owned()));
+        registration.pool().drain(&mut last, &mut |record| {
+            copied.push(record.message.as_str().to_owned())
+        });
         assert!(
             copied.iter().any(|line| line == "DG4CClass: named item"),
             "the class name prefixes the record: {copied:?}"
