@@ -342,59 +342,120 @@ catch and the reliable publications.
 these threads. This scoping is not a T5-2 relaxation: T5-2 governs class α,
 which does not use the queue.
 
-**Class α slot protocol (ownership handoff; redesigned R5 review
-2026-10-16).** The R4 form — plain (non-atomic) payload stores under a
+**Class α slot protocol (ownership handoff; redesigned R5, corrected R6
+review 2026-10-16).** The R4 form — plain (non-atomic) payload stores under a
 sequence tag, read back with "volatile-address copies" — is **withdrawn as
 memory-unsafe in Rust**: while the drainer copies the record, the producer
 may lawfully begin overwriting the same plain memory (the tag only
 instructs the reader to discard the copy afterwards); that concurrent
 plain read+write is a data race — undefined behavior that discarding the
 copy cannot undo — and volatile is not a synchronization mechanism. A
-single *writer* does not exclude the reader. The redesigned protocol
-excludes concurrent record access **structurally, by ownership — not by
-detection**:
+single *writer* does not exclude the reader. The R5 redesign excluded
+concurrent record access "structurally" — that conclusion was itself
+withdrawn in R6 (the recycle direction loaded `cons_gen` Relaxed, so the
+drainer's copy was not ordered against the producer's overwrite) and the
+protocol below is the corrected form: exclusivity is **asserted here and
+established only by the acceptance gates at the end of this block**:
 
 ```text
 Per registered class α producer — a private two-record pool:
-    pub_gen : AtomicU32     // last PUBLISHED generation (0 = nothing yet)
-    cons_gen: AtomicU32     // last generation the drainer FINISHED copying
+    pub_gen : AtomicU32     // last PUBLISHED generation; 0 = none yet
+    cons_gen: AtomicU32     // last generation the drainer FINISHED copying;
+                            // 0 = none yet
     record[2]: FixedRecord  // plain data (inline message buffer, whitelisted
                             // composition) — owned by exactly one party at a
-                            // time, never accessed by two threads at once
+                            // time
+
+Generation numbering: cyclic 1, 2, …, u32::MAX, 1, 2, … — 0 is RESERVED as
+the both-counters-initial "none" value and never re-emitted (R6: wrapping
+back onto 0 would collide with the sentinel). All comparisons are wrapping
+differences; the admission rule keeps pub − cons ∈ {0, 1, 2} forever, so
+every difference the protocol uses is exact modular arithmetic and no ABA
+is possible (the drainer's equality check against its own last_consumed
+always sits within distance ≤ 2).
 
 Publish (fault path — bounded, single attempt; no loop, no CAS, no lock,
 no alloc):
-    p = pub_gen.load(Acquire); n = p + 1
-    if wrapping(n − 2) > cons_gen.load(Relaxed):
-        drop + count                       // pool exhausted: one record
-                                           // published-unconsumed + one
-                                           // drainer-held — give up at once
-    write record[n % 2]                    // fully owned: plain stores
-    pub_gen.store(n, Release)              // ownership of this record
-                                           // passes to the drainer
+    p = pub_gen.load(Acquire)
+    if p.wrapping_sub(cons_gen.load(Acquire)) == 2:
+        drop + count                  // pool full: one record
+                                      // published-unconsumed + one
+                                      // drainer-held. ALL loss happens
+                                      // here, on the producer, counted.
+                                      // (R6: the R5 `wrapping(n−2) > cons`
+                                      // form rejected the very FIRST fault
+                                      // on an empty pool — withdrawn.)
+    n = next generation after p (cyclic, skipping 0)
+    write record[n % 2]               // fully owned: plain stores
+    pub_gen.store(n, Release)         // ownership of this record passes
+                                      // to the drainer
 
-Consume (drainer, the only reader — bounded):
-    g = pub_gen.load(Acquire)
-    if g == 0 or g == last_consumed: nothing new → next poll
-    copy record[g % 2]                     // safe: the producer cannot touch
-                                           // a published record it no
-                                           // longer owns
-    last_consumed = g; cons_gen.store(g, Release)
+Consume (drainer, the only reader — bounded, IN ORDER, no skips; R6: the
+R5 latest-only sketch silently skipped an intermediate generation with no
+count anywhere — withdrawn):
+    g = pub_gen.load(Acquire)         // snapshot
+    c = last_consumed
+    while c != g:                     // ≤ 2 iterations
+        c = next generation after c (cyclic, skipping 0)
+        copy record[c % 2]            // safe: the producer's admission
+                                      // blocks gen c+2 until it has
+                                      // Acquire-confirmed cons ≥ c
+    if c != last_consumed:
+        last_consumed = c
+        cons_gen.store(c, Release)    // ONE recycle store releases every
+                                      // record copied in this walk
 ```
 
-**Why there is no data race (the ownership invariant).** The producer
-writes slot `n % 2` for generation n only when `cons_gen ≥ n − 2`. The
-drainer stores `cons_gen = g` strictly **after** finishing the copy of
-generation g, and it only ever copies the latest published generation — so
-once `cons_gen ≥ n − 2` holds, every drainer copy that could still touch
-slot `n % 2` (generation n − 2's publication) has completed, and any later
-poll copies a strictly newer generation. During the producer's plain
-writes for generation n, `pub_gen` still holds n − 1, so a concurrent
-drainer poll copies the *other* slot; the Release publish / Acquire load
-edge (textbook message passing) makes the finished record visible before
-any reader can observe the new generation. No fence tricks and no volatile
-accesses are involved — ownership, not ordering repairs, excludes the
-race.
+**Why there is no data race — two synchronization directions (corrected
+R6; the R5 "structurally excluded" conclusion is withdrawn pending the
+gates).** The ownership invariant needs BOTH directions, each a
+Release/Acquire pair on one of the two counters; neither direction's
+counter may be loaded Relaxed by its consumer side:
+
+- *Publish:* payload stores → `pub_gen.store(n, Release)`; the drainer's
+  `pub_gen.load(Acquire)` reading that value synchronizes-with it, so all
+  payload writes of the copied generation happen-before the copy
+  (textbook message passing; the R5 form was already correct here).
+- *Recycle (the R6 fix):* copy reads → `cons_gen.store(c, Release)`;
+  the producer's `cons_gen.load(Acquire)` reading a value ≥ c
+  synchronizes-with that store — and because the drainer's earlier
+  copies are sequenced-before its later stores, synchronizing with any
+  later store also orders every earlier copy. The producer writes slot
+  `n % 2` only when `pub − cons ≤ 1`, i.e. only after an
+  Acquire-confirmed release of generation n − 2's copy. The R5 form
+  loaded `cons_gen` Relaxed: it observed the value without the
+  synchronization, the recycle direction established no happens-before,
+  and the producer's overwrite was not ordered against the drainer's
+  copy — a residual data race the ordering of the admission check alone
+  could not repair (Rust `Ordering` contract: Relaxed provides no
+  inter-thread ordering).
+
+No fence tricks and no volatile accesses are involved — but "no race" is
+a property this design OBLIGATES the gates below to establish, not one it
+claims done.
+
+**Pool state machine (the unit the gates verify).** With d =
+`pub_gen.wrapping_sub(cons_gen)` ∈ {0, 1, 2} by the admission rule:
+
+| d | pool state | publish attempt | consume walk |
+|---|---|---|---|
+| 0 | empty (nothing in flight) | accepted — slot n%2, n = next(p). Initial state: pub = cons = 0, d = 0 — **the first fault on an empty pool is accepted** (the R5 arithmetic rejected it; withdrawn) | nothing new |
+| 1 | one published-unconsumed | accepted — writes the OTHER record | copies 1 generation, releases it |
+| 2 | full: one published-unconsumed + one drainer-held | **dropped + counted (the only loss site)** | copies 2 generations in order, releases both via one `cons_gen` store |
+
+Transitions: publish d→min(d+1, 2) (write, then Release publish; at d = 2
+the publish is refused and d stays 2); consume d→0 (in-order walk of
+generations last_consumed+1 … pub, one Release recycle store at the end).
+
+**Loss accounting (every drop counted — R6).** Loss happens in exactly
+one place: the producer's admission check, counted before any write.
+Consumption is in order with no skips — the drainer walks
+last_consumed+1 … `pub` and delivers EVERY generation in that range, both
+records of a full pool included. "At most two in flight" is the capacity
+property; the accounting property is separate and stated as an identity:
+written-generations = delivered-generations + producer-side drops, and
+the gates below check both. No tearing exists by the ownership
+discipline: the drainer copies only whole published records.
 
 **Ownership and registration.** One pool per **registered** α producer
 (per critical thread / critical site). Registration happens on the cold
@@ -404,13 +465,6 @@ lazy-init lock. No two α producers ever touch the same pool, so every
 payload has exactly one writer (the DG-4b hook's pools are per registered
 critical thread; a panic on an unregistered thread is a class β event that
 chains and never touches a pool).
-
-**Loss (bounded; no tearing by construction).** There is no partial record
-to tear: the drainer copies only whole published records. At most TWO α
-records per producer are ever in flight (one published-unconsumed, one
-drainer-held); a further fault before the drainer advances `cons_gen` is
-dropped and counted at the publish check — the bounded single-attempt
-give-up the isolation contract requires.
 
 **Drainer discovery (a poll-frequency convention, not a latency bound).**
 An α publish has no wake event — a wake *from* the α thread would itself
@@ -431,8 +485,10 @@ interval" is withdrawn.
 **Platform note.** Two `AtomicU32` loads/stores with Release/Acquire
 pairing plus ordinary indexed array access — no CAS, no LL/SC, no fence
 intrinsics — available and lock-free on every tier-1 target
-(x86_64/aarch64; Windows/Linux/macOS). Generation arithmetic is wrapping
-(`n − 2` computed modularly), so `u32` wraparound is harmless.
+(x86_64/aarch64; Windows/Linux/macOS). Wraparound is handled by
+construction, not by the R5 assertion "wrapping therefore harmless"
+(withdrawn): 0 is the reserved none-sentinel, the cycle skips it, and the
+admission rule bounds every modular distance the protocol uses to ≤ 2.
 
 | Payload-access mechanism | Verdict |
 |---|---|
@@ -442,14 +498,20 @@ intrinsics — available and lock-free on every tier-1 target
 | `AtomicPtr` node exchange with a free list | subsumed: the two-record pool is the bounded, pointer-free special case of this idea |
 
 **Acceptance gates (binding, in this order — no α slot lands without all
-four).** (1) *No data race*: the ownership invariant above is verified
-exhaustively (Loom over one producer + one drainer interleavings;
-Kani/Miri on the wrapping arithmetic) — a fence-only or volatile-only
-"fix" does not satisfy this gate. (2) *Snapshot integrity*: every record
+four; the enumerated pool states are part of gate 1, R6).** (1) *No data
+race*: the two-direction ownership invariant (publish happens-before +
+recycle happens-before) is verified exhaustively — Loom over one producer
++ one drainer interleaving model, Kani/Miri on the cyclic arithmetic —
+covering the enumerated pool states: **first publish on an empty pool,
+two consecutive publishes, full-pool rejection, reuse after consumption,
+and cross-wrap generation sequences (0 skipped)**; a fence-only or
+volatile-only "fix" does not satisfy this gate, and neither does a
+Relaxed recycle load. (2) *Snapshot integrity*: every record
 an exporter sees is a complete publication (structural here; for the
 atomic-lane alternative this gate is the memory-model proof). (3) *Loss
-bound*: at most two in-flight records per pool, every drop counted.
-(4) *Producer cost*: a fixed store count — no loop, CAS, lock, or
+accounting*: written = delivered + producer-side drops, all drops
+counted; consumption walks last_consumed+1 … `pub` in order with no
+skips. (4) *Producer cost*: a fixed store count — no loop, CAS, lock, or
 allocation on the fault path.
 
 Residual `MECHANISM_OPEN` (representation-level, no semantics change): pool

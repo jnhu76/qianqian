@@ -609,6 +609,29 @@ zero-frames (no write path can observe it) → park latch after the last
 non-zero read → serialization point fires the parked seek with remainder
 provably None → next read surfaces the old fatal → Failed{decode}.
 
+2026-10-16 R6 review revision (same round, PR #284, three findings, all
+on the α pool protocol; R5-2 zero-frame construction and R5-3 poll
+convention accepted): (1) recycle direction corrected — the R5 producer
+loaded cons_gen Relaxed, so the drainer's copy was never ordered against
+the producer's overwrite (residual data race); both directions are now
+Release/Acquire pairs (publish: payload → Release pub_gen → Acquire →
+copy; recycle: copy → Release cons_gen → producer Acquire), and the
+"already structurally excluded" conclusion is withdrawn — exclusivity is
+asserted and obligated to the Loom/Kani gates; (2) admission arithmetic
+rewritten — the R5 `wrapping(n−2) > cons` form rejected the FIRST fault
+on an empty pool and plain `>` is not a modular order; now
+`pub.wrapping_sub(cons) == 2` → drop (empty pool d=0 accepts), 0 is the
+reserved none-sentinel skipped by the generation cycle, distances bounded
+to ≤ 2 by the admission rule itself; (3) consumption is in-order with no
+skips — the R5 latest-only copy silently skipped an intermediate
+generation with no count anywhere; the drainer now walks
+last_consumed+1 … pub (both records of a full pool delivered), loss
+occurs only at the producer admission check, accounting identity:
+written = delivered + producer drops. Protocol presented as an explicit
+pool state machine {d=0/1/2} whose enumerated states (first publish, two
+consecutive publishes, full-pool rejection, reuse after consumption,
+cross-wrap) are part of the binding no-data-race gate.
+
 ---
 
 # Historical evidence
