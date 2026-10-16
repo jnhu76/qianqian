@@ -505,7 +505,8 @@ fn with_current_pool<R>(f: impl FnOnce(&PoolCore) -> R) -> Option<R> {
 /// thread that created it, and no safe code can share the handle — or hand a
 /// second producer one — because the pool itself is private. The pool
 /// protocol's single-producer premise is enforced by ownership, not by
-/// documentation.
+/// documentation, and one thread holds at most one live registration
+/// ([`AlphaRegistration::register`] rejects a second).
 pub struct AlphaRegistration {
     pool: Arc<PoolCore>,
     _thread_bound: PhantomData<*const ()>,
@@ -513,9 +514,24 @@ pub struct AlphaRegistration {
 
 impl AlphaRegistration {
     /// Register the CALLING thread as an isolation-obligated producer.
+    ///
+    /// ONE registration per thread: a second call on a thread that already holds
+    /// one panics. The role is a per-thread fact (the thread-local fast path),
+    /// so two live registrations on one thread cannot both be valid — a second
+    /// would overwrite the first's fast path, and the first handle's `Drop`
+    /// would then clear the second's, silently returning a registered thread to
+    /// the class-β path (and, for the DG-4b posture, to chaining a panic into an
+    /// unknown synchronous sink). Rejecting the duplicate keeps the fact
+    /// single-valued; registering again AFTER a drop is ordinary and legal.
+    ///
     /// Cold path only (thread/site startup) — this takes the registry lock and
     /// initializes the process clock when it is not running yet.
     pub fn register() -> Self {
+        assert!(
+            ALPHA_POOL.with(Cell::get).is_none(),
+            "qianqian-diagnostics: this thread already holds an AlphaRegistration \
+             (one registration per thread)"
+        );
         ensure_process_clock();
         let pool = Arc::new(PoolCore::new());
         alpha_registry()
@@ -1087,6 +1103,30 @@ mod tests {
     // oracles.
     use super::*;
 
+    /// Serializes this module's registration/poll oracles: the class-α registry
+    /// is process-global, `poll_pools` walks every registered pool, and test
+    /// functions run in parallel — without this guard one oracle's poll (or its
+    /// live registration) leaks into another oracle's sink, counters or
+    /// registry-length assertions.
+    static SERIALIZE_POOL_TESTS: Mutex<()> = Mutex::new(());
+
+    fn serialize_pool_tests() -> std::sync::MutexGuard<'static, ()> {
+        SERIALIZE_POOL_TESTS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Drain and reap every registered pool through a throwaway facility
+    /// interior, so a finished oracle leaves neither a live registration nor a
+    /// retired pool with residual records in the process-global registry (the
+    /// poll oracles in this module must find a clean registry).
+    fn reap_this_threads_registration() {
+        let inner = detached_inner();
+        let mut exporter: Option<Box<dyn Exporter>> = None;
+        let mut disabled = false;
+        poll_pools(&inner, &mut exporter, &mut disabled);
+    }
+
     fn record(marker: i64) -> Record {
         let mut message = Text::from_static("marker=");
         message.push_i64(marker);
@@ -1142,6 +1182,7 @@ mod tests {
     #[cfg(not(loom))]
     #[test]
     fn retired_pools_are_residual_drained_folded_and_released() {
+        let _serial = serialize_pool_tests();
         let live_before = alpha_registry()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -1225,6 +1266,7 @@ mod tests {
     #[cfg(not(loom))]
     #[test]
     fn a_retired_pool_with_residual_records_is_released_only_after_they_are_delivered() {
+        let _serial = serialize_pool_tests();
         let live_before = alpha_registry()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -1261,5 +1303,108 @@ mod tests {
             live_before,
             "and only then is the pool released"
         );
+    }
+
+    /// Oracle (producer role, one per thread): a second registration on a thread
+    /// that already holds one is REJECTED, and the rejection cannot disturb the
+    /// live registration. Under the defect the second call overwrites the
+    /// thread's fast path, and the first handle's `Drop` then clears it out from
+    /// under the still-live second handle: a registered thread silently returns
+    /// to the class-β path — and, for the DG-4b posture, back to chaining a
+    /// panic into an unknown synchronous sink.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_second_registration_on_the_same_thread_is_rejected() {
+        let _serial = serialize_pool_tests();
+        let registration = AlphaRegistration::register();
+        assert!(is_alpha_producer());
+        assert_eq!(emit(record(1)), Disposition::AlphaRecorded);
+
+        let duplicate = std::panic::catch_unwind(AlphaRegistration::register);
+        let payload = match duplicate {
+            Err(payload) => payload,
+            Ok(_) => panic!("the duplicate registration must be rejected"),
+        };
+        let message = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .unwrap_or("<non-string panic payload>");
+        assert!(
+            message.contains("one registration per thread"),
+            "the rejection states the contract: {message:?}"
+        );
+
+        // The live registration is untouched by the rejected attempt.
+        assert!(
+            is_alpha_producer(),
+            "the fast path still belongs to the first handle"
+        );
+        assert_eq!(emit(record(2)), Disposition::AlphaRecorded);
+        assert_eq!(
+            registration.accepted(),
+            2,
+            "both publishes went to its pool"
+        );
+        assert_eq!(registration.rejected(), 0);
+
+        // And that handle's own drop still owns the fact.
+        drop(registration);
+        assert!(
+            !is_alpha_producer(),
+            "the drop closes the thread's fast path"
+        );
+        reap_this_threads_registration();
+    }
+
+    /// Oracle: after a registration drops, the thread may register again — the
+    /// one-per-thread rule is about LIVE registrations, not a thread's lifetime.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_thread_may_register_again_after_its_registration_drops() {
+        let _serial = serialize_pool_tests();
+        let first = AlphaRegistration::register();
+        drop(first);
+        assert!(!is_alpha_producer());
+
+        let second = AlphaRegistration::register();
+        assert!(is_alpha_producer(), "re-registration after a drop is legal");
+        assert_eq!(emit(record(3)), Disposition::AlphaRecorded);
+        assert_eq!(second.accepted(), 1, "the new registration starts fresh");
+        drop(second);
+        assert!(!is_alpha_producer());
+        reap_this_threads_registration();
+    }
+
+    /// Oracle (non-LIFO drop order): registration lifetimes on DIFFERENT threads
+    /// are independent — the later-created registration may drop first, and
+    /// neither drop touches the other thread's role fact. Once same-thread
+    /// duplicates are rejected this is the only legal order-variation (in-thread
+    /// non-LIFO becomes unconstructible rather than merely handled).
+    #[cfg(not(loom))]
+    #[test]
+    fn registration_lifetimes_are_per_thread_and_drop_order_is_irrelevant() {
+        let _serial = serialize_pool_tests();
+        let first_registration = AlphaRegistration::register();
+        let (report, observations) = std::sync::mpsc::channel();
+        let other = std::thread::spawn(move || {
+            let registration = AlphaRegistration::register();
+            assert!(is_alpha_producer(), "the second thread has its own fact");
+            assert_eq!(emit(record(4)), Disposition::AlphaRecorded);
+            drop(registration);
+            report.send(is_alpha_producer()).expect("report home");
+        });
+        assert!(
+            !observations.recv().expect("the second thread reports"),
+            "its own drop closes only its own fast path"
+        );
+        other.join().expect("the registering thread");
+        // The FIRST registration outlives the second (non-LIFO): its role fact
+        // and its pool are untouched.
+        assert!(is_alpha_producer(), "the first thread's fact survived");
+        assert_eq!(emit(record(5)), Disposition::AlphaRecorded);
+        assert_eq!(first_registration.accepted(), 1);
+        drop(first_registration);
+        assert!(!is_alpha_producer());
+        reap_this_threads_registration();
     }
 }
