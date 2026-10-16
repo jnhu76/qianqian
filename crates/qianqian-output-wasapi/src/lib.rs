@@ -55,6 +55,12 @@ mod render_order_oracle;
 #[cfg(all(test, windows))]
 mod event_handle_lifetime_tests;
 
+// The real failure-publication cone oracles (O-CONE-NECESSITY / O-CONE-ORDER),
+// error-system migration §7.1/§7.2. Windows-only and device-gated for the same
+// reason as the test above: the cone being verified does not exist elsewhere.
+#[cfg(all(test, windows))]
+mod cone_oracle_tests;
+
 /// The Host Render Backend this host assembly selects (PBK-003 §9):
 /// the owned Windows backend mechanism. Selection is configuration of
 /// the assembly, not composition truth; a future platform backend

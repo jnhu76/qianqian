@@ -15,6 +15,10 @@ qianqian-composition = { path = "../qianqian-composition" }
 
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }
+# Test admission only: the real-cone oracles (O-CONE-NECESSITY / O-CONE-ORDER)
+# drive a REAL episode so the cone's own stop/complete can be observed at the
+# session's settlement boundary. The mechanism itself keeps no such edge.
+qianqian-playback = { path = "../qianqian-playback" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

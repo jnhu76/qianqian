@@ -110,7 +110,10 @@ NORMAL_EDGES = {
 DEV_EDGES = {
     "qianqian-playback": {"qianqian-app"},  # admission tests
     "qianqian-decode-songcore": {"qianqian-app"},  # admission tests
-    "qianqian-output-wasapi": {"qianqian-app"},  # admission tests
+    "qianqian-output-wasapi": {
+        "qianqian-app",  # admission tests
+        "qianqian-playback",  # real-cone oracles: drive a real episode
+    },
     "qianqian-headless": {"qianqian-audio-api"},  # H-b: TEST ADMISSION ONLY
 }
 
