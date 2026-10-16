@@ -33,14 +33,20 @@
 //!
 //! Shutdown is bounded-or-honest: the host stops admission, waits a bounded
 //! deadline for the drainer's final sweep, and then ABANDONS the thread if it
-//! is stuck inside a blocking sink. Admission stops for BOTH producer classes,
-//! and a late presentation is dropped and counted at its own class's admission
-//! boundary ([`Diagnostics::shutdown`] declares the one race residual that
-//! producer quiescence cannot remove). An abandoned shutdown is reported as
-//! such — never dressed up as "drain complete" — and lost records are counted.
-//! The abandonment report itself is attempted off the exit path (a detached,
-//! never-joined writer): the sink is stuck by the abandonment rule, so the
-//! exit boundary must not synchronously enter it again.
+//! is stuck inside a blocking sink. Admission stops for BOTH producer classes
+//! through ONE admission word (bit 0 = closed, the remaining bits = publications
+//! in flight): the producer's single RMW carries both its admission decision and
+//! its claim on the final sweep, so a presentation the facility admitted is
+//! either swept — the drainer orders that sweep after the last in-flight
+//! publication, bounded by [`PUBLISHER_QUIESCENCE_WINDOW`] — or counted as an
+//! admission loss at its own class's boundary ([`Diagnostics::shutdown`] states
+//! the protocol). When that bound cannot be met the sweep still runs, but the
+//! report does NOT claim a drain: `drained` requires the quiescence observation.
+//! An abandoned shutdown is reported as such — never dressed up as "drain
+//! complete" — and lost records are counted. The abandonment report itself is
+//! attempted off the exit path (a detached, never-joined writer): the sink is
+//! stuck by the abandonment rule, so the exit boundary must not synchronously
+//! enter it again.
 //!
 //! Pool lifetime: one pool per registering thread, retired when the
 //! registration drops. The drainer walks the residual records, folds the
@@ -55,7 +61,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -69,6 +75,14 @@ pub const BETA_CAPACITY: usize = 256;
 /// The drainer's idle receive window: while idle it also polls every
 /// registered class-α pool at least once per window.
 pub const POLL_WINDOW: Duration = Duration::from_millis(50);
+/// The drainer's bounded wait for in-flight publications before its final
+/// sweep ([`Diagnostics::shutdown`]): the close orders that sweep after every
+/// publication the facility admitted, so a record admitted before the closure
+/// is either swept there or is a presentation the report refuses to call a
+/// complete drain. A representation parameter, like the poll cadence — the
+/// semantics is the ordering, the window is only how long a stalled producer
+/// may delay the drainer's own close decision.
+pub const PUBLISHER_QUIESCENCE_WINDOW: Duration = Duration::from_millis(250);
 
 // The drainer flag is thread-local: the facility's reentry guard must cost
 // one register read on the producer path, never a global lookup.
@@ -315,9 +329,13 @@ pub enum Disposition {
     /// The class-β channel was full: dropped + counted, no retry.
     BetaRejected,
     /// Shutdown has begun: dropped + counted, never published (a late producer
-    /// never revives the drainer). Checked first, for both classes: a class-α
+    /// never revives the drainer). Decided by the admission word's closed bit,
+    /// taken in the same RMW that would have held this publication, so it always
+    /// answers a presentation the facility decided NOT to admit: a class-α
     /// thread's presentation is counted at its own pool's admission boundary, a
-    /// class-β presentation at the channel's.
+    /// class-β presentation at the channel's. A presentation admitted BEFORE
+    /// the closure is never answered this way — it is swept, or (if its producer
+    /// outlasts the quiescence window) the drain is reported as incomplete.
     Shutdown,
     /// Called from the drainer thread itself: dropped (no reentry).
     Reentry,
@@ -433,15 +451,23 @@ impl Counters {
 /// The outcome of a bounded shutdown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ShutdownReport {
-    /// The drainer performed its final sweep and exited inside the deadline.
+    /// A COMPLETE drain: the drainer exited inside the deadline AND its final
+    /// sweep was ordered after every publication the facility admitted before
+    /// the closure (publisher quiescence was observed). Only a drained report
+    /// accounts for every admitted record — see [`Diagnostics::shutdown`] — and
+    /// it is never set when that ordering could not be established.
     pub drained: bool,
     /// The drainer did not exit inside the deadline: it was left running and
     /// the records not yet delivered are NOT claimed as delivered. NEVER
-    /// reported as drained.
+    /// reported as drained. (A report can also be neither drained nor
+    /// abandoned: the drainer exited, but its sweep could not be ordered after
+    /// publisher quiescence — the accounting is then incomplete by
+    /// construction, and says so.)
     pub abandoned: bool,
     /// Records admitted but undelivered at the moment of this report (a
     /// snapshot, not an accumulated loss — an abandoned drainer may still
-    /// deliver some of them later).
+    /// deliver some of them later). Zero whenever `drained`: a complete drain
+    /// leaves nothing admitted and unevaluated.
     pub undelivered_at_exit: u64,
     pub counters: Counters,
 }
@@ -449,8 +475,19 @@ pub struct ShutdownReport {
 struct Inner {
     beta_send: SyncSender<Record>,
     beta_recv: Mutex<Option<Receiver<Record>>>,
-    shutdown: AtomicBool,
+    /// The facility's admission word: bit 0 = CLOSED (the closure has been
+    /// published), the remaining bits = publications in flight. The producer
+    /// takes ONE RMW here and the closer takes ONE on the same word, which is
+    /// what makes "decide admission" and "publish" one indivisible step as seen
+    /// by the close: a producer whose `fetch_add` precedes the closer's
+    /// `fetch_or` holds a counted publication the drainer must wait for, and one
+    /// whose `fetch_add` follows it reads the closed word and never publishes.
+    admission: AtomicUsize,
     drainer_exited: AtomicBool,
+    /// Written by the drainer just before its final sweep (Release), read by
+    /// the closer after the drainer exited (Acquire): whether that sweep was
+    /// ordered after publisher quiescence. `drained` requires `true`.
+    sweep_quiescent: AtomicBool,
     /// Admission/delivery counters.
     beta_queued: AtomicU64,
     beta_rejected: AtomicU64,
@@ -462,6 +499,73 @@ struct Inner {
 
 /// Process-wide facility slot: at most one host installation.
 static FACILITY: OnceLock<Arc<Inner>> = OnceLock::new();
+
+/// Admission word bit: the closure has been published.
+const CLOSED: usize = 1;
+/// Admission word unit: one publication in flight.
+const IN_FLIGHT: usize = 2;
+
+/// Publications in flight, decoded from an admission word.
+fn in_flight(word: usize) -> usize {
+    word / IN_FLIGHT
+}
+
+/// Close admission: ONE RMW, the linearization point of the closure. Every
+/// admission decision is an RMW on the same word, so this is ordered against
+/// every publication attempt — see [`AdmissionSection`].
+fn close_admission(inner: &Inner) {
+    inner.admission.fetch_or(CLOSED, Ordering::AcqRel);
+}
+
+/// Whether the closure has been published.
+fn is_closed(inner: &Inner) -> bool {
+    inner.admission.load(Ordering::Acquire) & CLOSED != 0
+}
+
+/// The producer's admission section: entered by ONE RMW before the closure
+/// decision, left by ONE `Release` RMW after the publication (or after the
+/// rejection has been counted). `Drop` performs the leave on every path, so no
+/// early return can strand the count.
+struct AdmissionSection<'a>(&'a Inner);
+
+impl Drop for AdmissionSection<'_> {
+    fn drop(&mut self) {
+        self.0.admission.fetch_sub(IN_FLIGHT, Ordering::Release);
+    }
+}
+
+/// Enter the admission section. The flag is the admission decision: `true` =
+/// admitted before the closure (publish inside the section — the closer's
+/// quiescence observation cannot complete until this section leaves), `false` =
+/// the closure was already published (do NOT publish; count the presentation at
+/// its own class's admission boundary).
+fn enter_section(inner: &Inner) -> (bool, AdmissionSection<'_>) {
+    let word = inner.admission.fetch_add(IN_FLIGHT, Ordering::AcqRel);
+    (word & CLOSED == 0, AdmissionSection(inner))
+}
+
+/// The drainer's bounded wait for in-flight publications, run before its final
+/// sweep. The observation is an RMW on purpose: a plain load may read a stale 0
+/// that is concurrent with a `fetch_add` already preceding the closure in the
+/// word's modification order, while an RMW reads the value written by the
+/// latest modification before it. That is what makes "sees 0" mean "every
+/// counted publication has left its section", and — through the release
+/// sequence the Acquire observation reads from — makes those publications
+/// visible to the sweep that follows. `true` = quiescent; `false` = the window
+/// expired, and the sweep that follows must not be reported as a complete
+/// drain.
+fn wait_for_publisher_quiescence(inner: &Inner, window: Duration) -> bool {
+    let started = Instant::now();
+    loop {
+        if in_flight(inner.admission.fetch_add(0, Ordering::Acquire)) == 0 {
+            return true;
+        }
+        if started.elapsed() >= window {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
 
 /// The registered class-α pools. Producing threads never touch this: they
 /// write through their thread-local pointer only. Registration (cold path)
@@ -647,16 +751,28 @@ const PANIC_MESSAGE: &str = "panic on an isolation-obligated thread";
 /// thread that initializes it.
 pub fn note_critical_panic() -> Disposition {
     CRITICAL_PANICS.fetch_add(1, Ordering::Relaxed);
-    // Terminal admission, the same first check `emit` makes: after shutdown the
-    // pool has no consumer, so the one-shot publication is not attempted. The
-    // increment above — taken unconditionally — is the authoritative fact, and
-    // it is already recorded.
-    if FACILITY
-        .get()
-        .is_some_and(|inner| inner.shutdown.load(Ordering::Acquire))
-    {
+    let Some(inner) = FACILITY.get() else {
+        return publish_panic_record();
+    };
+    // The publication decision and the publication sit inside ONE admission
+    // section, exactly as in `emit`: after the drainer's quiescence observation
+    // there is no publication in flight, so the final sweep cannot miss this
+    // one. The increment above — taken unconditionally, before any decision — is
+    // the authoritative fact, and it is already recorded.
+    let (admitted, _section) = enter_section(inner);
+    if !admitted {
+        // The closure was already published: no consumer is left for the
+        // one-shot publication, and the counter above IS the record of the
+        // panic.
         return Disposition::Shutdown;
     }
+    publish_panic_record()
+}
+
+/// The one-shot panic publication into the calling thread's own pool (the hook
+/// never touches the class-β channel, whose send path may take internal
+/// synchronization).
+fn publish_panic_record() -> Disposition {
     let record =
         Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
     match with_current_pool(|pool| {
@@ -674,6 +790,110 @@ pub fn note_critical_panic() -> Disposition {
 /// Panics observed on isolation-obligated threads since process start.
 pub fn critical_panics() -> u64 {
     CRITICAL_PANICS.load(Ordering::Relaxed)
+}
+
+/// Test-only scheduling seam: parks a producer at the position where the
+/// admission section of a correct close protocol must still be held — after
+/// the closure decision, before the publication — so a lifecycle oracle can
+/// run the close and the final sweep against a publication that is in flight.
+///
+/// Compiled in test builds only (`cfg(all(test, not(loom)))`): production has
+/// no seam, no rendezvous and no extra load on the producer path, so the
+/// class-α "atomics only" property is untouched by this module. One-shot per
+/// [`arm`]: the first publication after arming parks here, every later one is
+/// untouched.
+#[cfg(all(test, not(loom)))]
+mod seam {
+    use std::sync::{Condvar, Mutex};
+    use std::time::{Duration, Instant};
+
+    /// Which publication the parked producer was about to perform.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum Transport {
+        Alpha,
+        Beta,
+    }
+
+    /// The liveness valve: a parked producer resumes on its own after this
+    /// long, so a broken oracle fails its assertions instead of hanging the
+    /// test binary forever. It is NOT a premise of any oracle — every oracle
+    /// releases the producer only after observing a signal that the schedule
+    /// it wants to test has been reached.
+    const VALVE: Duration = Duration::from_secs(30);
+
+    struct State {
+        armed: bool,
+        paused: Option<Transport>,
+        released: bool,
+    }
+
+    static STATE: Mutex<State> = Mutex::new(State {
+        armed: false,
+        paused: None,
+        released: false,
+    });
+    static RESUME: Condvar = Condvar::new();
+
+    fn lock() -> std::sync::MutexGuard<'static, State> {
+        STATE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Arm the seam for the next publication (the calling oracle's).
+    pub(crate) fn arm() {
+        let mut state = lock();
+        state.armed = true;
+        state.paused = None;
+        state.released = false;
+        RESUME.notify_all();
+    }
+
+    /// Disarm and resume (oracle cleanup; safe when nothing is parked).
+    pub(crate) fn disarm() {
+        let mut state = lock();
+        state.armed = false;
+        state.released = true;
+        RESUME.notify_all();
+    }
+
+    /// The producer-path hook: park here until [`release`] (or the valve).
+    pub(crate) fn pause(transport: Transport) {
+        let mut state = lock();
+        if !state.armed {
+            return;
+        }
+        state.armed = false;
+        state.paused = Some(transport);
+        RESUME.notify_all();
+        let (guard, _) = RESUME
+            .wait_timeout_while(state, VALVE, |state| !state.released)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        drop(guard);
+    }
+
+    /// Block until a producer is parked here, and report the transport it was
+    /// about to publish through.
+    pub(crate) fn wait_until_paused() -> Transport {
+        let mut state = lock();
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while state.paused.is_none() {
+            let now = Instant::now();
+            assert!(now < deadline, "no producer parked inside the seam");
+            let (guard, _) = RESUME
+                .wait_timeout(state, deadline.saturating_duration_since(now))
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            state = guard;
+        }
+        state.paused.expect("just observed")
+    }
+
+    /// Resume the parked producer.
+    pub(crate) fn release() {
+        let mut state = lock();
+        state.released = true;
+        RESUME.notify_all();
+    }
 }
 
 /// Emit one diagnostic record. Never blocks, never panics, never allocates on
@@ -708,15 +928,14 @@ fn emit_without_facility(record: Record) -> Disposition {
 /// once-only, process-global act, and an oracle that installed it would decide
 /// the fate of every other test in the binary.
 fn emit_through(inner: &Inner, record: Record) -> Disposition {
-    // TERMINAL admission is checked first, for BOTH classes: once shutdown has
-    // begun, the drainer's final sweep has run (or is about to), and a record
-    // admitted now would be stranded with no consumer left — counted as
-    // nothing, because "accepted" claimed it would be delivered. The check
-    // narrows the window rather than closing it: a producer cannot be required
-    // to be quiescent (the host's stdin reader is detached), so a publication
-    // that races the final sweep of its own pool is still possible and is
-    // declared on `Diagnostics::shutdown` (neither delivered nor counted).
-    if inner.shutdown.load(Ordering::Acquire) {
+    // ENTER the admission section BEFORE the closure decision: the one RMW
+    // below is both the decision and — when admitted — this publication's claim
+    // on the drainer's final sweep. A presentation the facility decides NOT to
+    // admit is counted at its own class's boundary instead (the pool's, or the
+    // channel's): never published, because the final sweep is the last consumer
+    // there will be.
+    let (admitted, _section) = enter_section(inner);
+    if !admitted {
         let counted = with_current_pool(|pool| pool.reject_presentation()).is_some();
         // No pool on this thread: the class-β admission-loss counter is the
         // only home for the presentation.
@@ -726,6 +945,8 @@ fn emit_through(inner: &Inner, record: Record) -> Disposition {
         return Disposition::Shutdown;
     }
     if let Some(disposition) = with_current_pool(|pool| {
+        #[cfg(all(test, not(loom)))]
+        seam::pause(seam::Transport::Alpha);
         if pool.publish(record) {
             Disposition::AlphaRecorded
         } else {
@@ -737,12 +958,8 @@ fn emit_through(inner: &Inner, record: Record) -> Disposition {
     if IS_DRAINER.with(Cell::get) {
         return Disposition::Reentry;
     }
-    // The class-β path keeps its own check: this call may have raced the flag
-    // between the terminal check above and here.
-    if inner.shutdown.load(Ordering::Acquire) {
-        inner.beta_rejected.fetch_add(1, Ordering::Relaxed);
-        return Disposition::Shutdown;
-    }
+    #[cfg(all(test, not(loom)))]
+    seam::pause(seam::Transport::Beta);
     match inner.beta_send.try_send(record) {
         Ok(()) => {
             inner.beta_queued.fetch_add(1, Ordering::Relaxed);
@@ -753,6 +970,10 @@ fn emit_through(inner: &Inner, record: Record) -> Disposition {
             Disposition::BetaRejected
         }
         Err(TrySendError::Disconnected(_)) => {
+            // Reachable only when an ABANDONED close let the drainer exit while
+            // a publication was still in flight (the receiver drops with it).
+            // The record is an admission loss at the channel's boundary, and the
+            // report for that close did not claim a drain.
             inner.beta_rejected.fetch_add(1, Ordering::Relaxed);
             Disposition::Shutdown
         }
@@ -777,8 +998,9 @@ impl Diagnostics {
         let inner = Arc::new(Inner {
             beta_send,
             beta_recv: Mutex::new(Some(beta_recv)),
-            shutdown: AtomicBool::new(false),
+            admission: AtomicUsize::new(0),
             drainer_exited: AtomicBool::new(false),
+            sweep_quiescent: AtomicBool::new(false),
             beta_queued: AtomicU64::new(0),
             beta_rejected: AtomicU64::new(0),
             beta_consumed: AtomicU64::new(0),
@@ -822,18 +1044,37 @@ impl Diagnostics {
     /// sweep, then abandon if it is stuck in a blocking sink. An abandoned
     /// shutdown is reported honestly and its records are counted as lost.
     ///
-    /// Terminal admission: once the flag this sets is observed, [`emit`] and
-    /// [`note_critical_panic`] reject further presentations — dropped and
-    /// counted, never published — because the final sweep is the last consumer
-    /// there will be. Producer quiescence is neither required by this method
-    /// nor enforceable (the host's stdin reader has a detached lifetime), so
-    /// one residual is DECLARED rather than hidden: a publication that races
-    /// the final sweep of its own pool can still land after that pool was
-    /// walked, and such a record is neither delivered nor counted (the facility
-    /// is closed; the process that shut it down is exiting). A presentation
-    /// made after this call returned is always observed and always counted.
+    /// The closing protocol. Admission and publication are ONE step as seen by
+    /// this closure: [`emit`] and [`note_critical_panic`] take a single RMW on
+    /// the facility's admission word whose closed bit is both their admission
+    /// decision and — when admitted — their claim on the final sweep, and this
+    /// method publishes the closure with one RMW on that same word. Exactly:
+    ///
+    /// * A presentation ADMITTED before the closure cannot be lost to it. Its
+    ///   producer holds a counted publication, the drainer waits
+    ///   ([`PUBLISHER_QUIESCENCE_WINDOW`]) for the last in-flight publication
+    ///   before sweeping, and the sweep therefore either delivers the record or
+    ///   charges it as an export loss.
+    /// * A presentation DECIDED after the closure is never published: it is
+    ///   dropped and counted at its own class's admission boundary (the
+    ///   presenting pool's counters for α, `beta_rejected` for β).
+    /// * Producer quiescence is not required of the host — the stdin reader has
+    ///   a detached lifetime — and producers never wait: their whole
+    ///   involvement is two RMWs. The side that waits is the DRAINER, bounded.
+    /// * If that bound cannot be met (a producer stalled inside its section),
+    ///   the sweep still runs — it is the last consumer there will be — but the
+    ///   report is NOT `drained`. The accounting says "incomplete" instead of
+    ///   presenting itself as a complete drain, and `abandoned` stays false
+    ///   because the drainer did exit. What happens to such a presentation
+    ///   afterwards is stated at its own admission boundary, never hidden: an α
+    ///   publication lands in its pool (visible as `outstanding`, and a later
+    ///   walk can still deliver it), while a β presentation finds the channel's
+    ///   receiver gone with the drainer and is counted as a `beta_rejected`
+    ///   admission loss.
     pub fn shutdown(&self, deadline: Duration) -> ShutdownReport {
-        self.inner.shutdown.store(true, Ordering::Release);
+        // The closure: ONE RMW on the admission word, ordered against every
+        // admission decision (which is an RMW on the same word).
+        close_admission(&self.inner);
         let started = Instant::now();
         while !self.inner.drainer_exited.load(Ordering::Acquire) {
             if started.elapsed() >= deadline {
@@ -857,7 +1098,10 @@ impl Diagnostics {
         }
         let counters = self.counters();
         ShutdownReport {
-            drained: true,
+            // The drainer exited; whether this is a COMPLETE drain is its own
+            // judgment, recorded when it saw (or failed to see) publisher
+            // quiescence before its sweep.
+            drained: self.inner.sweep_quiescent.load(Ordering::Acquire),
             abandoned: false,
             undelivered_at_exit: counters.undelivered_now(),
             counters,
@@ -1094,7 +1338,14 @@ fn drainer(
                 break;
             }
         }
-        if inner.shutdown.load(Ordering::Acquire) {
+        if is_closed(&inner) {
+            // The final sweep is the last consumer there will be, so it must be
+            // ordered after every publication the facility admitted: wait
+            // (bounded) for the last in-flight one, then sweep. The outcome is
+            // recorded for `shutdown` — a sweep that could not be ordered after
+            // publisher quiescence is never reported as a complete drain.
+            let quiescent = wait_for_publisher_quiescence(&inner, PUBLISHER_QUIESCENCE_WINDOW);
+            inner.sweep_quiescent.store(quiescent, Ordering::Release);
             final_sweep(&inner, &receiver, &mut exporter, &mut disabled);
             break;
         }
@@ -1246,8 +1497,9 @@ mod tests {
         Inner {
             beta_send,
             beta_recv: Mutex::new(Some(beta_recv)),
-            shutdown: AtomicBool::new(false),
+            admission: AtomicUsize::new(0),
             drainer_exited: AtomicBool::new(false),
+            sweep_quiescent: AtomicBool::new(false),
             beta_queued: AtomicU64::new(0),
             beta_rejected: AtomicU64::new(0),
             beta_consumed: AtomicU64::new(0),
@@ -1569,6 +1821,410 @@ mod tests {
             exported + export_failed,
             consumed,
             "the drain-boundary identity holds at quiescence"
+        );
+    }
+
+    // --- The close protocol: publications in flight across the closure ------
+    //
+    // The oracle shape (see `seam`): a producer is parked inside the seam —
+    // after the closure decision, before the publication — while the close and
+    // the final sweep run. Both the premise and the release are established
+    // through signals the oracle observes (the seam's Paused state, the sink's
+    // final-sweep flush, and the ShutdownReport itself); the one bounded
+    // quantity is the release valve, which is what lets the "delivered" oracle
+    // distinguish "the drainer swept first" from "the drainer was waiting for
+    // this producer".
+
+    /// The close-race probe: delivers records to the oracle and signals every
+    /// FINAL SWEEP that reaches it through [`Exporter::flush`] — the observable
+    /// "the sweep has run" fact.
+    #[cfg(not(loom))]
+    #[derive(Clone)]
+    struct CloseRaceProbe {
+        delivered: Arc<Mutex<Vec<i64>>>,
+        sweeps: Arc<AtomicU64>,
+    }
+
+    #[cfg(not(loom))]
+    impl Exporter for CloseRaceProbe {
+        fn name(&self) -> &'static str {
+            "close-race-probe"
+        }
+
+        fn export(&mut self, record: &Record) -> Result<(), ExportError> {
+            if let Some(value) = record.message.render().strip_prefix("marker=") {
+                self.delivered
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push(value.parse().expect("marker"));
+            }
+            Ok(())
+        }
+
+        fn flush(&mut self) -> Result<(), ExportError> {
+            self.sweeps.fetch_add(1, Ordering::Release);
+            Ok(())
+        }
+    }
+
+    /// A detached facility interior with its OWN real drainer thread: the whole
+    /// production close path — closure, quiescence wait, final sweep, report —
+    /// without the process-wide installation that would decide the fate of
+    /// every other oracle in the binary.
+    #[cfg(not(loom))]
+    struct CloseRace {
+        inner: Arc<Inner>,
+        diagnostics: Diagnostics,
+        delivered: Arc<Mutex<Vec<i64>>>,
+        sweeps: Arc<AtomicU64>,
+    }
+
+    #[cfg(not(loom))]
+    impl CloseRace {
+        fn new() -> Self {
+            let inner = Arc::new(detached_inner());
+            let receiver = inner
+                .beta_recv
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .take()
+                .expect("a fresh interior owns its receiver");
+            let delivered = Arc::new(Mutex::new(Vec::new()));
+            let sweeps = Arc::new(AtomicU64::new(0));
+            let probe = CloseRaceProbe {
+                delivered: Arc::clone(&delivered),
+                sweeps: Arc::clone(&sweeps),
+            };
+            let handle = std::thread::Builder::new()
+                .name("close-race-drainer".into())
+                .spawn({
+                    let inner = Arc::clone(&inner);
+                    move || drainer(inner, receiver, Box::new(probe), Duration::from_millis(5))
+                })
+                .expect("the probe drainer starts");
+            Self {
+                diagnostics: Diagnostics {
+                    inner: Arc::clone(&inner),
+                    drainer: Mutex::new(Some(handle)),
+                },
+                inner,
+                delivered,
+                sweeps,
+            }
+        }
+
+        fn delivered_markers(&self) -> Vec<i64> {
+            self.delivered
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone()
+        }
+
+        /// Whether a final sweep reached the sink inside `window`.
+        fn wait_for_sweep(&self, window: Duration) -> bool {
+            let deadline = Instant::now() + window;
+            loop {
+                if self.sweeps.load(Ordering::Acquire) > 0 {
+                    return true;
+                }
+                if Instant::now() >= deadline {
+                    return false;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
+
+    /// What the producing thread could observe on its OWN path, before its
+    /// registration dropped. The `Counters` of a detached harness are NOT usable
+    /// for class-α assertions: their pool half is summed from the process-global
+    /// registry, which folds in (and never unfolds) every other oracle's pools
+    /// for the whole life of the test binary.
+    #[derive(Clone, Copy, Debug)]
+    struct ProducerReport {
+        disposition: Disposition,
+        /// The producing thread's own pool: (accepted, copied_out, outstanding).
+        pool: Option<(u64, u64, u32)>,
+    }
+
+    /// Spawn the parked producer: a registered class-α thread when the oracle
+    /// arms the α transport (the registration lives for the whole emission), a
+    /// plain host thread for β.
+    #[cfg(not(loom))]
+    fn spawn_close_race_producer(
+        race: &CloseRace,
+        transport: seam::Transport,
+        marker: i64,
+    ) -> std::thread::JoinHandle<ProducerReport> {
+        let inner = Arc::clone(&race.inner);
+        std::thread::spawn(move || match transport {
+            seam::Transport::Alpha => {
+                let registration = AlphaRegistration::register();
+                let disposition = emit_through(&inner, record(marker));
+                let pool = Some((
+                    registration.accepted(),
+                    registration.copied_out(),
+                    registration.outstanding(),
+                ));
+                drop(registration);
+                ProducerReport { disposition, pool }
+            }
+            seam::Transport::Beta => ProducerReport {
+                disposition: emit_through(&inner, record(marker)),
+                pool: None,
+            },
+        })
+    }
+
+    /// How the "delivered" oracle's release was decided.
+    #[cfg(not(loom))]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum ReleaseReason {
+        /// A final sweep had already reached the sink: the drainer swept BEFORE
+        /// the release, so a producer released now publishes into a facility
+        /// whose last consumer is gone.
+        SweptFirst,
+        /// No sweep inside the valve: the drainer cannot have swept — it is the
+        /// one waiting for this producer.
+        Valved,
+    }
+
+    /// The release valve for the "delivered" oracles. It must stay well inside
+    /// the drainer's quiescence window (`PUBLISHER_QUIESCENCE_WINDOW`), because
+    /// the release has to precede that window's expiry for the protocol to
+    /// deliver the in-flight record: 150 ms against 250 ms.
+    #[cfg(not(loom))]
+    const RELEASE_VALVE: Duration = Duration::from_millis(150);
+    /// Generous: the closer only ever waits for the drainer's own bounded work.
+    #[cfg(not(loom))]
+    const CLOSE_RACE_DEADLINE: Duration = Duration::from_secs(30);
+
+    /// Oracle (close protocol, both transports): a record admitted BEFORE the
+    /// closure — the producer has already made its admission decision and is
+    /// parked before the publication — is delivered by the final sweep when the
+    /// producer completes inside the quiescence window. The release is decided
+    /// by the sink's own flush signal: a release under `SweptFirst` means the
+    /// schedule the protocol must survive was actually reached.
+    #[cfg(not(loom))]
+    fn an_in_flight_publication_is_delivered_by_the_final_sweep(
+        transport: seam::Transport,
+        marker: i64,
+    ) {
+        let _serial = serialize_pool_tests();
+        let race = CloseRace::new();
+        seam::arm();
+        let producer = spawn_close_race_producer(&race, transport, marker);
+        assert_eq!(
+            seam::wait_until_paused(),
+            transport,
+            "the producer must park inside its own transport's section"
+        );
+
+        let report = Mutex::new(None);
+        let release = Mutex::new(None);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let outcome = race.diagnostics.shutdown(CLOSE_RACE_DEADLINE);
+                *report.lock().unwrap_or_else(|p| p.into_inner()) = Some(outcome);
+            });
+            scope.spawn(|| {
+                let reason = if race.wait_for_sweep(RELEASE_VALVE) {
+                    ReleaseReason::SweptFirst
+                } else {
+                    ReleaseReason::Valved
+                };
+                *release.lock().unwrap_or_else(|p| p.into_inner()) = Some(reason);
+                seam::release();
+            });
+        });
+        let producer = producer.join().expect("the parked producer");
+        let release = release
+            .into_inner()
+            .unwrap_or_else(|p| p.into_inner())
+            .expect("the releaser recorded its reason");
+        let report = report
+            .into_inner()
+            .unwrap_or_else(|p| p.into_inner())
+            .expect("the closer recorded its report");
+
+        let hits = race
+            .delivered_markers()
+            .into_iter()
+            .filter(|delivered| *delivered == marker)
+            .count();
+        assert_eq!(
+            hits, 1,
+            "a record admitted before the closure must be delivered by the final \
+             sweep, exactly once (release decided by {release:?})"
+        );
+        assert!(
+            release == ReleaseReason::Valved,
+            "the release must be what let the sweep proceed: {release:?}"
+        );
+        assert!(
+            matches!(
+                producer.disposition,
+                Disposition::AlphaRecorded | Disposition::BetaQueued
+            ),
+            "the presentation was admitted before the closure: {producer:?}"
+        );
+        assert_eq!(
+            race.inner.exported.load(Ordering::Relaxed),
+            1,
+            "the sink's own delivery counter: the in-flight record was handed to it once"
+        );
+        assert!(
+            report.drained,
+            "the close completed a full drain: {report:?}"
+        );
+        assert!(!report.abandoned, "{report:?}");
+        // `undelivered_at_exit` and the drain-boundary identity are deliberately
+        // NOT asserted from this detached harness: their class-α half is summed
+        // from the process-global registry, whose retained totals belong to
+        // every other oracle in the binary as well. Those properties are
+        // asserted where they are real — on an installed facility, by
+        // `tests/shutdown_admission.rs` and the host's drained-report witness.
+        seam::disarm();
+    }
+
+    /// Oracle (close protocol, both transports): a record admitted before the
+    /// closure whose producer OUTLASTS the quiescence window makes the report
+    /// say so. The report must not claim a complete drain while a presentation
+    /// admitted before the closure is still in flight; the record itself is
+    /// not lost to the accounting (its boundary counters stay consistent and a
+    /// later walk still delivers it).
+    #[cfg(not(loom))]
+    fn a_publication_outlasting_the_quiescence_window_is_not_reported_drained(
+        transport: seam::Transport,
+        marker: i64,
+    ) {
+        let _serial = serialize_pool_tests();
+        let race = CloseRace::new();
+        seam::arm();
+        let producer = spawn_close_race_producer(&race, transport, marker);
+        assert_eq!(seam::wait_until_paused(), transport, "parked");
+
+        // The producer stays parked past the drainer's quiescence window; the
+        // report is built and returned while it is still in flight, so the
+        // release below is strictly ordered AFTER the report (a signal, not a
+        // guess).
+        let report = race.diagnostics.shutdown(CLOSE_RACE_DEADLINE);
+        assert!(
+            !report.drained,
+            "a drain must not be claimed while a presentation admitted before \
+             the closure is still in flight: {report:?}"
+        );
+        assert!(
+            !report.abandoned,
+            "the drainer exited; what failed is the ordering, not the sink: {report:?}"
+        );
+
+        seam::release();
+        let producer = producer.join().expect("the parked producer");
+        match transport {
+            seam::Transport::Alpha => {
+                // Admitted before the closure: the record is published into its
+                // own pool (the close does not retract an admission), where it
+                // is visible at its own boundary — never invisible — and a later
+                // walk still delivers it. The report simply did not claim to
+                // have done so.
+                assert_eq!(
+                    producer.disposition,
+                    Disposition::AlphaRecorded,
+                    "the presentation was admitted before the closure: {producer:?}"
+                );
+                let (accepted, copied_out, outstanding) =
+                    producer.pool.expect("an α producer reports its pool");
+                assert_eq!(
+                    accepted, 1,
+                    "the presentation was accepted at its own pool boundary"
+                );
+                assert_eq!(
+                    copied_out, 0,
+                    "the last sweep had already run without it (that is what the report said)"
+                );
+                assert_eq!(
+                    outstanding, 1,
+                    "the unevaluated record is visible as outstanding, never invisible"
+                );
+                let mut exporter: Option<Box<dyn Exporter>> = Some(Box::new(CloseRaceProbe {
+                    delivered: Arc::clone(&race.delivered),
+                    sweeps: Arc::clone(&race.sweeps),
+                }));
+                let mut disabled = false;
+                poll_pools(&race.inner, &mut exporter, &mut disabled);
+                let hits = race
+                    .delivered_markers()
+                    .into_iter()
+                    .filter(|delivered| *delivered == marker)
+                    .count();
+                assert_eq!(
+                    hits, 1,
+                    "the in-flight record was never lost: a later walk delivers it"
+                );
+            }
+            seam::Transport::Beta => {
+                // Admitted before the closure, but by the time its section left,
+                // the incomplete close had already dropped the channel's
+                // receiver: the presentation cannot be queued. It is therefore
+                // an ADMISSION LOSS at the channel's own boundary — an
+                // accountable rejection fact, never an invisible record.
+                assert_eq!(
+                    producer.disposition,
+                    Disposition::Shutdown,
+                    "with the receiver gone the presentation cannot be queued: {producer:?}"
+                );
+                assert_eq!(
+                    race.inner.beta_queued.load(Ordering::Relaxed),
+                    0,
+                    "nothing was queued into a channel whose consumer is gone"
+                );
+                assert!(
+                    race.inner.beta_rejected.load(Ordering::Relaxed) >= 1,
+                    "the admission loss is counted at the channel's boundary"
+                );
+            }
+        }
+        seam::disarm();
+    }
+
+    /// Oracle (close protocol): a class-α record admitted before the closure
+    /// and published only after the quiescence window is still delivered when
+    /// its producer completes inside that window.
+    #[cfg(not(loom))]
+    #[test]
+    fn an_in_flight_alpha_publication_is_delivered_by_the_final_sweep() {
+        an_in_flight_publication_is_delivered_by_the_final_sweep(seam::Transport::Alpha, 21);
+        reap_this_threads_registration();
+    }
+
+    /// Oracle (close protocol): the class-β half of the same property — the
+    /// channel's own window is closed by the same admission section.
+    #[cfg(not(loom))]
+    #[test]
+    fn an_in_flight_beta_publication_is_delivered_by_the_final_sweep() {
+        an_in_flight_publication_is_delivered_by_the_final_sweep(seam::Transport::Beta, 22);
+    }
+
+    /// Oracle (no false completion, α): the report never claims a drained
+    /// facility while a presentation admitted before the closure is in flight.
+    #[cfg(not(loom))]
+    #[test]
+    fn an_alpha_publication_outlasting_the_quiescence_window_is_not_reported_drained() {
+        a_publication_outlasting_the_quiescence_window_is_not_reported_drained(
+            seam::Transport::Alpha,
+            23,
+        );
+        reap_this_threads_registration();
+    }
+
+    /// Oracle (no false completion, β): the same property for the channel.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_beta_publication_outlasting_the_quiescence_window_is_not_reported_drained() {
+        a_publication_outlasting_the_quiescence_window_is_not_reported_drained(
+            seam::Transport::Beta,
+            24,
         );
     }
 }
