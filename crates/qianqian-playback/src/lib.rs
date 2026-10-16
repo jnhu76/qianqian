@@ -128,3 +128,12 @@ mod observation_tests;
 
 #[cfg(all(test, loom))]
 mod loom_edge_tests;
+
+// DG-1 class α ownership-handoff pool — design-candidate protocol
+// verification (PR #284 R7 directive): arithmetic property tests run in
+// both partitions; the loom schedule suite is inner-gated `cfg(loom)` and
+// the real-thread Miri race check is inner-gated `not(loom)`. Test-only
+// evidence for the target-contract §DG-1 acceptance gates — not
+// production code.
+#[cfg(test)]
+mod error_pool_model_tests;
