@@ -679,7 +679,35 @@ pub fn critical_panics() -> u64 {
 /// Emit one diagnostic record. Never blocks, never panics, never allocates on
 /// the producer path, and never waits for a sink.
 pub fn emit(record: Record) -> Disposition {
-    let inner = FACILITY.get();
+    match FACILITY.get() {
+        Some(inner) => emit_through(inner, record),
+        None => emit_without_facility(record),
+    }
+}
+
+/// The class-α-only path when no facility is installed: a registered pool can
+/// outlive the facility's absence (registration is an earlier, independent
+/// act), and with no facility there is no closure to be ordered against, so
+/// the calling thread's own pool is the only sink a presentation can reach.
+fn emit_without_facility(record: Record) -> Disposition {
+    match with_current_pool(|pool| {
+        if pool.publish(record) {
+            Disposition::AlphaRecorded
+        } else {
+            Disposition::AlphaRejected
+        }
+    }) {
+        Some(disposition) => disposition,
+        None => Disposition::NoSink,
+    }
+}
+
+/// The production emission body, parameterized by the facility interior it
+/// goes through. Split out of [`emit`] so the lifecycle oracles can drive the
+/// REAL path against a detached interior: a process-wide installation is a
+/// once-only, process-global act, and an oracle that installed it would decide
+/// the fate of every other test in the binary.
+fn emit_through(inner: &Inner, record: Record) -> Disposition {
     // TERMINAL admission is checked first, for BOTH classes: once shutdown has
     // begun, the drainer's final sweep has run (or is about to), and a record
     // admitted now would be stranded with no consumer left — counted as
@@ -688,11 +716,11 @@ pub fn emit(record: Record) -> Disposition {
     // to be quiescent (the host's stdin reader is detached), so a publication
     // that races the final sweep of its own pool is still possible and is
     // declared on `Diagnostics::shutdown` (neither delivered nor counted).
-    if inner.is_some_and(|inner| inner.shutdown.load(Ordering::Acquire)) {
+    if inner.shutdown.load(Ordering::Acquire) {
         let counted = with_current_pool(|pool| pool.reject_presentation()).is_some();
         // No pool on this thread: the class-β admission-loss counter is the
         // only home for the presentation.
-        if !counted && let Some(inner) = inner {
+        if !counted {
             inner.beta_rejected.fetch_add(1, Ordering::Relaxed);
         }
         return Disposition::Shutdown;
@@ -706,9 +734,6 @@ pub fn emit(record: Record) -> Disposition {
     }) {
         return disposition;
     }
-    let Some(inner) = inner else {
-        return Disposition::NoSink;
-    };
     if IS_DRAINER.with(Cell::get) {
         return Disposition::Reentry;
     }
