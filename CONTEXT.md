@@ -548,6 +548,17 @@ oracle / E-1 harness designs delivered; F5 GAP-01 recommendation =
 EXTEND_EXISTING_MODEL behind acceptance-gated triggers. Production
 error/logging refactor: NOT STARTED (owner-gated via D-2..D-11).
 
+2026-10-16 R2 review revision (same round, PR #284): seven design findings
+corrected in the two design docs — DG-1 queue fixed-step/no-syscall claim
+withdrawn (full producer path re-compared; fixed-capacity inline record);
+DG-2 late-vs-terminal policy + owned-payload mechanics; DG-4a call-boundary
+attribution; DG-4b hook path atomics-only; DG-4c av_log tiered β/α (no
+copy-the-line); cone oracle T1 withdrawn (wasapi cfg(windows); open failure
+is activation-stage) with program-order A/B witnesses; E1-ABI calibration
+split into healthy-control + fault-configuration legs; W1–W6 rebuilt on real
+execution positions (one new test-fence arming point); M7 oracle recorded as
+time-windowed evidence. Gates and model comments unchanged by the revision.
+
 ---
 
 # Historical evidence

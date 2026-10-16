@@ -232,6 +232,14 @@ run_mutation M6RefusalDropsRemainder M6RefusalDropsRemainder.patch \
   -p qianqian-playback --test seek_seam \
   a_refused_seek_finishes_its_own_remainder_with_zero_content_loss
 
+# M7 oracle observation, honestly scoped (2026-10-16 review note): the targeted
+# stateful probe observes "no post-failure production" via a post-terminal
+# 300ms bounded wait plus consumed-byte-count comparison — time-windowed
+# evidence, not a producer/worker-exit witness. A mutation that stops
+# production only after that window would pass today. The 2026-10-16 catch
+# (mutated fall-through re-entering the seek protocol, 86016 vs 23552 bytes)
+# remains a valid counterexample; a producer-exit witness is the recorded
+# follow-up strengthening, not a precondition for this gate.
 run_mutation M7ResumeAfterMutatedSeek M7ResumeAfterMutatedSeek.patch \
   -p qianqian-playback --lib \
   stateful_probe_tests::a_mutated_then_failed_seek_never_reconstructs_the_old_continuation
