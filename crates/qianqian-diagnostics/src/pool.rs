@@ -42,9 +42,9 @@
 //! `abandoned_at_exit`).
 
 #[cfg(loom)]
-use loom::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use loom::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 #[cfg(not(loom))]
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use std::cell::UnsafeCell;
 
@@ -63,6 +63,10 @@ pub struct AlphaPool {
     rejected: AtomicU64,
     /// Drain-boundary counter: generations copied out of the pool.
     copied_out: AtomicU64,
+    /// The DG-4b one-shot latch (see `publish_panic_once`). Deliberately
+    /// OUTSIDE the protocol above: it neither reads nor advances a generation,
+    /// so it cannot affect the admission/accounting arithmetic.
+    panic_published: AtomicBool,
 }
 
 // SAFETY: the safety argument IS the ownership protocol, established by the
@@ -96,6 +100,7 @@ impl AlphaPool {
             accepted: AtomicU64::new(0),
             rejected: AtomicU64::new(0),
             copied_out: AtomicU64::new(0),
+            panic_published: AtomicBool::new(false),
         }
     }
 
@@ -122,6 +127,23 @@ impl AlphaPool {
         self.pub_gen.store(n, Ordering::Release);
         self.accepted.fetch_add(1, Ordering::Relaxed);
         true
+    }
+
+    /// One-shot publish for the DG-4b panic path. A panic hook may fire more
+    /// than once on the same thread (a caught panic, then another); the FIRST
+    /// fire publishes, later ones return `false` and are counted by the hook
+    /// instead of occupying the second slot. Atomics only — one bounded RMW,
+    /// no loop, no lock, no allocation.
+    ///
+    /// A one-shot suppression is NOT a pool loss: it never touches `attempted`,
+    /// `accepted` or `rejected`, so the admission and drain identities are
+    /// unaffected by repeated panics. It also does not enter `accepted`, so a
+    /// suppressed record cannot appear in `copied_out + outstanding`.
+    pub fn publish_panic_once(&self, record: Record) -> bool {
+        if self.panic_published.swap(true, Ordering::AcqRel) {
+            return false;
+        }
+        self.publish(record)
     }
 
     /// The drainer's walk: copies every generation in `(*last, snapshot(pub)]`

@@ -1033,6 +1033,7 @@ dependencies = [
  "qianqian-audio-api",
  "qianqian-composition",
  "qianqian-decode-songcore",
+ "qianqian-diagnostics",
  "qianqian-output-wasapi",
  "qianqian-playback",
  "ratatui",
@@ -1058,6 +1059,7 @@ dependencies = [
  "qianqian-app",
  "qianqian-audio-api",
  "qianqian-composition",
+ "qianqian-diagnostics",
  "realfft",
 ]
 

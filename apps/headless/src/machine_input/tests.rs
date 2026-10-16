@@ -763,3 +763,126 @@ fn seal_final_read_witnesses_normal_returned_response_with_held_guard() {
 fn seal_final_read_witnesses_failure_returned_response_with_held_guard() {
     witness_response_and_drop_before_seal(true, true);
 }
+
+// --- DG-4b: the panic-hook posture, witnessed in a subprocess ---------------
+
+/// Child-process selector for the DG-4b witness below.
+const DG4B_SCENARIO: &str = "QIANQIAN_DG4B_SCENARIO";
+/// The test-owned previous hook's only output. "The chain ran" is then one
+/// unambiguous stderr line instead of a guess about a hook's behavior.
+const DG4B_MARKER: &str = "DG4B-PREVIOUS-HOOK";
+
+/// Child entry for the DG-4b witness. The hook posture is a process-wide
+/// ONCE-installed setting whose previous hook is captured at install time, so
+/// only a fresh process can witness either; this test re-executes its own
+/// binary with `DG4B_SCENARIO` set, and does nothing in the parent's run.
+///
+/// Scenarios (all deterministic: one spawned thread, panics caught inside it):
+///
+/// * `critical` — thread named `qianqian-stdin` (the registered name) panics
+///   TWICE with a marker previous hook installed: isolation says the previous
+///   hook must never run on it, and the one-shot latch says the first panic
+///   publishes while the second is counted but does not take the pool's second
+///   slot.
+/// * `default` — the production configuration (the std default hook is the
+///   previous one): the same thread panics once, and the default print must not
+///   appear at all.
+/// * `non-critical` — a thread whose name is NOT in the registry panics once
+///   with the marker hook installed: chaining must reach the previous hook. This
+///   is also the harness-sight control — it proves the parent can see the
+///   previous-hook output it asserts is absent in the other scenarios.
+#[test]
+fn dg4b_child_witness() {
+    let Ok(scenario) = std::env::var(DG4B_SCENARIO) else {
+        return;
+    };
+    let (thread_name, panics, marker_hook) = match scenario.as_str() {
+        "critical" => (READER_THREAD_NAME, 2usize, true),
+        "default" => (READER_THREAD_NAME, 1usize, false),
+        "non-critical" => ("qianqian-dg4b-bystander", 1usize, true),
+        other => panic!("unknown DG-4b scenario {other:?}"),
+    };
+    if marker_hook {
+        // The previous hook must be in place BEFORE the posture installs, so
+        // the install captures it.
+        std::panic::set_hook(Box::new(|_| eprintln!("{DG4B_MARKER}")));
+    }
+    install_reader_panic_hook();
+    let witness = std::thread::Builder::new()
+        .name(thread_name.into())
+        .spawn(move || {
+            let registration = qianqian_diagnostics::AlphaRegistration::register();
+            for _ in 0..panics {
+                let _ = catch_unwind(|| panic!("dg4b injected panic"));
+            }
+            registration.pool().outstanding()
+        })
+        .expect("spawn witness thread");
+    let outstanding = witness
+        .join()
+        .expect("the witness thread catches its own panics");
+    eprintln!("DG4B-PANICS={}", qianqian_diagnostics::critical_panics());
+    eprintln!("DG4B-OUTSTANDING={outstanding}");
+}
+
+#[test]
+fn dg4b_the_hook_isolates_critical_threads_and_chains_elsewhere() {
+    let exe = std::env::current_exe().expect("test binary path");
+    let run = |scenario: &str| {
+        let output = std::process::Command::new(&exe)
+            .args([
+                "--exact",
+                "machine_input::tests::dg4b_child_witness",
+                "--nocapture",
+            ])
+            .env(DG4B_SCENARIO, scenario)
+            .output()
+            .expect("run the witness child");
+        assert!(
+            output.status.success(),
+            "witness child {scenario} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stderr).into_owned()
+    };
+
+    // Isolation + one-shot latch: the previous hook is the marker hook and must
+    // not run; the first panic publishes, the second is counted only.
+    let critical = run("critical");
+    assert!(
+        !critical.contains(DG4B_MARKER),
+        "the previous hook ran on a registered critical thread: {critical}"
+    );
+    assert!(
+        critical.contains("DG4B-PANICS=2"),
+        "both critical panics must be counted: {critical}"
+    );
+    assert!(
+        critical.contains("DG4B-OUTSTANDING=1"),
+        "exactly one panic record may occupy the pool: {critical}"
+    );
+
+    // The production configuration: the std default hook is the previous one,
+    // and its print must not appear for a critical-thread panic.
+    let default = run("default");
+    assert!(
+        !default.contains("panicked at") && !default.contains(READER_THREAD_NAME),
+        "the default hook printed for a critical-thread panic: {default}"
+    );
+    assert!(
+        default.contains("DG4B-PANICS=1") && default.contains("DG4B-OUTSTANDING=1"),
+        "one panic, one record: {default}"
+    );
+
+    // Chaining off critical threads, and the harness-sight control: the marker
+    // the other scenarios assert absent is observable here.
+    let bystander = run("non-critical");
+    assert!(
+        bystander.contains(DG4B_MARKER),
+        "the previous hook did not run off a critical thread: {bystander}"
+    );
+    assert!(
+        bystander.contains("DG4B-PANICS=0") && bystander.contains("DG4B-OUTSTANDING=0"),
+        "a non-critical panic is not critical bookkeeping: {bystander}"
+    );
+}

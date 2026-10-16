@@ -278,6 +278,10 @@ pub enum Disposition {
     Shutdown,
     /// Called from the drainer thread itself: dropped (no reentry).
     Reentry,
+    /// A later critical panic on a thread whose pool already reported one: the
+    /// one-shot latch suppressed the record (DG-4b). Not a pool loss — the
+    /// panic is still counted by [`critical_panics`].
+    PanicAlreadyReported,
     /// No facility is installed and this thread registered no α pool.
     NoSink,
 }
@@ -359,6 +363,9 @@ pub struct Counters {
     pub outstanding: u64,
     /// Self-diagnostic events (an exporter disable, a flush failure).
     pub self_diagnostics: u64,
+    /// Panics observed on isolation-obligated threads (DG-4b). Counted on the
+    /// panicking thread with one relaxed increment; rendered elsewhere.
+    pub critical_panics: u64,
 }
 
 impl Counters {
@@ -448,10 +455,59 @@ impl Drop for AlphaRegistration {
     }
 }
 
-/// Whether the calling thread is a registered class-α producer (the panic
-/// hook's critical-thread test, DG-4b).
+/// Whether the calling thread is a registered class-α producer, i.e. whether
+/// [`emit`] on this thread is a bounded atomics-only publish.
+///
+/// This is the av_log bridge's admission predicate (DG-4c): an av_log callback
+/// runs on whatever FFmpeg-calling thread FFmpeg happens to be on, and the design
+/// admits only the class-α path there — a callback that cannot see a registered
+/// pool drops the record and counts it instead of riding the class-β channel,
+/// whose send path may take internal synchronization on a decode-side thread.
 pub fn is_alpha_producer() -> bool {
     ALPHA_POOL.with(Cell::get).is_some()
+}
+
+/// Process-wide count of panics the DG-4b hook observed on isolation-obligated
+/// threads. Relaxed: it orders nothing. Read from non-critical threads (the
+/// shutdown report), never rendered on the panicking thread.
+static CRITICAL_PANICS: AtomicU64 = AtomicU64::new(0);
+
+/// The panic record's static site tag (the site vocabulary for this facility).
+const PANIC_SITE: &str = "panic-hook";
+/// The panic record's fixed message text. It states what was observed and
+/// nothing more: no thread name, no payload, no backtrace — the hook cannot
+/// render and must not format.
+const PANIC_MESSAGE: &str = "panic on an isolation-obligated thread";
+
+/// The DG-4b panic-hook entry point: ATOMICS ONLY.
+///
+/// Per panic: one relaxed counter increment, always. Then, on a thread that
+/// registered a class-α pool, at most ONE bounded publication into that pool
+/// ([`pool::AlphaPool::publish_panic_once`]); a thread with no registered pool
+/// gets the count only — the hook never touches the class-β channel, whose
+/// send path may take internal synchronization.
+///
+/// Not here, by contract: no lock, no allocation, no formatting, no `write(2)`,
+/// no call into the previous hook, no call into [`emit`] (a panic inside the
+/// hook must not recurse). The record is deliberately unstamped — `stamped()`
+/// would touch the process clock's `OnceLock`, and a panic hook must not be the
+/// thread that initializes it.
+pub fn note_critical_panic() -> Disposition {
+    CRITICAL_PANICS.fetch_add(1, Ordering::Relaxed);
+    let Some(pool) = ALPHA_POOL.with(Cell::get) else {
+        return Disposition::NoSink;
+    };
+    let record = Record::new(PANIC_SITE, Level::Error).with_message(Text::from_static(PANIC_MESSAGE));
+    if pool.publish_panic_once(record) {
+        Disposition::AlphaRecorded
+    } else {
+        Disposition::PanicAlreadyReported
+    }
+}
+
+/// Panics observed on isolation-obligated threads since process start.
+pub fn critical_panics() -> u64 {
+    CRITICAL_PANICS.load(Ordering::Relaxed)
 }
 
 /// Emit one diagnostic record. Never blocks, never panics, never allocates on
@@ -608,6 +664,7 @@ fn counters_of(inner: &Inner) -> Counters {
         export_failed: inner.export_failed.load(Ordering::Relaxed),
         outstanding,
         self_diagnostics: inner.self_diagnostics.load(Ordering::Relaxed),
+        critical_panics: critical_panics(),
     }
 }
 
@@ -798,6 +855,18 @@ fn drainer(
 
 /// The built-in stderr exporter: one plain line per record, rendered on the
 /// drainer, written with the non-panicking writer.
+///
+/// Exporter admission (T5-5 strategy A — every exporter states its progress
+/// bound). This sink's bound: rendering is a bounded fixed-buffer format and the
+/// write is a single `write`/`write_all` on a descriptor already open at
+/// installation time — no open, no name resolution, no allocation growth. It is
+/// therefore bounded for a descriptor that drains, and its residual is the
+/// environment's: a full pipe with no reader (or a stalled filesystem behind
+/// stderr) blocks the DRAINER inside the write for as long as the environment
+/// keeps it blocked. That residual is not compensated anywhere: producers stay
+/// isolated (class α) and the drainer is not, which is exactly why shutdown is
+/// bounded-or-honest — the host abandons a stuck drainer at its deadline and
+/// reports lost records instead of claiming a completed drain.
 pub struct StderrExporter {
     /// Minimum level admitted by this sink (the authoritative filter).
     pub min_level: Level,

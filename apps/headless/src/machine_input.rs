@@ -189,6 +189,15 @@ impl Drop for Operation<'_> {
 // model. Catchers classify admitted host failures; they never commit D11.
 const READER_THREAD_NAME: &str = "qianqian-stdin";
 
+/// The critical-thread registry (DG-4b): thread names whose panic path is
+/// isolated from every previously installed hook. A hook cannot introspect what
+/// a previous hook does, so the posture confines unknown synchronous sinks to
+/// non-critical contexts instead of claiming they are safe. The registry is a
+/// static set compared on every panic — no lock, no allocation. Render/decode
+/// names join it only if their default prints ever need suppression; today the
+/// reader is the one thread whose output path is load-bearing.
+const CRITICAL_THREAD_NAMES: &[&str] = &[READER_THREAD_NAME];
+
 fn install_reader_panic_hook() {
     static INSTALL: Once = Once::new();
     INSTALL.call_once(|| {
@@ -197,13 +206,36 @@ fn install_reader_panic_hook() {
             // Hooks run BEFORE catch_unwind. The explicit reader catchers own
             // its invocation report, including post-seal silence. The hook has
             // no handle, ledger, admission check or bookkeeping synchronization.
-            if std::thread::current().name() != Some(READER_THREAD_NAME) {
-                previous(info);
+            if is_critical_thread() {
+                // Isolation (DG-4b): on a critical thread the hook performs the
+                // diagnostic outlet's atomic bookkeeping — one relaxed counter
+                // increment and at most one bounded publication into this
+                // thread's own class-α pool — and NEVER calls the previous hook,
+                // because an unknown synchronous sink must not run on a thread
+                // whose timing and allocations are load-bearing. Nothing is
+                // rendered here: the drainer or the shutdown report renders it
+                // from a non-critical thread. Suppressing a default print is not
+                // catching the panic; the reader's own catchers still classify
+                // the host failure.
+                qianqian_diagnostics::note_critical_panic();
+                return;
             }
+            previous(info);
         }));
     });
     // Keep this process diagnostic configuration after host return: restoring
     // the hook could let a detached reader print a late panic after seal.
+}
+
+/// The registered critical-thread test. `Thread::name()` is a lock-free read of
+/// the name fixed at spawn; an unnamed thread — or any name not in the registry
+/// — resolves to the chaining branch (fail-open to the previous hook's
+/// behavior, so a miss can only fail to suppress a print, never invent one).
+fn is_critical_thread() -> bool {
+    match std::thread::current().name() {
+        Some(name) => CRITICAL_THREAD_NAMES.contains(&name),
+        None => false,
+    }
 }
 
 pub(crate) fn spawn_reader(input: HostInput, handle: PlaybackSessionHandle) {
@@ -217,6 +249,11 @@ pub(crate) fn spawn_reader(input: HostInput, handle: PlaybackSessionHandle) {
                 .spawn(task)
         },
         move || {
+            // This thread is class α for the diagnostic outlet (DG-4b): the
+            // hook's panic bookkeeping must publish with atomics only, and the
+            // panic record lands in this thread's own preallocated pool. The
+            // registration is a cold-path one-time cost.
+            let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
             use std::io::BufRead;
             let stdin = io::stdin();
             let mut reader = stdin.lock();
