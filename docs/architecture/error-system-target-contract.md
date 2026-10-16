@@ -366,13 +366,19 @@ Per registered class α producer — a private two-record pool:
                             // composition) — owned by exactly one party at a
                             // time
 
-Generation numbering: cyclic 1, 2, …, u32::MAX, 1, 2, … — 0 is RESERVED as
-the both-counters-initial "none" value and never re-emitted (R6: wrapping
-back onto 0 would collide with the sentinel). All comparisons are wrapping
-differences; the admission rule keeps pub − cons ∈ {0, 1, 2} forever, so
-every difference the protocol uses is exact modular arithmetic and no ABA
-is possible (the drainer's equality check against its own last_consumed
-always sits within distance ≤ 2).
+Generation numbering (R7 — the R6 skip-0 cycle is withdrawn): plain u32
+counters wrapping NATURALLY through 0; empty is COUNTER EQUALITY
+(pub == cons means nothing in flight) — no sentinel value exists. Slot =
+generation % 2: parity alternates unbroken through the natural wrap (…,
+u32::MAX−1 even, u32::MAX odd, 0 even, 1 odd, …). The R6 cycle skipped 0,
+which executed with real u32 values maps u32::MAX (odd) and 1 (odd) to
+the SAME slot — overwriting an unconsumed record — and lets a third
+publish measure distance 3, past the `== 2` full check, because
+generations cycled mod 2^32−1 while `wrapping_sub` works mod 2^32. The
+admission rule keeps pub − cons ∈ {0, 1, 2} forever, so every
+`wrapping_sub` distance the protocol uses is exact modular arithmetic and
+no ABA is possible (the drainer's equality check against its own
+last_consumed always sits within distance ≤ 2).
 
 Publish (fault path — bounded, single attempt; no loop, no CAS, no lock,
 no alloc):
@@ -385,7 +391,7 @@ no alloc):
                                       // (R6: the R5 `wrapping(n−2) > cons`
                                       // form rejected the very FIRST fault
                                       // on an empty pool — withdrawn.)
-    n = next generation after p (cyclic, skipping 0)
+    n = p.wrapping_add(1)                // natural wrap through 0
     write record[n % 2]               // fully owned: plain stores
     pub_gen.store(n, Release)         // ownership of this record passes
                                       // to the drainer
@@ -396,7 +402,7 @@ count anywhere — withdrawn):
     g = pub_gen.load(Acquire)         // snapshot
     c = last_consumed
     while c != g:                     // ≤ 2 iterations
-        c = next generation after c (cyclic, skipping 0)
+        c = c.wrapping_add(1)             // natural wrap through 0
         copy record[c % 2]            // safe: the producer's admission
                                       // blocks gen c+2 until it has
                                       // Acquire-confirmed cons ≥ c
@@ -444,17 +450,31 @@ claims done.
 | 2 | full: one published-unconsumed + one drainer-held | **dropped + counted (the only loss site)** | copies 2 generations in order, releases both via one `cons_gen` store |
 
 Transitions: publish d→min(d+1, 2) (write, then Release publish; at d = 2
-the publish is refused and d stays 2); consume d→0 (in-order walk of
-generations last_consumed+1 … pub, one Release recycle store at the end).
+the publish is refused and d stays 2); consume releases everything the
+walk copied and lands at d = pub_at_release − released — a publish that
+races the walk leaves d = 1, not 0 (the `consume d→0` arrow of the R6
+table was an abstraction only valid without concurrent publishes; the
+verification model preserves the snapshot/copy/release interleavings).
 
-**Loss accounting (every drop counted — R6).** Loss happens in exactly
-one place: the producer's admission check, counted before any write.
-Consumption is in order with no skips — the drainer walks
-last_consumed+1 … `pub` and delivers EVERY generation in that range, both
-records of a full pool included. "At most two in flight" is the capacity
-property; the accounting property is separate and stated as an identity:
-written-generations = delivered-generations + producer-side drops, and
-the gates below check both. No tearing exists by the ownership
+**Loss accounting (pool boundaries — corrected R7).** Two identities,
+each at its own boundary; the R6 form "written = delivered +
+producer-side drops" was wrong twice over (a full-pool rejection happens
+BEFORE any write, so it never enters "written"; and it ignored
+outstanding records — a fully drained pool with 2 written+consumed and 1
+rejected would read `2 = 2 + 1`):
+
+```text
+attempted = accepted    + rejected      (admission boundary)
+accepted  = copied_out  + outstanding   (drain boundary)
+```
+
+"Copied out of the pool" and "delivered to a sink" are distinct events,
+accounted separately: copied_out = exported_ok + exporter_failed +
+abandoned_at_exit, each counted at its own site. Consumption remains in
+order with no skips — the drainer walks last_consumed+1 … snapshot(pub)
+and delivers EVERY generation in that range, both
+records of a full pool included; loss occurs only at the producer
+admission check. No tearing exists by the ownership
 discipline: the drainer copies only whole published records.
 
 **Ownership and registration.** One pool per **registered** α producer
@@ -487,8 +507,11 @@ pairing plus ordinary indexed array access — no CAS, no LL/SC, no fence
 intrinsics — available and lock-free on every tier-1 target
 (x86_64/aarch64; Windows/Linux/macOS). Wraparound is handled by
 construction, not by the R5 assertion "wrapping therefore harmless"
-(withdrawn): 0 is the reserved none-sentinel, the cycle skips it, and the
-admission rule bounds every modular distance the protocol uses to ≤ 2.
+(withdrawn): counters wrap naturally through 0, empty is counter
+equality (no sentinel to collide with), parity alternation survives the
+wrap, and the admission rule bounds every modular distance the protocol
+uses to ≤ 2 — the R6 skip-0 cycle that motivated the sentinel is the
+withdrawn rule (R7).
 
 | Payload-access mechanism | Verdict |
 |---|---|
@@ -504,15 +527,36 @@ recycle happens-before) is verified exhaustively — Loom over one producer
 + one drainer interleaving model, Kani/Miri on the cyclic arithmetic —
 covering the enumerated pool states: **first publish on an empty pool,
 two consecutive publishes, full-pool rejection, reuse after consumption,
-and cross-wrap generation sequences (0 skipped)**; a fence-only or
+and cross-wrap generation sequences**; a fence-only or
 volatile-only "fix" does not satisfy this gate, and neither does a
 Relaxed recycle load. (2) *Snapshot integrity*: every record
 an exporter sees is a complete publication (structural here; for the
 atomic-lane alternative this gate is the memory-model proof). (3) *Loss
-accounting*: written = delivered + producer-side drops, all drops
-counted; consumption walks last_consumed+1 … `pub` in order with no
+accounting*: attempted = accepted + rejected and accepted = copied_out +
+outstanding (pool boundaries; exporter outcome accounted separately);
+consumption walks last_consumed+1 … `pub` in order with no
 skips. (4) *Producer cost*: a fixed store count — no loop, CAS, lock, or
 allocation on the fault path.
+
+**Executed verification of the design-candidate model (R7 review
+directive: verify first, then sync the docs).**
+`crates/qianqian-playback/src/error_pool_model_tests.rs` — a test-only
+model of this exact protocol (no production code): the deterministic
+arithmetic suite is green including the R6/R7 counterexample values at
+the u32::MAX boundary; the loom suite (2 threads, 3 publish attempts /
+2 drain walks) is SCHEDULE-CLEAN within those bounds and is picked up by
+the existing playback-concurrency lane; local Miri is race-clean on the
+default schedule AND across 33 many-seed schedules. Negative controls,
+executed in an isolated scratch worktree against the committed model:
+(a) the R6 skip-0 rule goes RED through two independent oracles
+(first-publish rejection + cross-wrap slot alternation); (b) a Relaxed
+recycle load goes RED under many-seed Miri with the exact data-race
+signature (`publish` slot write vs the drainer's record read) — the
+single-schedule run was green because the default schedule never entered
+the recycle window (premise-by-scheduling, diagnosed before the control
+was accepted; the model's real-thread test now yields through rejected
+retries so the window is exercised). Evidence: dist X15. These runs
+verify the MODEL — the gates above still bind the production landing.
 
 Residual `MECHANISM_OPEN` (representation-level, no semantics change): pool
 enumeration (per critical thread vs per site — settled by the α-site census

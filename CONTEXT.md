@@ -632,6 +632,31 @@ pool state machine {d=0/1/2} whose enumerated states (first publish, two
 consecutive publishes, full-pool rejection, reuse after consumption,
 cross-wrap) are part of the binding no-data-race gate.
 
+2026-10-16 R7 review revision (same round, PR #284, two findings on the α
+pool arithmetic; the R6 two-direction Acquire and in-order consumption
+were accepted): (1) the R6 skip-0 generation cycle is withdrawn —
+executed at real u32 values it maps u32::MAX and 1 (both odd) to the
+SAME slot, overwriting an unconsumed record, and lets distance 3 past
+the ==2 full check (generations cycled mod 2^32−1 while wrapping_sub
+works mod 2^32); counters now wrap NATURALLY through 0, empty = counter
+equality, slot = generation % 2 (parity alternates through the wrap);
+(2) the loss identity is corrected to pool boundaries: attempted =
+accepted + rejected and accepted = copied_out + outstanding (the R6
+"written = delivered + drops" was wrong twice: rejections precede
+writes; outstanding was missing), with exporter outcome
+(ok/failed/abandoned) accounted separately from pool copy-out. Per the
+review directive (verify first, then sync docs), the design-candidate
+protocol now has EXECUTED evidence before the doc sync: a test-only
+model (qianqian-playback error_pool_model_tests.rs — no production
+code) with arithmetic tests at the reviewer's exact counterexample
+values, a loom schedule suite (picked up by the playback-concurrency
+lane), and local Miri clean across 33 seeds; negative controls in an
+isolated worktree: the R6 rule RED through two oracles, a Relaxed
+recycle load RED under many-seed Miri with the exact publish-vs-read
+race signature (the first single-schedule control run was green —
+premise-by-scheduling, diagnosed and fixed by yield-driven retries
+before the control was accepted).
+
 ---
 
 # Historical evidence
