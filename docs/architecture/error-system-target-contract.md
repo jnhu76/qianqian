@@ -227,9 +227,12 @@ production APIs land only through their own review. Every code anchor is @e44aa8
 ### DG-1 — Logging facility (T5-1/T5-2/T5-3/T5-5; absorbs ledger rows #8/#9/#10)
 
 **Goal.** A host-owned diagnostic logging facility where (1) producers on sensitive
-threads never block, allocate unboundedly, or panic on logging; (2) exporters/sinks
-execute only on a dedicated drainer thread, never on producer call stacks and never
-under a reliable-publication or resource-progress lock; (3) shutdown is bounded-or-honest
+threads never block, allocate unboundedly, or panic on logging — enforced per
+producer class: isolation-obligated threads (class α below) take **no lock and no
+queue** on their logging path (atomics only), while ordinary host threads (class β)
+get a capacity-non-waiting enqueue; (2) exporters/sinks execute only on a dedicated
+drainer thread, never on producer call stacks and never under a
+reliable-publication or resource-progress lock; (3) shutdown is bounded-or-honest
 (no fake "drain complete"); (4) the machine protocol stdout never passes through it.
 
 **Consumers and obligations.** Records are Class C diagnostics (candidate T2-1): no
@@ -248,11 +251,11 @@ identity needed — one process-lifetime resource).
 
 | Thread class | Sites (ledger §4 rows) | May emit | Discipline |
 |---|---|---|---|
-| render (realtime leg) | #8 (post-catch abort line, wasapi.rs:258-262), #9 (opened line, :538-547), #10 (volume, :678-686) | mechanism diagnostics, gated (QIANQIAN_AUDIO_LOG default off stays) | `try_send` only; record composed into the fixed inline buffer (bounded adapter) before the enqueue; never sink/exporter rendering, never an exporter call |
-| decode worker | (future decode-site diagnostics) | mechanism diagnostics | same |
-| failure-publication cone (post-catch stop+complete region) | the #8 cone around wasapi.rs:263-273 | the abort record | logging must not sit between the catch and the reliable publications: the record is enqueued (non-panicking, bounded) and the cone's `render_input.stop()` + `drain.complete()` proceed; a lost record may never delay or skip them (direction E/A) |
-| cleanup / teardown (session fiber effects, K0 `run_unwind`) | (future) | cleanup-failure diagnostics | `try_push`; teardown progress never waits on the drainer |
-| normal host threads (main, stdin reader) | #1–#4, #7 (CLI report lines) | presentation diagnostics | may use the facade; protocol rows #5/#6 NEVER (T5-7: protocol stdout stays direct `print!`+flush — its failure is a host-operation failure, not a log loss) |
+| render (realtime leg) | #8 (post-catch abort line, wasapi.rs:258-262), #9 (opened line, :538-547), #10 (volume, :678-686) | mechanism diagnostics, gated (QIANQIAN_AUDIO_LOG default off stays) | class α: record into the atomics slot (whitelisted composition only); **#8's emission point moves after `drain.complete()`**; never sink/exporter rendering, never an exporter call |
+| decode worker | (future decode-site diagnostics) | mechanism diagnostics | class α: same atomics-slot discipline |
+| failure-publication cone (post-catch stop+complete region) | the #8 cone around wasapi.rs:263-273 | the abort record | **the cone contains zero logging** (R3): #8's record is emitted only after `drain.complete()` returns — nothing sits between the catch and the reliable publications (direction E/A), met structurally rather than by a "bounded enqueue" |
+| cleanup / teardown (session fiber effects, K0 `run_unwind`) | (future) | cleanup-failure diagnostics | class α atomics slot; teardown progress never waits on the drainer |
+| normal host threads (main, stdin reader) | #1–#4, #7 (CLI report lines) | presentation diagnostics | class β: may use the facade's shared channel; protocol rows #5/#6 NEVER (T5-7: protocol stdout stays direct `print!`+flush — its failure is a host-operation failure, not a log loss) |
 
 Forbidden everywhere: exporter/sink invocation on a producer thread; logging inside the
 completion/verdict/edge locks; per-quantum logging on the steady render path (the three
@@ -268,54 +271,99 @@ Bounded owned plain-data record — no `String`, no heap per record, on any path
   status: Option<i32>, native_code: Option<i32>, seq: u64, ts }
 ```
 
-The status/native_code fields are the DG-3 consumer target. **Construction:** the
-producer composes the message through a bounded `fmt::Write` adapter that writes
-into the inline buffer and counts-and-drops everything past capacity (no
-allocation; UTF-8-boundary truncation, lossy tail visible in `len`). This is
-producer-side *payload composition*, bounded by the buffer; sink-side *rendering*
-(timestamps, level names, sink formats) still happens only on the drainer (R6).
-**Destruction:** records are plain data — dropping one is a no-op, and queue
-storage is a preallocated array, so neither construction nor destruction
-allocates or frees. A `String`-based record is rejected: construct-then-truncate
-bounds only the final length, not the transient allocation/drop cost (R2 review,
-2026-10-16).
+The status/native_code fields are the DG-3 consumer target. **Construction —
+whitelisted segment vocabulary (R3 review 2026-10-16).** A fixed buffer bounds
+*storage*, not *execution*: a `Display::fmt` may compute, allocate, block or
+panic before and between writer calls, and a full adapter cannot terminate the
+formatter's work. The producer therefore accepts only: (i) `&'static str` tags
+(plain bounded copy); (ii) primitive integer fields rendered by `core::fmt`'s
+integer impls (terminating digit loops — no allocation, no panic:
+site/level/status/native_code/seq/ts); (iii) bounded byte copies from
+site-provided `&[u8]`. Arbitrary `Display` values are **banned on producer
+paths**; a site needing richer rendering either sends structured fields and
+renders on the drainer, or must separately prove its formatter's cost bound,
+failure behavior and termination-on-full — "output length is bounded" never
+implies "arbitrary formatting is bounded". The capacity-dropping adapter
+remains as a safety net, not as the bound. **Destruction:** records are plain
+data — dropping one is a no-op, and storage is preallocated. A `String`-based
+record is rejected (R2): construct-then-truncate bounds only the final length,
+not the transient allocation/drop cost.
 
-**Producer path — compared queues (concrete type + version; corrected full-path
-facts, R2 review 2026-10-16).** The earlier "lock the channel mutex → write slot →
-notify; no allocation, no syscall; O(1) bounded steps" characterization of std
-1.97.1 is **withdrawn**: `SyncSender::try_send` enters the mpmc arrayed-context
-implementation — a CAS loop on the block index with spin/backoff under
-contention, block allocation as the ring advances (blocks are cached and reused,
-so allocation is amortized, not per-record steady-state), and, when a receiver
-has parked, an internal waker-mutex acquisition plus a futex/condvar wake (a
-syscall on Linux). Step count is contention-dependent; **no fixed-step or
-no-syscall claim is made for any candidate below, and none is required**.
+**Producer path — corrected std facts and the two-class admission (R3 review
+2026-10-16; supersedes the R2 wording, which was itself wrong).** Verified
+against the pinned toolchain's own source (rustc 1.97.1, `library/std`
+`sync/mpmc`):
 
-What T5-2 actually requires of a diagnostics producer: the attempt returns
-promptly whether or not space exists (never parks the producer), never allocates
-per record, memory bounded at construction, never runs exporter code.
+- The bounded **array** flavor allocates its fixed `cap` slots **at channel
+  creation** (`array.rs` `with_capacity`) — the R2 "cached blocks allocated as
+  the ring advances" description belonged to a different flavor and is
+  withdrawn. Per-record allocation: none.
+- The send path is a `compare_exchange_weak` loop with `Backoff::spin_*`
+  (array.rs:158-189): **no per-operation step bound exists**.
+- After a successful write, `receivers.notify()` runs (array.rs:210), and
+  `SyncWaker::notify` **takes an internal Mutex** (waker.rs:171-176): a
+  producer can **wait on internal synchronization**, so "never parks" is
+  false as previously stated.
 
-| Mechanism | Full producer path | Assessment |
+Two properties, no longer conflated:
+
+```text
+P-cap   capacity-non-waiting:        a full queue returns Err(Full)
+                                     immediately — the producer never
+                                     waits for space
+P-sync  internal-sync-non-waiting:   the producer never waits on a lock
+                                     or wakeup path shared with other
+                                     parties (drainer included)
+```
+
+std `sync_channel` + `try_send` provides **P-cap only**. The admission
+therefore splits by producer class:
+
+- **Class α — isolation-obligated producers** (the failure-publication cone,
+  render-leg sites, the decode worker, cleanup/teardown paths, critical
+  threads via DG-4b): the shared channel is **not admitted** — its admission
+  here was withdrawn. Accepting an internal-synchronization wait on these
+  threads would be an explicit T5-2/direction-E target-contract change, and
+  this design does not make it; "cold-path" frequency never waives an
+  isolation obligation. Class α records go to an **atomics-only slot** (the
+  DG-4b family: fixed-capacity plain-data record, last-wins atomic swap,
+  loss counted). For the cone the obligation is additionally met
+  **structurally**: the abort record's emission point moves **after
+  `drain.complete()`** (catch → stop → complete → record), so the cone
+  contains zero logging and no enqueue cost of any kind can sit between the
+  catch and the reliable publications.
+- **Class β — ordinary host threads** (CLI report rows #1–#4/#7, the App
+  shutdown report): std `sync_channel` + `try_send` **remains recommended** —
+  P-cap holds, per-record allocation is none, and the internal waker-mutex
+  wait is acceptable **here** because no isolation obligation attaches to
+  these threads. This scoping is not a T5-2 relaxation: T5-2 governs class α,
+  which does not use the queue.
+
+| Mechanism | Producer path facts | Assessment |
 |---|---|---|
-| (a) `std::sync::mpsc::sync_channel` (std 1.97.1) + `SyncSender::try_send` + one drainer `recv` loop | fixed-capacity record → CAS push (retry/backoff under contention) → cached-block reuse (a burst may allocate) → possible waker-mutex + futex wake of a parked drainer; full queue → `Err(Full)` immediately, producer never parks | **Recommended — on these corrected facts**: attempt-bounded, never parks, no new dependency; amortized allocation and an occasional wake syscall are acceptable costs for cold-path diagnostics sites (abort / opened-once / volume-once). Zero-logging zones (T5-2) unchanged; the critical-thread panic hook (DG-4b) is excluded from this queue entirely (atomics-only) |
-| (b) `crossbeam_queue::ArrayQueue` (0.3.x) `try_push` | CAS push only; no waker mutex, no wake syscall (no blocking receive — the drainer supplies its own park); allocation-free by construction | Rejected for now: not in the tree (new dependency) and no measured contention datum demands it — and it would carry the same no-fixed-step honesty, so switching queues does not buy the withdrawn guarantee |
-| (c) hand-rolled `Mutex<VecDeque> + Condvar + capacity` | mutex acquire → deque push → condvar notify (syscall when drainer parked) → unlock | Rejected: re-implements (a) with more verification surface and the same cost shape |
+| (a) `std::sync::mpsc::sync_channel` (std 1.97.1) + `SyncSender::try_send` + one drainer `recv` loop | fixed slots at creation (no per-record allocation); CAS loop + backoff (no step bound); post-success `notify()` takes an internal Mutex (**P-cap yes, P-sync no**); full → `Err(Full)` immediately | **Recommended for class β only**; no new dependency |
+| (b) `crossbeam_queue::ArrayQueue` `try_push` | CAS push only, no waker mutex (no blocking receive — the drainer parks on its own); P-sync would hold for the push itself; still no step bound | Rejected for now: new dependency, no contention datum; revisit only if class α ever needs a queue rather than the atomics slot |
+| (c) hand-rolled `Mutex<VecDeque> + Condvar + capacity` | explicit lock acquire + notify on every push | Rejected: P-sync fails by construction; more verification surface |
 
-Capacity: 256 records of the fixed record bound (MSG_CAP + ~40 B of plain data) —
-preallocated constant memory, sized to cover one episode's diagnostic burst;
-overflow policy below.
+Capacity: 256 records of the fixed record bound (MSG_CAP + ~40 B of plain
+data) — preallocated constant memory, sized to cover one episode's diagnostic
+burst; overflow policy below. The class α slot uses the same drop+count
+policy (last-wins overwrite counted as loss).
 
 **Full queue / consumer stopped / exporter failure / reentry / self-diagnosis.**
-Full: `try_send` fails → drop the record, increment a monotonic dropped counter
-(AtomicU64, relaxed), and enqueue nothing else (no retry loop on the producer). Consumer
-stopped (shutdown entered): same drop+count path; a late producer never blocks or revives
-the drainer. Exporter failure (drainer side): the exporter is disabled for the rest of
-the run (or of that record batch), its failure counted once in the self-diagnostic
-counter, and at most one bounded line is written via the non-panicking stderr writer —
-the drainer never calls back into the facade (no reentry: the facade's producer entry is
-a no-op when `thread::current()` is the drainer, enforced by a drainer thread-flag).
-Resource retirement: records hold only owned bounded data — no handles, no `Arc`
-cycles; the queue itself is dropped after the drainer join.
+Class β queue: full → `try_send` returns `Err(Full)` → drop the record,
+increment a monotonic dropped counter (AtomicU64, relaxed), enqueue nothing
+else (no retry loop on the producer). Class α slot: last-wins overwrite, the
+overwritten record counted as loss. Consumer stopped (shutdown entered): same
+drop+count path; a late producer never blocks or revives the drainer. Exporter
+failure (drainer side): the exporter is disabled for the rest of the run (or
+of that record batch), its failure counted once in the self-diagnostic
+counter, and at most one bounded line is written via the non-panicking stderr
+writer — the drainer never calls back into the facade (no reentry: the
+facade's producer entry is a no-op when `thread::current()` is the drainer,
+enforced by a drainer thread-flag). Resource retirement: records hold only
+owned bounded data — no handles, no `Arc` cycles; the queue and the slots are
+dropped after the drainer join.
 
 **Shutdown strategies (compared).**
 
@@ -329,11 +377,12 @@ The trilemma stands as stated: arbitrary sink + zero loss + bounded exit cannot 
 simultaneously; the design claims only "bounded producer paths + bounded-or-abandoned
 drainer + counted losses".
 
-**Cost.** Producer: bounded inline-buffer composition + one attempt-bounded
-enqueue (CAS retry under contention and a possible drainer-wake syscall are the
-honest worst cases; both cold-path only). Drainer: one thread, all rendering.
-Memory: capacity × fixed record bound, preallocated. No realtime-path cost (no
-steady-path logging exists to move).
+**Cost.** Class α producer: whitelisted composition into the fixed record + one
+atomic swap (last-wins). Class β producer: whitelisted composition + one
+P-cap enqueue whose honest worst case is a CAS retry loop and an internal
+waker-mutex wait (no step bound claimed). Drainer: one thread, all rendering.
+Memory: capacity × fixed record bound, preallocated. No realtime-path cost
+(no steady-path logging exists to move).
 
 **Migration and deletions.** Landing order is owner's (D-3: correctness-equal):
 either the narrow non-panicking writer lands first and the facility later replaces it
@@ -341,7 +390,9 @@ either the narrow non-panicking writer lands first and the facility later replac
 (CC-1 subsumed). In both cases the landing PR must state the residual full-pipe
 blocking (a synchronous stderr/file exporter still blocks the drainer — producers are
 isolated, the drainer is not) in the same row that marks the panic class resolved
-(H). The `QIANQIAN_AUDIO_LOG` gate maps to a site/level filter on the stderr exporter.
+(H), and must move #8's emission point after `drain.complete()` (the structural cone
+guarantee above). The `QIANQIAN_AUDIO_LOG` gate maps to a site/level filter on the
+stderr exporter.
 
 **Evidence.** Reference facts @5719020 (logger.ts): named facade + structured record +
 per-exporter thresholds + sink-side formatting + exporter lifetime = registering fiber
@@ -354,7 +405,11 @@ protocol/diagnostic separation (machine_input.rs:230-234).
 
 **Remaining decisions (owner).** Capacity number; record message bound; whether the
 dropped/self-diagnostic counters are surfaced beyond the shutdown report; exporter
-admission texts for file sinks; install point (App startup vs first use).
+admission texts for file sinks; install point (App startup vs first use); **whether
+an opt-in diagnostic mode may ever relax class α's render-leg sites onto the shared
+class β channel — an explicit, mode-scoped T5-2 contract discussion (the internal
+waker-mutex wait would sit on the render thread); default recommendation: no, keep
+even diagnostic-mode class α sites on the atomics slot.**
 
 ### DG-2 — Output-reason lifecycle (T2-5; D-10/D-9)
 
@@ -487,7 +542,7 @@ re-enters T1-3 with its own obligation proof.
 
 | Shape | Assessment |
 |---|---|
-| (a) copy-at-error-point + immediate emission | at the `_` arm (lib.rs:288-290) construct `DecodeFault{status, native_code, message: bounded}` from the borrowed `song_error` before any next same-handle call (T2-3 discipline), emit via DG-1 try_push (site = Decode), drop | **Recommended**: no idle state, bounded by construction, consumed at the point of maximal information |
+| (a) copy-at-error-point + immediate emission | at the `_` arm (lib.rs:288-290) construct `DecodeFault{status, native_code, message: bounded}` from the borrowed `song_error` before any next same-handle call (T2-3 discipline), emit via DG-1's class α producer path (atomics slot — the decode worker is an isolation-obligated thread), drop | **Recommended**: no idle state, bounded by construction, consumed at the point of maximal information |
 | (b) long-lived `self.last_fault: Option<DecodeFault>` | Rejected as primary: an idle field with no reader obligation between errors — exactly the "future use" shape direction G forbids; stale-fault attribution rules would have to be invented; the disposition-contract §5 warning applies |
 | (c) status-only (today) | the confirmed loss (U-ledger / #231 L1/L2) — baseline being replaced |
 
@@ -594,7 +649,14 @@ about DG-4b/4c (explicitly out of E-3's acceptance).
 
 **Remaining decisions (owner).** T1-6 adoption; the `BoundedIoFault` fields
 (kind-enum + raw_os_error + offset — final set at implementation review); whether the
-slot is ever surfaced beyond open-failure diagnostics.
+slot is ever surfaced beyond open-failure diagnostics; **the partial-success
+retention trade-off (R3 sync item): a callback fault recorded inside a call that
+ultimately succeeds stays in the slot but is permanently non-attributable — an
+explicit information-retention trade-off recorded as a known loss, surfaced only on
+explicit operator request. This design does NOT claim delayed-fatal cause fidelity:
+if a later fatal operation ever needs its true io origin and that origin lived in an
+earlier successful boundary, it is already lost. The owner accepts or rejects this
+loss knowingly (rejecting it would require per-boundary retention, not a slot).**
 
 **Migration and deletions.** `Box<File>` userdata → `Box<IoContext>` (same
 leak/reclaim discipline); no ABI change; CC-4/DG-3's DecodeFault and this slot remain
@@ -728,10 +790,12 @@ no handle identity (process-level diagnostic; per-handle attribution is explicit
 provided).
 
 **Copy/queue cost and error handling.** β per callback: one bounded memcpy of the
-static fmt string + one attempt-bounded enqueue (DG-1 producer discipline) +
-drop-on-full counted. α per callback: one shim `vsnprintf` into the fixed buffer
-(variable, output-bounded) + the same enqueue. No line above the record bound is
-realloc-ated; truncation happens at the copy (β) / in the shim (α).
+static fmt string + one write into DG-1's class α atomics slot (FFmpeg-calling
+threads are decode-side, isolation-obligated — the shared class β channel is not
+admitted here) + overwrite-counted loss. α per callback: one shim `vsnprintf`
+into the fixed buffer (variable, output-bounded) + the same slot write. No line
+above the record bound is realloc-ated; truncation happens at the copy (β) / in
+the shim (α).
 
 **E-3 is not acceptance for this package.** E-3 exercises song_io callbacks at the ABI
 level; av_log behavior under the pinned FFmpeg build needs its own runtime observation
