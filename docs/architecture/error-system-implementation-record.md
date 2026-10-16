@@ -3,6 +3,7 @@
 ```text
 STATUS:  IMPLEMENTATION RECORD / EVIDENCE INDEX — NOT AUTHORITY
 BASE_SHA 79c6d7832ce445115276f9a505901804cfa5415b (PR #284 merged; reviewed head 758a114)
+HEAD     the implementation branch's tip: eleven commits, each reviewable on its own
 ```
 
 This document records what an implementation round actually landed against the
@@ -109,11 +110,17 @@ priority, recovery strategy, public semantics, the SongCore ABI, or K0 authority
 | DG-4c witnesses | `cargo test --manifest-path crates/qianqian-decode-songcore/Cargo.toml --lib av_log_bridge` | real `av_log` through the real callback | 6/6 | β shape: no interpolated values; discard path unobserved at runtime |
 | F5 suite (unchanged) | `bash specs/f5-seek-discontinuity/check.sh` | tla2tools 1.7.4 | base PASS (672 distinct states) + 6 witnesses + M1–M7 all COUNTEREXAMPLE-WITNESSED | no model action changed this round |
 | Windows compile | `cargo check --target x86_64-pc-windows-gnu -p qianqian-output-wasapi --tests` | mingw target, Linux host | exit 0; a `compile_error!` sight control proved the test target was really compiled | compilation is not runtime evidence |
+| Loom (final pool) | `RUSTFLAGS="--cfg loom" cargo test -p qianqian-diagnostics --features loom --release --lib` | same | 2/2 schedule-clean (base + cross-wrap states) | explored-schedule bound, not a general proof |
+| Miri (final pool) | `MIRIFLAGS="-Zmiri-many-seeds=0..24" cargo +nightly miri test -p qianqian-diagnostics --lib real_thread_handoff` | nightly Miri, real threads | clean over the seeds | Miri's scheduling is still a sample per seed |
+| Full local gate | `lefthook run pre-push --all-files` | same | 8/8 steps green (commit-convention, vocabulary, plugin-boundary incl. its negative controls, rust-fmt, rust-clippy, rust-test, release-policy, docs-verify); 918 tests passed / 0 failed | the gate proves the working tree, not the Windows/formal/concurrency lanes |
+| Commit convention | `python3 tools/check_commit_convention.py --range 79c6d78 HEAD` | same | 11/11 PASS | header grammar only |
 
-Negative controls executed this round: the DG-1 Relaxed-recycle pool control
-(Miri RED, then reverted), the DG-4b isolation-removal control (RED, reverted),
-the cone-oracle compile sight control (RED, reverted), and the boundary gate's
-own negative-control suite.
+Negative controls executed this round, each reverted byte-identically and each
+re-verified on the final tree: the DG-1 Relaxed-recycle pool control (Miri RED with
+the Record-payload data-race signature, at the final pool), the DG-4b
+isolation-removal control (RED with its documented signature), the cone-oracle
+compile sight control (RED — proving the Windows test target really is compiled),
+and the boundary gate's own negative-control suite.
 
 ## 5. NOT_RUN (declared, with what each would settle)
 
