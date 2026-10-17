@@ -243,6 +243,32 @@ pub(crate) fn install_panic_hook_posture() {
     // the hook could let a detached reader print a late panic after seal.
 }
 
+/// Serializes {spawn child -> wait for its first witness -> close its pipe}
+/// across all subprocess-choreography tests in this process. A forkling (a
+/// forked-but-not-yet-exec'd child) temporarily holds the WHOLE parent fd
+/// table, including OTHER tests' pipe read ends; a close(2) during any
+/// in-flight forkling window is silently ineffective (see
+/// require_broken_sink's evidence). A `Command::spawn` call is itself that
+/// window: std surfaces exec failure synchronously (its CLOEXEC error
+/// pipe), so once spawn returns Ok the forkling has become the execed
+/// child. The lock therefore excludes concurrent spawns — the only window
+/// in which a forkling can hold the table — from every close taken under
+/// it; waiting for each child's first witness before release is
+/// belt-and-suspenders on top. The lock is poison-tolerant on purpose: a
+/// watchdog red while holding it must not cascade into spurious
+/// PoisonError reds of every later test. The child-side canary remains as
+/// the defense in depth. The forkling hazard is unix-specific, but the
+/// lock is a plain `Mutex<()>` everywhere so every test binary compiles
+/// unchanged on all targets. (Test-only; lives here so sibling test
+/// modules — e.g. entry::shutdown_tests — can share the same lock.)
+#[cfg(test)]
+pub(crate) fn test_spawn_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 pub(crate) fn spawn_reader(input: HostInput, handle: PlaybackSessionHandle) {
     install_panic_hook_posture();
     start_reader(

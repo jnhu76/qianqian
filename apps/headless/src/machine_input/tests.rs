@@ -606,6 +606,7 @@ fn reader_panic_hook_subprocess_probe() {
 
 #[test]
 fn real_reader_panic_hook_is_silent_after_seal_and_other_hooks_preserved() {
+    let _spawn_guard = super::test_spawn_lock();
     for phase in ["preseal", "postseal", "unrelated"] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
@@ -846,6 +847,7 @@ fn dg4b_child_witness() {
 
 #[test]
 fn dg4b_the_hook_isolates_critical_threads_and_chains_elsewhere() {
+    let _spawn_guard = super::test_spawn_lock();
     let exe = std::env::current_exe().expect("test binary path");
     let run = |scenario: &str| {
         let output = std::process::Command::new(&exe)
@@ -1056,6 +1058,7 @@ fn dg4b_blocked_stderr_child_witness() {
 /// the child's stderr really is a blocked sink. The child must exit on its own
 /// inside the deadline.
 fn run_blocked_stderr_child(scenario: &str) -> (std::process::ExitStatus, String) {
+    let _spawn_guard = super::test_spawn_lock();
     use std::io::Read;
     let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args([
@@ -1164,6 +1167,59 @@ fn real_binary(name: &str) -> std::path::PathBuf {
 #[cfg(unix)]
 type SharedText = std::sync::Arc<std::sync::Mutex<String>>;
 
+/// Gate-ready marker: the child printed it right before blocking on the
+/// parent's "go" line, so the parent's close provably happens-after the
+/// child reached the gate and the child's post-gate canary provably runs
+/// after the close attempt.
+#[cfg(unix)]
+const GATE_READY: &str = "Q290-GATE-READY";
+
+/// Premise observability (B2 root-cause round; ROOT-CAUSE.txt in the round's
+/// evidence archive, summarized in the implementation record §14.8 B2 row): a
+/// parent-side close of a child's pipe read end CANNOT be assumed to break
+/// the pipe. Under concurrent spawns another test's forkling (in its
+/// fork→exec window, O_CLOEXEC not yet applied) holds a copy of the read
+/// end; the close is then ineffective, every "broken-sink" write silently
+/// succeeds, and the whole choreography degrades into either a silent
+/// anomalous pass or an unrelated 30s wedge. Standalone A/B evidence:
+/// 46/100 anomalous FLUSH=Ok with parallel spawns under CPU saturation,
+/// 0/60 sequential. The child therefore OBSERVES the premise before the
+/// choreography proceeds: a canary write that MUST panic. An unbroken sink
+/// is a deterministic PREMISE-REFUTED red (child exits 3, the parent's
+/// watchdog names it), never a silent anomaly. The stdout canary is
+/// '\n'-terminated on purpose: the LineWriter writes newline-terminated
+/// data directly to the sink (the buffer stays empty), so the canary can
+/// neither pre-drain nor pollute the buffer state the property under test
+/// depends on — no premature-flush defect of the v1 kind. The canary's own
+/// default-hook panic text ("failed printing to stdout: Broken pipe") is
+/// silenced with a momentary hook swap, restored before the choreography
+/// proceeds: no other child thread can panic concurrently at any call site
+/// (everything else is parked at the gate or not yet started), and letting
+/// the canary's message into the capture would pre-satisfy the message
+/// assertions that exist to prove the CHOREOGRAPHY's panics. The single
+/// parameter also selects the witness stream: it goes to the healthy one
+/// (stderr when stdout is the broken sink, stdout otherwise).
+#[cfg(unix)]
+fn require_broken_sink(stdout_is_broken: bool) {
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let broken = if stdout_is_broken {
+        #[allow(clippy::print_with_newline)]
+        catch_unwind(|| print!("Q290-CANARY\n")).is_err()
+    } else {
+        catch_unwind(|| eprintln!("Q290-CANARY")).is_err()
+    };
+    std::panic::set_hook(previous_hook);
+    if !broken {
+        witness(
+            stdout_is_broken,
+            "Q290-PREMISE-REFUTED the parent-side close did not break the sink \
+             (fork-exec window held the read end); refusing the anomalous path",
+        );
+        std::process::exit(3);
+    }
+}
+
 #[cfg(unix)]
 fn shared_capture(
     reader: impl std::io::Read + Send + 'static,
@@ -1210,21 +1266,6 @@ fn capture(
 }
 
 #[cfg(unix)]
-fn wait_for_marker(text: &SharedText, needle: &str, what: &str) {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-    loop {
-        if text.lock().expect("capture lock").contains(needle) {
-            return;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "{what}: never saw {needle:?} (child hung or died)"
-        );
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
-}
-
-#[cfg(unix)]
 fn assert_contains(text: &SharedText, needle: &str, what: &str) {
     let guard = text.lock().expect("capture lock");
     assert!(guard.contains(needle), "{what}\n{guard}");
@@ -1259,35 +1300,130 @@ fn bounded_wait(child: &mut std::process::Child, what: &str) -> std::process::Ex
 
 /// Best-effort per-thread scheduler state of the child (B2 round): a timeout
 /// dump separates CPU starvation (S/R, empty wchan, no timeline progress),
-/// kernel waits (D, or wchan inside a read), and a dead process. Diagnostic
-/// only; never panics.
+/// kernel waits (D, or wchan inside a read), and a dead process. Two samples
+/// 500ms apart (failure-path forensics only — never on the pass path) plus
+/// the current syscall's first argument (the futex address for parked
+/// threads) distinguish a STATIC wait set (nothing will ever wake it —
+/// deadlock/lost-wakeup class) from a MOVING one (timed repoll/starvation
+/// class). Diagnostic only; never panics.
 #[cfg(target_os = "linux")]
 fn thread_states_snapshot(pid: u32) -> String {
+    use std::collections::BTreeMap;
     use std::fmt::Write as _;
-    let mut out = String::from("--- child thread states (/proc, best-effort) ---\n");
-    let Ok(tasks) = std::fs::read_dir(format!("/proc/{pid}/task")) else {
-        return format!("{out}unreadable (child may have exited)\n");
+    let sample = || -> BTreeMap<String, (String, String)> {
+        let mut map = BTreeMap::new();
+        if let Ok(tasks) = std::fs::read_dir(format!("/proc/{pid}/task")) {
+            for task in tasks.flatten() {
+                let tid = task.file_name().to_string_lossy().into_owned();
+                let stat = std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/stat"))
+                    .unwrap_or_default();
+                // Field 3 is the state; comm (field 2) may contain spaces,
+                // so parse after the final ')'.
+                let state = stat
+                    .rsplit_once(')')
+                    .and_then(|(_, rest)| rest.split_whitespace().next())
+                    .unwrap_or("?")
+                    .to_owned();
+                let wchan = std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/wchan"))
+                    .unwrap_or_default();
+                // "202 0x7f... ..." — the second field is syscall arg1 (the
+                // futex address for parked threads).
+                let syscall = std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/syscall"))
+                    .unwrap_or_default();
+                let arg1 = syscall.split_whitespace().nth(1).unwrap_or("-").to_owned();
+                map.insert(tid, (state, format!("{}:{}", wchan.trim(), arg1)));
+            }
+        }
+        map
     };
-    for task in tasks.flatten() {
-        let tid = task.file_name().to_string_lossy().into_owned();
-        let stat =
-            std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/stat")).unwrap_or_default();
-        // Field 3 is the state; comm (field 2) may contain spaces, so parse
-        // after the final ')'.
-        let state = stat
-            .rsplit_once(')')
-            .and_then(|(_, rest)| rest.split_whitespace().next())
-            .unwrap_or("?");
-        let wchan =
-            std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/wchan")).unwrap_or_default();
-        let _ = writeln!(out, "  thread {tid}: state={state} wchan={}", wchan.trim());
+    let mut out = String::from("--- child thread states (/proc, two samples 500ms apart) ---\n");
+    let first = sample();
+    if first.is_empty() {
+        return format!("{out}unreadable (child may have exited)\n");
+    }
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let second = sample();
+    let mut wait_groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (tid, (state, wait)) in &first {
+        let verdict = match second.get(tid) {
+            Some((state2, wait2)) if wait2 == wait && state2 == state => "STATIC",
+            Some(_) => "MOVED",
+            None => "GONE",
+        };
+        let _ = writeln!(out, "  thread {tid}: state={state} wait={wait} [{verdict}]");
+        wait_groups
+            .entry(wait.clone())
+            .or_default()
+            .push(tid.clone());
+    }
+    for (wait, tids) in &wait_groups {
+        if tids.len() > 1 {
+            let _ = writeln!(out, "  wait group {wait}: {} threads {tids:?}", tids.len());
+        }
     }
     out
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Stub for non-linux unix (macOS): the unix-gated child_diagnostics calls
+/// this, but /proc does not exist there. On Windows the whole unix
+/// choreography is cfg'd out, so no stub is needed and one would be dead code.
+#[cfg(all(unix, not(target_os = "linux")))]
 fn thread_states_snapshot(pid: u32) -> String {
     format!("--- child thread states: unavailable on this platform (pid {pid}) ---\n")
+}
+
+/// Symbolized per-thread backtraces of a WEDGED child (failure path only,
+/// linux, best-effort: silently absent when gdb is not installed). Attaching
+/// pauses the child; the caller kills it right after. This is what turns an
+/// all-STATIC futex set into a named deadlock chain. Bounded at 10s — a
+/// present-but-stuck gdb must not convert a classified red into an
+/// unbounded hang. gdb's own spawn is a lock-free window on this failure
+/// path; it is bounded here, and any interference it causes lands as a
+/// classified red anyway.
+#[cfg(target_os = "linux")]
+fn gdb_backtraces(pid: u32) -> String {
+    let Ok(mut child) = std::process::Command::new("gdb")
+        .args([
+            "-p",
+            &pid.to_string(),
+            "-batch",
+            "-ex",
+            "thread apply all bt",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    else {
+        return String::new();
+    };
+    let mut stdout = child.stdout.take().expect("gdb stdout");
+    let drained = std::thread::spawn(move || {
+        let mut text = String::new();
+        let _ = std::io::Read::read_to_string(&mut stdout, &mut text);
+        text
+    });
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) | Err(_) => break,
+            Ok(None) if std::time::Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break;
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(100)),
+        }
+    }
+    let text = drained.join().unwrap_or_default();
+    if text.trim().is_empty() {
+        return String::new();
+    }
+    format!("--- gdb thread backtraces (child paused during capture) ---\n{text}")
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn gdb_backtraces(_pid: u32) -> String {
+    String::new()
 }
 
 /// Post-mortem payload for a child-aware marker timeout (B2 round): whether
@@ -1326,20 +1462,27 @@ fn child_diagnostics(
         let mut last = *first;
         for (at, chunk) in stamps.iter() {
             report.push_str(&format!(
-                "+{:>7}ms (gap {}ms) {:?}\n",
+                "+{:>7}ms (gap {}ms) clock={:?} {:?}\n",
                 at.duration_since(*first).as_millis(),
                 at.duration_since(last).as_millis(),
+                at,
                 chunk
             ));
             last = *at;
         }
+        // CLOCK_MONOTONIC is system-wide on Linux, so these Instants are
+        // directly comparable with the parents' own close/gate timestamps
+        // (the site7 parent records them into its failure message).
+        report.push_str(&format!("first-chunk absolute Instant: {first:?}\n"));
     }
     drop(stamps);
     report.push_str(&thread_states_snapshot(child.id()));
+    report.push_str(&gdb_backtraces(child.id()));
     report
 }
 
-/// [`wait_for_marker`] with a child-aware watchdog (B2 round). The premise
+/// The former `wait_for_marker` polling loop, upgraded with a child-aware
+/// watchdog (B2 round). The premise
 /// bound (30s) and the pass path are IDENTICAL; only the failure is upgraded:
 /// a child that exited without the marker is reported DIED (silent death —
 /// abort/OOM class, the signature that must never pass), an alive child is
@@ -1355,16 +1498,36 @@ fn wait_for_marker_with_child(
     what: &str,
 ) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let mut drained_len: Option<usize> = None;
     loop {
         if text.lock().expect("capture lock").contains(needle) {
             return;
         }
         if let Ok(Some(status)) = child.try_wait() {
-            let dump = child_diagnostics(child, text, timeline);
-            panic!(
-                "{what}: child EXITED ({status}) without ever printing {needle:?} — \
-                 a silent child death (crash/OOM class), not a hang\n{dump}"
-            );
+            // The child is gone, but its last bytes may still be in flight to
+            // the capture thread (the DIED race observed in the saturated
+            // round): classify only after the captured text has stopped
+            // growing, never before.
+            let len = text.lock().expect("capture lock").len();
+            if drained_len == Some(len) {
+                let dump = child_diagnostics(child, text, timeline);
+                // The dump's forensic sampling grants one more drain window;
+                // a needle that arrived only there is a late-arrival race,
+                // not a silent death — classify it separately.
+                if text.lock().expect("capture lock").contains(needle) {
+                    panic!(
+                        "{what}: child EXITED ({status}) and {needle:?} appeared only \
+                         in the final drain — late-arrival race, classification \
+                         inconclusive (see the dump's timeline)\n{dump}"
+                    );
+                }
+                panic!(
+                    "{what}: child EXITED ({status}) without ever printing {needle:?} — \
+                     a silent child death (crash/OOM class), or a deliberate \
+                     Q290-PREMISE-REFUTED refusal (see the dump)\n{dump}"
+                );
+            }
+            drained_len = Some(len);
         }
         if std::time::Instant::now() >= deadline {
             let dump = child_diagnostics(child, text, timeline);
@@ -1512,7 +1675,8 @@ fn reader_output_panic_full_transport_contract() {
 //                  seal; release ⇒ clean completion with NO host failure.
 //   *-healthy      sight controls: same choreography, no break.
 //
-// B2 DAG (round §14.9; the boundaries the test harness owns, each witnessed
+// B2 DAG (round: §14.8 amendments, B2 scheduling-sensitivity round; the
+// boundaries the test harness owns, each witnessed
 // on the healthy stream with a +ms offset from child start — the parent's
 // timeout dump reconstructs how far the child advanced):
 //   spawn → assembly → transport rows (source/playing) → E9_ARMED →
@@ -1558,8 +1722,27 @@ fn e9_real_reader_child() {
     }
     let host_slot: Rc<RefCell<Option<HostInput>>> = Rc::new(RefCell::new(None));
     let slot = host_slot.clone();
+    let scenario_for_gate = scenario.clone();
     let start_reader = move |input: HostInput, reader_handle: PlaybackSessionHandle| {
         witness(marker_on_stderr, E9_ARMED);
+        // Premise observability (epipe arms only; see require_broken_sink):
+        // park at a gate the parent releases only AFTER closing the sink,
+        // then OBSERVE the break before arming the reader. For the epipe
+        // arms the markers flee to the healthy stream, so
+        // `marker_on_stderr` is simultaneously "the broken stream is
+        // stdout" and "the canary witness goes to stderr".
+        if scenario_for_gate.ends_with("epipe") {
+            use std::io::BufRead as _;
+            witness(marker_on_stderr, GATE_READY);
+            let gate = std::io::stdin()
+                .lock()
+                .lines()
+                .next()
+                .expect("the parent's gate line")
+                .expect("read the gate line");
+            assert_eq!(gate, "go");
+            require_broken_sink(marker_on_stderr);
+        }
         *slot.borrow_mut() = Some(input.clone());
         spawn_reader(input, reader_handle);
     };
@@ -1634,6 +1817,7 @@ fn spawn_e9_child(scenario: &str) -> std::process::Child {
 #[cfg(unix)]
 fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
     use std::io::Write;
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_e9_child("stdout-epipe");
     let (stderr_thread, stderr_text, stderr_timeline) =
         capture(child.stderr.take().expect("child stderr"));
@@ -1645,13 +1829,21 @@ fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
         E9_ARMED,
         "stdout-epipe child",
     );
-    drop(child_stdout); // break stdout AFTER the reader is armed
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        GATE_READY,
+        "stdout-epipe gate",
+    );
+    drop(child_stdout); // break stdout while the child parks at the gate
+    drop(spawn_guard); // close done — the forkling-free guarantee is no longer needed
     child
         .stdin
         .as_mut()
         .expect("child stdin")
-        .write_all(b"status\n")
-        .expect("write the status line");
+        .write_all(b"go\nstatus\n")
+        .expect("write the gate and status lines");
     drop(child.stdin.take());
     wait_for_marker_with_child(
         &stderr_text,
@@ -1700,6 +1892,7 @@ fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
 #[cfg(unix)]
 fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
     use std::io::Write;
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_e9_child("stderr-epipe");
     let (stdout_thread, stdout_text, stdout_timeline) =
         capture(child.stdout.take().expect("child stdout"));
@@ -1721,13 +1914,21 @@ fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
         "playing ",
         "the playing row must precede the marker",
     );
-    drop(child_stderr); // break stderr AFTER the rows reached the open pipe
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        GATE_READY,
+        "stderr-epipe gate",
+    );
+    drop(child_stderr); // break stderr while the child parks at the gate
+    drop(spawn_guard); // close done — the forkling-free guarantee is no longer needed
     child
         .stdin
         .as_mut()
         .expect("child stdin")
-        .write_all(b"badcmd\n")
-        .expect("write the command line");
+        .write_all(b"go\nbadcmd\n")
+        .expect("write the gate and command lines");
     drop(child.stdin.take());
     wait_for_marker_with_child(
         &stdout_text,
@@ -1768,6 +1969,7 @@ fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
 #[test]
 #[cfg(unix)]
 fn e9_real_reader_blocked_pipe_delays_seal_and_is_not_a_failure() {
+    let _spawn_guard = super::test_spawn_lock();
     use std::io::Write;
     let mut child = spawn_e9_child("blocked");
     let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
@@ -1857,6 +2059,7 @@ fn e9_real_reader_blocked_pipe_delays_seal_and_is_not_a_failure() {
 #[test]
 #[cfg(unix)]
 fn e9_real_reader_stdout_healthy_sight_control() {
+    let _spawn_guard = super::test_spawn_lock();
     use std::io::Write;
     let mut child = spawn_e9_child("stdout-healthy");
     let (stdout_thread, stdout_text, _stdout_timeline) =
@@ -1901,6 +2104,7 @@ fn e9_real_reader_stdout_healthy_sight_control() {
 #[test]
 #[cfg(unix)]
 fn e9_real_reader_stderr_healthy_sight_control() {
+    let _spawn_guard = super::test_spawn_lock();
     use std::io::Write;
     let mut child = spawn_e9_child("stderr-healthy");
     let (stdout_thread, stdout_text, stdout_timeline) =
@@ -1982,11 +2186,14 @@ fn e9_flush_probe_child() {
         // PA+PA-2, ONE sink: '\n'-terminated print! with NO intermediate
         // flush; the arm's only flush must then return Ok against the closed
         // pipe; a second print! on the SAME sink must panic, proving the sink
-        // was broken when that Ok was returned.
+        // was broken when that Ok was returned. The post-gate canary is
+        // '\n'-terminated: the LineWriter writes it directly to the sink, so
+        // it leaves the buffer empty and the flush property untouched.
         "pa" => {
             print!("Q290-PA row\n");
             witness(true, "Q290-PA PRINTED");
             gate();
+            require_broken_sink(true);
             let r = io::stdout().flush();
             witness(true, &format!("Q290-PA FLUSH={r:?}"));
             let w = catch_unwind(|| print!("Q290-PA2 row\n"));
@@ -1996,11 +2203,15 @@ fn e9_flush_probe_child() {
         // PB control: a non-newline tail stays buffered; the arm's only flush
         // performs the write and must Err (Broken pipe) — flush CAN fail
         // standalone while print! succeeded (the INJECTED shape production
-        // does not have).
+        // does not have). The tail print happens AFTER the gate and the
+        // canary so the canary's newline can never carry the tail out; the
+        // parent therefore waits for GATE-READY (not PRINTED) before closing.
         "pb" => {
+            witness(true, "Q290-PB GATE-READY");
+            gate();
+            require_broken_sink(true);
             print!("Q290-PB tail-no-newline");
             witness(true, "Q290-PB PRINTED");
-            gate();
             let r = io::stdout().flush();
             witness(true, &format!("Q290-PB FLUSH={r:?}"));
             std::process::exit(0);
@@ -2014,6 +2225,7 @@ fn e9_flush_probe_child() {
             print!("Q290-RQ5 row\n");
             witness(true, "Q290-RQ5 PRINTED");
             gate();
+            require_broken_sink(true);
             let r = io::stdout().flush();
             witness(true, &format!("Q290-RQ5 FLUSH={r:?}"));
             let w = catch_unwind(|| print!("Q290-RQ5-BROKE row\n"));
@@ -2096,10 +2308,19 @@ fn read_row_then_close(child: &mut std::process::Child, needle: &str, premise: &
 #[cfg(unix)]
 fn e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink() {
     use std::io::Write;
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_flush_probe_child("pa");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, "Q290-PA PRINTED", "pa child");
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-PA PRINTED",
+        "pa child",
+    );
     let text = read_row_then_close(&mut child, "Q290-PA row\n", "newline row reached the pipe");
+    drop(spawn_guard); // the row-observed close is done
     assert!(text.contains("Q290-PA row\n"), "{text}");
     child
         .stdin
@@ -2107,8 +2328,20 @@ fn e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink() {
         .expect("child stdin")
         .write_all(b"go\n")
         .expect("release the gate");
-    wait_for_marker(&stderr_text, "Q290-PA FLUSH=Ok(())", "pa target flush");
-    wait_for_marker(&stderr_text, "failed printing to stdout", "pa second print");
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-PA FLUSH=Ok(())",
+        "pa target flush",
+    );
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "failed printing to stdout",
+        "pa second print",
+    );
     assert_contains(&stderr_text, "Broken pipe", "pa second-print errno");
     assert_contains(
         &stderr_text,
@@ -2132,9 +2365,20 @@ fn e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink() {
 #[cfg(unix)]
 fn e9_flush_probe_no_newline_tail_flush_errs_broken_pipe() {
     use std::io::Write;
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_flush_probe_child("pb");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, "Q290-PB PRINTED", "pb child");
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    // The PB arm parks at the gate BEFORE printing its tail (the canary must
+    // not share the buffer with the tail), so GATE-READY replaces PRINTED as
+    // the close permission.
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-PB GATE-READY",
+        "pb child",
+    );
     // Close WITHOUT reading: nothing is expected in the pipe, and any content
     // would have been flushed by the print! itself (the falsifier direction).
     drop(child.stdout.take());
@@ -2144,7 +2388,14 @@ fn e9_flush_probe_no_newline_tail_flush_errs_broken_pipe() {
         .expect("child stdin")
         .write_all(b"go\n")
         .expect("release the gate");
-    wait_for_marker(&stderr_text, "Q290-PB FLUSH=Err(", "pb target flush");
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-PB FLUSH=Err(",
+        "pb target flush",
+    );
+    drop(spawn_guard); // close done
     assert_contains(&stderr_text, "BrokenPipe", "pb flush errno");
     let status = bounded_wait(&mut child, "pb child");
     assert_eq!(status.code(), Some(0));
@@ -2162,10 +2413,19 @@ fn e9_flush_probe_no_newline_tail_flush_errs_broken_pipe() {
 #[cfg(unix)]
 fn e9_flush_probe_foreign_tail_surfaces_in_next_row_print_not_flush() {
     use std::io::Write;
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_flush_probe_child("interleave");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, "Q290-RQ5 PRINTED", "interleave child");
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-RQ5 PRINTED",
+        "interleave child",
+    );
     let text = read_row_then_close(&mut child, "Q290-RQ5 row\n", "row reached the pipe");
+    drop(spawn_guard); // the row-observed close is done
     let tail_at = text
         .find("Q290-RQ5 foreign tail")
         .expect("the foreign tail must reach the pipe");
@@ -2182,13 +2442,17 @@ fn e9_flush_probe_foreign_tail_surfaces_in_next_row_print_not_flush() {
         .expect("child stdin")
         .write_all(b"go\n")
         .expect("release the gate");
-    wait_for_marker(
+    wait_for_marker_with_child(
         &stderr_text,
+        &stderr_timeline,
+        &mut child,
         "Q290-RQ5 FLUSH=Ok(())",
         "interleave target flush",
     );
-    wait_for_marker(
+    wait_for_marker_with_child(
         &stderr_text,
+        &stderr_timeline,
+        &mut child,
         "failed printing to stdout",
         "interleave second print",
     );
@@ -2240,6 +2504,9 @@ fn e8_report_site_child() {
                     .expect("read the gate line");
                 assert_eq!(gate, "go");
             }
+            // Premise observability: the parent closed stdout before the gate
+            // line; the canary must see the break (require_broken_sink).
+            require_broken_sink(true);
             let reader_spawned = Rc::new(Cell::new(false));
             let flag = reader_spawned.clone();
             let result = catch_unwind(AssertUnwindSafe(|| {
@@ -2271,6 +2538,22 @@ fn e8_report_site_child() {
             // happen-after the break (no scheduling premise).
             let start_reader = |input: HostInput, reader_handle: PlaybackSessionHandle| {
                 witness(true, E9_ARMED);
+                // Premise observability for the broken arm only (the healthy
+                // control never has a close to verify): park at the gate the
+                // parent releases only AFTER closing stdout, then OBSERVE the
+                // break before arming the reader (require_broken_sink).
+                if site == "site6" {
+                    use std::io::BufRead as _;
+                    witness(true, GATE_READY);
+                    let gate = std::io::stdin()
+                        .lock()
+                        .lines()
+                        .next()
+                        .expect("the parent's gate line")
+                        .expect("read the gate line");
+                    assert_eq!(gate, "go");
+                    require_broken_sink(true);
+                }
                 spawn_reader(input, reader_handle);
             };
             let result = catch_unwind(AssertUnwindSafe(|| {
@@ -2306,6 +2589,12 @@ fn e8_report_site_child() {
                     .expect("the parent's gate line")
                     .expect("read the gate line");
                 assert_eq!(gate, "go");
+            }
+            // Premise observability for the broken arm only: the parent
+            // closed stderr before the gate line; the canary must see the
+            // break (require_broken_sink).
+            if !control {
+                require_broken_sink(false);
             }
             let handle = assembled.start.handle.clone();
             let result = catch_unwind(AssertUnwindSafe(|| {
@@ -2409,10 +2698,20 @@ fn spawn_e8_child(site: &str) -> std::process::Child {
 #[test]
 #[cfg(unix)]
 fn e8_site4_source_playing_rows_panic_skip_disposal_on_broken_stdout() {
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_e8_child("site4");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, E9_ARMED, "site4 child");
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        E9_ARMED,
+        "site4 child",
+    );
     drop(child.stdout.take()); // break stdout AFTER the marker, BEFORE the rows
+    drop(spawn_guard); // close done
+    let closed_at = std::time::Instant::now();
     use std::io::Write as _;
     child
         .stdin
@@ -2420,10 +2719,21 @@ fn e8_site4_source_playing_rows_panic_skip_disposal_on_broken_stdout() {
         .expect("site4 child stdin")
         .write_all(b"go\n")
         .expect("write the gate line");
-    wait_for_marker(&stderr_text, "Q290-E8-SITE4-UNWIND", "site4 witnesses");
+    let gate_at = std::time::Instant::now();
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-E8-SITE4-UNWIND",
+        "site4 witnesses",
+    );
     let status = bounded_wait(&mut child, "site4");
     let stderr = finish_text(stderr_thread, stderr_text, "site4 stderr");
-    assert!(stderr.contains("Q290-E8-SITE4-UNWIND=1"), "{stderr}");
+    assert!(
+        stderr.contains("Q290-E8-SITE4-UNWIND=1"),
+        "close Instant={closed_at:?} gate Instant={gate_at:?} (CLOCK_MONOTONIC, comparable \
+         with the child's first-chunk absolute Instant)\n{stderr}"
+    );
     assert!(
         stderr.contains("Q290-E8-SITE4-DISPOSED=0"),
         "the unwind must skip the attempted root's disposal\n{stderr}"
@@ -2451,21 +2761,49 @@ fn e8_site4_source_playing_rows_panic_skip_disposal_on_broken_stdout() {
 #[test]
 #[cfg(unix)]
 fn e8_site6_final_reports_panic_skip_only_later_reports_on_broken_stdout() {
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_e8_child("site6");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, E9_ARMED, "site6 child");
-    drop(child.stdout.take()); // break stdout before the final reports
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        E9_ARMED,
+        "site6 child",
+    );
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        GATE_READY,
+        "site6 gate",
+    );
+    drop(child.stdout.take()); // break stdout while the child parks at the gate
+    let closed_at = std::time::Instant::now();
+    drop(spawn_guard); // close done
     use std::io::Write as _;
     child
         .stdin
         .as_mut()
         .expect("site6 child stdin")
-        .write_all(b"stop\n")
-        .expect("write the stop line");
-    wait_for_marker(&stderr_text, "Q290-E8-SITE6-UNWIND", "site6 witnesses");
+        .write_all(b"go\nstop\n")
+        .expect("write the gate and stop lines");
+    let gate_at = std::time::Instant::now();
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-E8-SITE6-UNWIND",
+        "site6 witnesses",
+    );
     let status = bounded_wait(&mut child, "site6");
     let stderr = finish_text(stderr_thread, stderr_text, "site6 stderr");
-    assert!(stderr.contains("Q290-E8-SITE6-UNWIND=1"), "{stderr}");
+    assert!(
+        stderr.contains("Q290-E8-SITE6-UNWIND=1"),
+        "close Instant={closed_at:?} gate Instant={gate_at:?} (CLOCK_MONOTONIC, comparable \
+         with the child's first-chunk absolute Instant)\n{stderr}"
+    );
     assert!(
         stderr.contains("Q290-E8-SITE6-DISPOSED=1"),
         "disposal must have completed BEFORE the panicked report\n{stderr}"
@@ -2481,6 +2819,7 @@ fn e8_site6_final_reports_panic_skip_only_later_reports_on_broken_stdout() {
     assert_eq!(status.code(), Some(0));
 
     // Sight control: the same child with a healthy sink.
+    let _control_guard = test_spawn_lock();
     let mut control = spawn_e8_child("site6-control");
     let (stdout_thread, stdout_text) =
         shared_capture(control.stdout.take().expect("control stdout"));
@@ -2511,10 +2850,20 @@ fn e8_site6_final_reports_panic_skip_only_later_reports_on_broken_stdout() {
 #[test]
 #[cfg(unix)]
 fn e8_site7_notestablished_report_panic_skips_disposal_on_broken_stderr() {
+    let spawn_guard = test_spawn_lock();
     let mut child = spawn_e8_child("site7");
-    let (stdout_thread, stdout_text) = shared_capture(child.stdout.take().expect("child stdout"));
-    wait_for_marker(&stdout_text, E9_ARMED, "site7 child");
+    let (stdout_thread, stdout_text, stdout_timeline) =
+        capture(child.stdout.take().expect("child stdout"));
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        E9_ARMED,
+        "site7 child",
+    );
     drop(child.stderr.take()); // break stderr AFTER the marker, BEFORE the report
+    drop(spawn_guard); // close done
+    let closed_at = std::time::Instant::now();
     {
         use std::io::Write as _;
         child
@@ -2524,11 +2873,22 @@ fn e8_site7_notestablished_report_panic_skips_disposal_on_broken_stderr() {
             .write_all(b"go\n")
             .expect("write the gate line");
     }
+    let gate_at = std::time::Instant::now();
     drop(child.stdin.take());
-    wait_for_marker(&stdout_text, "Q290-E8-SITE7-UNWIND", "site7 witnesses");
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        "Q290-E8-SITE7-UNWIND",
+        "site7 witnesses",
+    );
     let status = bounded_wait(&mut child, "site7");
     let stdout = finish_text(stdout_thread, stdout_text, "site7 stdout");
-    assert!(stdout.contains("Q290-E8-SITE7-UNWIND=1"), "{stdout}");
+    assert!(
+        stdout.contains("Q290-E8-SITE7-UNWIND=1"),
+        "close Instant={closed_at:?} gate Instant={gate_at:?} (CLOCK_MONOTONIC, comparable \
+         with the child's first-chunk absolute Instant)\n{stdout}"
+    );
     assert!(
         stdout.contains("Q290-E8-SITE7-DISPOSED=0"),
         "the report panic must skip the attempted root's disposal\n{stdout}"
@@ -2537,6 +2897,7 @@ fn e8_site7_notestablished_report_panic_skips_disposal_on_broken_stderr() {
     assert_eq!(status.code(), Some(0));
 
     // Sight control: healthy stderr — the exact report line, disposal, exit 1.
+    let _control_guard = test_spawn_lock();
     let mut control = spawn_e8_child("site7-control");
     let (stdout_thread, stdout_text) =
         shared_capture(control.stdout.take().expect("control stdout"));
@@ -2579,6 +2940,7 @@ fn e8_site7_notestablished_report_panic_skips_disposal_on_broken_stderr() {
 #[test]
 #[cfg(unix)]
 fn e8_site1_help_broken_stdout_pipe_exits_101_at_the_usage_site() {
+    let _spawn_guard = super::test_spawn_lock();
     let bin = real_binary("qianqian-headless");
     let mut child = std::process::Command::new("sh")
         .arg("-c")
@@ -2605,6 +2967,7 @@ fn e8_site1_help_broken_stdout_pipe_exits_101_at_the_usage_site() {
 #[test]
 #[cfg(unix)]
 fn e8_site1_version_broken_stdout_pipe_exits_101_at_the_version_site() {
+    let _spawn_guard = super::test_spawn_lock();
     let bin = real_binary("qianqian-headless");
     let mut child = std::process::Command::new("sh")
         .arg("-c")
@@ -2625,6 +2988,7 @@ fn e8_site1_version_broken_stdout_pipe_exits_101_at_the_version_site() {
 #[test]
 #[cfg(unix)]
 fn e8_site1_argument_error_broken_stderr_pipe_exits_101_at_the_error_site() {
+    let _spawn_guard = super::test_spawn_lock();
     let bin = real_binary("qianqian-headless");
     let mut child = std::process::Command::new("sh")
         .arg("-c")
@@ -2651,6 +3015,7 @@ fn e8_site1_argument_error_broken_stderr_pipe_exits_101_at_the_error_site() {
 #[test]
 #[cfg(unix)]
 fn e8_site1_healthy_sinks_pin_the_report_rows_for_attribution() {
+    let _spawn_guard = super::test_spawn_lock();
     let bin = real_binary("qianqian-headless");
     let help = std::process::Command::new(&bin)
         .arg("--help")
