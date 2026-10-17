@@ -1548,9 +1548,11 @@ Surviving evidence, scoped honestly:
     `290-r2-flushprobe/`): e9_flush_probe 4/4 green
     (flushprobe-v2-first-run.log), machine_input module 45/45
     (module-machine_input-full.log), mutant kills PA/PB
-    (mutant-PA-no-second-print.log / mutant-PB-newline-tail.log); CI
-    receipts for the committed tests will ride the repair tip's Linux lane
-    (cfg(unix)) and are to be recorded here once green.
+    (mutant-PA-no-second-print.log / mutant-PB-newline-tail.log); CI receipts:
+    the repair tip 1c62399's Linux lane PASS (Rust Regression run
+    39046043339, all four e9_flush_probe tests green in the workspace suite)
+    and the windows-latest lane PASS (Windows Compile Gate run 39046043276;
+    cfg(unix) probes excluded there by declaration, §14.8.6).
 ```
 
 The lost raw logs are not claimed as verification anywhere; each §14.8 claim

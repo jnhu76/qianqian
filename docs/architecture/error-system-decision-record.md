@@ -393,9 +393,9 @@ Repair note: the round's v1 scratch probe was withdrawn at this point by the
 owner's P1 review (2026-10-17) — its PA/interleave arms flushed explicitly
 before the observed flush and its PA-2 control ran on a different process's
 sink, so its Ok observations were non-discriminating (§14.8.3). The v2 probe
-is committed tests (`e9_flush_probe_*`, cfg(unix)), to be CI-executed by the
-repair tip's Linux lane; the instrument no longer depends on this record's
-transcription.
+is committed tests (`e9_flush_probe_*`, cfg(unix)), CI-executed green by the
+repair tip's Linux lane (run 39046043339 at 1c62399, §14.8.8-g); the
+instrument no longer depends on this record's transcription.
 
 Scope: Linux pipe + regular-file probes; terminal NOT_RUN (no tty in the
 harness; the interop console proxy is a pipe — §14.5/§14.7); std EBADF
