@@ -1,6 +1,6 @@
 # Error-system directed evidence and A/B reconciliation (#231, #280)
 
-> **Truth class: INVESTIGATION RECORD / DESIGN INPUT. NOT AUTHORITY. NOT IMPLEMENTED.**
+> **Truth class: INVESTIGATION RECORD / DESIGN INPUT. NOT AUTHORITY.**
 > **Evidence anchor (frozen read tree):** `SOURCE_BASE_SHA = 5e60da4c3bd5f0fa93b4215670f4e898e2ac844e`
 > (= PR #280 HEAD at round start = `INITIAL_DOCUMENT_HEAD_SHA`; production sources byte-identical
 > to `main@524c6efeeabcfc94ceaf8e9cf1392e88861288c3`).
@@ -12,6 +12,30 @@
 > no test, binary, device or fault-injection run. Companion documents:
 > [target contracts](error-system-target-contract.md),
 > [migration/acceptance](error-system-migration.md), [R0 contract](error-disposition-contract.md).
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = frozen directed-evidence / A-B reconciliation record
+>                                     (unified boundary ledger, GAP re-verification,
+>                                     NEEDS_RUNTIME_EVIDENCE registry)
+> DOCUMENT_AUTHORITY                = UNCHANGED: INVESTIGATION_RECORD / NOT_NORMATIVE_AUTHORITY
+>                                     (the unified ledger in §4 remains the current fact
+>                                     authority for the frozen baseline it describes)
+> ORIGINAL_BASELINE                 = 5e60da4c frozen read tree; every file:line anchor in
+>                                     the body is that tree and was NOT rewritten
+> CURRENT_IMPLEMENTATION_REFERENCE  = the target designs this record fed are implemented
+>                                     in defined scope by PR #287 (merged b86a9ce
+>                                     2026-10-16); index = error-system-implementation-record.md
+> CURRENT_ACCEPTANCE_BOUNDARY       = executed evidence Linux-only; Windows runtime
+>                                     acceptance pending #288; the NEEDS_RUNTIME_EVIDENCE
+>                                     registry rows keep their own carriers (#288/#289/#290)
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676))
+> UNRESOLVED_OWNER_DECISIONS        = D-4/D-5/D-7/D-9/D-11 unchanged; D-C #289; D-D #290
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
 
 This document answers four questions the two scans left open or conflicting:
 

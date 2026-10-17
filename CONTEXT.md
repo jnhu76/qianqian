@@ -524,10 +524,10 @@ all are mounted by K0 as Fibers
 
 This is why the old “Playback Session is Component but not Plugin” taxonomy was corrected (Issue #138 basis; PBK-002 D12) without a production runtime redesign.
 
-## Error-system design round status (derived projection; routing in docs/README.md)
+## Error-system status (derived projection; routing in docs/README.md)
 
-The #231/#280/#283 error-system line is a DESIGN_CANDIDATE track, not
-authority and not implemented:
+The #231/#280/#283 error-system line remains a DESIGN_CANDIDATE track — not
+authority — but its main mechanisms are now implemented in a defined scope:
 
 ```text
 frozen facts + boundary ledger -> docs/architecture/error-system-reconciliation.md
@@ -536,7 +536,31 @@ migration + acceptance designs -> docs/architecture/error-system-migration.md
 decision record (A–J directions,
 recommendations, amendment
 candidates, pending evidence)  -> docs/architecture/error-system-decision-record.md
+implementation + evidence      -> docs/architecture/error-system-implementation-record.md
 ```
+
+Current state (2026-10-17):
+
+```text
+PR #284 — DESIGN ROUND MERGED (79c6d78, 2026-10-16)
+PR #287 — IMPLEMENTATION MERGED (b86a9ce, 2026-10-16; four owner review rounds)
+ISSUE #283 — AUDIT CLOSED (2026-10-17; CLOSE_AUDIT_WITH_TRANSFERRED_DEBT)
+
+DG-1..DG-4c — LANDED IN DEFINED SCOPE (implementation record; the design docs
+              stay DESIGN_CANDIDATE — implementation is not promotion)
+E-1 / E-3   — EXECUTED ON LINUX
+WINDOWS_RUNTIME — ACCEPTANCE_PENDING (#288)
+F5 D-C      — OWNER_RULING_PENDING (#289)
+E-9 / D-D   — PENDING (#290)
+D-2 / D-10  — RATIFIED 2026-10-17 (D-2 option a adapter diagnostic retention;
+              D-10 carrier B verdict-borne reason; PBK-003 §5 terminal-evidence
+              diagnostic-attachment clarification + songcore binding note applied
+              by the same ruling; receipt: PR #291 owner decision record)
+```
+
+--- Historical design-round record (PR #284; kept because it explains why the
+landed mechanisms have their shape; superseded as CURRENT status by the block
+above):
 
 2026-10-16 round (BASE e44aa80): CC-2 gate wiring landed (F5 TLA now triggers
 the formal gate; the f5-implementation mutation gate runs in CI as the

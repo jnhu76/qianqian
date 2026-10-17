@@ -1,6 +1,9 @@
 # Error disposition contract — design candidate (#231)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.** The candidate reasoning,
+> stage matrix and firewall below propose; they do not govern. Parts of the
+> companion target contracts have since been implemented (status block below);
+> that fact promotes nothing on this page to authority.
 > **Evidence anchor:** `main@524c6efeeabcfc94ceaf8e9cf1392e88861288c3` (2026-10-15).
 > **Review status:** revised after the prior static review (owner-attributed to "Astra" in
 > the PR #280 owner comment of 2026-10-15; the reviewer's identity and independence are not
@@ -8,6 +11,29 @@
 > incorporated; repeat review pending; no owner adoption.
 > **Scope:** #231 error provenance, stage-local handling, escalation and diagnostic requirements.
 > **Explicitly out of scope:** #277 Failed auto-advance decision; changes to existing ADRs, public API, SongCore ABI, implementation, or tests.
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = R0 design candidate (four-dimension reasoning,
+>                                     stage-local disposition matrix, §6 logging firewall)
+> DOCUMENT_AUTHORITY                = UNCHANGED: DESIGN_CANDIDATE / NOT_NORMATIVE_AUTHORITY
+>                                     (implementation existing does not promote this page)
+> ORIGINAL_BASELINE                 = 524c6ef (2026-10-15); R0 conclusions preserved as history
+> CURRENT_IMPLEMENTATION_REFERENCE  = PR #287 merged b86a9ce 2026-10-16 — the §6 firewall
+>                                     sites are realized by the host diagnostic outlet; index
+>                                     = error-system-implementation-record.md
+> CURRENT_ACCEPTANCE_BOUNDARY       = executed evidence Linux-only; Windows runtime
+>                                     acceptance pending #288; F5 D-C ruling #289; E-9/D-D #290
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt PR #291 comment 6229433676)
+> UNRESOLVED_OWNER_DECISIONS        = D-4/D-5/D-7/D-9/D-11 and #277 unchanged; every
+>                                     §3/§4 NOT_EARNED recovery admission remains
+>                                     unimplemented and forbidden
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527)
+> (closed 2026-10-17, `CLOSE_AUDIT_WITH_TRANSFERRED_DEBT`).
 
 This document is a candidate decision record, not a new source of semantics. Where a
 sentence describes current behavior, its authority is the code or accepted ADR

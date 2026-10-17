@@ -1,7 +1,14 @@
 # Error-system target contracts (#231, #280)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
-> Every goal below is a **candidate obligation**. Nothing here changes D11, D14.*, U2,
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.** This file keeps its
+> original design-candidate document identity. Whether any specific goal below
+> has been ADOPTED is settled by formal owner decisions and ACCEPTED authority —
+> never by this file, and never by an implementation existing. The ratified
+> scopes of D-2 (T1-1/T1-2) and D-10 (T2-5) are recorded in
+> [error-system-decision-record.md](error-system-decision-record.md) §6; every
+> other goal below remains a **candidate obligation** and does not auto-promote
+> because the DG-1..DG-4c mechanisms have implementations. Nothing in this file
+> changes D11, D14.*, U2,
 > the SongCore ABI, K0 semantics, or any accepted document; merging or reviewing this file
 > authorizes no implementation and adopts no policy. Where a goal would change frozen
 > behavior or accepted authority, it is marked `AUTHORITY-AMENDMENT-REQUIRED` and its
@@ -10,6 +17,28 @@
 > **Evidence basis:** the frozen facts in
 > [error-system-reconciliation.md](error-system-reconciliation.md) (R1) at
 > `5e60da4c3bd5f0fa93b4215670f4e898e2ac844e`; scans #281/#282; #231 audit + erratum.
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = six-module target contracts + DG-1..DG-4c designs
+> DOCUMENT_AUTHORITY                = UNCHANGED: DESIGN_CANDIDATE / NOT_NORMATIVE_AUTHORITY
+>                                     (LANDED per-goal notes record implementation facts,
+>                                     not adoption of the candidate obligations)
+> ORIGINAL_BASELINE                 = 5e60da4c evidence basis; DG designs BASE e44aa80
+> CURRENT_IMPLEMENTATION_REFERENCE  = DG-1..DG-4c LANDED in defined scope by PR #287
+>                                     (merged b86a9ce 2026-10-16); per-goal status notes
+>                                     sit under each DG heading; index =
+>                                     error-system-implementation-record.md
+> CURRENT_ACCEPTANCE_BOUNDARY       = LANDED is not accepted: executed evidence Linux-only;
+>                                     Windows runtime acceptance pending #288; goals outside
+>                                     the DG scope remain unimplemented candidates
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt PR #291 comment 6229433676)
+> UNRESOLVED_OWNER_DECISIONS        = D-4/D-5/D-7/D-9/D-11 unchanged and open
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
 
 ## 0. How to read a goal
 
@@ -1204,11 +1233,11 @@ change.
 
 | ID | Question | Options | Recommendation (non-binding) |
 |---|---|---|---|
-| D-2 | Probe diagnostic read (T1-2) | (a) adopt one-line read; (b) leave as recorded loss | (a) — cheapest confirmed-loss fix, no contract touch |
-| D-3 | Cone write-failure isolation (T5-4) | (a) narrow corrective now (non-panicking writer on ledger rows #8/#9/#10 — **partial**: removes panic escalations, full-pipe blocking remains until the framework); (b) fold into future logging work; (c) leave as documented hazard | (a) — disposition-contract §6 already anticipates "a separate, minimal corrective"; independent of framework choice; the residual blocking must be stated in the landing PR, not silently dropped |
+| D-2 | Probe diagnostic read (T1-2) | (a) adopt one-line read; (b) leave as recorded loss | (a) — cheapest confirmed-loss fix, no contract touch. **Decision (2026-10-17)**: RATIFIED_OPTION_A — option (a) landed as DG-3 shape (a) via #287 and ratified by the owner (receipt [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676); decision-record §6.1) |
+| D-3 | Cone write-failure isolation (T5-4) | (a) narrow corrective now (non-panicking writer on ledger rows #8/#9/#10 — **partial**: removes panic escalations, full-pipe blocking remains until the framework); (b) fold into future logging work; (c) leave as documented hazard | (a) — disposition-contract §6 already anticipates "a separate, minimal corrective"; independent of framework choice; the residual blocking must be stated in the landing PR, not silently dropped. **Implementation state (2026-10-17)**: resolved in substance via direction H + #287 (DG-1 absorbs the three sites); acceptance rides #288 A4 |
 | D-4 | DRAIN_CAP semantics (C-8) | (a) keep as OPEN resolver tuning; (b) amendment defining slow-drain evidence class | (a) until E-5 runtime data exists; any (b) is an AI-7-space authority act; E-5 supplies the datum, not the verdict |
 | D-5 | Superseded-fatal witness (T3-1) | (a) adopt diagnostic witness — requires an ABI/SongCore mechanism amendment FIRST (currently unobservable across the ABI, R1.1); (b) accept silent supersession as ABI-coherent | (b) first — the latch belongs to the replaced continuation; (a) must price the ABI change, not assume a local read that does not exist |
 | D-7 | Panic-in-teardown-inverse handling | (a) K0 authority review of catch→Violated at dispose boundary; (b) keep crash-propagation, document it | (b) first (honest, cheap), (a) only if owner wants process survivability |
 | D-9 | "Concrete consumer" bar (C-6) | (a) presentation obligations count (name the surface, the failure mode it must explain, and why the local path cannot); (b) require programmatic consumers (diagnostic-only fields wait) | owner ruling; gates T1-3 applications incl. T2-5's exposure question. R1.1: the bar is obligation-based — consumer syntax (`format!` vs code) is not the discriminator |
-| D-10 | Output reason snapshot carrier (T2-5) | (a') session-owned cell handed off as a `RenderRequest` field (audio-api-typed, the `level`/`position` pattern), read session-internally; (b) parameter on the `drain.complete`-adjacent delivery API | both carriers cross the backend-neutral port crate (R1.1 path drawing) — the genuine open sub-question is observation-surface exposure (T1-3/D-9), not "port vs no port"; migration §3.4's interpretation note applies either way |
+| D-10 | Output reason snapshot carrier (T2-5) | (a') session-owned cell handed off as a `RenderRequest` field (audio-api-typed, the `level`/`position` pattern), read session-internally; (b) parameter on the `drain.complete`-adjacent delivery API | both carriers cross the backend-neutral port crate (R1.1 path drawing) — the genuine open sub-question is observation-surface exposure (T1-3/D-9), not "port vs no port"; migration §3.4's interpretation note applies either way. **Decision (2026-10-17)**: RATIFIED_CARRIER_B — carrier (b) landed via #287 (the reason rides INSIDE the `DrainVerdict::Aborted` value on the existing completion seam; see the §DG-2 status note) and ratified by the owner, together with the PBK-003 §5 minimal clarification adopted from migration §3.4's candidate text (receipt [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676); decision-record §6.2/§6.3) |
 | D-11 | Exit-code refinement | already #231 open question; unchanged | defer |

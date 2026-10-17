@@ -1,12 +1,38 @@
 # Error-system migration and acceptance (#231, #280)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.**
 > This file plans how the candidate goals in
 > [error-system-target-contract.md](error-system-target-contract.md) would be
 > adopted, what would break, and what evidence each adoption would owe. It performs no
 > migration, changes no authority, and approves nothing. Baseline:
 > `5e60da4c3bd5f0fa93b4215670f4e898e2ac844e` (facts in
 > [error-system-reconciliation.md](error-system-reconciliation.md)).
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = per-boundary migration + acceptance-by-nature plan
+> DOCUMENT_AUTHORITY                = UNCHANGED: DESIGN_CANDIDATE / NOT_NORMATIVE_AUTHORITY
+> ORIGINAL_BASELINE                 = 5e60da4c facts; plan text frozen at the PR #280 round
+> CURRENT_IMPLEMENTATION_REFERENCE  = the migrations whose goals landed via PR #287 (merged
+>                                     b86a9ce 2026-10-16) are indexed, with the actual
+>                                     deletions/replacements, in
+>                                     error-system-implementation-record.md §1/§3; this
+>                                     plan's own "Current" columns still describe the
+>                                     pre-implementation baseline and were NOT rewritten
+> CURRENT_ACCEPTANCE_BOUNDARY       = Windows acceptance designs pending #288; the §7.6 F5
+>                                     obligations pending the D-C ruling #289
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt PR #291 comment 6229433676). The §3
+>                                     conditional texts those rulings adopted are now
+>                                     applied: §3.4 as the PBK-003 §5 minimal
+>                                     clarification, §3.5 as the binding note in
+>                                     songcore-binding-architecture §6.2
+> UNRESOLVED_OWNER_DECISIONS        = §3.2/§3.3 candidates keep their own triggers
+>                                     (C-9 / D-4); D-4/D-5/D-7/D-9/D-11 unchanged
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
 
 ## 1. Per-boundary migration matrix
 
@@ -339,12 +365,26 @@ or parameter is introduced, and the observer signature is unchanged. The note's
 trigger and conditionality are unchanged; only the concrete shape reference is
 recorded.
 
+2026-10-17 implementation note: carrier B is now the LANDED shape (PR #287, `b86a9ce`
+— `DrainVerdict::Aborted { reason: Option<AbortReason> }`, 512-byte cap, backend-neutral
+`OutputAbortClass`). 2026-10-17 owner ruling: D-10 = RATIFIED_CARRIER_B and this
+candidate note is ADOPTED as the PBK-003 §5 minimal clarification (applied verbatim in
+substance as an Amendment note under TERMINAL EVIDENCE; receipt
+[PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676),
+decision-record §6.2/§6.3). This section remains the historical candidate record; the
+normative home of the adopted text is now ADR-PBK-003 §5.
+
 ### 3.5 NOTE-LEVEL — songcore-binding-architecture
 
 If T1-1/T1-2 are adopted, add one paragraph to the binding-class notes: "the reference
 Rust binding retains typed status/native_code internally for diagnostics; this is a
 binding-internal realization choice, not a binding-parity obligation; the canonical ABI
-(songcore.h) is unchanged." No authority hierarchy change.
+(songcore.h) is unchanged." No authority hierarchy change. (2026-10-17: T1-1/T1-2
+substance landed via #287, and the D-2 ruling — RATIFIED_OPTION_A, receipt
+[PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676) —
+adopts this note; it is applied in songcore-binding-architecture §6.2 as the
+binding-internal-retention note plus two classified table rows. This section remains
+the historical candidate record.)
 
 ### 3.6 K0 documents — intentionally not drafted
 
