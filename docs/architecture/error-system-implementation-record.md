@@ -803,3 +803,290 @@ Two fresh-context re-reviewers ran against 2a516bf after the §13.6 fixes.
      for the pre-existing benign family where LegObserve* records
      drainVerdict after settlement (inert in-model; TerminalCommit is
      gated on the unsettled outcome).
+
+---
+
+## 14. Machine stdout/stderr failure conformance round (#290, 2026-10-17) — E-9 three modes + E-8 main-thread report sites
+
+> **Truth class: EVIDENCE RECORD for issue #290. NOT authority; ratifies nothing.**
+> BASE_SHA `6a9b05101022ac8534dc1da791eda5f3a12a1a4a` (all line anchors below verified
+> at this SHA). Branch `evidence/machine-stdout-conformance-290`. Scope: verify the
+> EXISTING documented host-failure classes (T5-7; playback-execution-model D3/D5 §4.8;
+> migration §1.7 two-class split; reconciliation §8 E-8/E-9) against runtime reality,
+> and produce the D-D owner decision package. **PRODUCTION_BEHAVIOR_CHANGE = NONE;
+> D11/K0/ABI/ADR changes = NONE.** D-D Option A product work (if any) is a separate
+> owner-authorized PR; this round freezes scenarios first (§14.1–14.6), then records
+> results (§14.8) against them.
+
+### 14.1 SOURCE_DAG — reader status stdout (one admitted operation)
+
+```text
+physical stdin read            read_input machine_input.rs:317-319 (catch #R-read at :319)
+  ↓ read Ok(line)
+input.line(line, handle, out)  machine_input.rs:322
+  ↓ admit() :114               operation_active=true under bookkeeping mutex (None ⇒ admission closed ⇒ drop the line)
+  ↓ catch #R-dispatch :119     covers parse + command dispatch + format_status + output closure
+  ↓   Status ⇒ output(Stdout, format_status(observe))   :131-134
+  ↓     output closure         spawn_reader :269-278
+  ↓       Stdout ⇒ print!("{line}") :273;  let _ = io::stdout().flush() :274
+  ↓       Stderr ⇒ eprintln!("{line}") :276
+  ↓ catch is_err ⇒ operation.fail(HostFailure::Panic, handle) :142-145; line returns false ⇒ reader exits
+operation.fail ⇒ fail_with_response :166-174
+  ↓ record first_failure (get_or_insert, under mutex)   :171   ← RECORD precedes RESPONSE
+  ↓ response :160-162: if handle.observe().terminal_outcome.is_none() ⇒ handle.request_stop()
+Operation::drop :177-183       operation_active=false + notify  ← ACK after record+response
+  ↓ (reader loop exited; read_input returned)
+entry finish_episode           entry.rs:548-579
+wait_terminal :553 → dispose :554 → HostInput::seal :559
+  seal :84-100: admission_closed=true → condvar-wait !operation_active (ACK) → read first_failure
+  → report(Stderr, failure.report()) :561 → outcome_report :563-566 → machine_exit_code(host_failed⇒1) :574-578
+```
+
+Boundary answers (Phase-A questions):
+
+1. `print!` is covered by catch **#R-dispatch** (machine_input.rs:119), inside its
+   admitted operation.
+2. `HostFailure::Panic` is recorded at :143 (dispatch/output unwind), :296 (catch
+   #R-outer over the whole reader closure), :331 (read unwind).
+3. The conditional `request_stop()` runs at :160-162 — only when the observation shows
+   no committed terminal; a racing terminal makes the existing command inert.
+4. Yes — `Operation::drop` (the ack) runs when `line()` returns, which is after
+   `fail()` (record + response) completed; the condvar wait in `seal` observes it.
+5. `seal` closes admission, then waits on the completion condvar until
+   `operation_active == false`, then reads `first_failure` under the same mutex
+   (:84-100) — the result linearization point.
+6. A blocked/blocked-forever output sink stalls the reader INSIDE the admitted
+   operation (`print!`/`flush`/`eprintln!` do not return) ⇒ the Operation never drops
+   ⇒ `seal` waits at :87-93 indefinitely ("an active output effect can delay seal",
+   module doc machine_input.rs:4; ledger #5).
+7. Yes — `let _ = io::stdout().flush()` at :274 discards the flush result entirely: no
+   record, no Stop, no exit contribution, no report. It bypasses the HostFailure path
+   completely (the D-D subject).
+8. No. The panic hook (install_panic_hook_posture :217-244) runs BEFORE
+   catch_unwind and only performs diagnostic bookkeeping (class-α suppression /
+   previous-hook chaining); classification is owned by the catchers. It cannot change
+   a category.
+9. Failure admitted before seal ⇒ first_failure fixed at seal ⇒ exit 1 regardless of
+   the genuine terminal (machine_exit_code :160-170). Terminal committed before the
+   failure response ⇒ Stop arm inert, outcome keeps its D11 class. Failure arriving
+   after admission closure ⇒ `failure()`/`line()` admission returns None ⇒ discarded
+   without effect (:102-106, :114-115).
+
+### 14.2 CATCH_BOUNDARY_MAP
+
+| Catch | Covers | On unwind |
+|---|---|---|
+| #R-read :319 | one physical `read_line` | `failure(HostFailure::Panic)` :330-333 ⇒ record + conditional Stop (admits a fresh operation) |
+| #R-dispatch :119 | parse + dispatch + `format_status` + output closure (incl. `print!`, `flush`, `eprintln!`) | `operation.fail(HostFailure::Panic)` :143 ⇒ record → conditional Stop → (drop ⇒ ack) ⇒ reader exits |
+| #R-outer :295 | the entire reader closure | `failure(HostFailure::Panic)` :296 |
+| hook (process-wide, :217-244) | nothing semantic | class-α threads: `note_critical_panic()` only; others chain to previous hook |
+| main thread | **no catch** | unwind out of `run()` ⇒ process exit 101 (no `panic=abort`; Rust ignores SIGPIPE ⇒ closed pipes yield EPIPE write errors, not signal death). A closed stdio fd (EBADF) is deliberately swallowed by Rust std (pretends success) on Unix and Windows — a closed HANDLE never panics `print!`; only a real write error to an open descriptor does |
+
+### 14.3 HOST_FAILURE_ORDER_MAP (admitted operation)
+
+```text
+admit (:114) → work → [unwind ⇒ record :171 → response :160-162] → drop/ack :177-183 →
+owner seal: close admission → wait ack → read first_failure → reports → exit contribution
+```
+
+Physical reads are outside admission (:305-309); post-closure events are inert;
+first-failure is FIRST-WINS and bounded (one `Option<HostFailure>`).
+
+### 14.4 REPORT_SITE_INVENTORY (E-8 scope, re-verified at 6a9b051)
+
+Corrects the stale claim that "#1–#3 run on Linux without playback": #2/#3 live inside
+`reference_player_transport`, which is `#[cfg(feature = "playback")]` (entry.rs:331-332).
+
+| # | Site (HEAD) | Thread / stage | Gate | Note |
+|---|---|---|---|---|
+| 1 | entry.rs:70 (`print!` usage), :74 (`println!` version), :102-103 (`eprintln!` arg error) | main, pre-episode | none | Linux-portable real-binary |
+| 2 | entry.rs:371-373 (`println!("scanning…")` + `let _ = flush()` :373 — second discarded flush) | main, reference pre-open | `playback` | not compiled without the feature |
+| 3 | entry.rs:378 fail-stop, :387 shell failed, :404 open refused, :406 activation failure, :414 expansion refusal | main, reference open/shell phase | `playback` | attempted root disposed only AFTER report on the failure-clean path (ledger #3) |
+| 4 | entry.rs:529-535 (`println! source:` / `println! playing {}`) | main, machine post-establishment, BEFORE reader spawn :538 | `any(playback, test)` | broken write ⇒ 101 skipping wait_terminal/dispose/seal/reader spawn |
+| 5 | machine_input.rs:269-278 | stdin reader, per command | always | **E-9 scope** (protocol row) |
+| 6 | entry.rs:561-573 via `emit_machine_report` :582-587 (machine; AFTER seal); entry.rs:392-397 (reference; after quit) | main, terminal/disposal/final reports | machine: `any(playback, test)`; reference: `playback` | panic skips LATER reports only (episode already disposed; D11 committed) |
+| 7 | entry.rs:515 (`eprintln!` activation report) — **precedes `dispose()` :516** | main, machine NotEstablished | `any(playback, test)` | report panic ⇒ unwind skips dispose (root leak — `QianqianApp` has no Drop teardown) |
+
+### 14.5 FEATURE_PLATFORM_MATRIX + evidence grades
+
+Environment facts established this round (probe logs in the round evidence archive):
+
+```text
+native/build/artifacts/libsongcore.a = Windows COFF (mingw) only; Linux ELF SongCore
+artifact NOT available in this environment; a Linux FFmpeg+SongCore rebuild is
+#172/#288 release-engineering territory and was NOT attempted to completion.
+⇒ no Linux playback-feature build (binary or test) can link here.
+
+x86_64-pc-windows-gnu cross-build with --features playback SUCCEEDS against the
+mingw artifact (target/x86_64-pc-windows-gnu/debug/qianqian{,-headless}.exe,
+PE32+, rustc 1.97.1). WSL2 interop RUNS the exe on the real Windows host:
+
+  ./qianqian.exe --version                                  ⇒ "qianqian 0.1.0", rc=0
+  ./qianqian.exe --machine play <real wav>                  ⇒ source:/playing rows,
+                                                              reader answered `status`,
+                                                              "EOF: played out completely",
+                                                              rc=0  (REAL WASAPI episode)
+  ./qianqian.exe --machine play C:\nonexistent\garbage.wav  ⇒ stderr
+                                                              "playback session failed to
+                                                              activate: decode open failed: …
+                                                              (os error 3)", rc=1, stdout empty
+  argv reference transport                                  ⇒ "scanning …" row + TUI rendered
+                                                              under interop piped stdio; the TUI
+                                                              does not terminate cleanly on a
+                                                              piped 'q' (no clean exit evidence)
+
+Interop limitation (probe-evidenced): the Windows-interop stdio proxy ABSORBS the
+exe's writes; closing the WSL-side reader does not fail the exe's writes (broken-pipe
+probe returned rc=0 through interop). A CLOSED handle (>&-) is swallowed by Rust std's
+EBADF guard on both platforms (Linux probe: rc=0, empty stderr) and additionally
+produces interop-layer noise ("write failed 22: Invalid argument" on stderr, not a
+Rust panic — interop artifact, not product evidence). ⇒ broken-pipe / full-pipe
+failure-mode experiments on the Windows exe require a native Windows console
+session (#288 host); they are NOT reproducible under interop.
+```
+
+Evidence grades used below:
+
+```text
+L2_REAL_BINARY      production binary, real assembly/runtime, real OS pipe choreography
+L1_TEST_TRANSPORT   real production dispatch/record/ack/seal/report code driven in a
+                    test-binary subprocess with a fixture episode; injection at the
+                    operation boundary only; real OS pipe choreography
+L2_STD_PROBE        std-only characterization probe (toolchain/OS behavior; no qianqian code)
+NOT_RUN(reason)     honestly not executed
+```
+
+### 14.6 BDD scenarios (frozen before implementation; results in §14.8)
+
+**B1 — reader stdout print failure** (E-9 mode 1)
+
+```text
+GIVEN   an established, unsettled episode; the reader operation admitted (:114)
+WHEN    the real status stdout protocol write fails ⇒ `print!` panics
+THEN    panic caught by #R-dispatch; HostFailure::Panic recorded FIRST (:171);
+        conditional request_stop routed to the unsettled episode (:160-162);
+        Operation ack after record+response (:177-183); seal waits ack then returns
+        Some(Panic); host exit 1 (machine_exit_code); D11 terminal NOT forged Failed
+        (real Stopped/Completed from genuine evidence); host-failure report text is
+        HostFailure::Panic.report() on stderr
+ORACLE  exit code, D11 outcome class, failure_diagnostic absence, seal value, report
+        lines — exact-value assertions, not permissive
+SIGHT CONTROL  same child with a HEALTHY stdout sink ⇒ normal completion + correct
+        rows (proves the pipe choreography does not itself create the failure)
+FALSIFIERS  (a) panic escaping the catch ⇒ reader-thread crash (exit 101 +
+        uncaught-panic stderr naming the reader thread); (b) silent diagnostic-style
+        drop ⇒ seal None + exit 0; (c) record after response/ack ⇒ seal_witness
+        snapshot ≠ 5 (existing M-F/M-S mutation class); (d) D11 forged Failed ⇒
+        outcome report "playback failed"
+```
+
+**B2 — reader stderr write failure** (E-9 mode 1, stderr arm)
+
+```text
+GIVEN   an admitted reader operation producing a real stderr diagnostic
+        ("ignored input: …" from an unparseable line, :139; "not wired yet", :135-138;
+        "cannot read seek time", :126-130)
+WHEN    that eprintln! write fails ⇒ panic
+THEN    same #R-dispatch contract as B1 (one admitted-operation failure contract;
+        migration §1.7: protocol write failure = host-operation failure)
+OBSERVED-SHAPE NOTE  the subsequent OWNER host-failure report targets the same broken
+        stderr (entry.rs:561 ⇒ emit_machine_report eprintln!) ⇒ main-thread panic ⇒
+        recorded exit 101 AFTER D11 committed — ledger #6 class ("skipping later
+        reports only"); this is the two-class boundary made observable and is
+        recorded verbatim, not normalized away
+```
+
+**B3 — flush-Err checkpoint** (E-9 mode 2; D-D subject)
+
+```text
+GIVEN   `print!` genuinely completed (write error-free) — never after a write panic
+WHEN    the explicit flush() at :274 would return Err
+THEN    record whether that state is reachable WITHOUT changing production output
+        shape (every reader stdout line is '\n'-terminated), the std writer, or
+        ordering
+CLASS LADDER (pre-registered; pick exactly one)
+        REAL_PRODUCTION_REPRODUCED     constructed on the production path as-is
+        INJECTED_WRITER_ONLY           only a non-production writer/shape constructs it
+        NOT_REPRODUCED_WITH_SCOPED_ASSUMPTIONS
+                                       not constructed; scope, attempts, toolchain,
+                                       uncovered cases stated
+        NOT_RUN                        not executed
+RESEARCH QUESTIONS (pre-registered)
+        RQ1 format_status return paths all end '\n'?      (status.rs:24-74)
+        RQ2 pinned toolchain Stdout buffering?            (std source + behavior)
+        RQ3 pipe/terminal/file differences?               (probe)
+        RQ4 after a successful print!, can the buffer still hold unflushed data?
+        RQ5 can another writer leave buffered data between print! and flush?
+            (single-writer discipline per transport phase — §14.1)
+        RQ6 is there a real independent error window without reshaping output?
+PROBE DESIGN (L2_STD_PROBE, std-only, no qianqian code)
+        PA newline-terminated: print!('\n'-terminated line) succeeds into a pipe;
+        parent closes read end; child flush() ⇒ if Ok, flush performed NO write
+        (a write would EPIPE); control: a second print! then MUST panic
+        PB no-newline tail (INJECTED shape): print! without '\n' stays buffered;
+        flush() performs the fd write ⇒ can Err while print! succeeded
+IN-REPO L1   output closure that swallows a flush-shaped Err exactly like :274 ⇒
+        line() returns true, no record, no Stop, seal None (current behavior is
+        INDIFFERENT to flush Err); negative control inside the same test: a
+        closure that PANICS ⇒ false + Panic recorded (proves the harness
+        distinguishes swallow from panic)
+```
+
+**B4 — blocked output** (E-9 mode 3)
+
+```text
+GIVEN   reader admitted; writing to a real sink that stops consuming
+WHEN    sink stays blocked
+THEN    reader stays inside its admitted operation; seal cannot complete; no
+        "reader joined" claim; no synthetic completion; after the sink releases the
+        real operation completes and classification is CORRECT (blocking is not a
+        failure: no record, no Stop, exit per genuine outcome)
+WATCHDOG  kill/timeout is safety equipment only; if it fires the result is
+        INCONCLUSIVE/BLOCKED, never PASS
+```
+
+**B5 — late output failure vs seal boundary**
+
+```text
+Covered by existing oracles (cited, executed again this round):
+  seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work  (retention + rejection)
+  admitted_output_panic_records_before_ack_even_during_seal                (ack ordering)
+  postseal_commands_reports_and_failures_are_inert                          (late events)
+  first_failure_storage_is_bounded_and_sealed_result_immutable              (first-failure cut)
+  preseal_failure_preserves_natural_completed_and_runtime_failed            (D11 immutability)
+```
+
+**B6 — main-thread broken pipe (E-8, per site)**
+
+```text
+GIVEN   the target report site's real execution path is reached (sight control:
+        healthy-sink run of the same site captures the exact report line first)
+WHEN    its stdout/stderr write hits a closed downstream pipe
+THEN    record the ACTUAL process behavior (panic 101 / caught / other) per platform
+        lane; panic paths must show exit 101 + std panic text naming the site
+ATTRIBUTION  healthy-control content match + (stdout-broken cases) panic location in
+        the captured default-hook message + partial-output witnesses; a process exit
+        not demonstrably caused by the named site is NOT attributed to it
+DISPOSAL-SKIP (sites #3/#4/#7)  runtime disposal witness only via a test-transport
+        child that observes its disposed marker after catching the unwind
+        (disposed=false ⇒ skip witnessed at L1; the real-binary skip remains
+        source-inferable — no runtime witness claimed without one)
+```
+
+### 14.7 NOT_RUN register (pre-declared)
+
+```text
+E9_WIN_BROKEN_SINK          reader print-panic/broken pipe under REAL Windows playback —
+                            interop stdio proxy absorbs downstream closure (§14.5); needs
+                            native Windows console session
+E9_WIN_BLOCKED_SINK         same interop limitation for a deterministic full-pipe
+E8_WIN_BROKEN_PIPE_SITES    all E-8 broken-pipe rows on Windows — same limitation
+E8_LINUX_PLAYBACK_REAL_BIN  #2/#3/#7 real-binary on Linux — no Linux ELF SongCore
+                            artifact in this environment (§14.5)
+E8_SITE3_FAILSTOP_ARM       reference fail-stop (entry.rs:378) needs a latched §G.6
+                            violation — not constructible by argv; not forced
+```
+
+### 14.8 Results
+
+PENDING — filled after execution (same round, below this line).
