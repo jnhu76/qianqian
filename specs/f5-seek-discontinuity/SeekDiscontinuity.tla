@@ -200,9 +200,10 @@ VARIABLES
     oldCursorResumed, \* 不变式靶：Applied 之后旧 cursor 生产复活（D-T1 靶）
     fatalLatchedEver, \* 见证：pending fatal 曾被 latch（W_APPLIED_ERASURE_
                       \*   COMPLETED 的前半条件：latch→擦除→Completed）
-    refusedWhileLatched \* 见证：RefusedUnchanged 在 latch 已存在时发生
-                      \*   （W_REFUSED_FATAL_RETAINED 的精确形状——不带它，
-                      \*   「先拒绝后 latch」的等深路径会让 witness 形状失明）
+    refusedWhileLatched \* 见证：latch 已存在的拒绝之后 latch 幸存（仅当
+                      \*   拒绝前后都 latch 才置位；W_REFUSED_FATAL_RETAINED
+                      \*   的精确形状——防「先拒绝后 latch」等深路径与
+                      \*   「擦除后重 latch」两种形状失明）
 
 vars == <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
           cutRequested, landing, committed, seekFailed, stopIntent,
@@ -603,7 +604,8 @@ SeekRefusedUnchanged ==
     /\ seekFailed' = TRUE
     /\ pendingFatal' = IF Mutation = MutationRefusedClearsLatch
                        THEN FALSE ELSE pendingFatal
-    /\ refusedWhileLatched' = (refusedWhileLatched \/ pendingFatal)
+    /\ refusedWhileLatched' = (refusedWhileLatched
+                               \/ (pendingFatal /\ pendingFatal'))
     /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
                    landing, committed, stopIntent,
                    edgeTerminal, workerFailurePublished,
@@ -1055,10 +1057,13 @@ ProbeNoPartialSeekEver == seekFromPartial = FALSE
 ProbeNoAppliedErasureCompleted ==
     ~(fatalLatchedEver /\ committedOutcome = "completed")
 
-\* W_REFUSED_FATAL_RETAINED：L2 精确形状——latch 已存在时的拒绝之后
-\* latch 仍在（未被 surface、未被清除）。refusedWhileLatched 使形状精确：
-\* 「先拒绝后 latch」的等深合法路径不再满足前件；若保留义务回归为擦除
-\* （D-T2 缺陷进入基模型），本 witness 不可达而变绿，套件即红。
+\* W_REFUSED_FATAL_RETAINED：L2 精确形状——latch 已存在的拒绝之后
+\* latch 幸存（未被 surface、未被清除）。refusedWhileLatched 是幸存语义
+\* （仅当拒绝前 latch 在且拒绝后仍在才置位）：「先拒绝后 latch」的等深
+\* 合法路径与「擦除后重新 latch」（2026-10-17 审查 C-F2a 反例：拒绝擦除
+\* 缺陷下 ReadPartialSuccess 会重新置位 pendingFatal，单纯发生语义的
+\* 见证位仍会触发）都不满足前件；若保留义务回归为擦除（D-T2 缺陷进入
+\* 基模型），本 witness 不可达而变绿，套件即红。
 ProbeNoRefusedRetention ==
     ~(refusedWhileLatched /\ pendingFatal)
 

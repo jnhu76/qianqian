@@ -663,3 +663,13 @@ P2s across the two delivered slices were fixed and the full suite re-executed
   re-run.
 - Evidence-retention location (local archive path + per-file inventory +
   the D-T3 diagnostic-run recipe) now recorded in RESULTS (review F3).
+- Review-round delta re-verification (same reviewer): F1/F2(b)/F3 FIXED;
+  F2(a)'s defect-sensitivity claim was REFUTED by a reviewer counterexample
+  (under the erasure defect, ReadPartialSuccess re-latches and a plain
+  occurrence-semantics witness bit still fires). Fixed with the
+  survivor-based definition (`refusedWhileLatched' = … ∨ (pendingFatal ∧
+  pendingFatal')` — set only when the latch survives the refusal); the
+  .tla comment now states the two blind shapes it excludes. Full suite
+  re-run (run4): ALL PASS with base counts identical (15667/6330 — the
+  survivor semantics is count-neutral on the correct model and splits only
+  under the defect), L2 witness still firing.

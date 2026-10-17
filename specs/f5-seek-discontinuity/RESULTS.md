@@ -62,8 +62,10 @@ SUITE_RC=0
 - 每个 mutation / witness run 独立探索完成（"Finished in" 收尾，fail-closed）
 - 反例轨迹归档：D-T1..D-T4 的 TLC 反例逐状态保存在执行轮本地证据目录
   `/home/hoo/Source/qianqian-289-evidence/`（未入库；同轮其他证据：
-  f5-full-suite-run.log / f5-full-suite-run2.log = 修复 cfg 前后两次全套件
-  完整输出、base-attempt1-RetainLatchOnRefused-violated.log = 首跑红色日志、
+  f5-full-suite-run.log / f5-full-suite-run2.log / f5-full-suite-run3.log /
+  f5-full-suite-run4.log = 修复 cfg 前后、审查修正轮与幸存语义见证修正
+  共四次全套件完整输出（RESULTS 引用的数字来自 run3/run4，二者 base
+  计数一致：15667/6330）、base-attempt1-RetainLatchOnRefused-violated.log = 首跑红色日志、
   counterexample-DT*.log = 四条反例逐状态轨迹、counterexample-DT3-committed-
   cell-chain.log = D-T3 的 commit 完整链诊断运行、lefthook-pre-push-all*.log
   = 本地 gate 日志、dt-run-* = 首次 D-T cfg 配置错误的失败现场）。诊断运行的
