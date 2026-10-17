@@ -1117,6 +1117,61 @@ text is byte-unchanged since 9386592):
        is the committed `e9_flush_probe_*` tests (one sink, no intermediate
        flush, the row's arrival observed by the parent, same-sink second
        print! as the brokenness proof). §14.8.8(b)/(g) updated accordingly.
+§14.6/§14.7 B2 scheduling-sensitivity round (owner directive, 2026-10-18;
+       evidence: q290-evidence/290-r2-flushprobe first-round red archive +
+       q290-evidence/290-r3-b2/): the B2 red (`e9_real_reader_stderr_epipe_…`
+       30s marker timeout, once, under the full local gate) was classified by
+       building child-aware forensics (byte-arrival timeline, DIED-vs-BLOCKED
+       watchdog, /proc thread snapshots, RUN-RETURNED/TERMINAL boundary
+       witnesses) and re-running under a bounded CPU-saturated stress config.
+       Root cause named with a standalone reproducer (zero qianqian code):
+       a fork→exec forkling window — a concurrently spawned child briefly
+       holds the WHOLE parent fd table (its own + other tests' pipe read
+       ends, O_CLOEXEC not yet applied) — makes a parent-side close(2)
+       silently ineffective, so the "broken sink" never breaks: PA-2's
+       second print! succeeded (PRINT_PANIC=false), PB's flush returned Ok,
+       site6/site7 transports completed on unbroken sinks (UNWIND=0), and
+       the epipe arms wedged at wait_terminal (no panic → no Stop → the test
+       source never self-completes; all child threads STATIC in futex).
+       A/B: 46/100 anomalous FLUSH=Ok with parallel spawns under CPU
+       saturation vs 0/60 sequential; the foreign read-end holders were
+       named by /proc fd walks (mode=R, O_CLOEXEC set, not the victim's
+       parent or child). Fix (test orchestration only;
+       PRODUCTION_BEHAVIOR_CHANGE=NONE, D11/K0/ADR/ABI unchanged):
+       (a) premise observability — every epipe/site child parks at a gate
+       the parent releases only after the close (GATE-READY-witnessed for
+       the epipes and site6; site4/site7 park at their pre-existing
+       unmarked stdin gates), then runs a canary write that MUST panic
+       (`require_broken_sink`; the canary's default-hook text is silenced
+       with a momentary hook swap so it cannot pre-satisfy the
+       choreography's own "failed printing to stdout" message assertions);
+       an unbroken
+       sink is a deterministic Q290-PREMISE-REFUTED red (child exit 3,
+       named by the watchdog), never a silent anomaly — the stdout canary is
+       '\n'-terminated so the LineWriter writes it directly and the buffer
+       state each property depends on is untouched (no v1-style premature
+       flush); (b) spawn-window exclusion — a process-wide
+       `test_spawn_lock` serializes {spawn → first witness} against every
+       close (all forkling windows in the test binary are lock-covered, so
+       a lock-held close is structurally forkling-free); (c) the child-aware
+       watchdog (DIED vs BLOCKED + timeline + /proc + gdb-when-permitted)
+       classifies any residual red. Verification: module solo 45/45; under
+       20-busy-loop saturation 20/20 module greens (pre-fix 8/10 red) and
+       3/3 full-library greens incl. concurrent entry::shutdown_tests
+       spawns; canary negative control NC-C (parent skips the close) reds
+       deterministically with PREMISE-REFUTED (nc-c-canary-refuted.log).
+       The 30s marker-watchdog bound is UNCHANGED (owner: classification,
+       not a wider promise). Property texts of the v2 flush probe are
+       byte-preserved in meaning: PA/interleave prints stay pre-gate, the
+       PB tail print moved post-gate so the canary's newline can never
+       carry the tail out, and no arm gained an intermediate flush.
+       Post-author sufficiency review (owner-directed; 3 fresh-context
+       reviewers, verdicts all APPROVE_WITH_NITS): fixed an uncovered
+       spawn in the site1 version arm, lock poisoning (one watchdog red no
+       longer cascades into PoisonError reds), an unbounded gdb wait on
+       the failure path, the canary-hook message taint named above, and
+       record wording; the archive's batch receipts were retroactively
+       sidecarred.
 ```
 
 ### 14.8 Results

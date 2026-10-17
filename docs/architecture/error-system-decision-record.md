@@ -364,18 +364,20 @@ cross-process PA-2) was repaired by the committed v2 tests
 (`e9_flush_probe_*`, §7.2 repair note); the ruling followed that repair.
 
 Merged-with-this-ruling bounds: evidence PR #293 merge held by the owner
-pending the B2 test-oracle round (implementation record §14.9); issue #290
-closure must keep the NOT_RUN lanes (native Windows broken-sink, terminal
-sink) explicitly NOT counted as PASS — owner: “不能把它们悄悄计入 PASS”.
+pending the B2 test-oracle round (implementation record §14.8 amendments,
+B2 scheduling-sensitivity round); issue #290 closure must keep the NOT_RUN
+lanes (native Windows broken-sink, terminal sink) explicitly NOT counted as
+PASS — owner: “不能把它们悄悄计入 PASS”.
 
 Sections 7.1–7.5 below are the decision PACKAGE the ruling was made from,
-preserved as written (including its agent-recommendation label); §7.5's
+preserved as written (including its agent-recommendation label; the package
+text dates from 2026-10-17, before this ratification); §7.5's
 "moves from PENDING to the owner's recorded choice" has now happened, to
 RATIFY_OPTION_B_SCOPED.
 
 ---
 
-### 7.1 The decision being asked for (package text, 2026-10-17)
+### 7.1 The decision being asked for
 
 `machine_input.rs:273-274` — the reader's stdout output closure:
 
