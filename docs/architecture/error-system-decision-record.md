@@ -328,3 +328,102 @@ Execution record: the implementing round and its evidence live in
 `error-system-implementation-record.md` (§13) and
 `specs/f5-seek-discontinuity/` (PENDING_FATAL_DAG.md frozen ledger; extended
 SeekDiscontinuity.tla; RESULTS.md).
+
+## 7. D-D decision package (#290, 2026-10-17) — the `:274` flush-Err disposition (OWNER_RULING_PENDING)
+
+This section is a decision PACKAGE, not a decision: nothing below is adopted.
+Per §6's scope note, D-D remains explicitly not ratified; this package exists
+so the owner can rule from executed evidence instead of re-deriving it. The
+evidence cited here was produced by the #290 round
+(`error-system-implementation-record.md` §14.8, scenarios frozen in §14.6
+before implementation).
+
+### 7.1 The decision being asked for
+
+`machine_input.rs:273-274` — the reader's stdout output closure:
+
+```text
+print!("{line}");
+let _ = io::stdout().flush();
+```
+
+The explicit flush result is discarded. D-D decides the disposition:
+
+```text
+Option A — CLASSIFY_AND_RECORD     a flush Err becomes a classifiable
+                                   host failure (admitted-operation record +
+                                   conditional Stop), like the print! panic
+Option B — ACCEPT_DOCUMENTED_LOSS  the discarded flush result stays
+                                   discarded; the loss's scope is written
+                                   down, with explicit revisit triggers
+```
+
+Option A's own gate (frozen §14.6-B3): it is available ONLY if an independent
+flush Err is reachable WITHOUT reshaping production output, the std writer, or
+ordering.
+
+### 7.2 Executed evidence (§14.8.3)
+
+Verdict: **INJECTED_WRITER_ONLY** — with the current production shape there is
+NO independent error window at the flush:
+
+- every reader stdout writer emits '\n'-terminated rows (RQ1: `format_status`
+  8/8 push paths end '\n'; transport rows likewise);
+- Rust `Stdout` is a LineWriter independent of sink type (RQ2, demonstrated
+  behaviorally: a no-newline `print!` stays buffered on a pipe);
+- a successful '\n'-terminated `print!` leaves an EMPTY buffer — PA probe:
+  `flush()` returned Ok against a read end proven closed by the PA-2 control
+  (`print!` panicked with `Broken pipe`), so the flush performed no write;
+- a flush Err therefore requires a non-newline tail in the buffer (PB probe:
+  `Err(Os { code: 32, kind: BrokenPipe })` demonstrated) — a shape no
+  production writer has; a foreign non-newline tail is carried to the fd by
+  the NEXT row's own `print!` (interleave probe), i.e. it surfaces in the
+  already-classified print!-panic path (`HostFailure::Panic` via the
+  `#R-dispatch` catch), never in the trailing flush.
+
+Scope: Linux pipe + regular-file probes; terminal NOT_RUN (no tty in the
+harness; the interop console proxy is a pipe — §14.5/§14.7); std EBADF
+swallowing recorded; toolchain 1.97.1 (8bab26f4f) pinned in §14.8. In-repo L1:
+the current swallow is INDIFFERENT to a flush Err — no record, no Stop, seal
+clean (`flush_err_swallow_is_indistinguishable_from_success`, with an in-test
+control proving the harness distinguishes swallow from panic).
+
+### 7.3 What each option would mean today
+
+```text
+Option A  adds a record/Stop path for a state the executed evidence says
+          production cannot reach standalone (the print! fails first and is
+          already classified). New classification surface; covers hypothetical
+          writer reshapes in advance.
+Option B  records that the flush result is discarded BECAUSE the
+          '\n'-terminated single-writer shape leaves the flush nothing to do;
+          every reachable failure already surfaces at the print!. No cost
+          today; the risk is silent staleness if the output shape changes —
+          which the revisit triggers below retire.
+```
+
+### 7.4 Recommendation (the round's agent; NOT a ruling)
+
+B-leaning: Option A's evidence gate is not met in the scoped environment. The
+loss B accepts is exactly and only: "after a successful newline-terminated
+print!, the flush performs no write; its Err is unreachable standalone."
+Option B comes with these revisit triggers — any ONE reopens D-D:
+
+```text
+T1  any production stdout writer that can emit a non-newline-terminated tail
+    (the LineWriter buffer would carry it into the flush)
+T2  any reshaping of the :274 closure (write!+flush batching, a different
+    writer, a buffered-by-default writer swap)
+T3  a std contract change to Stdout buffering (LineWriter)
+T4  native-Windows-console evidence of a flush Err on the real sink
+    (the §14.7 lane; the interop proxy cannot reach it)
+```
+
+### 7.5 What this package does not decide
+
+No ratification, no production change, no ADR amendment. The whole #290 round
+carries PRODUCTION_BEHAVIOR_CHANGE=NONE / D11_CHANGE=NONE / K0_CHANGE=NONE /
+ABI_CHANGE=NONE / ADR_CHANGE=NONE. If the owner rules A, the product work is a
+separate post-ruling PR; if B, the disposition record is this section plus the
+§14.8.3 evidence, and D_D_OWNER_RULING moves from PENDING to the owner's
+recorded choice.
