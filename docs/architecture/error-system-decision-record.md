@@ -120,8 +120,10 @@ ordering and the absorption option (H). D-9/D-10 (consumer bar / carrier) ←
 DG-2 recommends carrier B and names the presentation obligation. D-A/D-B
 (gate wiring) ← executed this round as CC-2 (see the PR evidence log; the
 f5-impl gate's CI home is the `f5-implementation-mutations` job). D-C ← §2's
-F5 recommendation with its acceptance-gated triggers. All remain owner
-rulings; this record attaches recommendations to them, not outcomes.
+F5 recommendation with its acceptance-gated triggers. All of these remain
+owner rulings to which this record attaches recommendations, not outcomes —
+with the two exceptions now ruled (D-2/D-10, §6: recommendations that became
+ratified decisions on 2026-10-17).
 
 Implementation state (2026-10-17, from #287 and the #283 closeout): D-2, D-3
 and D-10 have landed implementations — D-2/D-10 now RATIFIED by the owner

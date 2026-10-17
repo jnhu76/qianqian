@@ -31,7 +31,7 @@
 >                                     acceptance pending #288; the NEEDS_RUNTIME_EVIDENCE
 >                                     registry rows keep their own carriers (#288/#289/#290)
 > RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
->                                     receipt PR #291 comment 6229433676)
+>                                     receipt [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676))
 > UNRESOLVED_OWNER_DECISIONS        = D-4/D-5/D-7/D-9/D-11 unchanged; D-C #289; D-D #290
 > ```
 >
