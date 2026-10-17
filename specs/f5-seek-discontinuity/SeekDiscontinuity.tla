@@ -198,8 +198,11 @@ VARIABLES
     remainderLost,    \* 不变式靶：refusal 丢掉了保留余量（M6 靶）
     producedAfterFailure, \* 不变式靶：destructive failure 后恢复生产（M7 靶）
     oldCursorResumed, \* 不变式靶：Applied 之后旧 cursor 生产复活（D-T1 靶）
-    fatalLatchedEver  \* 见证：pending fatal 曾被 latch（W_APPLIED_ERASURE_
+    fatalLatchedEver, \* 见证：pending fatal 曾被 latch（W_APPLIED_ERASURE_
                       \*   COMPLETED 的前半条件：latch→擦除→Completed）
+    refusedWhileLatched \* 见证：RefusedUnchanged 在 latch 已存在时发生
+                      \*   （W_REFUSED_FATAL_RETAINED 的精确形状——不带它，
+                      \*   「先拒绝后 latch」的等深路径会让 witness 形状失明）
 
 vars == <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
           cutRequested, landing, committed, seekFailed, stopIntent,
@@ -207,7 +210,7 @@ vars == <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
           exitPath, drainVerdict, committedOutcome,
           seekFromPartial, remainderLost, producedAfterFailure,
           oldDrainEver, oldAfterCommit, posMixAfterCommit,
-          oldCursorResumed, fatalLatchedEver>>
+          oldCursorResumed, fatalLatchedEver, refusedWhileLatched>>
 
 -----------------------------------------------------------------------------
 (******************************** 初始状态 **********************************)
@@ -239,6 +242,7 @@ Init ==
     /\ posMixAfterCommit = FALSE
     /\ oldCursorResumed = FALSE
     /\ fatalLatchedEver = FALSE
+    /\ refusedWhileLatched = FALSE
 
 -----------------------------------------------------------------------------
 (********************************* 动作 *************************************)
@@ -262,7 +266,8 @@ WriteOld ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   fatalLatchedEver>>
+                   fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* song_read_pcm 的 partial-success 出口（C:1136-1156）：出块成功、
 \* fatal 被 latch。块照常走写路径；latch 由下一次读复现。
@@ -280,7 +285,8 @@ ReadPartialSuccess ==
                    edgeTerminal, workerFailurePublished,
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
-                   oldDrainEver, oldAfterCommit, posMixAfterCommit>>
+                   oldDrainEver, oldAfterCommit, posMixAfterCommit,
+                   refusedWhileLatched>>
 
 \* bounded-slice 写的前缀落队：余量保留在 staging——由 seek 结果决定补完
 \* （refusal）或随 cut 丢弃（成功）。前缀能落队要求 edge 仍 Open。
@@ -297,7 +303,8 @@ WritePartial ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* staging 写 edge 完成（writing_old：整块一次落队；writing_partial：
 \* 保留余量补完——refusal 的零内容损失义务）。要求 edge Open：terminal 下
@@ -315,7 +322,8 @@ FinishWriteOld ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 真实 stop-exit (a)：容量等待中零进展 + terminal≠Open（session.rs
 \* :993-994 → :884）。只从 in-flight 整块写（writing_old）可达。
@@ -331,7 +339,8 @@ WriteStoppedExit ==
                    drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 真实 stop-exit (b)：保留余量 flush 的 terminal break（session.rs
 \* :798-802 → :805-809）。latch（若在）未被 surface 即随退出湮灭——与生产
@@ -348,7 +357,8 @@ RemainderFlushStopExit ==
                    drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* pending-fatal surfacing：下一次读在 C 入口复现 latch（C:1111-1113）→
 \* adapter Err → decode_failed + edge.fail + return（session.rs:896-900）。
@@ -372,7 +382,8 @@ ReadSurfacesFatal ==
                    drainVerdict,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— render leg（消费者）——
 
@@ -390,7 +401,8 @@ ParkLeg ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 UnparkLeg ==
     /\ parked = TRUE
@@ -402,7 +414,8 @@ UnparkLeg ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 从 edge 拉一个旧块进手（GetBuffer..read 之后的窗口）。
 PullOld ==
@@ -419,7 +432,8 @@ PullOld ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* ReleaseBuffer 提交手里的块。
 SubmitHeld ==
@@ -437,7 +451,8 @@ SubmitHeld ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* post-commit 生产/提交（协议：worker 在 landing 与 release 之间持有
 \* 产量，所以 SubmitNew 只在 committed 之后存在——rebase basis 因此精确）。
@@ -457,11 +472,15 @@ SubmitNew ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— 设备（audible truth 的抽象：drain 即成为 audible output）——
-\* （DrainOld 不 gate workerFailure：destructive failure 之后，已入设备尾
-\* 的旧 PCM 仍会自然播出，然后流终止——既有失败路线的合法形态。）
+\* （DrainOld 的 open 门槛对应 render 侧「terminal 先于数据」：failed 边
+\* 上的排空读立即放弃（edge.rs:237-239），已入设备尾的旧 chunk 随数据面
+\* 终止被放弃——2026-09-18 基线注释里的「失败后仍自然播出」在本模型中
+\* 被本门槛取代；无不变式/探针依赖失败后的 drain（WitnessOldDrainPreCommit
+\* 在 pre-commit 窗口内保持可达）。）
 
 DrainOld ==
     /\ tailOld > 0
@@ -474,7 +493,8 @@ DrainOld ==
                    edgeTerminal, pendingFatal, workerFailurePublished,
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
-                   posMixAfterCommit, oldCursorResumed, fatalLatchedEver>>
+                   posMixAfterCommit, oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 DrainNew ==
     /\ tailNew > 0
@@ -486,7 +506,8 @@ DrainNew ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— render leg 的终态观察（drain 证据）——
 
@@ -502,7 +523,8 @@ LegObserveAborted ==
                    workerGone, exitPath, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* EOF 排干后的观察：全部已消费、手中无块 → 下一次 read 看到 Eof。
 LegObserveDrained ==
@@ -518,7 +540,8 @@ LegObserveDrained ==
                    workerGone, exitPath, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— 协议（session / worker 的协调动作）——
 
@@ -536,7 +559,8 @@ RequestSeek ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* worker 串行化点上的 song_seek begin：发生在 BEFORE 一切 invalidation
 \* （frozen order）。eligibility（¬aborted ≈ ¬stopIntent ∧ unsettled；
@@ -560,7 +584,8 @@ WorkerSeek ==
                    drainVerdict, committedOutcome,
                    remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* song_seek 的「证毕 pre-mutation 拒绝」（INVALID_ARGUMENT 类）：什么都没
 \* 有被 invalidation，余量原样归还补完，命令被消费。**pendingFatal UNCHANGED
@@ -578,6 +603,7 @@ SeekRefusedUnchanged ==
     /\ seekFailed' = TRUE
     /\ pendingFatal' = IF Mutation = MutationRefusedClearsLatch
                        THEN FALSE ELSE pendingFatal
+    /\ refusedWhileLatched' = (refusedWhileLatched \/ pendingFatal)
     /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
                    landing, committed, stopIntent,
                    edgeTerminal, workerFailurePublished,
@@ -608,7 +634,8 @@ SeekMutatedThenFailed ==
                    drainVerdict,
                    remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* song_seek 成功（Applied）之后 worker 自行的 purge：staging/余量丢弃 +
 \* edge 清空 + landing 证据 + **latch 擦除**（C:1195-1196 reset_decode_state
@@ -635,7 +662,8 @@ WorkerCut ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 真实 stop-exit (c)：Applied 等待/恢复路径上数据面在 cut 之下终止
 \* （session.rs:725-735/:753-771 的 plane-terminal 退出；landing 已发布，
@@ -653,7 +681,8 @@ PostCutStopExit ==
                    drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 新 continuation 的 EOF 臂：close_eof + return（session.rs:892-895）。
 \* 只从已 commit 的新 continuation 可达（生产的两个等待循环先于恢复生产
@@ -674,7 +703,8 @@ EofClose ==
                    drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* request_stop 的 completion-lock 步（Q6-i 融合：intent + pause/seek-hold
 \* 释放同一锁程，completion.rs:552-576）。已 settle 后的 stop 不改写终局
@@ -689,7 +719,8 @@ RecordStopIntent ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 同一 request 的数据面 stop——锁程释放后的另一步（completion.rs
 \* :577-587；Q6-iv 禁止与 RecordStopIntent 融合）。first-wins：EOF 已提交
@@ -704,7 +735,8 @@ EdgeStopFromStop ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* 串行化点上的 seek_aborted 分支（session.rs:620-625）：
 \* release_seek_without_commit + pending=None——**bookkeeping，不是退出**；
@@ -725,7 +757,8 @@ CancelSeekBookkeeping ==
                    drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* session 的 cutover commit（D14.8 rebase 的触发点；**F5 域的 CommitCut，
 \* 不是 D11 TerminalCommit**）。承重护栏 = landing ∧ edge 干净 ∧ 尾排空 ∧
@@ -747,7 +780,8 @@ CommitCut ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— D11 terminal 的最小受约束投影（TERMINAL_DECISION_MAP）——
 \* 冻结 resolver（completion.rs:1337-1398）的转写：worker_failure 先于
@@ -774,7 +808,8 @@ TerminalCommit ==
                    workerGone, exitPath, drainVerdict,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* —— 位置发布（D14.8 seek 规则：publication 不得混合 pre/post basis）——
 \* （与基线相同：这两个发布动作是惰性的——位置不变式的 base 保证来自
@@ -804,7 +839,8 @@ StalePositionPublish ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 \* M7 注入：destructive failure 之后恢复旧游标生产——旧库里的旧 PCM
 \* 加上重定位后的新内容，无 cutover、无 rebase，直接混合。反例由
@@ -822,7 +858,8 @@ ResumeAfterFailure ==
                    workerGone, exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
-                   oldCursorResumed, fatalLatchedEver>>
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
 
 Next ==
     \/ WriteOld
@@ -894,6 +931,7 @@ TypeOK ==
     /\ posMixAfterCommit \in BOOLEAN
     /\ oldCursorResumed \in BOOLEAN
     /\ fatalLatchedEver \in BOOLEAN
+    /\ refusedWhileLatched \in BOOLEAN
 
 \* F5 根不变式（D14.5）：commit 之后旧 PCM 不得再成为 output。
 InvStaleOutput == oldAfterCommit = FALSE
@@ -1017,18 +1055,23 @@ ProbeNoPartialSeekEver == seekFromPartial = FALSE
 ProbeNoAppliedErasureCompleted ==
     ~(fatalLatchedEver /\ committedOutcome = "completed")
 
-\* W_REFUSED_FATAL_RETAINED：RefusedUnchanged 之后 latch 仍在（未被
-\* surface、未被清除）必须可达——保留义务的非空洞证明。
+\* W_REFUSED_FATAL_RETAINED：L2 精确形状——latch 已存在时的拒绝之后
+\* latch 仍在（未被 surface、未被清除）。refusedWhileLatched 使形状精确：
+\* 「先拒绝后 latch」的等深合法路径不再满足前件；若保留义务回归为擦除
+\* （D-T2 缺陷进入基模型），本 witness 不可达而变绿，套件即红。
 ProbeNoRefusedRetention ==
-    ~(seekFailed /\ pendingFatal)
+    ~(refusedWhileLatched /\ pendingFatal)
 
 \* W_STOPPED_FROM_REAL_EXIT：真实 stop-exit 上的 Stopped 终局必须可达
 \* （否则 stop-race 半边的模型是空转的）。
 ProbeNoStoppedEver == committedOutcome # "stopped"
 
-\* W_FAILED_FROM_PENDING_FATAL：pending fatal 的 surfacing 退出必须可达
-\* （default position 上 fatal 胜 stop 的那条腿）。
-ProbeNoFatalSurfacing == exitPath # "surfacedFatal"
+\* W_FAILED_FROM_PENDING_FATAL：L5 精确形状——stop intent 已记录而
+\* surfacing 仍发生（default position 上 fatal 胜 stop）。若回归把
+\* surfacing 错误地门控在 ¬stopIntent 上，本 witness 将不可达而变绿
+\* （MUST-FAIL 落空），套件即红。
+ProbeNoFatalSurfacing ==
+    ~(exitPath = "surfacedFatal" /\ stopIntent)
 
 \* W_MUTATED_THEN_FAILED：MutatedThenFailed 的 fail-closed 退出必须可达。
 ProbeNoMutatedExit == exitPath # "mutated"
