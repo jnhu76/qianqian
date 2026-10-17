@@ -96,8 +96,8 @@ run_tlc() {
   fi
 }
 
-echo "== 正常模型（必须 PASS：TypeOK + 五条安全不变式，探索完成）"
-run_tlc "$SPEC_ROOT/SeekDiscontinuity.cfg" pass "Base / safety（commit 后旧 PCM 不可能）"
+echo "== 正常模型（必须 PASS：TypeOK + 基线五条 + pending-fatal 五条安全不变式，探索完成）"
+run_tlc "$SPEC_ROOT/SeekDiscontinuity.cfg" pass "Base / safety（commit 后旧 PCM 不可能；pending-fatal 格合法）"
 
 echo "== witness 探针（必须 MUST-FAIL：可达性证明，防空洞不变式）"
 run_tlc "$SPEC_ROOT/probes/ReachCommit.cfg"              fail:ProbeNeverCommitted   "Witness / commit 可达"                  -continue
@@ -106,6 +106,11 @@ run_tlc "$SPEC_ROOT/probes/WitnessOldEdgePreCommit.cfg"   fail:ProbeNoOldEdgeEve
 run_tlc "$SPEC_ROOT/probes/WitnessSeekRefused.cfg"        fail:ProbeNoRefusalEver   "Witness / seek 拒绝路径可达"             -continue
 run_tlc "$SPEC_ROOT/probes/WitnessSeekDestructive.cfg"    fail:ProbeNoDestructiveEver "Witness / destructive failure 路线可达" -continue
 run_tlc "$SPEC_ROOT/probes/WitnessPartialSeek.cfg"        fail:ProbeNoPartialSeekEver "Witness / 余量在外 seek 可达"           -continue
+run_tlc "$SPEC_ROOT/probes/WitnessAppliedErasureCompleted.cfg" fail:ProbeNoAppliedErasureCompleted "Witness / Applied 擦除→新 continuation Completed 可达（L1）" -continue
+run_tlc "$SPEC_ROOT/probes/WitnessRefusedFatalRetained.cfg"    fail:ProbeNoRefusedRetention    "Witness / Refused 后 latch 保留可达（L2）" -continue
+run_tlc "$SPEC_ROOT/probes/WitnessStoppedFromRealExit.cfg"     fail:ProbeNoStoppedEver        "Witness / 真实 stop-exit 的 Stopped 可达（L4）" -continue
+run_tlc "$SPEC_ROOT/probes/WitnessFatalSurfacing.cfg"          fail:ProbeNoFatalSurfacing     "Witness / pending fatal surfacing 可达（L5）" -continue
+run_tlc "$SPEC_ROOT/probes/WitnessMutatedExit.cfg"             fail:ProbeNoMutatedExit        "Witness / MutatedThenFailed 可达（L3）"   -continue
 
 echo "== 负控制（每个 mutation 必须被抓住）"
 run_tlc "$SPEC_ROOT/mutations/M1CommitBeforeTailPurge.cfg" fail:InvStaleOutput     "Mutation / M1 CommitBeforeTailPurge（不等尾排空）" -continue
@@ -115,6 +120,10 @@ run_tlc "$SPEC_ROOT/mutations/M4StalePositionWriter.cfg"   fail:InvPositionNoMix
 run_tlc "$SPEC_ROOT/mutations/M5CommitBeforeLanding.cfg"   fail:InvStaleOutput     "Mutation / M5 CommitBeforeLanding（未 reposition）" -continue
 run_tlc "$SPEC_ROOT/mutations/M6RefusalDropsRemainder.cfg"  fail:InvRefusalContentContinuous "Mutation / M6 RefusalDropsRemainder（拒绝丢余量）" -continue
 run_tlc "$SPEC_ROOT/mutations/M7ResumeAfterMutatedSeek.cfg" fail:InvFailClosed      "Mutation / M7 ResumeAfterMutatedSeek（失败后复活）" -continue
+run_tlc "$SPEC_ROOT/mutations/DT1OldCursorResumeAfterApplied.cfg" fail:NoOldCursorResumeAfterApplied "Mutation / D-T1 OldCursorResumeAfterApplied（cut 后旧 cursor 复活）" -continue
+run_tlc "$SPEC_ROOT/mutations/DT2RefusedClearsLatch.cfg"          fail:RetainLatchOnRefused         "Mutation / D-T2 RefusedClearsLatch（拒绝误擦 latch）" -continue
+run_tlc "$SPEC_ROOT/mutations/DT3LoopTopStopExit.cfg"             fail:TerminalCellConformance      "Mutation / D-T3 LoopTopStopExit（取消位伪造 stop 退出）" -continue
+run_tlc "$SPEC_ROOT/mutations/DT4AppliedKeepsLatch.cfg"           fail:NoOldFatalAfterApplied       "Mutation / D-T4 AppliedKeepsLatch（旧 fatal 落入新 continuation）" -continue
 
 if [[ "$fail" -ne 0 ]]; then
   echo "F5-SEEK-DISCONTINUITY: FAILED"
