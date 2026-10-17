@@ -382,7 +382,10 @@ RemainderFlushStopExit ==
 \* 生产恢复复读可发生在 commit 之前——cutover wait 的 Aborted 分支
 \* （session.rs:721）直接跳出第二个等待（:750）并在 :775-778 恢复读，此时
 \* commit 未发生。基模型内该组合仍不可达（Applied 必擦除 latch，见
-\* WorkerCut），本臂只在 D-T4 缺陷注入下激活。
+\* WorkerCut），本臂只在 D-T4 缺陷注入下激活。permissiveness 注记（复审
+\* delta P3）：本臂不要求 ending 已记录（生产的 Aborted 前置隐含
+\* episode_ending_evidence，completion.rs:1257-1259）——诊断-only 臂的
+\* 刻意放宽，反例轨迹不逐步声称生产可执行。
 FatalFailurePublish ==
     /\ worker \in {"idle", "repositioned"}
     /\ pendingFatal = TRUE

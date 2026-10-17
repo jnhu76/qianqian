@@ -131,7 +131,7 @@ F5-SEEK-DISCONTINUITY: ALL PASS
   夸大生产（P2，见下）、3×P3（计数口径 / :675 行号 / 既有惰性
   drain-verdict 记录注记）。
 - **Evidence-integrity 复审：REVISE（全部 docs-only）**。套件独立复现
-  逐数吻合；证据归档四文件全部核verified（DT4 链逐状态比对）；发现
+  逐数吻合；证据归档四文件全部核实（DT4 链逐状态比对）；发现
   §8 D-T4 行与 REV.2 头声明矛盾（其 P1）、RESULTS 证据清单把
   run1/run2 的 base 计数误并入 15667/6330（P2）、2×P3。
 - **本轮 delta 修复（docs + 1 行模型 guard）**：§8 D-T4 行改写为单缺陷
@@ -180,7 +180,7 @@ F5-SEEK-DISCONTINUITY: ALL PASS
   模型的修复前反例，仅历史）、counterexample-DT4-surfacing-chain.log =
   **superseded**（committed 门槛版 10 态链）、
   counterexample-DT4-surfacing-chain-v2.log = **现行 D-T4 正式证据**
-  （8 态直达链）、counterexample-DT4-full-invariants.log = **superseded**、
+  （8 态直达链）、counterexample-DT4-full-invariants.log = **superseded**（committed 门槛版的全称披露运行）、
   counterexample-DT4-full-invariants-v2.log = 现行全称不变式披露运行
   （终止于 landing 时刻）、
   counterexample-WitnessFailedDecodeStoppedEdge.log = 终审 P1 合法交错
