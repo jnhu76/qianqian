@@ -31,14 +31,16 @@
 (*   ReadPartialSuccess        song_read_pcm 的 partial-success 出口：       *)
 (*                             produced>0 → SONG_OK，诊断清、latch 存活      *)
 (*                             （C:1136-1156）。生产的块照常走写路径。       *)
-(*   ReadSurfacesFatal         下一次读在入口复现 latch → adapter Err →      *)
-(*                             decode_failed + edge.fail + return            *)
+(*   FatalFailurePublish       失败路线（1/3）错误发布：下一次读在入口       *)
+(*                             复现 latch → adapter Err → decode_failed      *)
 (*                             （C:1111-1113；session.rs:896-900）。**不受   *)
 (*                             stopIntent/edgeTerminal 门控**——loop-top 到   *)
 (*                             read 之间无任何 terminal 检查（R1.1 的核心）。*)
-(*                             publication+settlement 同一锁程               *)
-(*                             （completion.rs publish_evidence），故与退出  *)
-(*                             原子；同锁程合并见 PENDING_FATAL_DAG §2。     *)
+(*                             publication+settlement 同一 publish_evidence  *)
+(*                             锁程（completion.rs:1319-1331）→ 二者原子；   *)
+(*                             **edge.fail 与退出漏斗在该锁程之外**，拆为    *)
+(*                             WorkerEdgeFailAdvance / WorkerExitFunnel      *)
+(*                             （2026-10-17 终审 P1；W-E 窗口）。            *)
 (*   PendingFatal（变量）      SongCore handle 的 fatal_error 位（C:82-83）： *)
 (*                             SET=失败迭代（C:1136-1140）、ERASE=仅 song_seek*)
 (*                             成功路径的 reset_decode_state（C:1195-1196）、 *)
@@ -47,12 +49,14 @@
 (*                             （wasapi.rs steady_loop；heldOld = 已拉取      *)
 (*                             的一个 chunk）。                              *)
 (*   ParkLeg（¬heldOld）       D14.7 gate park（loop-top、无设备缓冲跨 park） *)
-(*   WorkerSeek                worker 串行化点上的 song_seek begin（BEFORE   *)
-(*                             一切 invalidation）。eligibility 三查         *)
-(*                             （¬aborted ∧ parked 证据 ∧ edge Open）**不    *)
-(*                             排除 pending-fatal**（reconciliation §2.2）。 *)
-(*                             begin 与 provider 返回分离：stop intent/gate  *)
-(*                             release/edge stop 均可落在 FFI 调用中途。     *)
+(*   SeekEligibilityPass /     worker 串行化点上的 song_seek（BEFORE 一切    *)
+(*   SeekProviderBegin         invalidation）：eligibility 三查（¬aborted ∧  *)
+(*                             parked 证据 ∧ edge Open）**不排除             *)
+(*                             pending-fatal**（reconciliation §2.2）；通过  *)
+(*                             与 provider begin 之间是显式模型窗口（终审    *)
+(*                             P2 拆分表达：intent / edge stop / settlement  *)
+(*                             均可落入），begin 与 provider 返回再分离      *)
+(*                             （Q6-v：stop 可落在 FFI 调用中途）。          *)
 (*   SeekRefusedUnchanged      song_seek 的「证毕 pre-mutation 拒绝」：零     *)
 (*                             invalidation、余量保留补完、命令消费。        *)
 (*                             **pendingFatal UNCHANGED 是承重点**            *)
@@ -127,8 +131,9 @@
 (*   MutationOldCursorResumeAfterApplied  D-T1：Applied 后旧 cursor 生产      *)
 (*   MutationRefusedClearsLatch           D-T2：Refused 被误当 Applied 清 latch*)
 (*   MutationLoopTopStopExit              D-T3：canceled seek 位置伪造 stop 退出*)
-(*   MutationAppliedKeepsLatch            D-T4：Applied 不擦除 latch 且旧循环  *)
-(*                                        复跑 → 旧 fatal 落入新 continuation  *)
+(*   MutationAppliedKeepsLatch            D-T4：Applied 不擦除 latch（单缺陷， *)
+(*                                        终审 P2）→ 新 continuation 下一次读  *)
+(*                                        复现旧 fatal → 非法 failure 发布     *)
 (***************************************************************************)
 EXTENDS Naturals
 
@@ -163,7 +168,8 @@ ASSUME Mutation \in MutationChoices
 VARIABLES
     \* —— 两条腿的位置（协议串行化点的抽象）——
     worker,           \* "idle" | "writing_old" | "writing_partial"
-                      \* | "seeking" | "repositioned" | "decode_failed"
+                      \* | "seek_eligible" | "seeking" | "repositioned"
+                      \* | "decode_failed"
     parked,           \* render leg 停在 loop-top gate（不持有设备缓冲）
     \* —— stale-PCM 三库（D14.5 reservoir accounting 的抽象）——
     edgeOld,          \* edge 队列可能还有旧 PCM
@@ -255,7 +261,7 @@ Init ==
 
 \* loop-top 之后取一个旧 chunk 解码进 staging。guard ¬pendingFatal 正是
 \* 「latch 存在时下一次读必复现」（C 入口先于一切出帧）——surface 分支在
-\* ReadSurfacesFatal。读不检查 edge terminal（生产在 loop-top 与 read 之间
+\* FatalFailurePublish。读不检查 edge terminal（生产在 loop-top 与 read 之间
 \* 无任何 terminal 检查），故本动作不受 stopIntent/edgeTerminal 门控。
 WriteOld ==
     /\ worker = "idle"
@@ -364,26 +370,71 @@ RemainderFlushStopExit ==
                    oldCursorResumed, fatalLatchedEver,
                    refusedWhileLatched>>
 
-\* pending-fatal surfacing：下一次读在 C 入口复现 latch（C:1111-1113）→
-\* adapter Err → decode_failed + edge.fail + return（session.rs:896-900）。
+\* pending-fatal surfacing（1/3）——错误发布：下一次读在 C 入口复现 latch
+\* （C:1111-1113）→ adapter Err → decode_failed（session.rs:896-900）。
 \* **不受 stopIntent/edgeTerminal 门控**——R1.1 的核心事实：default position
-\* 上 pending fatal 胜过 stop。publication+settlement 同一 publish_evidence
-\* 锁程 → 与退出/提交原子（completion.rs:1319-1331；融合引用见
-\* PENDING_FATAL_DAG §2）。edge.fail 尊重 first-wins（EOF 已提交不被覆盖）。
-ReadSurfacesFatal ==
-    /\ worker = "idle"
+\* 上 pending fatal 胜过 stop。publication + settlement 同一 publish_evidence
+\* 锁程（completion.rs:1319-1331），故二者原子；**edge.fail 与退出漏斗不在
+\* 该锁程**（同一 Err 臂的后续独立语句 + :928 漏斗，终审 P1 更正——不得以
+\* 锁程理由融合）。exitPath 是路由 ghost：Err 臂必然 return，路由在此确定。
+\* 新 continuation 的 surfacing（D-T4 诊断形状）从 "repositioned" 同样可达：
+\* 入口复现先于一切且不区分位置；但生产 hold 期间无读（:719-774 等待），故
+\* repositioned 臂要求已 commit（恢复生产在 commit 路由之后，:775-778）。
+FatalFailurePublish ==
+    /\ worker \in {"idle", "repositioned"}
+    /\ (worker = "idle" \/ committed)
     /\ pendingFatal = TRUE
+    /\ ~workerFailurePublished
     /\ ~workerGone
     /\ worker' = "decode_failed"
     /\ workerFailurePublished' = TRUE
-    /\ edgeTerminal' = IF edgeTerminal = "open" THEN "failed" ELSE edgeTerminal
-    /\ workerGone' = TRUE
     /\ exitPath' = "surfacedFatal"
     /\ committedOutcome' = "failedDecode"
     /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
                    cutRequested, landing, committed, seekFailed, stopIntent,
-                   pendingFatal,
-                   drainVerdict,
+                   edgeTerminal, pendingFatal,
+                   workerGone, drainVerdict,
+                   seekFromPartial, remainderLost, producedAfterFailure,
+                   oldDrainEver, oldAfterCommit, posMixAfterCommit,
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
+
+\* pending-fatal surfacing（2/3）——edge 终态推进：Err 臂的 edge.fail()
+\* （session.rs:898；MutatedThenFailed 臂的 :675 同形）。**publish_evidence
+\* 锁程之外**（锁已释放）→ 与 request_stop 的 edge.stop()（W-A 窗口）及
+\* intent 记录真实可交错（终审 P1 的合法序列：settlement 先提交 Failed，
+\* stop 的 edge.stop 抢先置 Stopped，本动作 first-wins 不覆盖）。
+\* first-wins：已提交的 EOF/Stopped/Failed 不被改写（edge.rs:190-201）。
+WorkerEdgeFailAdvance ==
+    /\ worker = "decode_failed"
+    /\ ~workerGone
+    /\ edgeTerminal' = IF edgeTerminal = "open" THEN "failed" ELSE edgeTerminal
+    /\ UNCHANGED <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
+                   cutRequested, landing, committed, seekFailed, stopIntent,
+                   pendingFatal, workerFailurePublished,
+                   workerGone, exitPath, drainVerdict, committedOutcome,
+                   seekFromPartial, remainderLost, producedAfterFailure,
+                   oldDrainEver, oldAfterCommit, posMixAfterCommit,
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
+
+\* pending-fatal surfacing（3/3）——退出漏斗：worker_exited(edge.terminal())
+\* （session.rs:928 → completion.rs:1062-1067；publication + settlement 同一
+\* 锁程）。**publish_evidence first-wins**（completion.rs:1322-1324：outcome
+\* 已 Some 即返回 false）：失败路线的 settlement 已在发布步发生，漏斗的
+\* worker_gone / worker_terminal 证据被丢弃——workerGone 保持 FALSE 是忠实
+\* 值，不得把「物理即将退出」编码为「worker_gone 已发布」（终审 P1）。
+\* 条件形式忠实转写 publish_evidence 的门槛；本模型内 TRUE 臂不可达
+\* （失败路线的发布步总是先 settle），与 Failed{device} 格同类的转写保留。
+\* worker' 停留 decode_failed；abort_stranded_seek 的 slot 释放是模型外
+\* bookkeeping（失败路线 cutRequested 保持原值，与既有抽象一致）。
+WorkerExitFunnel ==
+    /\ worker = "decode_failed"
+    /\ workerGone' = (committedOutcome = "none")
+    /\ UNCHANGED <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
+                   cutRequested, landing, committed, seekFailed, stopIntent,
+                   edgeTerminal, pendingFatal, workerFailurePublished,
+                   exitPath, drainVerdict, committedOutcome,
                    seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
                    oldCursorResumed, fatalLatchedEver,
@@ -566,16 +617,15 @@ RequestSeek ==
                    oldCursorResumed, fatalLatchedEver,
                    refusedWhileLatched>>
 
-\* worker 串行化点上的 song_seek begin：发生在 BEFORE 一切 invalidation
-\* （frozen order）。eligibility（¬aborted ≈ ¬stopIntent ∧ unsettled；
-\* parked 证据与 edge Open 的承重位置在 CommitCut/WorkerCut 的纪律里，
-\* 与基线一致）**不排除 pending-fatal**（reconciliation §2.2）。begin 与
-\* provider 返回分离：stop 可落在 FFI 调用中途（Q6-v）。表达注记（审查
-\* A-2）：生产对检查的取消裁决只在 :620 发生一次；本动作把检查合入原子
-\* guard，「检查之间落 intent」的窗口由 intent 落点的非确定性表达（begin
-\* 前落 → CancelSeekBookkeeping；begin 后落 → 调用照常），两序终局格均
-\* 合法，行为并集保真。
-WorkerSeek ==
+\* worker 串行化点上的 song_seek eligibility（BEFORE 一切 invalidation，
+\* frozen order）。三查（¬aborted ≈ ¬stopIntent ∧ unsettled；parked 证据的
+\* 承重位置在 CommitCut/WorkerCut 的纪律里，与基线一致；edge Open 复核）
+\* 作为一步原子 guard——通过即消费 seek_aborted=false 的裁决（生产 :620-649
+\* 的检查时序在此之后不再有取消分支）。**不排除 pending-fatal**
+\* （reconciliation §2.2）。通过 → provider begin 之间是真实窗口（终审 P2
+\* 拆分表达，替代原 A-2 的并集论证：intent / edge stop / settlement 均可
+\* 落入；M2 注入点：从 in-flight 写进入）。
+SeekEligibilityPass ==
     /\ cutRequested = TRUE
     /\ (worker \in {"idle", "writing_partial"}
         \/ (Mutation = MutationSeekMidWrite /\ worker = "writing_old"))
@@ -583,7 +633,7 @@ WorkerSeek ==
     /\ committedOutcome = "none"
     /\ edgeTerminal = "open"
     /\ ~workerGone
-    /\ worker' = "seeking"
+    /\ worker' = "seek_eligible"
     /\ seekFromPartial' = (worker = "writing_partial")
     /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
                    cutRequested, landing, committed, seekFailed,
@@ -591,6 +641,24 @@ WorkerSeek ==
                    workerFailurePublished, workerGone, exitPath,
                    drainVerdict, committedOutcome,
                    remainderLost, producedAfterFailure,
+                   oldDrainEver, oldAfterCommit, posMixAfterCommit,
+                   oldCursorResumed, fatalLatchedEver,
+                   refusedWhileLatched>>
+
+\* provider begin：eligibility 已过后的 decode_stream.seek（session.rs:650）。
+\* **无 stopIntent / edgeTerminal 复核**——生产在该检查点之后不再重查
+\* （终审 P2 的真实序列：check 通过 → intent 落入 → edge 仍 Open → 调用
+\* 照常发出）。调用已发出，返回是 program order（Q6-v）。
+SeekProviderBegin ==
+    /\ worker = "seek_eligible"
+    /\ ~workerGone
+    /\ worker' = "seeking"
+    /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
+                   cutRequested, landing, committed, seekFailed,
+                   stopIntent, edgeTerminal, pendingFatal,
+                   workerFailurePublished, workerGone, exitPath,
+                   drainVerdict, committedOutcome,
+                   seekFromPartial, remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
                    oldCursorResumed, fatalLatchedEver,
                    refusedWhileLatched>>
@@ -622,25 +690,25 @@ SeekRefusedUnchanged ==
                    oldCursorResumed, fatalLatchedEver>>
 
 \* song_seek 的「非证毕 pre-mutation 失败」（generic SEEK_ERROR 等）：旧
-\* decoder 延续不再有保证 → fail-closed：worker_failure("seek failed") +
-\* edge.fail + return（session.rs:663-675）。publication+settlement 同一
-\* 锁程 → 与提交原子。返回不受 stopIntent 门控（Q6-v）。绝不伪装成 refusal
-\* 恢复旧播放——M7 注入的正是那种恢复。
+\* decoder 延续不再有保证 → fail-closed：release_seek_without_commit +
+\* worker_failure("seek failed")（session.rs:663-675）。publication+settlement
+\* 同一锁程 → 与提交原子（Q6-iii）。edge.fail 与退出漏斗在该锁程之外，
+\* 由 WorkerEdgeFailAdvance / WorkerExitFunnel 承载（终审 P1 拆分）。
+\* 返回不受 stopIntent 门控（Q6-v）。绝不伪装成 refusal 恢复旧播放——
+\* M7 注入的正是那种恢复。
 SeekMutatedThenFailed ==
     /\ worker = "seeking"
     /\ ~workerGone
     /\ worker' = "decode_failed"
     /\ workerFailurePublished' = TRUE
-    /\ edgeTerminal' = IF edgeTerminal = "open" THEN "failed" ELSE edgeTerminal
-    /\ workerGone' = TRUE
     /\ exitPath' = "mutated"
     /\ committedOutcome' = "failedDecode"
     /\ seekFromPartial' = FALSE
     /\ cutRequested' = FALSE
     /\ UNCHANGED <<parked, edgeOld, heldOld, tailOld, tailNew,
                    landing, committed, seekFailed, stopIntent,
-                   pendingFatal,
-                   drainVerdict,
+                   edgeTerminal, pendingFatal,
+                   workerGone, drainVerdict,
                    remainderLost, producedAfterFailure,
                    oldDrainEver, oldAfterCommit, posMixAfterCommit,
                    oldCursorResumed, fatalLatchedEver,
@@ -651,14 +719,15 @@ SeekMutatedThenFailed ==
 \* ——擦除只存在于成功路径）+ 持有产量。此后该线程按 program order 等待
 \* commit 路由。返回不受 stopIntent 门控（Q6-v：stop 可落在 FFI 调用中途，
 \* 调用照常返回 Applied）。M2 注入点：worker 回到 writing_old（in-flight 写
-\* 复活）；D-T1 注入点：worker 回到 idle（旧 cursor 生产复活）；D-T4 注入点：
-\* latch 不被擦除且旧循环复跑。
+\* 复活）；D-T1 注入点：worker 回到 idle（旧 cursor 生产复活）；D-T4 注入
+\* 点：**仅 latch 不被擦除**（单缺陷，2026-10-17 终审 P2 更正——去向保持
+\* 正常 repositioned，旧 fatal 由新 continuation 的下一次读经
+\* FatalFailurePublish 的 repositioned 臂复现，surfacing 全程链入反例）。
 WorkerCut ==
     /\ worker = "seeking"
     /\ ~workerGone
     /\ worker' = CASE Mutation = MutationSeekMidWrite -> "writing_old"
-                 [] Mutation \in {MutationOldCursorResumeAfterApplied,
-                                  MutationAppliedKeepsLatch} -> "idle"
+                 [] Mutation = MutationOldCursorResumeAfterApplied -> "idle"
                  [] OTHER -> "repositioned"
     /\ edgeOld' = FALSE
     /\ landing' = TRUE
@@ -718,11 +787,14 @@ EofClose ==
                    refusedWhileLatched>>
 
 \* request_stop 的 completion-lock 步（Q6-i 融合：intent + pause/seek-hold
-\* 释放同一锁程，completion.rs:552-576）。已 settle 后的 stop 不改写终局
-\* （first-wins；迟到 stop 的稳定性归 episode-terminal-settlement 域）。
+\* 释放同一锁程，completion.rs:552-576）。**不设 committedOutcome 门槛**：
+\* 生产 request_stop「safe from any thread and any state」——settle 之后
+\* intent 照常记录、gate 照常释放、锁程外的 edge.stop() 照常执行（「after
+\* settlement: nothing changes」指终局不被改写，不是动作不发生；终审 P1
+\* 的合法交错正依赖此）。迟到 stop 的稳定性归 episode-terminal-settlement
+\* 域（D11 first-wins）。
 RecordStopIntent ==
     /\ ~stopIntent
-    /\ committedOutcome = "none"
     /\ stopIntent' = TRUE
     /\ UNCHANGED <<worker, parked, edgeOld, heldOld, tailOld, tailNew,
                    cutRequested, landing, committed, seekFailed,
@@ -879,7 +951,9 @@ Next ==
     \/ FinishWriteOld
     \/ WriteStoppedExit
     \/ RemainderFlushStopExit
-    \/ ReadSurfacesFatal
+    \/ FatalFailurePublish
+    \/ WorkerEdgeFailAdvance
+    \/ WorkerExitFunnel
     \/ ParkLeg
     \/ UnparkLeg
     \/ PullOld
@@ -890,7 +964,8 @@ Next ==
     \/ LegObserveAborted
     \/ LegObserveDrained
     \/ RequestSeek
-    \/ WorkerSeek
+    \/ SeekEligibilityPass
+    \/ SeekProviderBegin
     \/ SeekRefusedUnchanged
     \/ SeekMutatedThenFailed
     \/ WorkerCut
@@ -912,8 +987,8 @@ Spec == Init /\ [][Next]_vars
 (***************************** 安全不变式 ***********************************)
 
 TypeOK ==
-    /\ worker \in {"idle", "writing_old", "writing_partial", "seeking",
-                   "repositioned", "decode_failed"}
+    /\ worker \in {"idle", "writing_old", "writing_partial", "seek_eligible",
+                   "seeking", "repositioned", "decode_failed"}
     /\ parked \in BOOLEAN
     /\ edgeOld \in BOOLEAN
     /\ heldOld \in BOOLEAN
@@ -983,6 +1058,18 @@ RetainLatchOnRefused ==
 \* failure 即旧 fatal 落入新 continuation）。
 NoOldFatalAfterApplied ==
     landing => (~pendingFatal /\ ~workerFailurePublished)
+
+\* 诊断（diagnostic-only，非产品契约；AGENTS.md「Verification harnesses may
+\* encode stronger diagnostic checks than production contracts only when
+\* those checks are named as diagnostics」）：landing 之后不得发布 worker
+\* failure——即 NoOldFatalAfterApplied 的 publication 半边。与全称版不同，
+\* 本条不在 landing 时刻（stale latch 残留处）提前触发，从而 D-T4 的反例
+\* 必须走完「Applied → latch 保留 → 新 continuation 下一次读 → 旧 fatal
+\* surfaced → 非法 failure publication」全程链（终审 P2 验收形状）。
+\* 基线 11 条不变式不含本条；仅 D-T4 诊断 cfg 引用；基模型中本条被
+\* NoOldFatalAfterApplied 蕴含（擦除语义使 landing 后无 latch 可复现）。
+DiagnosticNoFailurePublicationAfterLanding ==
+    landing => ~workerFailurePublished
 
 \* 作用域化安全（FORMAL-PLAN Q9 REV.2）：pre-Applied continuation 上存活的
 \* latch 封死旧 continuation 的 EOF/Completed——C:1111 入口复现先于一切
@@ -1086,6 +1173,18 @@ ProbeNoStoppedEver == committedOutcome # "stopped"
 \* （MUST-FAIL 落空），套件即红。
 ProbeNoFatalSurfacing ==
     ~(exitPath = "surfacedFatal" /\ stopIntent)
+
+\* W_FAILED_DECODE_WITH_STOPPED_EDGE：终审 P1 的合法交错 witness——失败
+\* settlement（publish_evidence 锁程内）之后、worker 的 edge.fail() 之前，
+\* request_stop 完成数据面 stop（intent :553 → 锁程外 edge.stop :585-587；
+\* settle 后 request_stop 仍照常执行，只是不改写终局）→
+\* committedOutcome=failedDecode ∧ edgeTerminal=stopped 必须可达。
+\* first-wins 两半各自承重：edge.fail 不覆盖已提交的 Stopped
+\* （edge.rs:190-201），D11 不重分类已提交的 Failed（rule 1 先于一切
+\* stop-intent 咨询）。拆分前模型无法表达该交错（edge.fail 与 settlement
+\* 被错误融合），本探针在旧形状下不可达。
+ProbeNoFailedDecodeStoppedEdge ==
+    ~(committedOutcome = "failedDecode" /\ edgeTerminal = "stopped")
 
 \* W_MUTATED_THEN_FAILED：MutatedThenFailed 的 fail-closed 退出必须可达。
 ProbeNoMutatedExit == exitPath # "mutated"

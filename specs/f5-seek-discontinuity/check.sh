@@ -111,6 +111,7 @@ run_tlc "$SPEC_ROOT/probes/WitnessRefusedFatalRetained.cfg"    fail:ProbeNoRefus
 run_tlc "$SPEC_ROOT/probes/WitnessStoppedFromRealExit.cfg"     fail:ProbeNoStoppedEver        "Witness / 真实 stop-exit 的 Stopped 可达（L4）" -continue
 run_tlc "$SPEC_ROOT/probes/WitnessFatalSurfacing.cfg"          fail:ProbeNoFatalSurfacing     "Witness / pending fatal surfacing 可达（L5）" -continue
 run_tlc "$SPEC_ROOT/probes/WitnessMutatedExit.cfg"             fail:ProbeNoMutatedExit        "Witness / MutatedThenFailed 可达（L3）"   -continue
+run_tlc "$SPEC_ROOT/probes/WitnessFailedDecodeStoppedEdge.cfg" fail:ProbeNoFailedDecodeStoppedEdge "Witness / Failed{decode}×stopped-edge 合法交错可达（终审 P1）" -continue
 
 echo "== 负控制（每个 mutation 必须被抓住）"
 run_tlc "$SPEC_ROOT/mutations/M1CommitBeforeTailPurge.cfg" fail:InvStaleOutput     "Mutation / M1 CommitBeforeTailPurge（不等尾排空）" -continue
@@ -123,7 +124,7 @@ run_tlc "$SPEC_ROOT/mutations/M7ResumeAfterMutatedSeek.cfg" fail:InvFailClosed  
 run_tlc "$SPEC_ROOT/mutations/DT1OldCursorResumeAfterApplied.cfg" fail:NoOldCursorResumeAfterApplied "Mutation / D-T1 OldCursorResumeAfterApplied（cut 后旧 cursor 复活）" -continue
 run_tlc "$SPEC_ROOT/mutations/DT2RefusedClearsLatch.cfg"          fail:RetainLatchOnRefused         "Mutation / D-T2 RefusedClearsLatch（拒绝误擦 latch）" -continue
 run_tlc "$SPEC_ROOT/mutations/DT3LoopTopStopExit.cfg"             fail:TerminalCellConformance      "Mutation / D-T3 LoopTopStopExit（取消位伪造 stop 退出）" -continue
-run_tlc "$SPEC_ROOT/mutations/DT4AppliedKeepsLatch.cfg"           fail:NoOldFatalAfterApplied       "Mutation / D-T4 AppliedKeepsLatch（旧 fatal 落入新 continuation）" -continue
+run_tlc "$SPEC_ROOT/mutations/DT4AppliedKeepsLatch.cfg"           fail:DiagnosticNoFailurePublicationAfterLanding "Mutation / D-T4 AppliedKeepsLatch（单缺陷；surfacing 全程链）" -continue
 
 if [[ "$fail" -ne 0 ]]; then
   echo "F5-SEEK-DISCONTINUITY: FAILED"
