@@ -548,3 +548,258 @@ Verified on the fixed tree: the loom suite 12 passed / 0 failed with **zero warn
 12 passed + 1 warning); `cargo test -p qianqian-playback --lib` 207 passed / 0 failed; clippy
 `--all-targets -- -D warnings` clean; `cargo fmt --all --check` clean; `specs/check.sh rust`
 re-run — LANE_RC=0 with the unchanged `RESULT` set and no warnings in the lane log.
+
+## 13. D-C execution round (#289, 2026-10-17) — the pending-fatal model extension
+
+The owner decided D-C = EXTEND_EXISTING_MODEL on 2026-10-17 (receipt
+[issue #289 comment 6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387);
+decision-record §6.4; a new decision, not a backfilled #287 ruling). This round
+executed it against `origin/main` frozen at
+`0e43ef0cbac6fe21d0cd83e14875ace98c73501a`. Scope discipline held: **no
+production code, ABI, K0 or ADR change; no new taxonomy; specs-local
+representations only** (`f5-seek-implementation/` untouched — its M1–M7
+production-patch correspondence is name-stable).
+
+### 13.1 Trace-first frozen ledger (before any mutation)
+
+`specs/f5-seek-discontinuity/PENDING_FATAL_DAG.md` — the six Phase-A maps
+(EXECUTION_DAG / LOCK_BOUNDARY_MAP / WORKER_POSITION_MAP / PROVIDER_OUTCOME_MAP
+/ LATCH_LIFETIME_MAP / TERMINAL_DECISION_MAP), every line re-anchored at the
+frozen BASE_SHA (the reconciliation/migration line numbers were NOT reused),
+legal families L1–L6 and defect traces D-T1..D-T4 with the six mandatory
+fields each. The Q6 atomicity splits are load-bearing in the model:
+`RecordStopIntent` and `EdgeStopFromStop` are separate actions (the intent-
+visible-but-edge-open window exists); `WorkerSeek` (eligibility + begin) is
+separate from the three provider-return actions (stop may land mid-FFI, and
+the return actions are deliberately NOT gated on stop intent); fusions carry
+lock citations (`publish_evidence`'s single hold justifies surfacing ⊕ commit).
+
+### 13.2 Model extension and executed evidence
+
+Extended `SeekDiscontinuity.tla` (11 invariants = baseline 6 + pending-fatal
+5: `NoOldCursorResumeAfterApplied`, `RetainLatchOnRefused`,
+`NoOldFatalAfterApplied`, `ScopedLatchedFatalNoComplete`,
+`TerminalCellConformance`), 12 new actions with 1 removal (`Stop`) and every
+baseline action re-gated (read split three ways, stop split
+two ways, six real exit positions incl. the bookkeeping-only cancel, leg
+verdicts, one-shot TerminalCommit), 27 variables each justified against the
+Q5 six-question budget (27th = `refusedWhileLatched`, added by the
+2026-10-17 independent-review F2 fix to pin W_REFUSED_FATAL_RETAINED's
+shape; rejected candidates documented: latchRetained,
+stopSeen, providerOutcome, a separate workerPos). TerminalCommit is a MINIMAL
+constrained D11 projection (frozen resolver transcription; CommitCut ≠
+TerminalCommit; protocol Stop never read as D11 Stopped; the Failed{device}
+cells kept as unreachable-in-model frozen-table branches).
+
+Executed (tla2tools v1.7.4 / TLC2 2.19 / java 17.0.20.1, 4 workers, safety
+only, no fairness): **base PASS with 6330 distinct states** (15667 generated,
+exhausted; 13117/5216 before the review-round `refusedWhileLatched` witness;
+baseline was 672 — the growth is the pending-fatal × stop-window ×
+exit-position × terminal-projection dimension, no real interleaving fused away,
+no bound lowered); **11/11 witnesses reachable** (incl. the mandatory
+`W_APPLIED_ERASURE_COMPLETED` — the scoped safety did not kill the legal
+new-continuation Completed); **11/11 mutations COUNTEREXAMPLE-WITNESSED**
+with M1–M7 showing NO regression and D-T1..D-T4 each caught by its frozen
+target (D-T3 additionally evidenced by a diagnostic commit-completing trace:
+intent → edge stop → aborted drain → bogus-position exit → TerminalCommit=
+stopped, archived separately from the gate config). Calibration facts stand
+unmodified: E1-ABI/E1-WORKER remain the Rust real-behavior calibration; TLC
+results do not replace them.
+
+Round-honesty records: (1) the base run went red ONCE — the first
+`RetainLatchOnRefused` formulation was too strong and was refuted by the
+LEGAL never-latched refusal; reformulated with `fatalLatchedEver` as the
+"latch existed at refusal time" witness; the red log is archived, not washed
+by a rerun. (2) The D-T3 ledger precondition was revised after counterexample
+review (the bogus-exit mechanism is latch-orthogonal); both traces are
+archived. (3) Four D-T cfgs initially shipped with an incomplete mutation-
+constant block and failed for a configuration reason before any exploration;
+regenerated and disclosed here.
+
+### 13.3 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| F5 suite (base + 11 probes + 11 mutations) | `specs/f5-seek-discontinuity/check.sh` | `F5-SEEK-DISCONTINUITY: ALL PASS` (SUITE_RC=0, rerun after the review fixes); base 6330 distinct / 0 on queue; per-run "Finished in" observed | CHECKED-IN-MODEL bounds (MAX_TAIL=2); not production evidence |
+| Counterexample trace capture | 4 × targeted TLC runs (D-T1..D-T4) + 1 diagnostic run (D-T3 committed-cell chain) | each violates its frozen target; traces archived | evidence artifacts, not gate runs |
+| Production tree | untouched (git diff scoped to `specs/f5-seek-discontinuity/**`, `specs/README.md`, three error-system docs) | SOURCE_CHANGES=NONE / ABI_CHANGES=NONE / ADR_CHANGES=NONE | — |
+
+### 13.4 Still NOT_RUN (unchanged)
+
+Nothing new goes unexecuted by this round; the extension adds no Rust
+harness obligation (the existing E-1 harness is the calibration baseline, not
+rewritten). The pre-existing NOT_RUN items (§12.5: Windows runtime
+acceptance for cone / E-7 / carrier-B reason / close protocol) are unchanged
+and remain owned by #288/#290.
+
+### 13.5 Independent review round and fixes (2026-10-17)
+
+Three-slice fresh-context adversarial review per the campaign checklist
+(R1–R10). Delivered verdicts: authority/baseline/minimality slice **APPROVE**;
+mutation/witness/evidence slice **REVISE (3×P2, all fixed)**; the
+causal/matrix slice was interrupted by the account's 5-hour quota and is
+re-run before final verdict (its slice had no findings recorded). All seven
+P2s across the two delivered slices were fixed and the full suite re-executed
+(ALL PASS, 6330 distinct — numbers above updated):
+
+- decision-record §6.4: wrong section pointer (§12→§13) and a garbled
+  machine-parsable receipt id (now `issue #289 comment 6229911387`).
+- f5 .tla: DrainOld's comment had kept the baseline's "tail still plays out
+  after failure" rationale while the guard had moved to terminal-before-data;
+  comment corrected to the production-faithful reading (no invariant/probe
+  depended on post-failure drains).
+- ProbeNoDestructiveEver's variable was redefined (episodeFailed→
+  workerFailurePublished, a superset); the mutated-route pin now carried by
+  W_MUTATED_THEN_FAILED — redefinition documented in f5 README/RESULTS.
+- RESULTS: the D-T4 evidence sentence overclaimed (the archived trace ends at
+  the latch-retention violation; the surfacing follows by the guard but was
+  not walked) — reworded.
+- Two witnesses were shape-blind (review F2): W_REFUSED_FATAL_RETAINED now
+  pinned by the `refusedWhileLatched` ghost (the "refuse-then-latch" equal-
+  depth path no longer satisfies the antecedent), and W_FAILED_FROM_PENDING_
+  FATAL now requires `surfacedFatal ∧ stopIntent` (the L5 fatal-beats-stop
+  shape; a regression gating surfacing on ¬stopIntent would turn the witness
+  green and fail the suite). Model, probes and cfgs updated; full suite
+  re-run.
+- Evidence-retention location (local archive path + per-file inventory +
+  the D-T3 diagnostic-run recipe) now recorded in RESULTS (review F3).
+- Causal/matrix slice (third reviewer, independent suite re-execution at
+  head — reproduced 6330 distinct / 11+11 exactly): APPROVE with 5×P2,
+  all ledger/comment-accuracy fixes, none touching a guard, invariant or
+  the state space. The delta re-review caught two
+  silent application failures in the first wording commit (the A-2
+  WorkerSeek-comment sentence and the A-5 unmodeled-list declaration did
+  not match their targets and were not applied, while the fix inventory
+  claimed them — the same record-vs-artifact defect class the slice had
+  flagged at A-1); both were then applied for real with per-edit
+  occurrence asserts, together with the inventory correction (this
+  paragraph). Final state at HEAD: eligibility "lock-free reads" → three
+  separate single-lock acquisitions (ledger); the W-B first-half window's
+  nondeterministic-placement idiom disclosed in the ledger AND the
+  WorkerSeek comment; EofClose's commit-only gate labeled a model scoping
+  choice in README/.tla; processing-failure (session.rs:827-831/:856-866)
+  and panic (:914-916) exits declared outside the frozen six-path
+  inventory in the .tla header and README unmodeled lists. The fifth
+  finding (witness sensitivity overclaim) had already been independently
+  found by the mutation/witness slice's residual round and fixed at
+  9f95eef with bidirectional counterfactual verification.
+- Review-round delta re-verification (same reviewer): F1/F2(b)/F3 FIXED;
+  F2(a)'s defect-sensitivity claim was REFUTED by a reviewer counterexample
+  (under the erasure defect, ReadPartialSuccess re-latches and a plain
+  occurrence-semantics witness bit still fires). Fixed with the
+  survivor-based definition (`refusedWhileLatched' = … ∨ (pendingFatal ∧
+  pendingFatal')` — set only when the latch survives the refusal); the
+  .tla comment now states the two blind shapes it excludes. Full suite
+  re-run (run4): ALL PASS with base counts identical (15667/6330 — the
+  survivor semantics is count-neutral on the correct model and splits only
+  under the defect), L2 witness still firing.
+
+### 13.6 External final-review round (PR #292, 2026-10-17) — atomicity convergence
+
+The owner-routed independent final review of PR #292 returned REVISE
+(1×P1, 2×P2; `FULL_CAUSAL_FIDELITY = REVISE`, `PRODUCTION_DEFECT_FOUND =
+NO`, `MODEL_REFINEMENT_GAP = YES`). All three findings were verified
+against BASE_SHA source and fixed on the same PR; no production change.
+
+- **P1 (confirmed) — failure-route atomicity was over-fused.**
+  `ReadSurfacesFatal` fused `decode_failed` (publication+settlement),
+  `edge.fail()` and the `worker_exited()` funnel into one action; only the
+  publication+settlement pair shares one `publish_evidence` lock hold
+  (completion.rs:1319-1331). `edge.fail()` (session.rs:898, edge lock) and
+  the funnel (:928) are outside it, and `publish_evidence` drops evidence
+  once the outcome is settled (:1322-1324) — the old model's unconditional
+  `workerGone=TRUE` on this route was a fusion artifact. The lost legal
+  interleaving: after the failure settlement commits `Failed{decode}`,
+  `request_stop` still records intent and still executes its data-plane
+  stop ("after settlement: nothing changes" refers to the outcome, not to
+  the actions), so `committedOutcome=failedDecode ∧ edgeTerminal=stopped`
+  is a legal terminal cell (edge first-wins does not overwrite; D11 rule 1
+  never reclassifies). Fix: split into `FatalFailurePublish`
+  (publication+settlement atomic; `SeekMutatedThenFailed` split the same
+  way) → `WorkerEdgeFailAdvance` (first-wins edge advancement) →
+  `WorkerExitFunnel` (`workerGone' = (committedOutcome = "none")` — FALSE
+  on the failure route, the faithful dropped-publication value);
+  `RecordStopIntent` lost its settle gate (production `request_stop` is
+  "safe from any thread and any state"). Acceptance: new witness
+  `W_FAILED_DECODE_WITH_STOPPED_EDGE` reachable (6-state counterexample —
+  TLC counts include the initial state — archived, exactly the reviewer's
+  sequence).
+- **P2 (confirmed) — the eligibility→provider window rested on an unproven
+  union argument.** The A-2 "nondeterministic intent placement" idiom was
+  judged insufficient (correctly). Fix: explicit split
+  `SeekEligibilityPass` (atomic checks; consumes the seek_aborted verdict)
+  → `SeekProviderBegin` (no re-check — production calls the provider after
+  the checks with no re-examination, session.rs:620-650); new worker value
+  `seek_eligible`; the A-2 union argument retired from model and ledger
+  (PENDING_FATAL_DAG §1 W-B). Acceptance: base space 6330 → 7470 distinct
+  (the window states); the D-T4 chain trace passes through both actions.
+- **P2 (confirmed) — D-T4 was a double defect injection.** It changed both
+  latch erasure and worker destination (→ idle rerun), violating
+  one-mutation-one-defect, and the universal invariant fired at the landing
+  state before any surfacing. Fix: single defect (skip erasure only;
+  destination stays `repositioned`); `FatalFailurePublish` gained a
+  `repositioned` arm (see §13.7 for the re-review correction that removed
+  an initial `committed` gate whose justification overstated production);
+  added named-diagnostic
+  `DiagnosticNoFailurePublicationAfterLanding` (the publication half of
+  `NoOldFatalAfterApplied`; referenced only by the D-T4 diagnostic cfg,
+  not in the 11-invariant baseline — the AGENTS.md "named as diagnostics"
+  provision). Acceptance: the D-T4 counterexample now walks the full
+  surfacing chain (archive: counterexample-DT4-surfacing-chain-v2.log,
+  8 states, direct — no commit needed); the universal invariant's
+  violation recorded in a disclosed second run
+  (counterexample-DT4-full-invariants-v2.log, terminates at the landing
+  state as before).
+
+Post-fix full suite (f5-full-suite-run5-finalrev-fixes.log): first run all
+green — base PASS 22349/7470 exhausted; 12/12 witnesses reachable; 11/11
+mutations counterexample-witnessed; M1–M7 no regression. Also recorded in
+RESULTS: under TLC `-continue` a violating state is reported but not
+expanded, so a mutation's reported violation set is complete over its
+generated states (D-T1's extra `NoOldFatalAfterApplied` firing is a
+mutant-only post-cut re-eligibility artifact; M7's resumed worker stopping
+into a non-matrix exit cell is likewise mutant-only). PENDING_FATAL_DAG
+bumped to REV.2 (W-E window, corrected atomicity rulings, `seek_eligible`
+position row, D-T4 single-defect row). No production file touched; BASE_SHA
+line anchors unchanged.
+
+### 13.7 Re-review round (same day, 2026-10-17) — delta fixes after the final-review fixes
+
+Two fresh-context re-reviewers ran against 2a516bf after the §13.6 fixes.
+
+- **Causal-fidelity re-review: APPROVE.** All three §13.6 fixes verified
+  faithful against source (the publish_evidence lock hold, request_stop's
+  any-state behavior, the three separate single-lock eligibility
+  acquisitions, the D-T4 single-defect path); the full suite re-run was
+  line-identical to the archived run5 log; every TerminalCellConformance
+  cell was independently re-derived against the new action set with no
+  counterexample (including the compatibility arguments for the relaxed
+  `RecordStopIntent` against cells (2e)/(2g)).
+- **Evidence-integrity re-review: REVISE (docs-only).** Suite reproduced
+  exactly; the four evidence-archive files verified state-by-state;
+  findings: the stale PENDING_FATAL_DAG §8 D-T4 row contradicting the
+  REV.2 header claim, the run1/run2 base-count wording in RESULTS'
+  inventory, and two count/notation P3s.
+- **Delta fixes applied** (docs + one model guard line):
+  1. PENDING_FATAL_DAG §8 D-T4 row rewritten (single defect, diagnostic
+     target, direct chain) — the edit had been planned but never applied
+     in 2a516bf while the REV.2 header claimed it.
+  2. The `committed` gate on `FatalFailurePublish`'s `repositioned` arm
+     was removed: its justification ("production resumes reading only
+     after commit routing, :775-778") overstated production — the cutover
+     wait's `Aborted` branch (session.rs:721) exits the second wait (:750)
+     and resumes reading (:775-778) without a commit. The arm stays
+     base-dead (Applied always erases), so the base space is unchanged
+     point-for-point (22349/7470, re-verified: f5-base-rewiden-recheck-
+     run5c.log); the D-T4 counterexample is now a direct 8-state chain
+     (counterexample-DT4-surfacing-chain-v2.log; both pre-fix D-T4 logs
+     retained, marked superseded in the RESULTS inventory).
+  3. Line-citation corrections (:671-672 for the Mutated arm's
+     release+publish, :673 for its edge.fail), the witness counterexample
+     stated in TLC state-counting convention (6 states = initial + 5
+     action steps), the workerGone action count (four unconditional real
+     exits + the conditional funnel), the run1/run2 counts
+     (13117/5216) restored in the RESULTS inventory, and a disclosure note
+     for the pre-existing benign family where LegObserve* records
+     drainVerdict after settlement (inert in-model; TerminalCommit is
+     gated on the unsettled outcome).
