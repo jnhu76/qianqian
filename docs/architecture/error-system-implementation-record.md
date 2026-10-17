@@ -1094,7 +1094,7 @@ E9_TERMINAL_SINK_PROBE      B3 flush-Err probe against a real terminal — no tt
                             (§14.5), so the pipe result is the covering evidence
 ```
 
-Post-freeze amendments to §14.1–§14.7 (declared; the frozen §14.6 scenario
+Post-freeze amendments to §14.1–§14.8 (declared; the frozen §14.6 scenario
 text is byte-unchanged since 9386592):
 
 ```text
@@ -1206,13 +1206,15 @@ it could not prove PA's own sink was broken at flush time. Disposition: the
 v1 PA and interleave Ok observations are WITHDRAWN as non-discriminating;
 the v1 PB Err, PA-2 panic and EBADF observations stand (their conclusions do
 not rest on the voided step). The v2 probe below replaces the withdrawn arms
-as COMMITTED, CI-executed tests (`e9_flush_probe_*` in
+as COMMITTED, CI-executable tests (`e9_flush_probe_*` in
 `apps/headless/src/machine_input/tests.rs`, cfg(unix)): one child, ONE sink,
 no intermediate flush, the row's arrival OBSERVED by the parent before the
 close (the premise is synchronized, not assumed — a missing row REFUTES it
 and fails the test), and the same-sink second `print!` as the brokenness
 proof. The v2 PA test doubles as the automated tripwire for revisit trigger
-T3 (decision-record §7.4): a std Stdout-buffering change fails it.
+T3 (decision-record §7.4): a std buffering regression (the '\n' no longer
+draining, or the flush writing on an empty buffer) fails it via its premise,
+flush-value, or brokenness oracle.
 
 RQ answers (evidence in parentheses):
 
@@ -1231,8 +1233,8 @@ RQ4 unflushed data after a successful print!  NO for '\n'-terminated rows (v2 PA
                                               test e9_flush_probe_newline_row_
                                               flush_ok_on_proven_broken_sink: the
                                               row is OBSERVED in the pipe before
-                                              the close, the run's ONLY flush
-                                              returns Ok, and the SAME-sink second
+                                              the close, the arm's single
+                                              flush returns Ok, and the SAME-sink second
                                               print! panics — the sink was broken
                                               and the flush still performed no
                                               write)
@@ -1246,16 +1248,18 @@ RQ5 another writer leaves buffered data       the mechanism exists only for a NO
 RQ6 real independent error window             NO_WITH_SCOPE for the production shape
 ```
 
-v2 probe (the committed tests ARE the receipt: the instrument is versioned in
-this repository and re-executed by the required CI lanes, so the source is
+v2 probe (grade: L2_STD_PROBE-equivalent — bare-Stdout characterization; the
+child arm carries no qianqian machinery, the harness is qianqian test code;
+the committed tests ARE the receipt: the instrument is versioned in this
+repository and re-executed by the required Linux CI lane, so the source is
 NOT duplicated here; the parent test bodies own the pipe/gate/close order):
 
 ```text
 PA+PA-2  ONE child, ONE real pipe sink: print!('\n'-terminated row) with NO
      intermediate flush; the parent OBSERVES the row in the pipe (premise
      oracle: the '\n' flushed it), closes the read end, releases the gate;
-     the run's ONLY flush() ⇒ Ok(()) asserted on the child witness; a second
-     print! on the SAME sink panics ("failed printing to stdout" +
+     the arm's single flush() ⇒ Ok(()) asserted on the child witness; a
+     second print! on the SAME sink panics ("failed printing to stdout" +
      "Broken pipe") ⇒ the sink was broken when the flush returned Ok ⇒ that
      Ok can only mean NO write was attempted.
      e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink
@@ -1273,9 +1277,10 @@ INTERLEAVE  a foreign non-newline tail is carried to the fd by the NEXT row's
 ```
 
 Mutant checks (local, archived `290-r2-flushprobe/mutant-*.log`): a
-newline-terminated PB tail kills the PB test (the child prints
-`FLUSH=Ok(())`; the Err-marker wait times out); dropping PA's second `print!`
-kills the PA test (the brokenness witness never appears). Both oracles bite.
+newline-terminated PB tail kills the PB test (the child's flush then finds
+an empty buffer, so the Err-marker wait times out); dropping PA's second
+`print!` kills the PA test (the brokenness witness never appears). Both
+oracles bite.
 
 v1 probe (SUPERSEDED — kept verbatim for the record; scratch std-only binary
 `flushprobe`, no qianqian code; run logs `flushprobe-build/run/run2/run3.log`
@@ -1543,9 +1548,9 @@ Surviving evidence, scoped honestly:
     `290-r2-flushprobe/`): e9_flush_probe 4/4 green
     (flushprobe-v2-first-run.log), machine_input module 45/45
     (module-machine_input-full.log), mutant kills PA/PB
-    (mutant-PA-no-second-print.log / mutant-PB-newline-tail.log); the
-    committed tests' CI receipts ride this PR's required lanes at the
-    repair tip.
+    (mutant-PA-no-second-print.log / mutant-PB-newline-tail.log); CI
+    receipts for the committed tests will ride the repair tip's Linux lane
+    (cfg(unix)) and are to be recorded here once green.
 ```
 
 The lost raw logs are not claimed as verification anywhere; each §14.8 claim

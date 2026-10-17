@@ -377,8 +377,8 @@ NO independent error window at the flush:
   on a real pipe);
 - a successful '\n'-terminated `print!` leaves an EMPTY buffer — committed v2
   probe `e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink`: the row
-  is OBSERVED in the pipe before the parent closes the read end, the run's
-  ONLY `flush()` then returns Ok, and a second `print!` on the SAME sink
+  is OBSERVED in the pipe before the parent closes the read end, the arm's
+  single `flush()` then returns Ok, and a second `print!` on the SAME sink
   panics with `Broken pipe` — so the sink was broken when the flush returned
   Ok and that Ok can only mean no write was attempted;
 - a flush Err therefore requires a non-newline tail in the buffer (committed
@@ -393,8 +393,9 @@ Repair note: the round's v1 scratch probe was withdrawn at this point by the
 owner's P1 review (2026-10-17) — its PA/interleave arms flushed explicitly
 before the observed flush and its PA-2 control ran on a different process's
 sink, so its Ok observations were non-discriminating (§14.8.3). The v2 probe
-is committed, CI-executed tests (`e9_flush_probe_*`, cfg(unix)); the
-instrument no longer depends on this record's transcription.
+is committed tests (`e9_flush_probe_*`, cfg(unix)), to be CI-executed by the
+repair tip's Linux lane; the instrument no longer depends on this record's
+transcription.
 
 Scope: Linux pipe + regular-file probes; terminal NOT_RUN (no tty in the
 harness; the interop console proxy is a pipe — §14.5/§14.7); std EBADF
@@ -430,9 +431,9 @@ T1  any production stdout writer that can emit a non-newline-terminated tail
 T2  any reshaping of the :274 closure (write!+flush batching, a different
     writer, a buffered-by-default writer swap)
 T3  a std contract change to Stdout buffering (LineWriter) — the committed
-    v2 PA probe is the automated tripwire for exactly this: a buffering
-    change makes `e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink`
-    fail (its premise oracle or its brokenness oracle)
+    v2 PA probe is the automated tripwire for a buffering regression: it
+    makes `e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink` fail
+    via its premise, flush-value, or brokenness oracle
 T4  flush-Err evidence from any §14.7 NOT_RUN lane — a native Windows
     console session or a real terminal sink on any platform (the interop
     proxy cannot reach either)

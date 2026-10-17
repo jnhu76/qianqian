@@ -1760,7 +1760,7 @@ fn e9_flush_probe_child() {
     };
     match mode.as_str() {
         // PA+PA-2, ONE sink: '\n'-terminated print! with NO intermediate
-        // flush; the run's ONLY flush must then return Ok against the closed
+        // flush; the arm's only flush must then return Ok against the closed
         // pipe; a second print! on the SAME sink must panic, proving the sink
         // was broken when that Ok was returned.
         "pa" => {
@@ -1773,7 +1773,7 @@ fn e9_flush_probe_child() {
             witness(true, &format!("Q290-PA2-PRINT_PANIC={}", w.is_err()));
             std::process::exit(0);
         }
-        // PB control: a non-newline tail stays buffered; the run's ONLY flush
+        // PB control: a non-newline tail stays buffered; the arm's only flush
         // performs the write and must Err (Broken pipe) — flush CAN fail
         // standalone while print! succeeded (the INJECTED shape production
         // does not have).
@@ -1867,7 +1867,7 @@ fn read_row_then_close(child: &mut std::process::Child, needle: &str, premise: &
 // PROPERTY (B3 v2 PA+PA-2): with the production writer shape ('\n'-terminated
 // row), a successful newline print! leaves the LineWriter EMPTY — proven on
 // ONE real pipe sink in one child: the row is OBSERVED in the pipe before the
-// parent closes the read end; the run's ONLY flush() then returns Ok against
+// parent closes the read end; the arm's single flush() then returns Ok against
 // the closed pipe; and a second print! on the SAME sink panics with
 // "failed printing to stdout: Broken pipe" — so the sink was broken when the
 // flush returned Ok, and that Ok can only mean "no write was attempted".
@@ -1902,7 +1902,7 @@ fn e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink() {
 
 // PROPERTY (B3 v2 PB control): a NON-newline tail stays buffered after a
 // successful print! (if it had reached the fd, the only flush would find an
-// empty buffer and return Ok), so the run's ONLY flush performs the write and
+// empty buffer and return Ok), so the arm's single flush performs the write and
 // MUST Err Broken pipe — flush CAN fail standalone while print! succeeded.
 // This is the INJECTED writer shape production does not have (all
 // format_status rows end '\n', RQ1): the counterfactual that makes the PA
