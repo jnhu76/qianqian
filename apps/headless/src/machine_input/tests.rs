@@ -1716,6 +1716,273 @@ fn e9_real_reader_stderr_healthy_sight_control() {
     );
 }
 
+// --- E-9 B3 v2 flush-Err probe: real-Stdout sink experiments ------------------
+//
+// Owner P1 repair (PR #293 review, 2026-10-17): the round's v1 scratch probe
+// had an explicit flush() BETWEEN the print! and the observed flush in its PA
+// and interleave arms, so its FLUSH=Ok(()) could not distinguish "the '\n'
+// already drained the buffer" from "my own earlier flush did" — and its PA-2
+// control ran on a different process's sink, so it could not prove PA's own
+// sink was broken at flush time. These committed tests replace those arms
+// (v2): one child, ONE sink, no intermediate flush, the row's arrival
+// OBSERVED by the parent before the close, and the same-sink second print!
+// as the brokenness proof.
+
+/// Child-process selector for the B3 v2 flush-Err probe.
+#[cfg(unix)]
+const E9_FLUSH_PROBE: &str = "QIANQIAN_E9_FLUSH_PROBE";
+
+// PROPERTY (B3 v2 child arm): bare-Stdout choreography only (no episode
+// machinery). Every arm records on the healthy stderr and exits explicitly —
+// the harness's own result print must not run into a possibly-broken stdout.
+// The arms deliberately print '\n'-TERMINATED literals: whether the newline
+// flushes the buffer is the property under test (the production shape is
+// print!("{line}") with every row '\n'-terminated, RQ1).
+#[test]
+#[cfg(unix)]
+#[allow(clippy::print_with_newline)]
+fn e9_flush_probe_child() {
+    use std::io::Write as _;
+    let Ok(mode) = std::env::var(E9_FLUSH_PROBE) else {
+        return;
+    };
+    // The parent writes "go" only after it has observed the expected pipe
+    // content and closed its read end, so everything after the gate is
+    // strictly post-break (no scheduling premise).
+    let gate = || {
+        let line = std::io::stdin()
+            .lock()
+            .lines()
+            .next()
+            .expect("the parent's gate line")
+            .expect("read the gate line");
+        assert_eq!(line, "go");
+    };
+    match mode.as_str() {
+        // PA+PA-2, ONE sink: '\n'-terminated print! with NO intermediate
+        // flush; the run's ONLY flush must then return Ok against the closed
+        // pipe; a second print! on the SAME sink must panic, proving the sink
+        // was broken when that Ok was returned.
+        "pa" => {
+            print!("Q290-PA row\n");
+            witness(true, "Q290-PA PRINTED");
+            gate();
+            let r = io::stdout().flush();
+            witness(true, &format!("Q290-PA FLUSH={r:?}"));
+            let w = catch_unwind(|| print!("Q290-PA2 row\n"));
+            witness(true, &format!("Q290-PA2-PRINT_PANIC={}", w.is_err()));
+            std::process::exit(0);
+        }
+        // PB control: a non-newline tail stays buffered; the run's ONLY flush
+        // performs the write and must Err (Broken pipe) — flush CAN fail
+        // standalone while print! succeeded (the INJECTED shape production
+        // does not have).
+        "pb" => {
+            print!("Q290-PB tail-no-newline");
+            witness(true, "Q290-PB PRINTED");
+            gate();
+            let r = io::stdout().flush();
+            witness(true, &format!("Q290-PB FLUSH={r:?}"));
+            std::process::exit(0);
+        }
+        // RQ5 mechanism: a foreign non-newline tail is carried to the fd by
+        // the NEXT row's own print! (the parent observes both in the pipe
+        // before any flush ran); the trailing flush has nothing left to do,
+        // and the closing same-sink print! must panic.
+        "interleave" => {
+            print!("Q290-RQ5 foreign tail");
+            print!("Q290-RQ5 row\n");
+            witness(true, "Q290-RQ5 PRINTED");
+            gate();
+            let r = io::stdout().flush();
+            witness(true, &format!("Q290-RQ5 FLUSH={r:?}"));
+            let w = catch_unwind(|| print!("Q290-RQ5-BROKE row\n"));
+            witness(true, &format!("Q290-RQ5-PRINT_PANIC={}", w.is_err()));
+            std::process::exit(0);
+        }
+        other => panic!("unknown flush-probe mode {other:?}"),
+    }
+}
+
+#[cfg(unix)]
+fn spawn_flush_probe_child(mode: &str) -> std::process::Child {
+    std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "machine_input::tests::e9_flush_probe_child",
+            "--nocapture",
+        ])
+        .env(E9_FLUSH_PROBE, mode)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn the flush-probe child")
+}
+
+/// Reads the child's piped stdout until `needle` arrives, then CLOSES the
+/// read end (dropped inside the thread) BEFORE reporting — when the parent
+/// proceeds, the pipe is provably broken, with no scheduling premise.
+/// Deadline: kill the child and fail naming the refuted premise (a missing
+/// row REFUTES the v2 premise; it is never a pass).
+#[cfg(unix)]
+fn read_row_then_close(child: &mut std::process::Child, needle: &str, premise: &str) -> String {
+    use std::io::Read;
+    let stdout = child.stdout.take().expect("child stdout");
+    let (tx, rx) = mpsc::channel::<String>();
+    let needle = needle.to_owned();
+    std::thread::spawn(move || {
+        let stdout = stdout;
+        let mut text = Vec::new();
+        let mut buffer = [0u8; 4096];
+        let mut reader = stdout;
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    text.extend_from_slice(&buffer[..n]);
+                    if text.windows(needle.len()).any(|w| w == needle.as_bytes()) {
+                        break;
+                    }
+                }
+            }
+        }
+        drop(reader); // close the read end BEFORE the parent learns of the row
+        let _ = tx.send(String::from_utf8_lossy(&text).into_owned());
+    });
+    match rx.recv_timeout(Duration::from_secs(30)) {
+        Ok(text) => text,
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!(
+                "BLOCKED/PREMISE REFUTED ({premise}): the expected bytes never reached \
+                 the pipe inside the bound — the newline print! did not drain the \
+                 LineWriter; this REFUTES the §14.8.3 v2 premise and must fail"
+            );
+        }
+    }
+}
+
+// PROPERTY (B3 v2 PA+PA-2): with the production writer shape ('\n'-terminated
+// row), a successful newline print! leaves the LineWriter EMPTY — proven on
+// ONE real pipe sink in one child: the row is OBSERVED in the pipe before the
+// parent closes the read end; the run's ONLY flush() then returns Ok against
+// the closed pipe; and a second print! on the SAME sink panics with
+// "failed printing to stdout: Broken pipe" — so the sink was broken when the
+// flush returned Ok, and that Ok can only mean "no write was attempted".
+// FALSIFIER: FLUSH=Err, or PRINT_PANIC=false (a healthy sink).
+#[test]
+#[cfg(unix)]
+fn e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink() {
+    use std::io::Write;
+    let mut child = spawn_flush_probe_child("pa");
+    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker(&stderr_text, "Q290-PA PRINTED", "pa child");
+    let text = read_row_then_close(&mut child, "Q290-PA row\n", "newline row reached the pipe");
+    assert!(text.contains("Q290-PA row\n"), "{text}");
+    child
+        .stdin
+        .as_mut()
+        .expect("child stdin")
+        .write_all(b"go\n")
+        .expect("release the gate");
+    wait_for_marker(&stderr_text, "Q290-PA FLUSH=Ok(())", "pa target flush");
+    wait_for_marker(&stderr_text, "failed printing to stdout", "pa second print");
+    assert_contains(&stderr_text, "Broken pipe", "pa second-print errno");
+    assert_contains(
+        &stderr_text,
+        "Q290-PA2-PRINT_PANIC=true",
+        "pa second-print witness",
+    );
+    let status = bounded_wait(&mut child, "pa child");
+    assert_eq!(status.code(), Some(0));
+    finish_text(stderr_thread, stderr_text, "pa stderr");
+}
+
+// PROPERTY (B3 v2 PB control): a NON-newline tail stays buffered after a
+// successful print! (if it had reached the fd, the only flush would find an
+// empty buffer and return Ok), so the run's ONLY flush performs the write and
+// MUST Err Broken pipe — flush CAN fail standalone while print! succeeded.
+// This is the INJECTED writer shape production does not have (all
+// format_status rows end '\n', RQ1): the counterfactual that makes the PA
+// conclusion a property of the newline shape, not of pipes in general.
+// FALSIFIER: FLUSH=Ok(()) (the tail was not buffered).
+#[test]
+#[cfg(unix)]
+fn e9_flush_probe_no_newline_tail_flush_errs_broken_pipe() {
+    use std::io::Write;
+    let mut child = spawn_flush_probe_child("pb");
+    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker(&stderr_text, "Q290-PB PRINTED", "pb child");
+    // Close WITHOUT reading: nothing is expected in the pipe, and any content
+    // would have been flushed by the print! itself (the falsifier direction).
+    drop(child.stdout.take());
+    child
+        .stdin
+        .as_mut()
+        .expect("child stdin")
+        .write_all(b"go\n")
+        .expect("release the gate");
+    wait_for_marker(&stderr_text, "Q290-PB FLUSH=Err(", "pb target flush");
+    assert_contains(&stderr_text, "BrokenPipe", "pb flush errno");
+    let status = bounded_wait(&mut child, "pb child");
+    assert_eq!(status.code(), Some(0));
+    finish_text(stderr_thread, stderr_text, "pb stderr");
+}
+
+// PROPERTY (B3 v2 INTERLEAVE / RQ5): a foreign NON-newline tail is carried to
+// the fd by the NEXT row's own newline print! — the parent observes BOTH in
+// the pipe, tail ahead of row, before any flush ran — and the trailing flush
+// has nothing left to do (Ok against the same sink, whose brokenness the
+// closing second print! proves). A stale tail therefore surfaces in the
+// already-classified print!-panic path, never in the trailing :274 flush.
+// FALSIFIER: the tail missing from the pipe, or FLUSH=Err.
+#[test]
+#[cfg(unix)]
+fn e9_flush_probe_foreign_tail_surfaces_in_next_row_print_not_flush() {
+    use std::io::Write;
+    let mut child = spawn_flush_probe_child("interleave");
+    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker(&stderr_text, "Q290-RQ5 PRINTED", "interleave child");
+    let text = read_row_then_close(&mut child, "Q290-RQ5 row\n", "row reached the pipe");
+    let tail_at = text
+        .find("Q290-RQ5 foreign tail")
+        .expect("the foreign tail must reach the pipe");
+    let row_at = text
+        .find("Q290-RQ5 row\n")
+        .expect("the row must reach the pipe");
+    assert!(
+        tail_at < row_at,
+        "the tail must be carried ahead of the row\n{text}"
+    );
+    child
+        .stdin
+        .as_mut()
+        .expect("child stdin")
+        .write_all(b"go\n")
+        .expect("release the gate");
+    wait_for_marker(
+        &stderr_text,
+        "Q290-RQ5 FLUSH=Ok(())",
+        "interleave target flush",
+    );
+    wait_for_marker(
+        &stderr_text,
+        "failed printing to stdout",
+        "interleave second print",
+    );
+    assert_contains(&stderr_text, "Broken pipe", "interleave second-print errno");
+    assert_contains(
+        &stderr_text,
+        "Q290-RQ5-PRINT_PANIC=true",
+        "interleave second-print witness",
+    );
+    let status = bounded_wait(&mut child, "interleave child");
+    assert_eq!(status.code(), Some(0));
+    finish_text(stderr_thread, stderr_text, "interleave stderr");
+}
+
 // --- E-8: main-thread report sites against real broken pipes -----------------
 
 // PROPERTY (round-frozen scenario B6 / E-8; normative source: reconciliation
