@@ -28,8 +28,8 @@
 > D-2/D-10, 2026-10-17) — each in its own labeled class so nothing silently
 > becomes adopted. Classes (a)–(d) keep their original meanings; adding (e)
 > changed no other class, and a ratified decision binds only its stated scope.
-> §7 is class (b)-shaped but stronger-labeled: a DECISION PACKAGE with the
-> ruling itself explicitly OWNER_RULING_PENDING.
+> §7 is class (b)-shaped but stronger-labeled: a DECISION PACKAGE, now
+> carrying the owner's RATIFY_OPTION_B_SCOPED ruling (§7.0, 2026-10-18).
 > The designs themselves live in the four
 > stable-named error-system documents; accepted architecture semantics live
 > only in the ADRs and documents `docs/README.md` lists as NORMATIVE
@@ -40,7 +40,8 @@
 §6 ratification proposals (superseded in place by the rulings below), §5
 implementation-state note; 2026-10-17 Gate B — §6 became OWNER_RATIFIED_DECISIONS
 and the companion authority clarifications were applied; 2026-10-17 #290 —
-§7 D-D decision package (OWNER_RULING_PENDING).
+§7 D-D decision package; 2026-10-18 — §7.0 owner ruling RATIFY_OPTION_B_SCOPED
+(recorded with the owner's scope + merge/closure bounds).
 **BASE_SHA:** `e44aa806def5729fa360be19daeb21f5436d7fd9` (all code anchors).
 **Inputs:** issue #283 REV.3 (final reports); the four error-system documents
 ([target contract](error-system-target-contract.md) / [reconciliation](error-system-reconciliation.md) /
@@ -332,16 +333,49 @@ Execution record: the implementing round and its evidence live in
 `specs/f5-seek-discontinuity/` (PENDING_FATAL_DAG.md frozen ledger; extended
 SeekDiscontinuity.tla; RESULTS.md).
 
-## 7. D-D decision package (#290, 2026-10-17) — the `:274` flush-Err disposition (OWNER_RULING_PENDING)
+## 7. D-D decision package (#290, 2026-10-17) — the `:274` flush-Err disposition (RATIFIED 2026-10-18)
 
-This section is a decision PACKAGE, not a decision: nothing below is adopted.
-Per §6's scope note, D-D remains explicitly not ratified; this package exists
-so the owner can rule from executed evidence instead of re-deriving it. The
-evidence cited here was produced by the #290 round
-(`error-system-implementation-record.md` §14.8, scenarios frozen in §14.6
-before implementation).
+### 7.0 OWNER RULING — RATIFY_OPTION_B_SCOPED (2026-10-18)
 
-### 7.1 The decision being asked for
+Ruled by the owner in the #290 evidence round (session directives of
+2026-10-17 review + 2026-10-18 confirmation; the review is not a GitHub
+comment — its verdict block was `D_D_OWNER_RULING=HOLD_PENDING_EVIDENCE_REPAIR`).
+
+```text
+D_D_OWNER_RULING = RATIFY_OPTION_B_SCOPED
+    接受当前条件下的 flush 结果丢弃，不修改产品行为，
+    并保留 T1–T4 重审条件（owner's words, 2026-10-17 review）
+```
+
+Scope of the ratification (owner-stated, binding):
+
+```text
+current writer (the :273-274 print!+flush closure)
++ current output format ('\n'-terminated single-writer rows)
++ verified std implementation (LineWriter, toolchain pinned §14.8)
++ its defined environments (§7.2 scope) ONLY
+— never "flush Err impossible everywhere on all platforms";
+  all of T1–T4 (§7.4) reopen D-D, especially native Windows
+  and a real terminal sink
+```
+
+Repair precondition: the owner's P1 (v1 probe premature flush +
+cross-process PA-2) was repaired by the committed v2 tests
+(`e9_flush_probe_*`, §7.2 repair note); the ruling followed that repair.
+
+Merged-with-this-ruling bounds: evidence PR #293 merge held by the owner
+pending the B2 test-oracle round (implementation record §14.9); issue #290
+closure must keep the NOT_RUN lanes (native Windows broken-sink, terminal
+sink) explicitly NOT counted as PASS — owner: “不能把它们悄悄计入 PASS”.
+
+Sections 7.1–7.5 below are the decision PACKAGE the ruling was made from,
+preserved as written (including its agent-recommendation label); §7.5's
+"moves from PENDING to the owner's recorded choice" has now happened, to
+RATIFY_OPTION_B_SCOPED.
+
+---
+
+### 7.1 The decision being asked for (package text, 2026-10-17)
 
 `machine_input.rs:273-274` — the reader's stdout output closure:
 
