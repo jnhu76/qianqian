@@ -803,3 +803,789 @@ Two fresh-context re-reviewers ran against 2a516bf after the §13.6 fixes.
      for the pre-existing benign family where LegObserve* records
      drainVerdict after settlement (inert in-model; TerminalCommit is
      gated on the unsettled outcome).
+
+---
+
+## 14. Machine stdout/stderr failure conformance round (#290, 2026-10-17) — E-9 three modes + E-8 main-thread report sites
+
+> **Truth class: EVIDENCE RECORD for issue #290. NOT authority; ratifies nothing.**
+> BASE_SHA `6a9b05101022ac8534dc1da791eda5f3a12a1a4a` (all line anchors below verified
+> at this SHA). Branch `evidence/machine-stdout-conformance-290`. Scope: verify the
+> EXISTING documented host-failure classes (T5-7; playback-execution-model D3/D5 §4.8;
+> migration §1.7 two-class split; reconciliation §8 E-8/E-9) against runtime reality,
+> and produce the D-D owner decision package. **PRODUCTION_BEHAVIOR_CHANGE = NONE;
+> D11/K0/ABI/ADR changes = NONE.** D-D Option A product work (if any) is a separate
+> owner-authorized PR; this round freezes scenarios first (§14.1–14.6), then records
+> results (§14.8) against them.
+
+### 14.1 SOURCE_DAG — reader status stdout (one admitted operation)
+
+```text
+physical stdin read            read_input machine_input.rs:317-319 (catch #R-read at :319)
+  ↓ read Ok(line)
+input.line(line, handle, out)  machine_input.rs:322
+  ↓ admit() :114               operation_active=true under bookkeeping mutex (None ⇒ admission closed ⇒ line() false ⇒ reader loop ends)
+  ↓ catch #R-dispatch :119     covers parse + command dispatch + format_status + output closure
+  ↓   Status ⇒ output(Stdout, format_status(observe))   :131-134
+  ↓     output closure         spawn_reader :269-278
+  ↓       Stdout ⇒ print!("{line}") :273;  let _ = io::stdout().flush() :274
+  ↓       Stderr ⇒ eprintln!("{line}") :276
+  ↓ catch is_err ⇒ operation.fail(HostFailure::Panic, handle) :142-145; line returns false ⇒ reader exits
+operation.fail ⇒ fail_with_response :166-174
+  ↓ record first_failure (get_or_insert, under mutex)   :171   ← RECORD precedes RESPONSE
+  ↓ response :160-162: if handle.observe().terminal_outcome.is_none() ⇒ handle.request_stop()
+Operation::drop :177-183       operation_active=false + notify  ← ACK after record+response
+  ↓ (reader loop exited; read_input returned)
+entry finish_episode           entry.rs:548-579
+wait_terminal :553 → dispose :554 → HostInput::seal :559
+  seal :84-100: admission_closed=true → condvar-wait !operation_active (ACK) → read first_failure
+  → report(Stderr, failure.report()) :561 → outcome_report :563-566 → machine_exit_code(host_failed⇒1) :574-578
+```
+
+Boundary answers (Phase-A questions):
+
+1. `print!` is covered by catch **#R-dispatch** (machine_input.rs:119), inside its
+   admitted operation.
+2. `HostFailure::Panic` is recorded at :143 (dispatch/output unwind), :296 (catch
+   #R-outer over the whole reader closure), :331 (read unwind).
+3. The conditional `request_stop()` runs at :160-162 — only when the observation shows
+   no committed terminal; a racing terminal makes the existing command inert.
+4. Yes — `Operation::drop` (the ack) runs when `line()` returns, which is after
+   `fail()` (record + response) completed; the condvar wait in `seal` observes it.
+5. `seal` closes admission, then waits on the completion condvar until
+   `operation_active == false`, then reads `first_failure` under the same mutex
+   (:84-100) — the result linearization point.
+6. A blocked/blocked-forever output sink stalls the reader INSIDE the admitted
+   operation (`print!`/`flush`/`eprintln!` do not return) ⇒ the Operation never drops
+   ⇒ `seal` waits at :87-93 indefinitely ("an active output effect can delay seal",
+   module doc machine_input.rs:4; ledger #5).
+7. Yes — `let _ = io::stdout().flush()` at :274 discards the flush result entirely: no
+   record, no Stop, no exit contribution, no report. It bypasses the HostFailure path
+   completely (the D-D subject).
+8. No. The panic hook (install_panic_hook_posture :217-244) runs BEFORE
+   catch_unwind and only performs diagnostic bookkeeping (class-α suppression /
+   previous-hook chaining); classification is owned by the catchers. It cannot change
+   a category.
+9. Failure admitted before seal ⇒ first_failure fixed at seal ⇒ exit 1 regardless of
+   the genuine terminal (machine_exit_code :160-170). Terminal committed before the
+   failure response ⇒ Stop arm inert, outcome keeps its D11 class. Failure arriving
+   after admission closure ⇒ `failure()`/`line()` admission returns None ⇒ discarded
+   without effect (:102-106, :114-115).
+
+### 14.2 CATCH_BOUNDARY_MAP
+
+| Catch | Covers | On unwind |
+|---|---|---|
+| #R-read :319 | one physical `read_line` | `failure(HostFailure::Panic)` :330-333 ⇒ record + conditional Stop (admits a fresh operation) |
+| #R-dispatch :119 | parse + dispatch + `format_status` + output closure (incl. `print!`, `flush`, `eprintln!`) | `operation.fail(HostFailure::Panic)` :143 ⇒ record → conditional Stop → (drop ⇒ ack) ⇒ reader exits |
+| #R-outer :295 | the entire reader closure | `failure(HostFailure::Panic)` :296 |
+| hook (process-wide, :217-244) | nothing semantic | class-α threads: `note_critical_panic()` only; others chain to previous hook |
+| main thread | **no catch** | unwind out of `run()` ⇒ process exit 101 (no `panic=abort`; Rust ignores SIGPIPE ⇒ closed pipes yield EPIPE write errors, not signal death). A closed stdio fd (EBADF) is deliberately swallowed by Rust std (pretends success) — probed on Linux this round; on Windows the swallow is std-source-derived, not probed here. A closed HANDLE never panics `print!`; only a real write error to an open descriptor does |
+
+### 14.3 HOST_FAILURE_ORDER_MAP (admitted operation)
+
+```text
+admit (:114) → work → [unwind ⇒ record :171 → response :160-162] → drop/ack :177-183 →
+owner seal: close admission → wait ack → read first_failure → reports → exit contribution
+```
+
+Physical reads are outside admission (:305-309); post-closure events are inert;
+first-failure is FIRST-WINS and bounded (one `Option<HostFailure>`).
+
+### 14.4 REPORT_SITE_INVENTORY (E-8 scope, re-verified at 6a9b051)
+
+Corrects the stale claim that "#1–#3 run on Linux without playback": #2/#3 live inside
+`reference_player_transport`, which is `#[cfg(feature = "playback")]` (entry.rs:331-332).
+
+| # | Site (HEAD) | Thread / stage | Gate | Note |
+|---|---|---|---|---|
+| 1 | entry.rs:70 (`print!` usage), :74 (`println!` version), :102-103 (`eprintln!` arg error) | main, pre-episode | none | Linux-portable real-binary |
+| 2 | entry.rs:371-373 (`println!("scanning…")` + `let _ = flush()` :373 — second discarded flush) | main, reference pre-open | `playback` | not compiled without the feature |
+| 3 | entry.rs:378 fail-stop, :387 shell failed, :404 open refused, :406 activation failure, :414 expansion refusal | main, reference open/shell phase | `playback` | ordering per arm: the :387 shell-failure report precedes `player.quit()` :390 (whose disposal); the reference failure-clean arm (`ActivationFailedClean`, :405-407) disposes the attempted root BEFORE its report (player.rs `failure_clean_start`); the report-precedes-dispose shape is the machine NotEstablished path (site #7, :515→:516) — the old ledger-#3 anchor (entry.rs:380-381) no longer exists |
+| 4 | entry.rs:529-535 (`println! source:` / `println! playing {}`) | main, machine post-establishment, BEFORE reader spawn :538 | `any(playback, test)` | broken write ⇒ 101 skipping wait_terminal/dispose/seal/reader spawn |
+| 5 | machine_input.rs:269-278 | stdin reader, per command | `any(playback, test)` (module gate lib.rs:42-43; no per-site cfg) | **E-9 scope** (protocol row) |
+| 6 | entry.rs:561-573 via `emit_machine_report` :582-587 (machine; AFTER seal); entry.rs:392-397 (reference; after quit) | main, terminal/disposal/final reports | machine: `any(playback, test)`; reference: `playback` | panic skips LATER reports only (episode already disposed; D11 committed) |
+| 7 | entry.rs:515 (`eprintln!` activation report) — **precedes `dispose()` :516** | main, machine NotEstablished | `any(playback, test)` | report panic ⇒ unwind skips dispose (root leak — `QianqianApp` has no Drop teardown) |
+
+### 14.5 FEATURE_PLATFORM_MATRIX + evidence grades
+
+Environment facts established this round (probe logs were in the round
+evidence archive — LOST after execution, §14.8.8; the values below are the
+record's own transcription and the Windows rows are re-obtainable only by a
+fresh cross-build + interop session):
+
+```text
+native/build/artifacts/libsongcore.a = Windows COFF (mingw) only; Linux ELF SongCore
+artifact NOT available in this environment; a Linux FFmpeg+SongCore rebuild is
+#172/#288 release-engineering territory and was NOT attempted to completion.
+⇒ no Linux playback-feature build (binary or test) can link here.
+
+x86_64-pc-windows-gnu cross-build with --features playback SUCCEEDS against the
+mingw artifact (target/x86_64-pc-windows-gnu/debug/qianqian{,-headless}.exe,
+PE32+, rustc 1.97.1). WSL2 interop RUNS the exe on the real Windows host:
+
+  ./qianqian.exe --version                                  ⇒ "qianqian 0.1.0", rc=0
+  ./qianqian.exe --machine play <real wav>                  ⇒ source:/playing rows,
+                                                              reader answered `status`,
+                                                              "EOF: played out completely",
+                                                              rc=0  (REAL WASAPI episode)
+  ./qianqian.exe --machine play C:\nonexistent\garbage.wav  ⇒ stderr
+                                                              "playback session failed to
+                                                              activate: decode open failed: …
+                                                              (os error 3)", rc=1, stdout empty
+  argv reference transport                                  ⇒ "scanning …" row + TUI rendered
+                                                              under interop piped stdio; the TUI
+                                                              does not terminate cleanly on a
+                                                              piped 'q' (no clean exit evidence)
+
+Interop limitation (probe-evidenced): the Windows-interop stdio proxy ABSORBS the
+exe's writes; closing the WSL-side reader does not fail the exe's writes (broken-pipe
+probe returned rc=0 through interop). A CLOSED handle (>&-) is swallowed by Rust std's
+EBADF guard (Linux-probed this round; Windows half source-derived) and additionally
+produces interop-layer noise ("write failed 22: Invalid argument" on stderr, not a
+Rust panic — interop artifact, not product evidence). ⇒ broken-pipe / full-pipe
+failure-mode experiments on the Windows exe require a native Windows console
+session (#288 host); they are NOT reproducible under interop.
+```
+
+Evidence grades used below:
+
+```text
+L2_REAL_BINARY      production binary, real assembly/runtime, real OS pipe choreography
+L1_TEST_TRANSPORT   real production dispatch/record/ack/seal/report code driven in a
+                    test-binary subprocess with a fixture episode; injection at the
+                    operation boundary only; real OS pipe choreography
+L2_STD_PROBE        std-only characterization probe (toolchain/OS behavior; no qianqian code)
+NOT_RUN(reason)     honestly not executed
+```
+
+### 14.6 BDD scenarios (frozen before implementation; results in §14.8)
+
+**B1 — reader stdout print failure** (E-9 mode 1)
+
+```text
+GIVEN   an established, unsettled episode; the reader operation admitted (:114)
+WHEN    the real status stdout protocol write fails ⇒ `print!` panics
+THEN    panic caught by #R-dispatch; HostFailure::Panic recorded FIRST (:171);
+        conditional request_stop routed to the unsettled episode (:160-162);
+        Operation ack after record+response (:177-183); seal waits ack then returns
+        Some(Panic); host exit 1 (machine_exit_code); D11 terminal NOT forged Failed
+        (real Stopped/Completed from genuine evidence); host-failure report text is
+        HostFailure::Panic.report() on stderr
+ORACLE  exit code, D11 outcome class, failure_diagnostic absence, seal value, report
+        lines — exact-value assertions, not permissive
+SIGHT CONTROL  same child with a HEALTHY stdout sink ⇒ normal completion + correct
+        rows (proves the pipe choreography does not itself create the failure)
+FALSIFIERS  (a) panic escaping the catch ⇒ reader-thread crash (exit 101 +
+        uncaught-panic stderr naming the reader thread); (b) silent diagnostic-style
+        drop ⇒ seal None + exit 0; (c) record after response/ack ⇒ seal_witness
+        snapshot ≠ 5 (existing M-F/M-S mutation class); (d) D11 forged Failed ⇒
+        outcome report "playback failed"
+```
+
+**B2 — reader stderr write failure** (E-9 mode 1, stderr arm)
+
+```text
+GIVEN   an admitted reader operation producing a real stderr diagnostic
+        ("ignored input: …" from an unparseable line, :139; "not wired yet", :135-138;
+        "cannot read seek time", :126-130)
+WHEN    that eprintln! write fails ⇒ panic
+THEN    same #R-dispatch contract as B1 (one admitted-operation failure contract;
+        migration §1.7: protocol write failure = host-operation failure)
+OBSERVED-SHAPE NOTE  the subsequent OWNER host-failure report targets the same broken
+        stderr (entry.rs:561 ⇒ emit_machine_report eprintln!) ⇒ main-thread panic ⇒
+        recorded exit 101 AFTER D11 committed — ledger #6 class ("skipping later
+        reports only"); this is the two-class boundary made observable and is
+        recorded verbatim, not normalized away
+```
+
+**B3 — flush-Err checkpoint** (E-9 mode 2; D-D subject)
+
+```text
+GIVEN   `print!` genuinely completed (write error-free) — never after a write panic
+WHEN    the explicit flush() at :274 would return Err
+THEN    record whether that state is reachable WITHOUT changing production output
+        shape (every reader stdout line is '\n'-terminated), the std writer, or
+        ordering
+CLASS LADDER (pre-registered; pick exactly one)
+        REAL_PRODUCTION_REPRODUCED     constructed on the production path as-is
+        INJECTED_WRITER_ONLY           only a non-production writer/shape constructs it
+        NOT_REPRODUCED_WITH_SCOPED_ASSUMPTIONS
+                                       not constructed; scope, attempts, toolchain,
+                                       uncovered cases stated
+        NOT_RUN                        not executed
+RESEARCH QUESTIONS (pre-registered)
+        RQ1 format_status return paths all end '\n'?      (status.rs:24-74)
+        RQ2 pinned toolchain Stdout buffering?            (std source + behavior)
+        RQ3 pipe/terminal/file differences?               (probe)
+        RQ4 after a successful print!, can the buffer still hold unflushed data?
+        RQ5 can another writer leave buffered data between print! and flush?
+            (single-writer discipline per transport phase — §14.1)
+        RQ6 is there a real independent error window without reshaping output?
+PROBE DESIGN (L2_STD_PROBE, std-only, no qianqian code)
+        PA newline-terminated: print!('\n'-terminated line) succeeds into a pipe;
+        parent closes read end; child flush() ⇒ if Ok, flush performed NO write
+        (a write would EPIPE); control: a second print! then MUST panic
+        PB no-newline tail (INJECTED shape): print! without '\n' stays buffered;
+        flush() performs the fd write ⇒ can Err while print! succeeded
+IN-REPO L1   output closure that swallows a flush-shaped Err exactly like :274 ⇒
+        line() returns true, no record, no Stop, seal None (current behavior is
+        INDIFFERENT to flush Err); negative control inside the same test: a
+        closure that PANICS ⇒ false + Panic recorded (proves the harness
+        distinguishes swallow from panic)
+```
+
+**B4 — blocked output** (E-9 mode 3)
+
+```text
+GIVEN   reader admitted; writing to a real sink that stops consuming
+WHEN    sink stays blocked
+THEN    reader stays inside its admitted operation; seal cannot complete; no
+        "reader joined" claim; no synthetic completion; after the sink releases the
+        real operation completes and classification is CORRECT (blocking is not a
+        failure: no record, no Stop, exit per genuine outcome)
+WATCHDOG  kill/timeout is safety equipment only; if it fires the result is
+        INCONCLUSIVE/BLOCKED, never PASS
+```
+
+**B5 — late output failure vs seal boundary**
+
+```text
+Covered by existing oracles (cited, executed again this round):
+  seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work  (retention + rejection)
+  admitted_output_panic_records_before_ack_even_during_seal                (ack ordering)
+  postseal_commands_reports_and_failures_are_inert                          (late events)
+  first_failure_storage_is_bounded_and_sealed_result_immutable              (first-failure cut)
+  preseal_failure_preserves_natural_completed_and_runtime_failed            (D11 immutability)
+```
+
+**B6 — main-thread broken pipe (E-8, per site)**
+
+```text
+GIVEN   the target report site's real execution path is reached (sight control:
+        healthy-sink run of the same site captures the exact report line first)
+WHEN    its stdout/stderr write hits a closed downstream pipe
+THEN    record the ACTUAL process behavior (panic 101 / caught / other) per platform
+        lane; panic paths must show exit 101 + std panic text naming the site
+ATTRIBUTION  healthy-control content match + (stdout-broken cases) panic location in
+        the captured default-hook message + partial-output witnesses; a process exit
+        not demonstrably caused by the named site is NOT attributed to it
+DISPOSAL-SKIP (sites #3/#4/#7)  runtime disposal witness only via a test-transport
+        child that observes its disposed marker after catching the unwind
+        (disposed=false ⇒ skip witnessed at L1; the real-binary skip remains
+        source-inferable — no runtime witness claimed without one)
+```
+
+### 14.7 NOT_RUN register (pre-declared)
+
+```text
+E9_WIN_BROKEN_SINK          reader print-panic/broken pipe under REAL Windows playback —
+                            interop stdio proxy absorbs downstream closure (§14.5); needs
+                            native Windows console session
+E9_WIN_BLOCKED_SINK         same interop limitation for a deterministic full-pipe
+E8_WIN_BROKEN_PIPE_SITES    all E-8 broken-pipe rows on Windows — same limitation
+E8_LINUX_PLAYBACK_REAL_BIN  #2/#3/#7 + the #6 reference arm (:392-397) real-
+                            binary on Linux — no Linux ELF SongCore
+                            artifact in this environment (§14.5)
+E8_SITE3_FAILSTOP_ARM       reference fail-stop (entry.rs:378) needs a latched §G.6
+                            violation — not constructible by argv; not forced
+E9_TERMINAL_SINK_PROBE      B3 flush-Err probe against a real terminal — no tty in
+                            this harness; the WSL-interop console proxy is a pipe
+                            (§14.5), so the pipe result is the covering evidence
+```
+
+Post-freeze amendments to §14.1–§14.8 (declared; the frozen §14.6 scenario
+text is byte-unchanged since 9386592):
+
+```text
+§14.1  admit-line wording precision (None ⇒ line() false ⇒ reader loop ends —
+       not merely "drop the line"); R1 review NOTE.
+§14.4  site-#3 note rewritten: the imported ledger-#3 anchor (entry.rs:380-381)
+       no longer exists; the ordering facts were re-derived per arm (R1 review
+       P1: the reference failure-clean arm disposes BEFORE its report).
+§14.4  site-#5 gate cell corrected "always" → any(playback, test) — the module
+       gate (lib.rs:42-43) governs; verified against source (R1 review P1).
+§14.7  E8_LINUX_PLAYBACK_REAL_BIN extended with the #6 reference arm
+       (:392-397) — the matrix's Linux gap was registered incompletely
+       (R3 review); E9_TERMINAL_SINK_PROBE added after the B3 probe ran
+       (terminal lane unavailable).
+§14.8.3 B3 probe replaced by the P1 repair (owner review of this PR,
+       2026-10-17): the v1 scratch probe's PA and interleave arms had a
+       premature flush between print! and the observed flush (and the PA-2
+       control ran on a different process's sink), so their FLUSH=Ok
+       observations were non-discriminating and are WITHDRAWN; the v2 probe
+       is the committed `e9_flush_probe_*` tests (one sink, no intermediate
+       flush, the row's arrival observed by the parent, same-sink second
+       print! as the brokenness proof). §14.8.8(b)/(g) updated accordingly.
+```
+
+### 14.8 Results
+
+Executed 2026-10-17 on branch `evidence/machine-stdout-conformance-290` at base
+6a9b051 + C1 9386592, toolchain rustc 1.97.1 (8bab26f4f 2026-07-14 — the std whose
+panic text/locations appear below). Lanes: Linux native (test transport + REAL
+pipes; no Linux playback artifact exists — §14.5), Windows only via WSL interop
+(healthy-sink real-Windows rows). Every run was a separate archived full log
+per the round's evidence contract; the session-local archive was lost after
+execution (disclosed in §14.8.8), so the surviving record is the committed
+oracles below plus the PR CI logs. Exact-value assertions below are quoted
+from the test oracles, not paraphrased.
+
+#### 14.8.1 B1 — reader stdout print failure (EVIDENCED; lane: test-transport child + REAL pipe)
+
+Child = REAL `spawn_reader` over real stdin inside a REAL admitted operation
+(test transport; grade L1_TEST_TRANSPORT per §14.5 — the real reader thread,
+real pipes, in-process composition); parent polls the arming marker on the
+healthy stderr, closes the stdout read end, then writes `status`.
+
+```text
+witness (child stderr, captured):
+  Q290-ARMED
+  Q290-E9-UNWIND=1 Q290-E9-D11=Stopped Q290-E9-DISPOSED=1 Q290-E9-SEAL=Some(Panic)
+asserted by the parent (exact-value):
+  HostFailure::Panic.report() reached the healthy stderr;
+  "failed printing to stdout" + "Broken pipe" on stderr — the transport's
+  final OUTCOME ROW panicked on MAIN against the same broken stdout and the
+  panic text reached the healthy stderr (ledger #6: later reports only, after
+  D11 committed; the host-failure report itself SUCCEEDED on the healthy
+  stderr — that is the first asserted bullet);
+  child exit 0 through its witness path (no escaped panic, no crash exit).
+```
+
+The parent wrote only `status` — the `Stopped` terminal was committed by the
+host failure's own conditional Stop response (the stop-routing property,
+machine_input.rs:160-162); the host failure is a separate record, never merged
+into the terminal fact. Terminal preservation against a PRE-EXISTING user stop
+is a different property, carried by the L1 oracles
+`existing_user_stop_and_host_failure_keep_one_genuine_terminal` and
+`preseal_failure_preserves_natural_completed_and_runtime_failed` (green, B5).
+Sight control (`*-healthy` twin, same choreography, no break): full row set
+(`source:`, `playing`, `outcome:`, `stopped before completion`), stderr carries
+no host failure, exit 0 — the pipe choreography itself creates no failure.
+Falsifiers: (a) escaped panic — at this lane `UNWIND=1` cannot by itself
+distinguish the #R-dispatch catch from the #R-outer boundary (both classify
+identically); the catch-holding property is carried by the L1 oracles
+(`reader_output_panic_full_transport_contract` and the flush test's panic
+arm), which fail loudly if the catch is removed; (b) silent drop ⇒
+`SEAL=Some(Panic)` asserted; (c) record-after-response ⇒ B5 oracles green;
+(d) forged Failed ⇒ D11=Stopped asserted. Tests:
+`e9_real_reader_stdout_epipe_*`, `e9_real_reader_stdout_healthy_*`.
+
+#### 14.8.2 B2 — reader stderr write failure (EVIDENCED; lane: test-transport child + REAL pipe)
+
+Same child shape; parent verifies the transport rows reached the open pipe
+(`source:`, `playing`) BEFORE closing stderr, then writes `badcmd` (real
+`:139` "ignored input" diagnostic path). Captured/asserted:
+
+```text
+  Q290-E9-UNWIND=1 Q290-E9-D11=Stopped Q290-E9-DISPOSED=1 Q290-E9-SEAL=Some(Panic)
+  stdout (healthy) does NOT contain "stopped before completion" — the owner's
+  outcome row was skipped by the host-failure report's own panic on the same
+  broken stderr (the OBSERVED-SHAPE NOTE of §14.6-B2, recorded verbatim).
+```
+
+Sight control (`stderr-healthy`): the diagnostic reaches the healthy stderr,
+full report set completes, no host failure. Tests: `e9_real_reader_stderr_epipe_*`,
+`e9_real_reader_stderr_healthy_*`.
+
+#### 14.8.3 B3 — flush-Err checkpoint: class verdict `INJECTED_WRITER_ONLY`
+
+The frozen ladder asks for exactly one class. The executed verdict is
+**INJECTED_WRITER_ONLY**, with the stronger scoped statement: with the current
+production output shape there is **no independent error window** at the `:274`
+flush — every condition that would make `flush()` fail already made the
+preceding `print!` fail (and that path is classified as `HostFailure::Panic`).
+
+**P1 probe repair (owner review of this PR, 2026-10-17).** The round's v1
+scratch probe (kept below, SUPERSEDED) was defective in a way that voids its
+central observation: in its PA and interleave arms an explicit `flush()` sat
+BETWEEN the `print!` and the observed flush, so the observed `FLUSH=Ok(())`
+proved only "nothing pending after an explicit flush" — true under ANY
+buffering regime — and its PA-2 control ran on a DIFFERENT process's sink, so
+it could not prove PA's own sink was broken at flush time. Disposition: the
+v1 PA and interleave Ok observations are WITHDRAWN as non-discriminating;
+the v1 PB Err, PA-2 panic and EBADF observations stand (their conclusions do
+not rest on the voided step). The v2 probe below replaces the withdrawn arms
+as COMMITTED, CI-executable tests (`e9_flush_probe_*` in
+`apps/headless/src/machine_input/tests.rs`, cfg(unix)): one child, ONE sink,
+no intermediate flush, the row's arrival OBSERVED by the parent before the
+close (the premise is synchronized, not assumed — a missing row REFUTES it
+and fails the test), and the same-sink second `print!` as the brokenness
+proof. The v2 PA test doubles as the automated tripwire for revisit trigger
+T3 (decision-record §7.4): a std buffering regression (the '\n' no longer
+draining, or the flush writing on an empty buffer) fails it via its premise,
+flush-value, or brokenness oracle.
+
+RQ answers (evidence in parentheses):
+
+```text
+RQ1 all format_status paths end '\n'          YES (status.rs:24-74, 8/8 push paths; frozen §14.6)
+RQ2 Stdout buffering                          LineWriter, sink-independent (std source;
+                                              demonstrated behaviorally by the v2 PB
+                                              test: a no-newline print! stays
+                                              buffered on a real pipe)
+RQ3 pipe/terminal/file                        pipe: v2 PA/PB tests; regular file: v1
+                                              probe (corroborative only, receipt lost,
+                                              §14.8.8); terminal: NOT_RUN (no tty in
+                                              this harness; the interop proxy is a
+                                              pipe — §14.5) — registered §14.7
+RQ4 unflushed data after a successful print!  NO for '\n'-terminated rows (v2 PA
+                                              test e9_flush_probe_newline_row_
+                                              flush_ok_on_proven_broken_sink: the
+                                              row is OBSERVED in the pipe before
+                                              the close, the arm's single
+                                              flush returns Ok, and the SAME-sink second
+                                              print! panics — the sink was broken
+                                              and the flush still performed no
+                                              write)
+RQ5 another writer leaves buffered data       the mechanism exists only for a NON-newline tail,
+                                              and such a tail is carried to the fd by the NEXT
+                                              row's own print! (v2 INTERLEAVE test: tail then
+                                              row observed in the pipe before any flush ran;
+                                              trailing flush Ok on the proven-broken sink);
+                                              production writers are all '\n'-terminated
+                                              (RQ1 + §14.1 single-writer phases)
+RQ6 real independent error window             NO_WITH_SCOPE for the production shape
+```
+
+v2 probe (grade: L2_STD_PROBE-equivalent — bare-Stdout characterization; the
+child arm carries no qianqian machinery, the harness is qianqian test code;
+the committed tests ARE the receipt: the instrument is versioned in this
+repository and re-executed by the required Linux CI lane, so the source is
+NOT duplicated here; the parent test bodies own the pipe/gate/close order):
+
+```text
+PA+PA-2  ONE child, ONE real pipe sink: print!('\n'-terminated row) with NO
+     intermediate flush; the parent OBSERVES the row in the pipe (premise
+     oracle: the '\n' flushed it), closes the read end, releases the gate;
+     the arm's single flush() ⇒ Ok(()) asserted on the child witness; a
+     second print! on the SAME sink panics ("failed printing to stdout" +
+     "Broken pipe") ⇒ the sink was broken when the flush returned Ok ⇒ that
+     Ok can only mean NO write was attempted.
+     e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink
+PB    control: a non-newline tail stays buffered after a successful print!
+     (had it reached the fd, the only flush would find an empty buffer and
+     return Ok), so the only flush() performs the write ⇒ Err(BrokenPipe)
+     asserted — flush CAN fail standalone while print! succeeded; the
+     INJECTED shape production does not have (RQ1).
+     e9_flush_probe_no_newline_tail_flush_errs_broken_pipe
+INTERLEAVE  a foreign non-newline tail is carried to the fd by the NEXT row's
+     own print! (parent observes tail-then-row in the pipe before any flush
+     ran); the trailing flush() ⇒ Ok on the same proven-broken sink (closing
+     second print! panics).
+     e9_flush_probe_foreign_tail_surfaces_in_next_row_print_not_flush
+```
+
+Mutant checks (local, archived `290-r2-flushprobe/mutant-*.log`): a
+newline-terminated PB tail kills the PB test (the child's flush then finds
+an empty buffer, so the Err-marker wait times out); dropping PA's second
+`print!` kills the PA test (the brokenness witness never appears). Both
+oracles bite.
+
+v1 probe (SUPERSEDED — kept verbatim for the record; scratch std-only binary
+`flushprobe`, no qianqian code; run logs `flushprobe-build/run/run2/run3.log`
+— LOST with the archive, §14.8.8; every v1 value below was transcription-only):
+
+```text
+PA   print!('\n'-terminated row) into the pipe; row lands (ROW-DELIVERED sync);
+     parent closes the read end; flush() ⇒ Ok(())  ⇒ flush performed NO write.
+     [WITHDRAWN: the arm flushed explicitly before the gate — the Ok is the
+     pre-flush's doing, not the newline drain's; non-discriminating.]
+PA-2 CONTROL  with the read end closed, a second print! MUST panic — it did
+     ("failed printing to stdout: Broken pipe (os error 32)", exit path 101) ⇒
+     the PA sink was genuinely broken; PA's Ok means "no write", not "write ok".
+     [Observation stands; its evidentiary ROLE (proving PA's own sink broken
+     at flush time) is replaced by the v2 same-sink second print!.]
+PB   print!(no-newline tail) stays buffered; flush() after the close ⇒
+     Err(Os { code: 32, kind: BrokenPipe }) ⇒ flush CAN fail while print!
+     succeeded — but only for a writer shape production does not have (RQ1).
+     [Stands — this arm had no intermediate flush; re-executed as the v2 PB
+     test.]
+INTERLEAVE  foreign non-newline tail + clean row: the tail is flushed by the
+     row's own print!; trailing flush() ⇒ Ok(()).
+     [WITHDRAWN: same premature flush — the tail's carriage by the row's
+     print! was NOT demonstrated (the explicit flush could have carried it);
+     replaced by the v2 INTERLEAVE test.]
+FILE sink: same PA shape ⇒ Ok(()), 12 bytes landed. EBADF: stdout closed at
+     exec ⇒ print! did NOT panic and flush did NOT err (std handle_ebadf
+     swallows).
+     [File cell: corroborative only (never discriminated "no write"), receipt
+     lost. EBADF: stands — swallow-vs-panic is independent of buffering.]
+```
+
+v1 probe source, inlined so the WITHDRAWN instrument remains inspectable
+(scratch std-only binary `flushprobe`, no qianqian code; driver: pipes
+stdin/stdout/stderr, waits for the child's `ROW-DELIVERED` stderr sync before
+closing the read end, then writes the `go` gate line):
+
+```rust
+use std::io::{self, BufRead, Write};
+
+// Parent writes "go" on stdin after it has arranged the sink state
+// (closed the read end / opened the file). No timing premise.
+fn gate() {
+    let line = io::stdin().lock().lines().next();
+    assert_eq!(line.expect("gate line").expect("read gate"), "go");
+}
+
+fn main() {
+    let mode = std::env::args().nth(1).unwrap_or_default();
+    match mode.as_str() {
+        // PA: '\n'-terminated row lands; read end closes; flush is the :274 shape.
+        "pa" => {
+            print!("Q290-PA row\n");
+            let _ = io::stdout().flush();
+            eprintln!("Q290-PA ROW-DELIVERED");
+            gate();
+            let r = io::stdout().flush();
+            eprintln!("Q290-PA FLUSH={r:?}");
+        }
+        // PB (INJECTED shape): no-newline tail stays buffered; flush writes it.
+        "pb" => {
+            print!("Q290-PB tail-no-newline");
+            gate();
+            let r = io::stdout().flush();
+            eprintln!("Q290-PB FLUSH={r:?}");
+        }
+        // RQ5 mechanism: a foreign non-newline tail rides the NEXT row's print!.
+        "interleave" => {
+            print!("Q290-RQ5 foreign tail");
+            print!("Q290-RQ5 row\n");
+            let _ = io::stdout().flush();
+            eprintln!("Q290-RQ5 ROW-DELIVERED");
+            gate();
+            let r = io::stdout().flush();
+            eprintln!("Q290-RQ5 FLUSH={r:?}");
+        }
+        // PA control: after the close, a second print! MUST panic — proving the
+        // PA sink was really broken and PA's Ok means "no write".
+        "pa2" => {
+            gate();
+            let w = std::panic::catch_unwind(|| {
+                print!("Q290-PA2 row\n");
+                let _ = io::stdout().flush();
+            });
+            eprintln!("Q290-PA2 print-panic={}", w.is_err());
+        }
+        // EBADF posture: stdout closed at exec — std swallows, never panics.
+        "ebadf" => {
+            let w = std::panic::catch_unwind(|| {
+                print!("Q290-EBADF row\n");
+                let _ = io::stdout().flush();
+            });
+            eprintln!("Q290-EBADF print-panic={}", w.is_err());
+            gate();
+            let r = std::panic::catch_unwind(|| {
+                let _ = io::stdout().flush();
+            });
+            eprintln!("Q290-EBADF flush-panic={}", r.is_err());
+        }
+        other => panic!("unknown mode {other:?}"),
+    }
+}
+```
+
+In-repo L1 (the committed counterpart): `flush_err_swallow_is_indistinguishable_from_success`
+— a flush-shaped Err swallowed exactly like `:274` is indistinguishable from
+success (no record, no Stop, seal clean); its in-test negative control proves
+the harness distinguishes swallow from panic (a panicking closure yields
+`false` + `Some(HostFailure::Panic)` + stop routed).
+
+D-D consequence: Option A's precondition ("only if an independent flush Err is
+reachable") is NOT met in the scoped environment — see decision-record §7.
+
+#### 14.8.4 B4 — blocked output (EVIDENCED; lane: test-transport child + REAL pipe; one frozen-premise correction)
+
+Constructed park: the child pre-fills its own unread stdout pipe (~64 KiB
+default capacity — measured out-of-band in this round's LOST probe log, not
+by committed code; on any capacity mismatch the reader never parks, the child
+exits early, and the parent's parked-window poll fails loudly, so the
+construction is self-verifying) before starting the transport, so the reader's
+status writes park inside the admitted dispatch after a handful of rows,
+regardless of scheduling. Observed: the child stayed alive through the parked
+window (the transport's `seal` blocked on the parked operation's ack — no
+"reader joined" claim possible), and after the parent drained the pipe the run
+completed cleanly: exit 0, no `machine input failed`, at least one admitted
+status row completed, the transport's own outcome row shipped, and
+`Q290-E9-SEAL=None` asserted on the healthy stderr (blocking is not a
+failure). Watchdog: bounded non-exit polling; a timeout reports BLOCKED (a
+failed oracle), never PASS.
+
+Evidence weighting (honest scheduling status): the parked window is
+schedule-BIASED L2 evidence — on a pathologically slow machine the child could
+reach neither park nor exit inside the window and the remaining asserts would
+still pass; it cannot false-fire (an early exit fails the window loudly), but
+it is not a happens-before proof. The load-bearing parked-ack ordering oracle
+is the channel-synchronized L1
+`seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work`
+(seal waits the admitted operation's ack while a blocked output is in
+flight), which fails on schedule removal.
+
+**Frozen-premise correction (recorded, not normalized away).** The B4
+choreography as first IMPLEMENTED this round ("a status flood after `stop`
+parks the reader" — the d9d179c test construction, not the frozen §14.6-B4
+text) is NOT the production semantics: the transport's `seal` closes stdin
+admission right after
+the stop settles (`machine_input.rs:86` `seal()` sets `admission_closed` before
+waiting), so a post-stop flood is answered only until that closure and the
+reader then exits on the closed admission long before a flood could fill the
+64 KiB pipe — the first executed runs completed cleanly within seconds with
+`SEAL=None` and were initially misread as a park failure. The park is real and
+now constructed by pre-fill; the corrected oracle asserts the contract, not the
+race: the parked row itself completed at release (≥ 1 `outcome:` row), the
+transport's own outcome row shipped, and no host failure was recorded. This
+sharpens the frozen invariant "admission closed ≠ reader exited": here the
+reader exits ON closure, while parked-inside-admission is what delays the seal.
+
+#### 14.8.5 B5 — late output failure vs seal boundary (cited oracles re-run green)
+
+All five oracles cited in §14.6-B5 executed again this round, green (module
+solo run and full-workspace run; both runs' logs were lost with the evidence
+archive — §14.8.8; the oracles are committed and the post-fix rerun re-confirmed
+them green):
+
+```text
+seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work   ok
+admitted_output_panic_records_before_ack_even_during_seal                 ok
+postseal_commands_reports_and_failures_are_inert                          ok
+first_failure_storage_is_bounded_and_sealed_result_immutable              ok
+preseal_failure_preserves_natural_completed_and_runtime_failed            ok
+```
+
+#### 14.8.6 B6 / E-8 per-site matrix
+
+Lanes: `L1` = test-transport child (real spawn_reader / real report writer /
+real pipes, in-process composition); `L2` = real production binary. Grades per
+§14.5. All child probes are `#[cfg(unix)]`: the POSIX pipe choreography (incl.
+the measured 64 KiB capacity) is the Linux-portable lane; the Windows
+broken-sink lane stays NOT_RUN per §14.7 (interop proxy absorbs closure), so
+the gate does not pretend to run it on windows-latest.
+
+| SITE | LOCATION (6a9b051) | GATE | LANE | TRIGGER → SINK FAILURE | OBSERVED (exact asserted values) | CLASSIFICATION | GRADE |
+|---|---|---|---|---|---|---|---|
+| #1 help | entry.rs:70 | none | Linux real binary | `--help`, stdout read end closed pre-write | exit 101; stderr `failed printing to stdout` + `Broken pipe` | main-thread protocol write panic | L2_REAL_BINARY |
+| #1 version | entry.rs:74 | none | Linux real binary | `--version`, same | exit 101; same panic text | same | L2_REAL_BINARY |
+| #1 arg-error | entry.rs:102-103 | none | Linux real binary | `--bogus-flag`, stderr closed | exit 101; stdout empty; panic text UNOBSERVABLE (the default hook's own write targets the broken stderr) | main-thread protocol write panic (site attribution rides the healthy control: exit 2 + `error:` + `Usage:`) | L2_REAL_BINARY |
+| #1 healthy | :70/:74/:102-103 | none | Linux real binary | no break | help starts `Qianqian` + `Usage:`; version `qianqian-headless `; arg error exit 2 `error:` on stderr | SITE ATTRIBUTION controls | L2_REAL_BINARY |
+| #4 | entry.rs:529-535 | any(playback,test) | L1 child | stdout closed after arming marker, before rows | `UNWIND=1 DISPOSED=0 TERMINAL=None READER_SPAWNED=0` + panic text on healthy stderr; child exit 0 | panic skips wait+dispose+seal+reader spawn — disposal-skip WITNESSED at runtime | L1_TEST_TRANSPORT |
+| #5 | machine_input reader stderr | any(playback,test) | (E-9 B2 lane) | see §14.8.2 | — | covered by B2, not a separate E-8 row | — |
+| #6 machine | entry.rs:561-573 via the report writer (`real_report` in the probe lane: a byte-identical replica of `emit_machine_report` :582-587) | any(playback,test) | L1 child | stdout closed after arming (reader spawned on real stdin; parent `stop` settles) | broken: `UNWIND=1 DISPOSED=1 TERMINAL=Stopped` + `failed printing to stdout`/`Broken pipe` on the healthy stderr (panic skips only LATER reports); control: full row set + exit 0 | ledger #6 class at the final reports | L1_TEST_TRANSPORT |
+| #7 | entry.rs:515 (dispose :516) | any(playback,test) | L1 child | stderr closed after arming marker | broken: `UNWIND=1 DISPOSED=0 TERMINAL=None`; control: exact `activation_failure_report(None)` line on stderr, disposal ran, exit 1 | disposal-skip WITNESSED (report panic precedes dispose) | L1_TEST_TRANSPORT |
+| #2/#3 healthy | entry.rs:371-373/:378-414 | playback | Windows real binary (interop; x86_64-pc-windows-gnu build, §14.5) | healthy sink | `scanning …`, `source:`, `playing` rows captured (machine + reference runs) | healthy-site Windows rows (transcription-only survivors, §14.8.8) | L2_REAL_BINARY (healthy-sink interop only) |
+| #7 Windows | entry.rs:515 | playback | Windows real binary (interop; x86_64-pc-windows-gnu build, §14.5) | `garbage` argv (NotEstablished) | rc=1 + activation-failure report on real Windows stderr | healthy-sink Windows row for #7 (transcription-only survivor, §14.8.8) | L2_REAL_BINARY (healthy-sink interop only) |
+| #2/#3/#4/#6/#7 broken × Windows | — | playback | — | — | — | NOT_RUN (E8_WIN_BROKEN_PIPE_SITES, §14.7) | NOT_RUN |
+| #2/#3/#7 broken × Linux real bin | — | playback | — | — | — | NOT_RUN (E8_LINUX_PLAYBACK_REAL_BIN, §14.7) | NOT_RUN |
+| #3 fail-stop arm | entry.rs:378 | playback | — | — | — | NOT_RUN (E8_SITE3_FAILSTOP_ARM, §14.7) | NOT_RUN |
+
+Attribution notes: `print!` panics INSIDE std (`stdio.rs:1166` in this
+toolchain), so panic LOCATION text names std, not entry.rs — site attribution
+rides the healthy controls' exact rows plus the per-site witness values
+(UNWIND/DISPOSED/TERMINAL distinguish #4/#6/#7 unambiguously). Differential
+against the frozen §14.6-B6 THEN, recorded here: B6's "std panic text naming
+the site" clause is UNSATISFIABLE as frozen — the panic location is always
+std-internal (D-γ) and the stderr-arm text is structurally unobservable (the
+hook writes into the broken sink itself); the executed attribution formula is
+healthy-control rows + per-site witnesses + single-stream elimination, which
+is what every evidenced row above actually used. The #7 disposal-skip is
+RUNTIME-WITNESSED (disposed marker still false after the unwind), upgrading
+the source-inferred claim frozen in §14.4. The #6 REFERENCE arm (:392-397,
+`playback` gate) has no Linux broken-sink row — NOT_RUN, registered §14.7.
+
+#### 14.8.7 Discoveries register (this round)
+
+```text
+D-α  kernel §L.4 totality raise discharges a fiber's effects during ASSEMBLY:
+     the first #7 fixture declared AudioOutputCapability but never installed
+     it; the activation raise ran the unwind (kernel.rs §L.4 ⇒ run_unwind),
+     pre-discharging the disposal marker before the transport ever ran
+     (witnessed as DISPOSED=1 with no transport). Fixture corrected to the
+     dependency-refusal shape (declaration ABSENT, assembly.rs Case::Dependency
+     pattern). No production change; recorded as a fixture-authoring hazard
+     for every future disposal-witness fixture.
+D-β  B4 admission-closure semantics (§14.8.4): post-stop stdin floods are cut
+     off by seal's admission closure; the park needs a pre-filled sink. The
+     round's own oracle wording ("every admitted command" — d9d179c test
+     comments, not the frozen §14.6-B4 text) stays correct; the construction
+     changed.
+D-γ  print! panic location is std's (stdio.rs:1166), never the call site —
+     exit-101 attribution must ride healthy-sink row controls (§14.8.6 note).
+```
+
+#### 14.8.8 Executed verification of this round
+
+EVIDENCE_ARCHIVE_LOST (disclosed per the round's evidence contract): the
+session-local log archive (`/tmp/q290` — every full gate/test/probe log
+referenced above, the Windows interop stdout/stderr captures, and the
+flushprobe artifacts) was deleted from outside the working session AFTER
+execution and AFTER the values below were transcribed into this record.
+Surviving evidence, scoped honestly:
+
+```text
+(a) the committed test suite — every exact value in §14.8.1/§14.8.2/§14.8.4/
+    §14.8.5/§14.8.6's L1 and Linux-real-binary rows is a literal assertion in
+    it, rerunnable via the commands below;
+(b) the v1 flushprobe SOURCE inlined in §14.8.3 (its recorded OUTPUT values —
+    PA Ok / PA-2 panic / PB Err(BrokenPipe) / interleave Ok / file 12 bytes /
+    EBADF no-panic — survive as this record's transcription only; the PA and
+    interleave Ok values are WITHDRAWN as non-discriminating by the P1 probe
+    repair, §14.8.3);
+(c) the §14.5 environment facts and §14.8.6's Windows interop rows
+    (rc=0/1, row texts, "scanning"/"source:" captures): transcription-only
+    survivors — no committed oracle exercises the interop path; re-obtainable
+    only by a fresh x86_64-pc-windows-gnu cross-build + interop session;
+(d) two lost-log toolchain observations, so marked: the pipe capacity
+    (64 KiB default) behind the B4 pre-fill, and the std panic location
+    (stdio.rs:1166 at rustc 1.97.1/8bab26f4f); the blocked construction is
+    self-verifying against capacity drift (§14.8.4);
+(e) PR CI (GitHub-held logs): Linux lane + windows-latest lane both PASS at
+    8c68a7f (runs 39030941998/39030942020) and at 8cdc2d2 (runs
+    39038920923/39038920918); the review-fix delta runs on the PR;
+(f) post-fix local reruns in the RECREATED session archive:
+    machine_input 41/41 solo post-fix (run-mi-solo5-fixes.log),
+    cargo test --workspace green (run-ws-2-postfix.log),
+    full pre-push gate green + push (push3.log, 134.10s);
+(g) v2 flush-probe local runs (owner P1 repair; recreated session archive
+    `290-r2-flushprobe/`): e9_flush_probe 4/4 green
+    (flushprobe-v2-first-run.log), machine_input module 45/45
+    (module-machine_input-full.log), mutant kills PA/PB
+    (mutant-PA-no-second-print.log / mutant-PB-newline-tail.log); CI receipts:
+    the repair tip 1c62399's Linux lane PASS (Rust Regression run
+    39046043339, all four e9_flush_probe tests green in the workspace suite)
+    and the windows-latest lane PASS (Windows Compile Gate run 39046043276;
+    cfg(unix) probes excluded there by declaration, §14.8.6).
+```
+
+The lost raw logs are not claimed as verification anywhere; each §14.8 claim
+names the evidence class above it actually stands on.
+
+```text
+cargo test --workspace                                 green (§14.8.8-f; 0 warnings)
+cargo test -p qianqian-headless --lib machine_input::  41/41 green solo (--test-threads=1)
+cargo test -p qianqian-headless --lib machine_input::tests::e9   6/6 green solo
+cargo test -p qianqian-headless --lib machine_input::tests::e8   8/8 green solo
+flushprobe v1 (std-only scratch)                        SUPERSEDED (§14.8.3 P1 repair);
+                                                        v1 PA/interleave Ok WITHDRAWN
+e9_flush_probe v2 (committed tests)                     PA+PA-2 / PB / INTERLEAVE green;
+                                                        mutants killed (§14.8.8-g)
+Windows interop healthy-sink runs                      real-Windows rows captured (§14.8.6;
+                                                       transcription-only survivors)
+NOT executed here: native-Windows broken sinks (NOT_RUN §14.7), terminal-sink
+probe (NOT_RUN §14.7). windows-latest CI lane: executed by PR CI, PASS
+(§14.8.8-e) — with the pipe-choreography probes cfg(unix)-excluded there by
+declaration (§14.8.6).
+```
+
+#### 14.8.9 Round closure gates
+
+```text
+E9_PRINT_PANIC        EVIDENCED (B1)
+E9_STDERR_PANIC       EVIDENCED (B2)
+E9_FLUSH_ERR          CLASSIFIED: INJECTED_WRITER_ONLY (B3, §14.8.3; v2
+                      committed-probe basis after the P1 repair)
+E9_BLOCKING           EVIDENCED, not-a-failure (B4)
+HOST_FAILURE_CLASS    VERIFIED (host failure ≠ D11 Failed: B1/B2 assert D11=Stopped
+                      with a separate host-failure record)
+ACK_SEAL_ORDER        VERIFIED (B5 oracles + B4 parked-ack seal block)
+D11_BOUNDARY          PRESERVED (no D11 change anywhere in this round)
+D_D_OWNER_RULING      PENDING (decision-record §7; owner only)
+```
