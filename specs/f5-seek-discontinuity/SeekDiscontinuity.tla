@@ -102,7 +102,10 @@
 (* Duration、Generation/Window/TimelineSegment；设备中断（device abort——     *)
 (* resolver 的 Failed{device} 格在模型内不可达，分支保留以忠实转写冻结表）；  *)
 (* Frames(0) 退出（真实 provider 在 pending-fatal 窗口不可达，R1.2；mock      *)
-(* provider 之外的状态另有 Rust 证据）；**新 continuation 自身的解码故障**    *)
+(* provider 之外的状态另有 Rust 证据）；processing-failure 退出与 panic 路径  *)
+(* （session.rs:827-831/:856-866/:914-916——都在冻结六路径退出清单之外；两者  *)
+(* 都发 worker_failure → 同一 failedDecode 格，模型内不可产生——审查 A-5）； *)
+(* **新 continuation 自身的解码故障**    *)
 (* （模型内新 continuation 无故障——因此 landing 之后的任何 worker failure    *)
 (* 即旧 fatal，NoOldFatalAfterApplied 只在该抽象内是全称命题，如实声明）。    *)
 (* 无 fairness / liveness：本门只攻击 safety 碰撞；不以任何 fairness 假设    *)
@@ -567,7 +570,11 @@ RequestSeek ==
 \* （frozen order）。eligibility（¬aborted ≈ ¬stopIntent ∧ unsettled；
 \* parked 证据与 edge Open 的承重位置在 CommitCut/WorkerCut 的纪律里，
 \* 与基线一致）**不排除 pending-fatal**（reconciliation §2.2）。begin 与
-\* provider 返回分离：stop 可落在 FFI 调用中途（Q6-v）。
+\* provider 返回分离：stop 可落在 FFI 调用中途（Q6-v）。表达注记（审查
+\* A-2）：生产对检查的取消裁决只在 :620 发生一次；本动作把检查合入原子
+\* guard，「检查之间落 intent」的窗口由 intent 落点的非确定性表达（begin
+\* 前落 → CancelSeekBookkeeping；begin 后落 → 调用照常），两序终局格均
+\* 合法，行为并集保真。
 WorkerSeek ==
     /\ cutRequested = TRUE
     /\ (worker \in {"idle", "writing_partial"}

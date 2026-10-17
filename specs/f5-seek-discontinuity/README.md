@@ -142,6 +142,9 @@ K0/Fiber/Capability、ring 容量与游标、WASAPI 流状态机、请求语法/
 语义、多 seek 排队、Duration、Generation/Window/TimelineSegment、设备中断
 （device abort——Failed{device} 格模型内不可达）、Frames(0) 退出（真实
 provider 在 pending-fatal 窗口不可达，R1.2；mock provider 场景归 Rust 证据）、
+processing-failure 退出与 panic 路径（session.rs:827-831/:856-866/:914-916——
+都在冻结六路径退出清单之外；两者都发 worker_failure → 同一 failedDecode
+格，模型内不可产生；审查 A-5）、
 **新 continuation 自身的解码故障**（模型内新 continuation 无故障——因此
 NoOldFatalAfterApplied 是模型内全称命题，不是生产全称命题，如实声明）。
 无 fairness/liveness：本门只攻击 safety 碰撞；不以任何 fairness 假设代替

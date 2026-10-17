@@ -666,16 +666,23 @@ P2s across the two delivered slices were fixed and the full suite re-executed
 - Causal/matrix slice (third reviewer, independent suite re-execution at
   head — reproduced 6330 distinct / 11+11 exactly): APPROVE with 5×P2,
   all ledger/comment-accuracy fixes, none touching a guard, invariant or
-  the state space. Four applied as prescribed (eligibility "lock-free
-  reads" → three separate single-lock acquisitions; the W-B first-half
-  window's nondeterministic-placement idiom disclosed in the ledger and
-  the WorkerSeek comment; EofClose's commit-only gate labeled a model
-  scoping choice, not a production necessity, in README/.tla/ledger;
-  processing-failure and panic exits declared outside the frozen
-  six-path inventory in the unmodeled list). The fifth (witness
-  sensitivity overclaim) had already been independently found by the
-  mutation/witness slice's residual round and fixed at 9f95eef with
-  bidirectional counterfactual verification.
+  the state space. The delta re-review caught two
+  silent application failures in the first wording commit (the A-2
+  WorkerSeek-comment sentence and the A-5 unmodeled-list declaration did
+  not match their targets and were not applied, while the fix inventory
+  claimed them — the same record-vs-artifact defect class the slice had
+  flagged at A-1); both were then applied for real with per-edit
+  occurrence asserts, together with the inventory correction (this
+  paragraph). Final state at HEAD: eligibility "lock-free reads" → three
+  separate single-lock acquisitions (ledger); the W-B first-half window's
+  nondeterministic-placement idiom disclosed in the ledger AND the
+  WorkerSeek comment; EofClose's commit-only gate labeled a model scoping
+  choice in README/.tla; processing-failure (session.rs:827-831/:856-866)
+  and panic (:914-916) exits declared outside the frozen six-path
+  inventory in the .tla header and README unmodeled lists. The fifth
+  finding (witness sensitivity overclaim) had already been independently
+  found by the mutation/witness slice's residual round and fixed at
+  9f95eef with bidirectional counterfactual verification.
 - Review-round delta re-verification (same reviewer): F1/F2(b)/F3 FIXED;
   F2(a)'s defect-sensitivity claim was REFUTED by a reviewer counterexample
   (under the erasure defect, ReadPartialSuccess re-latches and a plain
