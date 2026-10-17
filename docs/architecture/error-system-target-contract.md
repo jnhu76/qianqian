@@ -29,7 +29,7 @@
 >                                     Windows runtime acceptance pending #288; goals outside
 >                                     the DG scope remain unimplemented candidates
 > UNRESOLVED_OWNER_DECISIONS        = D-2/D-10 substance landed, formal ratification PENDING
->                                     (error-system-decision-record.md); D-4/D-7/D-9/D-11
+>                                     (error-system-decision-record.md); D-4/D-5/D-7/D-9/D-11
 >                                     unchanged
 > ```
 >

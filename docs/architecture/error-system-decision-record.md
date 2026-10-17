@@ -118,11 +118,12 @@ implementation and no new evidence.
 
 Two decisions now have landed implementations but no recorded owner ruling. The
 #283 closeout verified exactly that differential and explicitly declined to
-rule; no ruling exists in the #283/#284/#287 comment or review record either
-(checked; only bot comments there). Each proposal below states what a YES
-ratifies, what it does not, and what happens on a NO. The owner may answer each
-independently. Until an answer is recorded here, both formal lines stay
-PENDING and no ACCEPTED ADR text changes.
+rule; no ruling exists elsewhere in the round record either — #283's comments
+are the owner's audit reports and closeout (recommendations and status
+verifications only), and the #284/#287 conversations carry no human ruling.
+Each proposal below states what a YES ratifies, what it does not, and what
+happens on a NO. The owner may answer each independently. Until an answer is
+recorded here, both formal lines stay PENDING and no ACCEPTED ADR text changes.
 
 ### 6.1 D-2 — probe diagnostic read + adapter retention (T1-1/T1-2, CC-4, DG-3)
 
