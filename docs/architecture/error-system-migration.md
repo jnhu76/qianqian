@@ -361,12 +361,25 @@ or parameter is introduced, and the observer signature is unchanged. The note's
 trigger and conditionality are unchanged; only the concrete shape reference is
 recorded.
 
+2026-10-17 implementation note: carrier B is now the LANDED shape (PR #287, `b86a9ce`
+— `DrainVerdict::Aborted { reason: Option<AbortReason> }`, 512-byte cap, backend-neutral
+`OutputAbortClass`). This candidate note remains CONDITIONAL / PROPOSED_ONLY: whether
+it is adopted as normative PBK-003 text, or the existing PBK-003 §5 TERMINAL EVIDENCE
+clause ("report drain/abort mechanism evidence through the existing owner seam without
+becoming D11 semantic authority") is judged to already cover the attachment, is part of
+the D-10 owner ruling — see the ratification proposal in
+`error-system-decision-record.md` §6.2. No ACCEPTED ADR text was changed by the
+implementation or by this note.
+
 ### 3.5 NOTE-LEVEL — songcore-binding-architecture
 
 If T1-1/T1-2 are adopted, add one paragraph to the binding-class notes: "the reference
 Rust binding retains typed status/native_code internally for diagnostics; this is a
 binding-internal realization choice, not a binding-parity obligation; the canonical ABI
-(songcore.h) is unchanged." No authority hierarchy change.
+(songcore.h) is unchanged." No authority hierarchy change. (2026-10-17: T1-1/T1-2
+substance landed via #287, but the paragraph is NOT yet added — the D-2 ruling is
+still pending; see decision-record §6.1. The landed retention is in every other
+respect the shape this note describes.)
 
 ### 3.6 K0 documents — intentionally not drafted
 

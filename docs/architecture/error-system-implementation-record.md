@@ -152,6 +152,22 @@ and the boundary gate's own negative-control suite.
 
 ## 6. Open owner rulings (presented, not decided here)
 
+**D-2 — probe diagnostic read / adapter retention.** Substance landed (§1 M1/M4:
+`DecodeFault{status, native_code, message}` copied at the error point; probe reads
+`song_last_error` before `song_close`; public shapes unchanged; SongCore ABI untouched).
+The formal decision line remains OPEN — the #283 closeout records it as pending.
+Ratification proposal: `error-system-decision-record.md` §6.1 (RATIFY_OPTION_A; scope =
+local representation + diagnostic retention only; no T1-3/D-9/recovery approval).
+
+**D-10 — output reason snapshot carrier.** Carrier B landed (§1 M2/M3: bounded
+`AbortReason` inside `DrainVerdict::Aborted` on the existing completion seam;
+discriminant-only resolve; drop+count late policy; control-inertness witness). The
+formal decision line remains OPEN — including whether migration §3.4's PBK-003 note is
+adopted or the existing PBK-003 §5 TERMINAL EVIDENCE clause is judged to cover the
+attachment. That note stays PROPOSED_ONLY; no ACCEPTED ADR text was modified by the
+implementation or by the status records. Ratification proposal:
+`error-system-decision-record.md` §6.2 (RATIFY_CARRIER_B).
+
 **D-C — F5 model extension for the pending-fatal × seek × stop window.** The
 design's acceptance-gated trigger is NOW SATISFIED, and this round verified it
 rather than assuming it: E1-ABI is green on both legs (healthy control; partial

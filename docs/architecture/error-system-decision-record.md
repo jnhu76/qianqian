@@ -5,6 +5,11 @@
 > mechanism choices, executed evidence, NOT_RUN items and the still-open rulings (D-C above
 > all) are indexed in `error-system-implementation-record.md`. This record's classifications
 > are unchanged, and an OPEN item stays un-authorized.
+> **Ratification round (2026-10-17)**: D-2 and D-10 remain formally OPEN. Their
+> implementation substance landed with #287, and the #283 closeout verified exactly that
+> differential while explicitly declining to rule ("D-C/D-D/D-2/D-4/D-7/D-9/D-10 的 owner
+> 裁决（全部仍待裁，本文仅核实状态）"). Prepared ratification proposals now sit in §6;
+> nothing there is adopted until the owner answers. IMPLEMENTED != OWNER_RATIFIED.
 
 > **Truth class: DECISION RECORD / ROUTING INDEX. NOT AUTHORITY.**
 > This file records (a) directions the owner has approved, (b) mechanism
@@ -16,7 +21,9 @@
 > AUTHORITY. Nothing here changes D11, D14.*, U2, the SongCore ABI, K0
 > semantics, or any accepted document.
 
-**Version:** v1 — 2026-10-16 design round (post-#283).
+**Version:** v1 — 2026-10-16 design round (post-#283); 2026-10-17 addition:
+§6 ratification proposals for D-2/D-10 (prepared, not adopted) and the §5
+implementation-state note.
 **BASE_SHA:** `e44aa806def5729fa360be19daeb21f5436d7fd9` (all code anchors).
 **Inputs:** issue #283 REV.3 (final reports); the four error-system documents
 ([target contract](error-system-target-contract.md) / [reconciliation](error-system-reconciliation.md) /
@@ -101,3 +108,132 @@ DG-2 recommends carrier B and names the presentation obligation. D-A/D-B
 f5-impl gate's CI home is the `f5-implementation-mutations` job). D-C ← §2's
 F5 recommendation with its acceptance-gated triggers. All remain owner
 rulings; this record attaches recommendations to them, not outcomes.
+
+Implementation state (2026-10-17, from #287 and the #283 closeout): D-2, D-3
+and D-10 have landed implementations — D-2/D-10 as the §6 ratification
+proposals, D-3's acceptance riding #288 A4; D-4/D-5/D-7/D-9/D-11 have no landed
+implementation and no new evidence.
+
+## 6. RATIFICATION_PROPOSAL (prepared 2026-10-17; NOT adopted — owner-gated)
+
+Two decisions now have landed implementations but no recorded owner ruling. The
+#283 closeout verified exactly that differential and explicitly declined to
+rule; no ruling exists in the #283/#284/#287 comment or review record either
+(checked; only bot comments there). Each proposal below states what a YES
+ratifies, what it does not, and what happens on a NO. The owner may answer each
+independently. Until an answer is recorded here, both formal lines stay
+PENDING and no ACCEPTED ADR text changes.
+
+### 6.1 D-2 — probe diagnostic read + adapter retention (T1-1/T1-2, CC-4, DG-3)
+
+```text
+D-2_RECOMMENDATION       = RATIFY_OPTION_A
+SCOPE                    = LOCAL_REPRESENTATION_AND_DIAGNOSTIC_RETENTION
+PUBLIC_ABI_CHANGE        = NONE
+PLAYBACK_SEMANTIC_CHANGE = NONE
+```
+
+What a YES ratifies — each item verified by reading `b86a9ce` (this round, not
+assumed from the implementation record):
+
+- Adapter-internal `DecodeFault{status, native_code, message}` copied at the
+  error point (`qianqian-decode-songcore/src/lib.rs:238`), consumed
+  immediately, no long-lived `last_fault` (DG-3 shape (a); direction G).
+- `song_probe` failure reads the borrowed diagnostic via `song_last_error`
+  BEFORE `song_close` (lib.rs:400-413), inside the ABI's
+  valid-until-next-same-handle-call window; the owned copy then rides
+  `DecodeOpenError.message` text only. `song_open`'s no-diagnostic contract is
+  untouched (a failed open publishes no handle to query — E1-ABI witness).
+- The named consumers are the DG-1 record fields (`with_status` /
+  `with_native_code`, lib.rs:264-271) and the App-facing message text. No
+  control-flow consumer exists: `DecodeError`/`DecodeOpenError` remain
+  `{message: String}` (ports.rs:1156-1164), so no downstream branch can even
+  read a typed status — control-inertness is structural, not just tested.
+- SongCore C ABI and native sources are unchanged since the R0 baseline
+  (`git diff 524c6ef..b86a9ce -- native/` is empty).
+- Executed evidence: decode-songcore lib tests 36/36 green (Linux), including
+  E1-ABI 8/8 and the typed-fault outlet witness
+  (`e1_abi_tests.rs:585 adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet`).
+
+What a YES does NOT do: approve D-9, T1-3 public fields, or any recovery
+policy; create a binding-parity obligation for other bindings (the migration
+§3.5 note-level text — "binding-internal realization choice, not a
+binding-parity obligation; the canonical ABI is unchanged" — is the companion
+that lands only upon this YES); change `songcore.h` or any accepted document.
+
+On a NO: option (b) is recorded; the landed retention is unbundled from the
+formal decision and the resulting authority differential returns to the owner
+(reverting production is a separate instruction, not a docs action).
+
+### 6.2 D-10 — Output reason snapshot carrier (T2-5, DG-2)
+
+```text
+D-10_RECOMMENDATION      = RATIFY_CARRIER_B
+CARRIER                  = EXISTING_DRAIN_COMPLETION
+REASON                   = BOUNDED_DIAGNOSTIC_ATTACHMENT
+CLASS                    = CLASS_C
+D11_EFFECT               = NONE
+BACKEND_AUTHORITY        = NONE
+NEW_PUBLIC_PLUGIN        = NONE
+D9_DECISION              = UNCHANGED
+```
+
+What a YES ratifies — the eight correspondence questions, each answered
+against `b86a9ce` (this round):
+
+1. **Single completion interface?** Yes: the reason is a payload inside
+   `DrainVerdict::Aborted { reason: Option<AbortReason> }` (ports.rs:162-167)
+   delivered by the existing `DrainSignal::complete` — no second cell,
+   parameter, seam or lifecycle.
+2. **Bounded owned payload?** Yes: `AbortReason{class, message}` with the
+   512-byte char-boundary cap (ports.rs:126-150); `OutputAbortClass` is
+   backend-neutral (`Device`/`Panic`; `Cone`/`Open` are documented absences,
+   not names).
+3. **Resolver reads only the semantic discriminant?** Yes: `resolve` matches
+   `Some(DrainVerdict::Aborted { .. })` (completion.rs:1360) — the pattern
+   ignores the reason field.
+4. **Can the reason change D11 classification?** No: structurally (the
+   resolver pattern cannot see it) and on the read side — the one production
+   reader enriches `failure_diagnostic` presentation text only AFTER the
+   terminal is committed and only for `Failed` + `OutputAbortClass::Device`
+   (completion.rs:1126-1136); the public observation vocabulary is unchanged.
+   Witness: `dg2_a_reason_cannot_change_the_committed_terminal`
+   (e1_worker_tests.rs:1186) shows the identical committed terminal with the
+   reason present and absent.
+5. **Late delivery fate explicit?** Yes: `publish_evidence` first-wins
+   early-return drops a late verdict+reason; `late_drain_verdicts` counts it
+   (completion.rs:284/416/1224); witness
+   `dg2_a_late_verdict_is_dropped_and_counted` (e1_worker_tests.rs:1233).
+6. **New legal diagnostic shape on the backend-neutral port?** The attachment
+   type is audio-api-typed and backend-neutral; it IS a new shape on the port
+   surface (the `Copy` removal went through the audio-api surface gate's own
+   reviewed regeneration). This is precisely why PBK-003 correspondence is
+   part of this ruling — see below.
+7. **Authorized by current ADR-PBK-003?** PBK-003 §5 TERMINAL EVIDENCE
+   obliges "report drain/abort mechanism evidence through the existing owner
+   seam without becoming D11 semantic authority". Carrier B satisfies that
+   clause as written (same seam, evidence-only payload, no D11 authority).
+   Whether that reading suffices, or migration §3.4's candidate note should
+   be adopted to make the bounded-diagnostic-attachment permission explicit
+   normative text, is part of THIS ruling, not pre-decided (migration §3.1
+   already says so).
+8. **D-9 stays independently OPEN?** Yes: the presentation-consumer bar is
+   untouched; carrier B's exposure on the public observation plane rides the
+   same `failure_diagnostic: Option<String>` surface that already existed.
+
+Until the owner rules:
+
+```text
+D10_IMPLEMENTATION = LANDED (carrier B, #287, b86a9ce)
+D10_RATIFICATION   = PENDING_OWNER
+ADR_AMENDMENT      = PROPOSED_ONLY (migration §3.4 candidate; ADR-PBK-003
+                     itself is untouched by the implementation and by this PR)
+```
+
+On a YES: a follow-up reviewed commit applies the minimal §3.4 differential —
+existing completion boundary MAY carry a bounded control-inert diagnostic
+attachment; verdict semantics unchanged; attachment absence MUST be legal;
+backend identity stays non-semantic; the reason never participates in terminal
+classification or control — and records the ruling here. It does NOT touch
+Output Plugin identity, D11, K0 or backend ownership. On a NO: same
+differential-return path as D-2.
