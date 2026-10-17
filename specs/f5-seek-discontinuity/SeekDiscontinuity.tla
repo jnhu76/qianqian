@@ -378,11 +378,13 @@ RemainderFlushStopExit ==
 \* 该锁程**（同一 Err 臂的后续独立语句 + :928 漏斗，终审 P1 更正——不得以
 \* 锁程理由融合）。exitPath 是路由 ghost：Err 臂必然 return，路由在此确定。
 \* 新 continuation 的 surfacing（D-T4 诊断形状）从 "repositioned" 同样可达：
-\* 入口复现先于一切且不区分位置；但生产 hold 期间无读（:719-774 等待），故
-\* repositioned 臂要求已 commit（恢复生产在 commit 路由之后，:775-778）。
+\* 入口复现先于一切且不区分位置。**不设 committed 门槛**（终审复审更正）：
+\* 生产恢复复读可发生在 commit 之前——cutover wait 的 Aborted 分支
+\* （session.rs:721）直接跳出第二个等待（:750）并在 :775-778 恢复读，此时
+\* commit 未发生。基模型内该组合仍不可达（Applied 必擦除 latch，见
+\* WorkerCut），本臂只在 D-T4 缺陷注入下激活。
 FatalFailurePublish ==
     /\ worker \in {"idle", "repositioned"}
-    /\ (worker = "idle" \/ committed)
     /\ pendingFatal = TRUE
     /\ ~workerFailurePublished
     /\ ~workerGone
@@ -400,7 +402,7 @@ FatalFailurePublish ==
                    refusedWhileLatched>>
 
 \* pending-fatal surfacing（2/3）——edge 终态推进：Err 臂的 edge.fail()
-\* （session.rs:898；MutatedThenFailed 臂的 :675 同形）。**publish_evidence
+\* （session.rs:898；MutatedThenFailed 臂的 :673 同形）。**publish_evidence
 \* 锁程之外**（锁已释放）→ 与 request_stop 的 edge.stop()（W-A 窗口）及
 \* intent 记录真实可交错（终审 P1 的合法序列：settlement 先提交 Failed，
 \* stop 的 edge.stop 抢先置 Stopped，本动作 first-wins 不覆盖）。
@@ -565,6 +567,11 @@ DrainNew ==
                    refusedWhileLatched>>
 
 \* —— render leg 的终态观察（drain 证据）——
+\* 公开注记（终审复审 P3，既有形状、惰性）：生产的 drain 证据发布同样走
+\* publish_evidence，已 settle 即被 first-wins 丢弃（completion.rs:405-418
+\* late_drain_verdicts 家族）；本模型在 settlement 后仍允许记录
+\* drainVerdict，但该记录是惰性的（TerminalCommit 以 committedOutcome=
+\* "none" 为门槛），无可观察差异。
 
 \* terminal 检查先于数据（edge.rs:237-239）：stopped/failed 边上的 pull
 \* 立即放弃缓冲退出。heldOld 可能仍 TRUE（ReleaseBuffer 永不发生）。
