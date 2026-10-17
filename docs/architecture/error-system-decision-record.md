@@ -55,7 +55,9 @@ direction is **not** approval of any specific mechanism, queue type, closing
 posture, hook-chaining rule, or carrier named in §2 — those remain
 LOCAL_MECHANISM_RECOMMENDATION until the owner adopts them. The open decision
 entries D-2..D-11 (target-contract §Owner decision points) are unchanged by
-this record.
+this record. (Time anchor: this section is the 2026-10-16 design-round scope.
+D-2 and D-10 were subsequently ruled by the owner on 2026-10-17 — §6 is the
+current authority for those two lines; the other entries stand as written.)
 
 | # | Direction (as approved) | Scope notes (what it does and does not fix) |
 |---|---|---|
@@ -70,10 +72,14 @@ this record.
 | I | Keep synchronous publish/resolve/commit with post-unlock notify; no async resolver, no consumer-triggered settlement, no new terminal states. | The terminal model's Publish+AuthoritySettle split is a proof device (CC-3 comment fix re-anchored this). |
 | J | No Lean 4; no six-module mega-model. F5 extension is decided by residual interleaving risk vs Rust verification coverage — an E-1 pass does not auto-cancel it. | This round's concrete recommendation: §2 (EXTEND_EXISTING_MODEL behind acceptance-gated triggers). |
 
-## 2. LOCAL_MECHANISM_RECOMMENDATION (evidence-based; NOT adopted)
+## 2. LOCAL_MECHANISM_RECOMMENDATION (evidence-based; NOT adopted at the original design freeze)
 
 Full designs with compared alternatives, rejections and evidence live in the
 named sections; this index records only the recommended mechanism.
+(Time anchor: the freeze statement above is the 2026-10-16 state. The DG-3
+and DG-2 mechanisms were subsequently RATIFIED through the D-2/D-10 owner
+rulings of 2026-10-17 — §6; the rows below keep their original
+recommendation wording as the design-freeze record.)
 
 | Area | Recommendation (one line) | Design |
 |---|---|---|
@@ -94,7 +100,9 @@ named sections; this index records only the recommended mechanism.
    migration §3.4 candidate text, now annotated with DG-2's concrete carrier-B
    shape (payload inside the drain-verdict value, single completion seam).
    Conditional on T2-5 adoption (D-10); the note text itself is unchanged in
-   substance.
+   substance. (Outcome, 2026-10-17: applied — the D-10 ruling adopted this
+   candidate as the ADR-PBK-003 §5 TERMINAL EVIDENCE Amendment note; this
+   section retains the original candidate wording for provenance.)
 2. Nothing else. In particular: no D14.x amendment is proposed by this round;
    §3.2/§3.3 candidates remain as-is with their own triggers (E-6/E-5); no K0
    text (§3.6 posture stands); no ABI change (D-5(b) recommended posture

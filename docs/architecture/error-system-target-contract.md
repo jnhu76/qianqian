@@ -1,9 +1,14 @@
 # Error-system target contracts (#231, #280)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.** Every goal below remains a
-> **candidate obligation** — the DG-1..DG-4c mechanisms have since been implemented
-> in a defined scope (status block below), and that fact adopts no goal and
-> promotes nothing here to authority. Nothing in this file changes D11, D14.*, U2,
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.** This file keeps its
+> original design-candidate document identity. Whether any specific goal below
+> has been ADOPTED is settled by formal owner decisions and ACCEPTED authority —
+> never by this file, and never by an implementation existing. The ratified
+> scopes of D-2 (T1-1/T1-2) and D-10 (T2-5) are recorded in
+> [error-system-decision-record.md](error-system-decision-record.md) §6; every
+> other goal below remains a **candidate obligation** and does not auto-promote
+> because the DG-1..DG-4c mechanisms have implementations. Nothing in this file
+> changes D11, D14.*, U2,
 > the SongCore ABI, K0 semantics, or any accepted document; merging or reviewing this file
 > authorizes no implementation and adopts no policy. Where a goal would change frozen
 > behavior or accepted authority, it is marked `AUTHORITY-AMENDMENT-REQUIRED` and its
