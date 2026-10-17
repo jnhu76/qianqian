@@ -2,6 +2,8 @@
 
 ```text
 STATUS:   TRACE-FIRST FROZEN LEDGER（模型构造依据；非 authority）
+          REV.2（2026-10-17 PR #292 外部终审后修正：W-E 失败路线三步窗口、
+          §2 原子性裁定更正、§3 seek_eligible、§8 D-T4 单缺陷化）
 BASE_SHA: 0e43ef0cbac6fe21d0cd83e14875ace98c73501a (origin/main, frozen 2026-10-17)
 DECISION: D-C = EXTEND_EXISTING_MODEL
 RECEIPT:  https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387
@@ -102,28 +104,46 @@ BASE_SHA `e44aa80` 行号；两轮之间这些区域无行号漂移的文件也�
 
 ```text
 W-A  request_stop 的 intent 记录（锁程内） → 同一请求的 edge.stop()（锁程外）
-W-B  worker eligibility 检查（:626-649） → provider 调用期间 → provider 返回
-     —— stop intent / gate release / edge stop 均可落在 provider 调用中途。
-     模型表达注记（审查 A-2）：第一半窗口（首次检查→provider begin）由
-     intent 落点的非确定性表达——intent 在 begin 前落入 → CancelSeek-
-     Bookkeeping（生产 :620 取消时序）；intent 在 begin 后落入 → 调用照常
-     （生产 [:620,:650) 时序）。WorkerSeek 的原子 guard 是这一表达惯例，
-     两序的终局格均合法，行为并集保真；非字面的 pre-call 状态。
+W-B  worker eligibility 检查（:626-649） → provider begin（:650） → provider
+     调用期间 → provider 返回——stop intent / gate release / edge stop /
+     settlement 均可落在其中任意一段。
+     模型表达（2026-10-17 终审 P2 拆分更正，替代原 A-2「intent 落点非确定
+     性」并集论证）：SeekEligibilityPass（检查原子通过，消费 seek_aborted
+     裁决）与 SeekProviderBegin（无任何复核，调用照常发出）是两个动作，
+     检查通过→调用发出之间的窗口直接可交错；调用中途段由「begin 与返回
+     分离」承载。
 W-C  worker 块内写（staging 未落队）期间 → 命令观察 → 余量保留 → 下一 loop-top 串行化点
 W-D  render leg 排干 / 终态观察 → worker_exited → TerminalCommit
      （decisive 证据齐备前 commit 不发生：Aborted+worker_terminal=None → 等待）
+W-E  失败路线三步（2026-10-17 终审 P1 新增；源码本就是三段，模型此前
+     错误融合）：
+       ① decode_failed 的 publish_evidence 锁程：publication + settlement
+         （session.rs:896-897；MutatedThenFailed 臂 :673-674 同形）
+       ② edge.fail()（:898/:675，锁程已释放；first-wins，edge.rs:190-201）
+       ③ return → 退出漏斗 worker_exited（:928；其 publication 因 outcome
+         已 settle 被 publish_evidence 丢弃，completion.rs:1322-1324）
+     三步之间可与 request_stop 全程交错：settle 之后 intent 照常记录、
+     edge.stop() 照常执行（completion.rs「after settlement: nothing
+     changes」指终局不被改写，不是动作不发生）。故
+     committedOutcome=failedDecode ∧ edgeTerminal=stopped 是合法终态格：
+     edge.fail first-wins 不覆盖已提交的 Stopped，D11 rule 1 先于一切
+     stop-intent 咨询、已提交的 Failed 不被重分类。
+     模型动作：FatalFailurePublish / WorkerEdgeFailAdvance /
+     WorkerExitFunnel；合法交错 witness = W_FAILED_DECODE_WITH_STOPPED_EDGE。
 ```
 
 ## 2. LOCK_BOUNDARY_MAP
 
 | 操作 | 锁/同步 | 原子性裁定 |
 |---|---|---|
-| stop intent + pause/seek-hold gate 释放 | completion lock 单一锁程（completion.rs:552-576） | **融合为一动作**（Q6-i，锁程引用） |
+| stop intent + pause/seek-hold gate 释放 | completion lock 单一锁程（completion.rs:552-576） | **融合为一动作**（Q6-i，锁程引用）；**不设 settle 门槛**——settle 后 request_stop 仍照常执行（终审 P1；RecordStopIntent 无 committedOutcome guard） |
 | intent 记录 → edge.stop() | 锁程释放之后（:577-587） | **必须 split**（Q6-iv）；W-A 窗口 |
 | read 调用（surface vs frames） | 单次 C 调用（C:1103-1157；adapter lib.rs:510-545） | **融合为一动作的三分支**（Q6-ii） |
-| decode_failed publication + settlement | publish_evidence 单一锁程（completion.rs:1319-1331） | **surfacing 与 commit 同一模型动作**（Q6-iii 锁程引用） |
-| worker eligibility 三查 | 三次独立的单锁获取（seek_aborted/leg_parked_evidence 各取 completion 锁 completion.rs:800-803/:782-785；edge.terminal() 取 edge 锁 edge.rs:204-213），均不跨持有（2026-10-17 审查 A-1 措辞修正：非「无锁读」——恰因三次独立获取才与 request_stop 可交错） | 与 request_stop **可交错**；不得与 provider 调用融合（Q6-v） |
-| provider seek begin → return | 长 FFI 调用 | **begin（WorkerSeek）/ return（三分支动作）分离**；W-B 窗口 |
+| decode_failed publication + settlement | publish_evidence 单一锁程（completion.rs:1319-1331） | **publication+settlement 同一模型动作**（Q6-iii 锁程引用；FatalFailurePublish / SeekMutatedThenFailed） |
+| Err 臂 edge.fail()（session.rs:898；Mutated 臂 :675） | edge lock（set_terminal first-wins，edge.rs:188-201）；**publish_evidence 锁程之外** | **必须 split**（终审 P1）→ WorkerEdgeFailAdvance；与 request_stop 的 edge.stop() 可交错（W-A/W-E），先后决定终态格 stopped/failed |
+| 退出漏斗 worker_exited（session.rs:928） | publish_evidence 锁程；**outcome 已 settle 时 evidence 丢弃**（completion.rs:1322-1324 早退） | **必须 split**（终审 P1）→ WorkerExitFunnel；workerGone 仅在未 settle 时发布（失败路线恒为 FALSE——不得把「物理退出」编码为「证据已发布」） |
+| worker eligibility 三查 | 三次独立的单锁获取（seek_aborted/leg_parked_evidence 各取 completion 锁 completion.rs:800-803/:782-785；edge.terminal() 取 edge 锁 edge.rs:204-213），均不跨持有（2026-10-17 审查 A-1 措辞修正：非「无锁读」——恰因三次独立获取才与 request_stop 可交错） | 与 request_stop **可交错**；不得与 provider 调用融合（Q6-v）。模型为独立动作 SeekEligibilityPass；通过 → begin 之间显式窗口（终审 P2；W-B） |
+| provider seek begin → return | 长 FFI 调用 | **eligibility（SeekEligibilityPass）→ begin（SeekProviderBegin）/ return（三分支动作）分离**；W-B 窗口（终审 P2） |
 | purge+landing（Applied 臂 :690-701） | worker 自身 program order（串行化点纪律） | 融合为一动作（D14.5 frozen order；F5 基线已如此） |
 | 余量 flush 的 write_some 循环 | edge lock 每次单独获取，不跨等待（session.rs:950-957 锁序注） | 模型抽象为「补完成功 ∣ mid-remainder 终态退出」两结果 |
 | render pull/submit | edge lock | 模型三库记账（基线不变） |
@@ -137,9 +157,10 @@ W-D  render leg 排干 / 终态观察 → worker_exited → TerminalCommit
 | `idle` | loop-top（:608-612）→ read（:834）之间 | **default position**：stop 不能在此退出 worker；下一次 read 必复现 latch（R1.1 核心更正） |
 | `writing_old` | staging 持有整块、未落队（:843-867 之后） | in-flight 写；容量等待观察 terminal → `WriteStep::Stopped`（:993-994→:884）＝真实 stop-exit (a) |
 | `writing_partial` | 前缀已落队、余量保留（:987-988）；refusal 后回此态补完（:793-811） | 余量 flush 终态 break（:798-802→:805-809）＝真实 stop-exit (b) |
-| `seeking` | provider 调用在飞（:650-779） | eligibility 已过；stop 可落在调用中途（W-B）；返回后按 outcome 分派 |
-| `repositioned` | Applied purge/landing 后（:676-779 完成时点抽象） | 新 continuation；恢复生产的写/EOF 从此态出发 |
-| `decode_failed` | 失败退出后（:896-900/:663-675/:914-916） | 终态；workerGone 已发布 |
+| `seek_eligible` | eligibility 通过（:626-649）→ provider begin（:650）之间 | 检查裁决已消费（此后无取消分支）；stop intent / edge stop / settlement 可落入该窗口（终审 P2；W-B 前半） |
+| `seeking` | provider 调用在飞（:650-779） | 调用已发出；stop 可落在调用中途（W-B 后半）；返回后按 outcome 分派 |
+| `repositioned` | Applied purge/landing 后（:676-779 完成时点抽象） | 新 continuation；恢复生产的写/EOF 从此态出发（恢复在 commit 路由之后，:775-778——模型 repositioned 臂的 surfacing 要求 committed） |
+| `decode_failed` | 失败退出后（:896-900/:663-675/:914-916） | 终态；**workerGone 未发布**——失败路线 settlement 先于漏斗发生，漏斗 evidence 被 publish_evidence first-wins 丢弃（completion.rs:1322-1324；终审 P1 更正，原「workerGone 已发布」是模型融合伪影） |
 | （exited） | 退出漏斗（:928-929） | 由 `workerGone` + `exitPath` 承载，不复用 worker 值 |
 
 **canceled pending seek 不是 worker 位置也不是退出**（:620-625 只做 release
@@ -153,8 +174,8 @@ bookkeeping，控制流继续向下）——模型中以独立 no-op 动作表�
 | `RefusedUnchanged`（INVALID_ARGUMENT） | `fail_arg`（C:1166）仅覆盖诊断 | **保留**（生产 adapter 不可达该类，mock/ABI 控制下 contract-live） | release park → 余量补完 → 旧 cursor 继续 → 下次 read surface |
 | `MutatedThenFailed`（其余全部） | `fail()`（C:1186 区）覆盖诊断；latch 保留但失效 | 被取代 | release_without_commit + decode_failed("seek failed") + edge.fail + return |
 
-模型表达：provider outcome 不设独立变量；由 WorkerSeek 之后的三个互斥
-return 动作的非确定性选择表达（与基线一致）。**outcome 动作不受
+模型表达：provider outcome 不设独立变量；由 SeekProviderBegin 之后的三个
+互斥 return 动作的非确定性选择表达（与基线一致）。**outcome 动作不受
 stopIntent/edgeTerminal 门控**——调用已发出，返回是 program order（W-B）。
 
 ## 5. LATCH_LIFETIME_MAP
@@ -194,8 +215,12 @@ rule 6  drain = Aborted ∧ worker_terminal∈{Eof,Failed} → Failed{device}  �
 - `Failed{device}` 两格在模型内不可达（无设备中断源），保留分支以忠实转写
   冻结表；不为其构造可达性。
 - surfacing / MutatedThenFailed 的 `decode_failed` 在生产即「publication +
-  settlement 同一锁程」→ 模型中与退出动作原子；其余格子等 workerGone +
-  drain verdict 齐备后由 TerminalCommit 一次性计算。
+  settlement 同一锁程」→ 模型中二者同一动作（FatalFailurePublish /
+  SeekMutatedThenFailed）；**同臂的 edge.fail 与退出漏斗在锁程之外，模型
+  split 为 WorkerEdgeFailAdvance / WorkerExitFunnel**（终审 P1，W-E）；
+  其余格子等 workerGone + drain verdict 齐备后由 TerminalCommit 一次性计算。
+- 失败路线的 workerGone 恒为 FALSE（漏斗 evidence 被 first-wins 丢弃）——
+  终态格不受影响：rule 1 的 worker_failure 证据在发布步已在案。
 - 设备中断（device abort）不建模（AF-1 领域）；EOF×stop 竞争由 first-wins
   edge terminal 表达（EOF 已提交则 edge.stop no-op）。
 
@@ -205,19 +230,22 @@ rule 6  drain = Aborted ∧ worker_terminal∈{Eof,Failed} → Failed{device}  �
 
 ```text
 L1  APPLIED-ERASURE（必须可达）
-    ReadPartialSuccess（latch）→ RequestSeek → WorkerSeek → Applied(WorkerCut：
-    latch 擦除) → CommitCut → 新 continuation（SubmitNew）→ EofClose →
+    ReadPartialSuccess（latch）→ RequestSeek → SeekEligibilityPass →
+    SeekProviderBegin → Applied(WorkerCut：latch 擦除) → CommitCut →
+    新 continuation（SubmitNew）→ EofClose →
     LegObserveDrained → TerminalCommit = Completed
     ——「旧 fatal 被合法吞没、新 continuation 正常完成」是 D14.5 设计行为；
        W_APPLIED_ERASURE_COMPLETED 强制验收。
 
 L2  REFUSED-RETENTION（必须可达）
-    ReadPartialSuccess（latch）→ RequestSeek → WorkerSeek → RefusedUnchanged
+    ReadPartialSuccess（latch）→ RequestSeek → SeekEligibilityPass →
+    SeekProviderBegin → RefusedUnchanged
     （latch 保留，pendingFatal UNCHANGED）→ 余量补完（或无余量）→ 旧 cursor
     继续 → read 复现 → surfacedFatal → TerminalCommit = failedDecode
 
 L3  MUTATED-THEN-FAILED（必须可达）
-    … → WorkerSeek → MutatedThenFailed → worker_failure("seek failed") →
+    … → SeekEligibilityPass → SeekProviderBegin → MutatedThenFailed →
+    worker_failure("seek failed") →
     failedDecode；旧 cursor 生产永不恢复（InvFailClosed / M7 域）
 
 L4  STOP-WITH-GENUINE-EXIT（必须可达）

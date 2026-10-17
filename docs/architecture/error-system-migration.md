@@ -896,7 +896,11 @@ not serve as another's proof); W5a's single-legal-outcome row (`Stopped`, with
 > the extended model, mutations and executed TLC evidence live in that directory
 > (RESULTS.md). All obligations below were discharged as written, including the
 > scoped safety with the Applied-erasure witness retained and every mutation tied to
-> its defect trace.
+> its defect trace. Final-review addendum (same day): the PR #292 external final
+> review's three model-fidelity findings (failure-route atomicity split, explicit
+> eligibility→provider-begin window, D-T4 single-defect surfacing chain) were
+> verified against source and fixed on the same PR; post-fix suite all green
+> (base 22349/7470; implementation-record §13.6).
 
 
 **Recommendation: EXTEND_EXISTING_MODEL** — extend `f5-seek-discontinuity` with the

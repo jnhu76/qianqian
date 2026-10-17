@@ -693,3 +693,70 @@ P2s across the two delivered slices were fixed and the full suite re-executed
   re-run (run4): ALL PASS with base counts identical (15667/6330 — the
   survivor semantics is count-neutral on the correct model and splits only
   under the defect), L2 witness still firing.
+
+### 13.6 External final-review round (PR #292, 2026-10-17) — atomicity convergence
+
+The owner-routed independent final review of PR #292 returned REVISE
+(1×P1, 2×P2; `FULL_CAUSAL_FIDELITY = REVISE`, `PRODUCTION_DEFECT_FOUND =
+NO`, `MODEL_REFINEMENT_GAP = YES`). All three findings were verified
+against BASE_SHA source and fixed on the same PR; no production change.
+
+- **P1 (confirmed) — failure-route atomicity was over-fused.**
+  `ReadSurfacesFatal` fused `decode_failed` (publication+settlement),
+  `edge.fail()` and the `worker_exited()` funnel into one action; only the
+  publication+settlement pair shares one `publish_evidence` lock hold
+  (completion.rs:1319-1331). `edge.fail()` (session.rs:898, edge lock) and
+  the funnel (:928) are outside it, and `publish_evidence` drops evidence
+  once the outcome is settled (:1322-1324) — the old model's unconditional
+  `workerGone=TRUE` on this route was a fusion artifact. The lost legal
+  interleaving: after the failure settlement commits `Failed{decode}`,
+  `request_stop` still records intent and still executes its data-plane
+  stop ("after settlement: nothing changes" refers to the outcome, not to
+  the actions), so `committedOutcome=failedDecode ∧ edgeTerminal=stopped`
+  is a legal terminal cell (edge first-wins does not overwrite; D11 rule 1
+  never reclassifies). Fix: split into `FatalFailurePublish`
+  (publication+settlement atomic; `SeekMutatedThenFailed` split the same
+  way) → `WorkerEdgeFailAdvance` (first-wins edge advancement) →
+  `WorkerExitFunnel` (`workerGone' = (committedOutcome = "none")` — FALSE
+  on the failure route, the faithful dropped-publication value);
+  `RecordStopIntent` lost its settle gate (production `request_stop` is
+  "safe from any thread and any state"). Acceptance: new witness
+  `W_FAILED_DECODE_WITH_STOPPED_EDGE` reachable (5-state counterexample
+  archived, exactly the reviewer's sequence).
+- **P2 (confirmed) — the eligibility→provider window rested on an unproven
+  union argument.** The A-2 "nondeterministic intent placement" idiom was
+  judged insufficient (correctly). Fix: explicit split
+  `SeekEligibilityPass` (atomic checks; consumes the seek_aborted verdict)
+  → `SeekProviderBegin` (no re-check — production calls the provider after
+  the checks with no re-examination, session.rs:620-650); new worker value
+  `seek_eligible`; the A-2 union argument retired from model and ledger
+  (PENDING_FATAL_DAG §1 W-B). Acceptance: base space 6330 → 7470 distinct
+  (the window states); the D-T4 chain trace passes through both actions.
+- **P2 (confirmed) — D-T4 was a double defect injection.** It changed both
+  latch erasure and worker destination (→ idle rerun), violating
+  one-mutation-one-defect, and the universal invariant fired at the landing
+  state before any surfacing. Fix: single defect (skip erasure only;
+  destination stays `repositioned`); `FatalFailurePublish` gained a
+  `repositioned` arm gated on `committed` (production resumes reading only
+  after commit routing, :775-778; unreachable in the base model where
+  Applied always erases); added named-diagnostic
+  `DiagnosticNoFailurePublicationAfterLanding` (the publication half of
+  `NoOldFatalAfterApplied`; referenced only by the D-T4 diagnostic cfg,
+  not in the 11-invariant baseline — the AGENTS.md "named as diagnostics"
+  provision). Acceptance: the D-T4 counterexample now walks the full
+  10-state surfacing chain (archive: counterexample-DT4-surfacing-
+  chain.log); the universal invariant's violation recorded in a disclosed
+  second run (counterexample-DT4-full-invariants.log, terminates at the
+  landing state as before).
+
+Post-fix full suite (f5-full-suite-run5-finalrev-fixes.log): first run all
+green — base PASS 22349/7470 exhausted; 12/12 witnesses reachable; 11/11
+mutations counterexample-witnessed; M1–M7 no regression. Also recorded in
+RESULTS: under TLC `-continue` a violating state is reported but not
+expanded, so a mutation's reported violation set is complete over its
+generated states (D-T1's extra `NoOldFatalAfterApplied` firing is a
+mutant-only post-cut re-eligibility artifact; M7's resumed worker stopping
+into a non-matrix exit cell is likewise mutant-only). PENDING_FATAL_DAG
+bumped to REV.2 (W-E window, corrected atomicity rulings, `seek_eligible`
+position row, D-T4 single-defect row). No production file touched; BASE_SHA
+line anchors unchanged.
