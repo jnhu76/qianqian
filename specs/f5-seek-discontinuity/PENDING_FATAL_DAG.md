@@ -102,8 +102,13 @@ BASE_SHA `e44aa80` 行号；两轮之间这些区域无行号漂移的文件也�
 
 ```text
 W-A  request_stop 的 intent 记录（锁程内） → 同一请求的 edge.stop()（锁程外）
-W-B  worker eligibility 检查（:626-649，无锁读） → provider 调用期间 → provider 返回
-     —— stop intent / gate release / edge stop 均可落在 provider 调用中途
+W-B  worker eligibility 检查（:626-649） → provider 调用期间 → provider 返回
+     —— stop intent / gate release / edge stop 均可落在 provider 调用中途。
+     模型表达注记（审查 A-2）：第一半窗口（首次检查→provider begin）由
+     intent 落点的非确定性表达——intent 在 begin 前落入 → CancelSeek-
+     Bookkeeping（生产 :620 取消时序）；intent 在 begin 后落入 → 调用照常
+     （生产 [:620,:650) 时序）。WorkerSeek 的原子 guard 是这一表达惯例，
+     两序的终局格均合法，行为并集保真；非字面的 pre-call 状态。
 W-C  worker 块内写（staging 未落队）期间 → 命令观察 → 余量保留 → 下一 loop-top 串行化点
 W-D  render leg 排干 / 终态观察 → worker_exited → TerminalCommit
      （decisive 证据齐备前 commit 不发生：Aborted+worker_terminal=None → 等待）
@@ -117,7 +122,7 @@ W-D  render leg 排干 / 终态观察 → worker_exited → TerminalCommit
 | intent 记录 → edge.stop() | 锁程释放之后（:577-587） | **必须 split**（Q6-iv）；W-A 窗口 |
 | read 调用（surface vs frames） | 单次 C 调用（C:1103-1157；adapter lib.rs:510-545） | **融合为一动作的三分支**（Q6-ii） |
 | decode_failed publication + settlement | publish_evidence 单一锁程（completion.rs:1319-1331） | **surfacing 与 commit 同一模型动作**（Q6-iii 锁程引用） |
-| worker eligibility 三查 | 无锁普通读（session.rs:620/626/646） | 与 request_stop **可交错**；不得与 provider 调用融合（Q6-v） |
+| worker eligibility 三查 | 三次独立的单锁获取（seek_aborted/leg_parked_evidence 各取 completion 锁 completion.rs:800-803/:782-785；edge.terminal() 取 edge 锁 edge.rs:204-213），均不跨持有（2026-10-17 审查 A-1 措辞修正：非「无锁读」——恰因三次独立获取才与 request_stop 可交错） | 与 request_stop **可交错**；不得与 provider 调用融合（Q6-v） |
 | provider seek begin → return | 长 FFI 调用 | **begin（WorkerSeek）/ return（三分支动作）分离**；W-B 窗口 |
 | purge+landing（Applied 臂 :690-701） | worker 自身 program order（串行化点纪律） | 融合为一动作（D14.5 frozen order；F5 基线已如此） |
 | 余量 flush 的 write_some 循环 | edge lock 每次单独获取，不跨等待（session.rs:950-957 锁序注） | 模型抽象为「补完成功 ∣ mid-remainder 终态退出」两结果 |

@@ -687,9 +687,11 @@ PostCutStopExit ==
                    refusedWhileLatched>>
 
 \* 新 continuation 的 EOF 臂：close_eof + return（session.rs:892-895）。
-\* 只从已 commit 的新 continuation 可达（生产的两个等待循环先于恢复生产
-\* 解析；stop intent 下等待以 plane-terminal 退出取代）。first-wins：
-\* EOF 已提交后 edge.stop 是 no-op（EdgeStopFromStop 的 open 门槛）。
+\* 模型内只从已 commit 的新 continuation 启用（生产的两个等待循环先于
+\* 恢复生产解析；stop intent 下等待以 plane-terminal 退出取代）。审查
+\* A-3 范围注记：生产上该 EOF 臂也在无 seek 播放到达（不在本模型窗口内）
+\* ——TCC(2d) 的 landing 合取是模型作用域选择，不是生产必要性。first-
+\* wins：EOF 已提交后 edge.stop 是 no-op（EdgeStopFromStop 的 open 门槛）。
 EofClose ==
     /\ worker = "repositioned"
     /\ landing = TRUE

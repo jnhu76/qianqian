@@ -663,6 +663,19 @@ P2s across the two delivered slices were fixed and the full suite re-executed
   re-run.
 - Evidence-retention location (local archive path + per-file inventory +
   the D-T3 diagnostic-run recipe) now recorded in RESULTS (review F3).
+- Causal/matrix slice (third reviewer, independent suite re-execution at
+  head — reproduced 6330 distinct / 11+11 exactly): APPROVE with 5×P2,
+  all ledger/comment-accuracy fixes, none touching a guard, invariant or
+  the state space. Four applied as prescribed (eligibility "lock-free
+  reads" → three separate single-lock acquisitions; the W-B first-half
+  window's nondeterministic-placement idiom disclosed in the ledger and
+  the WorkerSeek comment; EofClose's commit-only gate labeled a model
+  scoping choice, not a production necessity, in README/.tla/ledger;
+  processing-failure and panic exits declared outside the frozen
+  six-path inventory in the unmodeled list). The fifth (witness
+  sensitivity overclaim) had already been independently found by the
+  mutation/witness slice's residual round and fixed at 9f95eef with
+  bidirectional counterfactual verification.
 - Review-round delta re-verification (same reviewer): F1/F2(b)/F3 FIXED;
   F2(a)'s defect-sensitivity claim was REFUTED by a reviewer counterexample
   (under the erasure defect, ReadPartialSuccess re-latches and a plain

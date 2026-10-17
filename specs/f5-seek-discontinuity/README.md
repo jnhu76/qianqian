@@ -100,7 +100,7 @@ terminal     workerGone + drain verdict + worker_failure 按冻结 resolver
 | `RecordStopIntent` / `EdgeStopFromStop` | `request_stop` 的 completion-lock 步 / 其数据面 stop（两步间为真实窗口，Q6-iv） |
 | `CancelSeekBookkeeping` | 串行化点 seek_aborted 分支：bookkeeping，**不是退出**（R1.2） |
 | `WriteStoppedExit` / `RemainderFlushStopExit` / `PostCutStopExit` | 三个真实 worker stop-exit（session.rs:993-994 / :798-802 / :725-735,:753-771） |
-| `EofClose` | read 的 Eof 臂（:892-895）；只从已 commit 的新 continuation 可达 |
+| `EofClose` | read 的 Eof 臂（:892-895）；模型内只从已 commit 的新 continuation 启用（生产上无 seek 播放的 EOF 也到该臂，不在本模型窗口内） |
 | `LegObserveAborted` / `LegObserveDrained` | render leg 终态观察与 drain verdict 证据（edge.rs:237-239 terminal 先于数据） |
 | `TerminalCommit` | D11 最小受约束投影（冻结 resolver 转写；见上文区分） |
 | `DrainOld`/`DrainNew` | 设备消费（audible truth 抽象） |
