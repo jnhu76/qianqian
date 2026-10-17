@@ -1168,8 +1168,27 @@ type SharedText = std::sync::Arc<std::sync::Mutex<String>>;
 fn shared_capture(
     reader: impl std::io::Read + Send + 'static,
 ) -> (std::thread::JoinHandle<()>, SharedText) {
+    let (handle, text, _timeline) = capture(reader);
+    (handle, text)
+}
+
+/// Byte-arrival timeline of a capture: the instant and text of every chunk
+/// the drain thread observed. Diagnostic-only (B2 round) — the pass path
+/// never reads it; a marker timeout reconstructs from it WHEN the child
+/// last made observable progress.
+#[cfg(unix)]
+type CaptureTimeline = std::sync::Arc<std::sync::Mutex<Vec<(std::time::Instant, String)>>>;
+
+/// [`shared_capture`] plus the byte-arrival timeline. Same drain semantics:
+/// polled, never consumed; marker waits must not wait for EOF.
+#[cfg(unix)]
+fn capture(
+    reader: impl std::io::Read + Send + 'static,
+) -> (std::thread::JoinHandle<()>, SharedText, CaptureTimeline) {
     let text: SharedText = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let timeline: CaptureTimeline = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let sink = text.clone();
+    let stamps = timeline.clone();
     let handle = std::thread::spawn(move || {
         let mut buffer = [0u8; 4096];
         let mut reader = reader;
@@ -1177,13 +1196,17 @@ fn shared_capture(
             match reader.read(&mut buffer) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    let mut guard = sink.lock().expect("capture lock");
-                    guard.push_str(&String::from_utf8_lossy(&buffer[..n]));
+                    let chunk = String::from_utf8_lossy(&buffer[..n]).into_owned();
+                    stamps
+                        .lock()
+                        .expect("capture lock")
+                        .push((std::time::Instant::now(), chunk.clone()));
+                    sink.lock().expect("capture lock").push_str(&chunk);
                 }
             }
         }
     });
-    (handle, text)
+    (handle, text, timeline)
 }
 
 #[cfg(unix)]
@@ -1231,6 +1254,130 @@ fn bounded_wait(child: &mut std::process::Child, what: &str) -> std::process::Ex
             }
             None => std::thread::sleep(std::time::Duration::from_millis(20)),
         }
+    }
+}
+
+/// Best-effort per-thread scheduler state of the child (B2 round): a timeout
+/// dump separates CPU starvation (S/R, empty wchan, no timeline progress),
+/// kernel waits (D, or wchan inside a read), and a dead process. Diagnostic
+/// only; never panics.
+#[cfg(target_os = "linux")]
+fn thread_states_snapshot(pid: u32) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::from("--- child thread states (/proc, best-effort) ---\n");
+    let Ok(tasks) = std::fs::read_dir(format!("/proc/{pid}/task")) else {
+        return format!("{out}unreadable (child may have exited)\n");
+    };
+    for task in tasks.flatten() {
+        let tid = task.file_name().to_string_lossy().into_owned();
+        let stat =
+            std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/stat")).unwrap_or_default();
+        // Field 3 is the state; comm (field 2) may contain spaces, so parse
+        // after the final ')'.
+        let state = stat
+            .rsplit_once(')')
+            .and_then(|(_, rest)| rest.split_whitespace().next())
+            .unwrap_or("?");
+        let wchan =
+            std::fs::read_to_string(format!("/proc/{pid}/task/{tid}/wchan")).unwrap_or_default();
+        let _ = writeln!(out, "  thread {tid}: state={state} wchan={}", wchan.trim());
+    }
+    out
+}
+
+#[cfg(not(target_os = "linux"))]
+fn thread_states_snapshot(pid: u32) -> String {
+    format!("--- child thread states: unavailable on this platform (pid {pid}) ---\n")
+}
+
+/// Post-mortem payload for a child-aware marker timeout (B2 round): whether
+/// the child is alive, everything it printed and WHEN each chunk arrived,
+/// and (linux) what each of its threads is blocked in. The point is the
+/// owner's B2 requirement: a red must separate "child stopped advancing",
+/// "child died silently", and "marker missed" instead of failing as an
+/// unclassified 30s timeout.
+#[cfg(unix)]
+fn child_diagnostics(
+    child: &mut std::process::Child,
+    text: &SharedText,
+    timeline: &CaptureTimeline,
+) -> String {
+    let mut report = String::new();
+    match child.try_wait() {
+        Ok(Some(status)) => report.push_str(&format!("child status: EXITED {status}\n")),
+        Ok(None) => report.push_str("child status: ALIVE\n"),
+        Err(error) => report.push_str(&format!("child status: UNPOLLABLE ({error})\n")),
+    }
+    let guard = text.lock().expect("capture lock");
+    report.push_str("--- captured so far ---\n");
+    if guard.is_empty() {
+        report.push_str("(nothing)\n");
+    } else {
+        report.push_str(&guard.clone());
+        report.push('\n');
+    }
+    drop(guard);
+    report.push_str("--- byte-arrival timeline (offset and gap from the previous chunk) ---\n");
+    let stamps = timeline.lock().expect("capture lock");
+    if stamps.is_empty() {
+        report.push_str("(no bytes ever arrived)\n");
+    }
+    if let Some((first, _)) = stamps.first() {
+        let mut last = *first;
+        for (at, chunk) in stamps.iter() {
+            report.push_str(&format!(
+                "+{:>7}ms (gap {}ms) {:?}\n",
+                at.duration_since(*first).as_millis(),
+                at.duration_since(last).as_millis(),
+                chunk
+            ));
+            last = *at;
+        }
+    }
+    drop(stamps);
+    report.push_str(&thread_states_snapshot(child.id()));
+    report
+}
+
+/// [`wait_for_marker`] with a child-aware watchdog (B2 round). The premise
+/// bound (30s) and the pass path are IDENTICAL; only the failure is upgraded:
+/// a child that exited without the marker is reported DIED (silent death —
+/// abort/OOM class, the signature that must never pass), an alive child is
+/// reported BLOCKED with the full post-mortem dump, and the child is reaped
+/// so a red never leaks a process holding the pipes. The bound stays 30s by
+/// owner decision — classification, not a wider promise.
+#[cfg(unix)]
+fn wait_for_marker_with_child(
+    text: &SharedText,
+    timeline: &CaptureTimeline,
+    child: &mut std::process::Child,
+    needle: &str,
+    what: &str,
+) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        if text.lock().expect("capture lock").contains(needle) {
+            return;
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            let dump = child_diagnostics(child, text, timeline);
+            panic!(
+                "{what}: child EXITED ({status}) without ever printing {needle:?} — \
+                 a silent child death (crash/OOM class), not a hang\n{dump}"
+            );
+        }
+        if std::time::Instant::now() >= deadline {
+            let dump = child_diagnostics(child, text, timeline);
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!(
+                "{what}: never saw {needle:?} inside the bound — child was ALIVE at the \
+                 deadline (scheduling stall or genuine hang); child killed by the watchdog\n\
+                 {dump}\
+                 thread-state legend: R running, S sleeping, D disk-wait, Z zombie\n"
+            );
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
     }
 }
 
@@ -1364,6 +1511,18 @@ fn reader_output_panic_full_transport_contract() {
 //                  parks inside a status write; the settled episode cannot
 //                  seal; release ⇒ clean completion with NO host failure.
 //   *-healthy      sight controls: same choreography, no break.
+//
+// B2 DAG (round §14.9; the boundaries the test harness owns, each witnessed
+// on the healthy stream with a +ms offset from child start — the parent's
+// timeout dump reconstructs how far the child advanced):
+//   spawn → assembly → transport rows (source/playing) → E9_ARMED →
+//   reader thread reads the command line → line() catches the output panic
+//   INSIDE the admitted operation → fail(Panic) records + conditional Stop →
+//   Operation::drop acks → episode settles (D11) → RUN-RETURNED witness →
+//   wait_terminal returns → TERMINAL witness → dispose/seal → final UNWIND
+//   witness. The only blocking primitives in the child are the stdin read
+//   (satisfied by the parent), the D11 condvar wait (completion.rs), and the
+//   seal ack condvar (machine_input.rs) — everything else is immediate.
 #[test]
 #[cfg(unix)]
 fn e9_real_reader_child() {
@@ -1374,6 +1533,7 @@ fn e9_real_reader_child() {
         "stdout-epipe" | "stderr-epipe" | "blocked" | "stdout-healthy" | "stderr-healthy" => {}
         other => panic!("unknown E-9 scenario {other:?}"),
     }
+    let epoch = std::time::Instant::now();
     let marker_on_stderr = !scenario.starts_with("stderr");
     let (assembled, disposed) = episode(SourceBehavior::EofAfter(100_000), true, None);
     let handle = assembled.start.handle.clone();
@@ -1406,7 +1566,25 @@ fn e9_real_reader_child() {
     let result = catch_unwind(AssertUnwindSafe(|| {
         crate::entry::run_machine_reader_for_test(assembled, start_reader)
     }));
+    // B2 boundary witnesses: the timeout dump separates "stuck inside the
+    // transport (reader/terminal path)" from "stuck after run returned" from
+    // "stuck in the harness tail".
+    witness(
+        marker_on_stderr,
+        &format!(
+            "Q290-E9-RUN-RETURNED unwind={} at=+{}ms",
+            u8::from(result.is_err()),
+            epoch.elapsed().as_millis()
+        ),
+    );
     let terminal = handle.wait_terminal();
+    witness(
+        marker_on_stderr,
+        &format!(
+            "Q290-E9-TERMINAL={terminal:?} at=+{}ms",
+            epoch.elapsed().as_millis()
+        ),
+    );
     // The transport sealed its own host input; `seal` on a closed admission
     // with no active operation is an idempotent read of the same record.
     let sealed = host_slot.borrow().as_ref().map(|input| input.seal());
@@ -1457,9 +1635,16 @@ fn spawn_e9_child(scenario: &str) -> std::process::Child {
 fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
     use std::io::Write;
     let mut child = spawn_e9_child("stdout-epipe");
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
     let child_stdout = child.stdout.take().expect("child stdout"); // held, uncaptured
-    wait_for_marker(&stderr_text, E9_ARMED, "stdout-epipe child");
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        E9_ARMED,
+        "stdout-epipe child",
+    );
     drop(child_stdout); // break stdout AFTER the reader is armed
     child
         .stdin
@@ -1468,7 +1653,13 @@ fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
         .write_all(b"status\n")
         .expect("write the status line");
     drop(child.stdin.take());
-    wait_for_marker(&stderr_text, "Q290-E9-UNWIND", "stdout-epipe witnesses");
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        "Q290-E9-UNWIND",
+        "stdout-epipe witnesses",
+    );
     let status = bounded_wait(&mut child, "stdout-epipe");
     let stderr = finish_text(stderr_thread, stderr_text, "stderr capture");
     assert!(stderr.contains(E9_ARMED), "{stderr}");
@@ -1510,9 +1701,16 @@ fn e9_real_reader_stdout_epipe_follows_the_documented_host_failure_classes() {
 fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
     use std::io::Write;
     let mut child = spawn_e9_child("stderr-epipe");
-    let (stdout_thread, stdout_text) = shared_capture(child.stdout.take().expect("child stdout"));
+    let (stdout_thread, stdout_text, stdout_timeline) =
+        capture(child.stdout.take().expect("child stdout"));
     let child_stderr = child.stderr.take().expect("child stderr"); // held, uncaptured
-    wait_for_marker(&stdout_text, E9_ARMED, "stderr-epipe child");
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        E9_ARMED,
+        "stderr-epipe child",
+    );
     assert_contains(
         &stdout_text,
         "source: ",
@@ -1531,7 +1729,13 @@ fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
         .write_all(b"badcmd\n")
         .expect("write the command line");
     drop(child.stdin.take());
-    wait_for_marker(&stdout_text, "Q290-E9-UNWIND", "stderr-epipe witnesses");
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        "Q290-E9-UNWIND",
+        "stderr-epipe witnesses",
+    );
     let status = bounded_wait(&mut child, "stderr-epipe");
     let stdout = finish_text(stdout_thread, stdout_text, "stdout capture");
     assert!(stdout.contains("Q290-E9-UNWIND=1"), "{stdout}");
@@ -1655,9 +1859,17 @@ fn e9_real_reader_blocked_pipe_delays_seal_and_is_not_a_failure() {
 fn e9_real_reader_stdout_healthy_sight_control() {
     use std::io::Write;
     let mut child = spawn_e9_child("stdout-healthy");
-    let (stdout_thread, stdout_text) = shared_capture(child.stdout.take().expect("child stdout"));
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stderr_text, E9_ARMED, "stdout-healthy child");
+    let (stdout_thread, stdout_text, _stdout_timeline) =
+        capture(child.stdout.take().expect("child stdout"));
+    let (stderr_thread, stderr_text, stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stderr_text,
+        &stderr_timeline,
+        &mut child,
+        E9_ARMED,
+        "stdout-healthy child",
+    );
     child
         .stdin
         .as_mut()
@@ -1691,9 +1903,17 @@ fn e9_real_reader_stdout_healthy_sight_control() {
 fn e9_real_reader_stderr_healthy_sight_control() {
     use std::io::Write;
     let mut child = spawn_e9_child("stderr-healthy");
-    let (stdout_thread, stdout_text) = shared_capture(child.stdout.take().expect("child stdout"));
-    let (stderr_thread, stderr_text) = shared_capture(child.stderr.take().expect("child stderr"));
-    wait_for_marker(&stdout_text, E9_ARMED, "stderr-healthy child");
+    let (stdout_thread, stdout_text, stdout_timeline) =
+        capture(child.stdout.take().expect("child stdout"));
+    let (stderr_thread, stderr_text, _stderr_timeline) =
+        capture(child.stderr.take().expect("child stderr"));
+    wait_for_marker_with_child(
+        &stdout_text,
+        &stdout_timeline,
+        &mut child,
+        E9_ARMED,
+        "stderr-healthy child",
+    );
     child
         .stdin
         .as_mut()
