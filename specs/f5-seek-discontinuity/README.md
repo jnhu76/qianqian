@@ -121,7 +121,7 @@ Ghost 变量（`oldDrainEver`/`oldAfterCommit`/`posMixAfterCommit`/`seekFromPart
 | `stopIntent` | request_stop 已记录 intent（completion lock 步） | SessionCompletion | RecordStopIntent | TCC（rule 4 读 stop_requested）；W-A 窗口 | 否——与 edgeTerminal 的窗口正是 GAP-01 | 真实状态映射 |
 | `edgeTerminal` | PcmEdge terminal（first-wins，edge.rs:190-201） | PcmEdge | EdgeStopFromStop / WorkerEdgeFailAdvance（边 fail）/ EofClose | 全部真实退出位置的门控；TCC；first-wins EOF×stop；Failed{decode}×stopped 合法格（终审 P1 witness） | 否——基线 `stopped` 一位无法表达 open/eof/failed/stopped | 真实状态映射 |
 | `workerFailurePublished` | worker_failure record 已发布 | SessionCompletion | FatalFailurePublish / SeekMutatedThenFailed（first-wins） | resolver rule 1 先于 stop 咨询；TCC | 否——基线 episodeFailed 只覆盖 Mutated 一支 | 真实状态映射 |
-| `workerGone` | worker_gone evidence 已发布（≠ 物理退出） | SessionCompletion | 五个真实退出动作 + WorkerExitFunnel（**仅未 settle 时发布**——失败路线被 publish_evidence first-wins 丢弃，恒 FALSE） | TerminalCommit 前置（证据未齐不 commit） | 否 | 真实状态映射 |
+| `workerGone` | worker_gone evidence 已发布（≠ 物理退出） | SessionCompletion | 四个真实退出动作（无条件发布）+ WorkerExitFunnel（条件发布——**仅未 settle 时**；失败路线被 publish_evidence first-wins 丢弃，恒 FALSE） | TerminalCommit 前置（证据未齐不 commit） | 否 | 真实状态映射 |
 | `drainVerdict` | render leg 的 drain 证据 | SessionCompletion（drain observer） | LegObserveAborted/Drained | resolver rule 3/4 的输入 | 否 | 真实状态映射 |
 | `committedOutcome` | D11 terminal 的最小受约束投影 | Playback Session（authority） | TerminalCommit（一次性） | Scoped/TCC；L4/L5 | 否——本轮新增 | 投影（受约束） |
 | `exitPath` | worker 从哪个真实位置退出 | —（verifier-only） | 六个退出动作 | TCC 的冻结退出清单半边（D-T3 靶） | 否 | ghost |
@@ -176,7 +176,7 @@ D-C 扩展四条（#289 冻结 defect ledger，PENDING_FATAL_DAG §8；
 | D-T1 `OldCursorResumeAfterApplied` | Applied 后旧 cursor 生产复活（WorkerCut→idle） | NoOldCursorResumeAfterApplied |
 | D-T2 `RefusedClearsLatch` | RefusedUnchanged 被误当 Applied 清除 latch | RetainLatchOnRefused |
 | D-T3 `LoopTopStopExit` | canceled-seek 的 bookkeeping 位置被改成 worker 退出（pre-R1.1 错误措辞）——反例链：pendingFatal→seek→stop intent→edge stop→取消→aborted drain→commit=Stopped，而该位置合法格是 failedDecode | TerminalCellConformance |
-| D-T4 `AppliedKeepsLatch` | Applied 不擦除 latch（**单缺陷**，终审 P2——去向保持正常 repositioned）→ 新 continuation 下一次读复现旧 fatal → 非法 failure publication（surfacing 全程链 10 态：ReadPartialSuccess→…→WorkerCut→CommitCut→FatalFailurePublish） | DiagnosticNoFailurePublicationAfterLanding（NoOldFatalAfterApplied 的 publication 半边，诊断性命名检查——全称版在 landing 时刻提前触发，走不完链；全称版违规由披露运行 counterexample-DT4-full-invariants.log 另行记录） |
+| D-T4 `AppliedKeepsLatch` | Applied 不擦除 latch（**单缺陷**，终审 P2——去向保持正常 repositioned）→ 新 continuation 下一次读复现旧 fatal → 非法 failure publication（surfacing 全程链 8 态直达：ReadPartialSuccess→…→WorkerCut→FatalFailurePublish；无需 commit——Aborted 恢复读路径合法，终审复审更正） | DiagnosticNoFailurePublicationAfterLanding（NoOldFatalAfterApplied 的 publication 半边，诊断性命名检查——全称版在 landing 时刻提前触发，走不完链；全称版违规由披露运行 counterexample-DT4-full-invariants-v2.log 另行记录） |
 
 FORMAL-PLAN REV.2 撤回的 M-A（pickup-order-flipped）不进入负控制集
 （「fatal 先于 seek 结果被读到」是 §2.3 的合法格，不保证 red）。

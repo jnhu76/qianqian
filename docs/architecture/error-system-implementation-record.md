@@ -721,8 +721,9 @@ against BASE_SHA source and fixed on the same PR; no production change.
   on the failure route, the faithful dropped-publication value);
   `RecordStopIntent` lost its settle gate (production `request_stop` is
   "safe from any thread and any state"). Acceptance: new witness
-  `W_FAILED_DECODE_WITH_STOPPED_EDGE` reachable (5-state counterexample
-  archived, exactly the reviewer's sequence).
+  `W_FAILED_DECODE_WITH_STOPPED_EDGE` reachable (6-state counterexample —
+  TLC counts include the initial state — archived, exactly the reviewer's
+  sequence).
 - **P2 (confirmed) — the eligibility→provider window rested on an unproven
   union argument.** The A-2 "nondeterministic intent placement" idiom was
   judged insufficient (correctly). Fix: explicit split
@@ -737,17 +738,18 @@ against BASE_SHA source and fixed on the same PR; no production change.
   one-mutation-one-defect, and the universal invariant fired at the landing
   state before any surfacing. Fix: single defect (skip erasure only;
   destination stays `repositioned`); `FatalFailurePublish` gained a
-  `repositioned` arm gated on `committed` (production resumes reading only
-  after commit routing, :775-778; unreachable in the base model where
-  Applied always erases); added named-diagnostic
+  `repositioned` arm (see §13.7 for the re-review correction that removed
+  an initial `committed` gate whose justification overstated production);
+  added named-diagnostic
   `DiagnosticNoFailurePublicationAfterLanding` (the publication half of
   `NoOldFatalAfterApplied`; referenced only by the D-T4 diagnostic cfg,
   not in the 11-invariant baseline — the AGENTS.md "named as diagnostics"
   provision). Acceptance: the D-T4 counterexample now walks the full
-  10-state surfacing chain (archive: counterexample-DT4-surfacing-
-  chain.log); the universal invariant's violation recorded in a disclosed
-  second run (counterexample-DT4-full-invariants.log, terminates at the
-  landing state as before).
+  surfacing chain (archive: counterexample-DT4-surfacing-chain-v2.log,
+  8 states, direct — no commit needed); the universal invariant's
+  violation recorded in a disclosed second run
+  (counterexample-DT4-full-invariants-v2.log, terminates at the landing
+  state as before).
 
 Post-fix full suite (f5-full-suite-run5-finalrev-fixes.log): first run all
 green — base PASS 22349/7470 exhausted; 12/12 witnesses reachable; 11/11
@@ -760,3 +762,44 @@ into a non-matrix exit cell is likewise mutant-only). PENDING_FATAL_DAG
 bumped to REV.2 (W-E window, corrected atomicity rulings, `seek_eligible`
 position row, D-T4 single-defect row). No production file touched; BASE_SHA
 line anchors unchanged.
+
+### 13.7 Re-review round (same day, 2026-10-17) — delta fixes after the final-review fixes
+
+Two fresh-context re-reviewers ran against 2a516bf after the §13.6 fixes.
+
+- **Causal-fidelity re-review: APPROVE.** All three §13.6 fixes verified
+  faithful against source (the publish_evidence lock hold, request_stop's
+  any-state behavior, the three separate single-lock eligibility
+  acquisitions, the D-T4 single-defect path); the full suite re-run was
+  line-identical to the archived run5 log; every TerminalCellConformance
+  cell was independently re-derived against the new action set with no
+  counterexample (including the compatibility arguments for the relaxed
+  `RecordStopIntent` against cells (2e)/(2g)).
+- **Evidence-integrity re-review: REVISE (docs-only).** Suite reproduced
+  exactly; the four evidence-archive files verified state-by-state;
+  findings: the stale PENDING_FATAL_DAG §8 D-T4 row contradicting the
+  REV.2 header claim, the run1/run2 base-count wording in RESULTS'
+  inventory, and two count/notation P3s.
+- **Delta fixes applied** (docs + one model guard line):
+  1. PENDING_FATAL_DAG §8 D-T4 row rewritten (single defect, diagnostic
+     target, direct chain) — the edit had been planned but never applied
+     in 2a516bf while the REV.2 header claimed it.
+  2. The `committed` gate on `FatalFailurePublish`'s `repositioned` arm
+     was removed: its justification ("production resumes reading only
+     after commit routing, :775-778") overstated production — the cutover
+     wait's `Aborted` branch (session.rs:721) exits the second wait (:750)
+     and resumes reading (:775-778) without a commit. The arm stays
+     base-dead (Applied always erases), so the base space is unchanged
+     point-for-point (22349/7470, re-verified: f5-base-rewiden-recheck-
+     run5c.log); the D-T4 counterexample is now a direct 8-state chain
+     (counterexample-DT4-surfacing-chain-v2.log; both pre-fix D-T4 logs
+     retained, marked superseded in the RESULTS inventory).
+  3. Line-citation corrections (:671-672 for the Mutated arm's
+     release+publish, :673 for its edge.fail), the witness counterexample
+     stated in TLC state-counting convention (6 states = initial + 5
+     action steps), the workerGone action count (four unconditional real
+     exits + the conditional funnel), the run1/run2 counts
+     (13117/5216) restored in the RESULTS inventory, and a disclosure note
+     for the pre-existing benign family where LegObserve* records
+     drainVerdict after settlement (inert in-model; TerminalCommit is
+     gated on the unsettled outcome).

@@ -45,8 +45,9 @@
    "none")`——失败路线恒 FALSE，忠实转写 first-wins 丢弃）；
    `RecordStopIntent` 移除 settle 门槛（生产 request_stop any state）。
    **验收**：新 witness `W_FAILED_DECODE_WITH_STOPPED_EDGE` 可达（反例
-   5 态，归档 counterexample-WitnessFailedDecodeStoppedEdge.log，轨迹即
-   终审描述的交错序列）；first-wins 两半不变式全绿。
+   6 态＝初始态+5 动作步，TLC 计数含初始态；归档
+   counterexample-WitnessFailedDecodeStoppedEdge.log，轨迹即终审描述的
+   交错序列）；first-wins 两半不变式全绿。
 2. **P2（核实成立）——eligibility 与 provider begin 的窗口靠并集论证**。
    原模型以「intent 落点非确定性」论证 `WorkerSeek` 原子 guard 的等价性，
    终审判定该等价性未被证明（正确）。生产序列 session.rs:620-650：check
@@ -63,17 +64,22 @@
    （与 D-T3 前提修订同原则：缺陷机制应单因子）；且全称不变式在 landing
    时刻提前触发，归档反例未走完 surfacing。
    **修复**：D-T4 收敛为单缺陷（仅跳过擦除；去向保持正常 repositioned）；
-   `FatalFailurePublish` 增加 repositioned 臂（要求 committed——生产恢复
-   生产在 commit 路由之后，:775-778；基模型中该臂不可达：Applied 必擦除）；
-   新增诊断性命名检查 `DiagnosticNoFailurePublicationAfterLanding`
+   `FatalFailurePublish` 增加 repositioned 臂；新增诊断性命名检查
+   `DiagnosticNoFailurePublicationAfterLanding`
    （NoOldFatalAfterApplied 的 publication 半边，仅 D-T4 诊断 cfg 引用，
    基线 11 条不含——AGENTS.md「named as diagnostics」条款）。
-   **验收**：D-T4 反例走完全程 10 态链（归档 counterexample-DT4-surfacing-
-   chain.log）：ReadPartialSuccess → … → SeekEligibilityPass →
-   SeekProviderBegin → WorkerCut（latch 未擦）→ CommitCut →
-   FatalFailurePublish（旧 fatal 在新 continuation surfaced）；全称版
+   （复审更正：初版给 repositioned 臂加了 committed 门槛并称「生产恢复
+   生产在 commit 路由之后」——复审指出 cutover wait 的 Aborted 分支
+   （session.rs:721→:750→:775-778）允许未 commit 恢复读，该说法夸大生产；
+   已去掉门槛。基模型内 latch×repositioned 组合仍不可达（Applied 必擦除），
+   base 状态空间逐点不变（22349/7470，f5-base-rewiden-recheck-run5c.log）。）
+   **验收**：D-T4 反例走完全程 8 态链（归档
+   counterexample-DT4-surfacing-chain-v2.log；初版 10 态经 CommitCut 的
+   链在 committed 门槛下取得，v1 日志保留为 superseded）：ReadPartialSuccess
+   → … → SeekEligibilityPass → SeekProviderBegin → WorkerCut（latch 未擦）
+   → FatalFailurePublish（旧 fatal 在新 continuation surfaced）；全称版
    `NoOldFatalAfterApplied` 的违规由披露运行 counterexample-DT4-full-
-   invariants.log 另行记录（终止于 landing 时刻，与修复前同形）。
+   invariants-v2.log 另行记录（终止于 landing 时刻，与修复前同形）。
 
 修复后全套件复跑（f5-full-suite-run5-finalrev-fixes.log）：**首跑全绿**。
 无生产代码改动；模型语义锚点与 BASE_SHA 行号全部未变（PENDING_FATAL_DAG
@@ -113,6 +119,30 @@ F5-SEEK-DISCONTINUITY: ALL PASS
 （以上为终审修正轮 run5 输出；修复前审查修正轮 run3/run4 的 11-witness
 版本输出见证据目录，base 计数 15667/6330。）
 
+### 复审轮（同日，两个 fresh-context 复审 agent）
+
+- **Causal-fidelity 复审：APPROVE**。三项终审修复全部对照源码核实为
+  忠实（publish_evidence 锁程 / request_stop any-state / 三次独立单锁
+  eligibility / D-T4 单缺陷路径逐一验证）；独立重跑全套件与归档 run5
+  **逐行一致**（22349/7470；12/12 witness、11/11 mutation、D-T4 恰好
+  击中诊断不变式）；对 TerminalCellConformance 全部格逐格重推导无反例
+  （含 relaxed RecordStopIntent 与 (2g)/(2e) 的相容性论证）。附带发现：
+  §8 D-T4 行未更新（P2，见下）、repositioned 臂 committed 门槛的说法
+  夸大生产（P2，见下）、3×P3（计数口径 / :675 行号 / 既有惰性
+  drain-verdict 记录注记）。
+- **Evidence-integrity 复审：REVISE（全部 docs-only）**。套件独立复现
+  逐数吻合；证据归档四文件全部核verified（DT4 链逐状态比对）；发现
+  §8 D-T4 行与 REV.2 头声明矛盾（其 P1）、RESULTS 证据清单把
+  run1/run2 的 base 计数误并入 15667/6330（P2）、2×P3。
+- **本轮 delta 修复（docs + 1 行模型 guard）**：§8 D-T4 行改写为单缺陷
+  + 诊断目标 + 8 态直达链；FatalFailurePublish 的 repositioned 臂去掉
+  committed 门槛（Aborted 恢复读无需 commit，session.rs:721→:750→
+  :775-778），base 逐点复核不变（run5c）；行号引用 :671-672/:673 更正；
+  witness 计数统一为 TLC 口径（6 态＝初始+5 步）；workerGone 动作计数
+  更正（4 个无条件真实退出 + 条件漏斗）；run1/2 计数与 superseded 文件
+  标注；LegObserve 的 settle 后 drain 记录惰性注记（既有形状，P3）。
+  D-T4 两份证据运行按「重跑=新文件」归档为 *-v2。
+
 ## 状态空间
 
 - base：22349 states generated / **7470 distinct**（穷举完成，0 on queue；
@@ -136,21 +166,30 @@ F5-SEEK-DISCONTINUITY: ALL PASS
   判定。
 - 反例轨迹归档：D-T1..D-T4 与终审 P1 witness 的 TLC 反例逐状态保存在执行轮
   本地证据目录 `/home/hoo/Source/qianqian-289-evidence/`（未入库；同轮其他
-  证据：f5-full-suite-run.log … f5-full-suite-run4.log = 执行轮与审查修正轮
-  的四次全套件完整输出（base 15667/6330）、
+  证据：f5-full-suite-run.log/run2.log = 执行轮前两跑（base 13117/5216）、
+  run3/run4.log = 执行轮定稿与审查修正轮（base 15667/6330）、
   f5-full-suite-run5-finalrev-fixes.log = 终审修正轮全套件（base
-  22349/7470，本文引用数字）、base-attempt1-RetainLatchOnRefused-violated.log
-  = 首跑红色日志、counterexample-DT*.log = 各反例逐状态轨迹、
+  22349/7470，本文引用数字；其头部 MODEL_SHA 记录的是 fbb3c64+未提交修复
+  ——提交在其后 14 分钟完成，证据身份由两个复审 agent 在 2a516bf 上的独立
+  复跑闭合：逐行一致）、f5-base-comment-recheck-run5b.log /
+  f5-base-rewiden-recheck-run5c.log = 注释修正与复审去门槛后的 base 逐点
+  复核（均 22349/7470）、base-attempt1-RetainLatchOnRefused-violated.log
+  = 首跑红色日志、counterexample-DT1/DT2/DT3*.log = 各反例逐状态轨迹、
   counterexample-DT3-committed-cell-chain.log = D-T3 的 commit 完整链诊断
-  运行、counterexample-DT4-surfacing-chain.log = D-T4 终审 P2 后的 10 态
-  surfacing 全程链（正式 D-T4 证据）、counterexample-DT4-full-invariants.log
-  = D-T4 全称不变式披露运行（终止于 landing 时刻）、
+  运行、counterexample-DT4AppliedKeepsLatch.log = **superseded**（双缺陷
+  模型的修复前反例，仅历史）、counterexample-DT4-surfacing-chain.log =
+  **superseded**（committed 门槛版 10 态链）、
+  counterexample-DT4-surfacing-chain-v2.log = **现行 D-T4 正式证据**
+  （8 态直达链）、counterexample-DT4-full-invariants.log = **superseded**、
+  counterexample-DT4-full-invariants-v2.log = 现行全称不变式披露运行
+  （终止于 landing 时刻）、
   counterexample-WitnessFailedDecodeStoppedEdge.log = 终审 P1 合法交错
-  witness 5 态反例、lefthook-pre-push-all*.log = 本地 gate 日志、dt-run-* =
-  首次 D-T cfg 配置错误的失败现场）。诊断运行的复现配方：拷贝本目录 .tla +
-  mutations/DT3LoopTopStopExit.cfg 后，把 `TerminalCellConformance` 替换为
-  仅保留其 (2e) committed-cell 合取项的形式（PENDING_FATAL_DAG §8 注明
-  「非 gate 配置」）——gate 配置本身不变。2026-10-17 审查 F3 修复注记。
+  witness 反例（6 态＝初始+5 步）、lefthook-pre-push-all*.log = 本地 gate
+  日志、dt-run-* = 首次 D-T cfg 配置错误的失败现场）。诊断运行的复现配方：
+  拷贝本目录 .tla + mutations/DT3LoopTopStopExit.cfg 后，把
+  `TerminalCellConformance` 替换为仅保留其 (2e) committed-cell 合取项的形式
+  （PENDING_FATAL_DAG §8 注明「非 gate 配置」）——gate 配置本身不变。
+  2026-10-17 审查 F3 修复注记。
 
 ## 判读
 
@@ -196,13 +235,14 @@ F5-SEEK-DISCONTINUITY: ALL PASS
      前提修订已记录在 PENDING_FATAL_DAG §8；
    - D-T4（Applied 不擦 latch——终审 P2 后为单缺陷，去向保持正常
      repositioned）被诊断检查 DiagnosticNoFailurePublicationAfterLanding
-     抓住，反例走完 10 态 surfacing 全程链：ReadPartialSuccess → … →
+     抓住，反例走完 8 态 surfacing 全程链：ReadPartialSuccess → … →
      SeekEligibilityPass → SeekProviderBegin → WorkerCut（landing ∧ latch
-     未擦）→ CommitCut → FatalFailurePublish（旧 fatal 在新 continuation
-     surfaced → 非法 failure publication）。全称版 NoOldFatalAfterApplied
-     在同模型中亦被违反（披露运行 counterexample-DT4-full-invariants.log，
-     反例终止于 landing 时刻——其保留半边先行触发，走不完链，故正式证据
-     采用诊断版全程链，两份日志都已归档）。
+     未擦）→ FatalFailurePublish（旧 fatal 在新 continuation surfaced →
+     非法 failure publication；无需 commit——Aborted 恢复读路径合法）。
+     全称版 NoOldFatalAfterApplied 在同模型中亦被违反（披露运行
+     counterexample-DT4-full-invariants-v2.log，反例终止于 landing 时刻
+     ——其保留半边先行触发，走不完链，故正式证据采用诊断版全程链，两份
+     日志都已归档）。
 
 ## 校准关系（如实声明）
 
