@@ -1612,14 +1612,21 @@ fn e9_real_reader_blocked_pipe_delays_seal_and_is_not_a_failure() {
         !stderr.contains("machine input failed"),
         "blocking must not be recorded as a host failure\n{stderr}"
     );
+    assert!(
+        stderr.contains("Q290-E9-SEAL=None"),
+        "a released block must seal with no recorded host failure\n{stderr}"
+    );
     // Admission closes at the transport's seal, which runs right after the
     // stop settles (machine_input.rs): the post-stop flood is answered only
     // until that closure, so the answered count is the scheduling race, not
-    // the contract. The contract: the PARKED row itself completed at release
-    // (>= 1 row), the outcome row shipped, and no host failure was recorded.
+    // the contract. This assert is a sanity row only (the pre-park rows
+    // already satisfy it); the load-bearing parked-ack ordering oracle is the
+    // channel-synchronized L1 `seal_retains_admitted_postclosure_output_
+    // failure_and_rejects_fresh_work`, and the non-exit window above is
+    // schedule-biased L2 evidence of the park.
     assert!(
         stdout.matches("outcome: ").count() >= 1,
-        "the parked status write must complete at release\nstdout tail: {stdout_tail}"
+        "at least one admitted status row must have completed\nstdout tail: {stdout_tail}"
     );
     assert!(stdout.contains("stopped before completion"), "{stdout}");
     assert!(
@@ -1966,6 +1973,10 @@ fn e8_site6_final_reports_panic_skip_only_later_reports_on_broken_stdout() {
     assert!(
         stderr.contains("Q290-E8-SITE6-TERMINAL=Stopped"),
         "the terminal must be committed before the final reports\n{stderr}"
+    );
+    assert!(
+        stderr.contains("failed printing to stdout") && stderr.contains("Broken pipe"),
+        "the outcome-row panic must name the failed stdout write\n{stderr}"
     );
     assert_eq!(status.code(), Some(0));
 
