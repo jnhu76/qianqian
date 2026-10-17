@@ -373,16 +373,28 @@ NO independent error window at the flush:
 - every reader stdout writer emits '\n'-terminated rows (RQ1: `format_status`
   8/8 push paths end '\n'; transport rows likewise);
 - Rust `Stdout` is a LineWriter independent of sink type (RQ2, demonstrated
-  behaviorally: a no-newline `print!` stays buffered on a pipe);
-- a successful '\n'-terminated `print!` leaves an EMPTY buffer — PA probe:
-  `flush()` returned Ok against a read end proven closed by the PA-2 control
-  (`print!` panicked with `Broken pipe`), so the flush performed no write;
-- a flush Err therefore requires a non-newline tail in the buffer (PB probe:
-  `Err(Os { code: 32, kind: BrokenPipe })` demonstrated) — a shape no
-  production writer has; a foreign non-newline tail is carried to the fd by
-  the NEXT row's own `print!` (interleave probe), i.e. it surfaces in the
-  already-classified print!-panic path (`HostFailure::Panic` via the
-  `#R-dispatch` catch), never in the trailing flush.
+  behaviorally by the committed PB test: a no-newline `print!` stays buffered
+  on a real pipe);
+- a successful '\n'-terminated `print!` leaves an EMPTY buffer — committed v2
+  probe `e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink`: the row
+  is OBSERVED in the pipe before the parent closes the read end, the run's
+  ONLY `flush()` then returns Ok, and a second `print!` on the SAME sink
+  panics with `Broken pipe` — so the sink was broken when the flush returned
+  Ok and that Ok can only mean no write was attempted;
+- a flush Err therefore requires a non-newline tail in the buffer (committed
+  PB test: `Err(BrokenPipe)` demonstrated — the only flush performs the
+  write), a shape no production writer has; a foreign non-newline tail is
+  carried to the fd by the NEXT row's own `print!` (committed INTERLEAVE
+  test), i.e. it surfaces in the already-classified print!-panic path
+  (`HostFailure::Panic` via the `#R-dispatch` catch), never in the trailing
+  flush.
+
+Repair note: the round's v1 scratch probe was withdrawn at this point by the
+owner's P1 review (2026-10-17) — its PA/interleave arms flushed explicitly
+before the observed flush and its PA-2 control ran on a different process's
+sink, so its Ok observations were non-discriminating (§14.8.3). The v2 probe
+is committed, CI-executed tests (`e9_flush_probe_*`, cfg(unix)); the
+instrument no longer depends on this record's transcription.
 
 Scope: Linux pipe + regular-file probes; terminal NOT_RUN (no tty in the
 harness; the interop console proxy is a pipe — §14.5/§14.7); std EBADF
@@ -417,7 +429,10 @@ T1  any production stdout writer that can emit a non-newline-terminated tail
     (the LineWriter buffer would carry it into the flush)
 T2  any reshaping of the :274 closure (write!+flush batching, a different
     writer, a buffered-by-default writer swap)
-T3  a std contract change to Stdout buffering (LineWriter)
+T3  a std contract change to Stdout buffering (LineWriter) — the committed
+    v2 PA probe is the automated tripwire for exactly this: a buffering
+    change makes `e9_flush_probe_newline_row_flush_ok_on_proven_broken_sink`
+    fail (its premise oracle or its brokenness oracle)
 T4  flush-Err evidence from any §14.7 NOT_RUN lane — a native Windows
     console session or a real terminal sink on any platform (the interop
     proxy cannot reach either)
