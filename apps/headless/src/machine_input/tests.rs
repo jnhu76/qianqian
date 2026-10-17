@@ -1234,7 +1234,9 @@ fn bounded_wait(child: &mut std::process::Child, what: &str) -> std::process::Ex
     }
 }
 
-// PROPERTY/AUTHORITY: B3 of implementation-record §14.6 — a swallowed flush
+// PROPERTY (round-frozen scenario B3, implementation-record §14.6; normative
+// source: reconciliation §8 E-9 / migration §1.7; the D-D disposition itself
+// is OWNER_RULING_PENDING, decision-record §7) — a swallowed flush
 // result (the production `let _ = io::stdout().flush()`, machine_input.rs:274)
 // leaves an admitted operation indistinguishable from success: no record, no
 // Stop, no exit contribution. The negative control, inside the same test, is
@@ -1278,7 +1280,8 @@ fn flush_err_swallow_is_indistinguishable_from_success() {
     assert!(handle.observe().stop_requested);
 }
 
-// PROPERTY/AUTHORITY: B1 of implementation-record §14.6 — the full D3 chain
+// PROPERTY (round-frozen scenario B1, implementation-record §14.6; normative
+// source: execution-model D3/D5) — the full D3 chain
 // for an output-write panic, assembled at transport level: catch #R-dispatch
 // → HostFailure::Panic recorded BEFORE the response → conditional Stop on the
 // unsettled episode → ack → seal Some(Panic) → exit 1 → D11 stays Stopped
@@ -1333,8 +1336,8 @@ fn reader_output_panic_full_transport_contract() {
     );
 }
 
-// PROPERTY/AUTHORITY: E-9 three-mode protocol-write conformance
-// (reconciliation §8 E-9; implementation-record §14.6 B1/B2/B4), executed
+// PROPERTY (round-frozen §14.6 E-9 three-mode protocol-write conformance;
+// normative source: reconciliation §8 E-9), executed
 // against the REAL production reader: `spawn_reader` reads real stdin and
 // writes through the real `print!`+`flush` / `eprintln!` closure; the parent
 // choreographs a real OS pipe (broken or left unread) and drives real command
@@ -1375,13 +1378,17 @@ fn e9_real_reader_child() {
     let (assembled, disposed) = episode(SourceBehavior::EofAfter(100_000), true, None);
     let handle = assembled.start.handle.clone();
     if scenario == "blocked" {
-        // Pre-fill the unread stdout pipe (64 KiB here, F_GETPIPE_SZ-checked)
-        // so the reader's status writes park deterministically inside the
-        // admitted dispatch: after this filler and the transport's two
-        // opening rows there is room for only a handful of ~140-byte status
-        // rows. A flood alone cannot do it: the transport's seal closes
-        // admission right after the stop settles, and the reader then exits
-        // on the closed admission long before a flood could fill the pipe.
+        // Pre-fill the unread stdout pipe so the reader's status writes park
+        // deterministically inside the admitted dispatch: after this filler
+        // and the transport's two opening rows there is room for only a
+        // handful of ~140-byte status rows. The 64 KiB default pipe capacity
+        // was measured out-of-band in this round's (lost) probe log, not by
+        // committed code; the construction is self-verifying regardless — on
+        // any capacity mismatch the reader never parks, the child exits
+        // early, and the parent's parked-window poll fails loudly. A flood
+        // alone cannot do it: the transport's seal closes admission right
+        // after the stop settles, and the reader then exits on the closed
+        // admission long before a flood could fill the pipe.
         let filler = "x".repeat(120);
         for _ in 0..536 {
             println!("{filler}");
@@ -1541,15 +1548,19 @@ fn e9_real_reader_stderr_epipe_follows_the_documented_host_failure_classes() {
     assert_eq!(status.code(), Some(0));
 }
 
-// PROPERTY: B4 mode-3 L2 — a REAL unread pipe parks the REAL reader INSIDE a
-// status write while the episode settles; the transport cannot seal (the
-// admitted operation owes its ack) and the child cannot exit; after release
-// the run completes cleanly with NO host failure (blocking is not a failure).
-// The parked state is constructed by the flood itself (the parent never
-// reads; the pipe fills) — its witness is the bounded non-exit window AFTER
-// `stop` was delivered; direct seal-wait witnessing remains the in-process
-// oracle (`seal_retains_admitted_postclosure_output_failure…`). WATCHDOG:
-// safety only — a timeout is reported BLOCKED (a failed oracle), never PASS.
+// PROPERTY (round-frozen scenario B4 mode-3; implementation-record §14.8.4) —
+// a REAL unread pipe parks the REAL reader INSIDE a status write while the
+// episode settles; the transport cannot seal (the admitted operation owes its
+// ack) and the child cannot exit; after release the run completes cleanly
+// with NO host failure (blocking is not a failure). The parked state is
+// constructed by the child's PRE-FILLED pipe (see the child arm — a flood
+// alone cannot: seal closes admission at the stop settle); the flood only
+// exercises post-closure inertness. Its witness is the bounded non-exit
+// window AFTER `stop` was delivered — schedule-biased L2 evidence, never a
+// happens-before proof; direct seal-wait witnessing remains the in-process,
+// load-bearing oracle (`seal_retains_admitted_postclosure_output_failure…`).
+// WATCHDOG: safety only — a timeout is reported BLOCKED (a failed oracle),
+// never PASS.
 #[test]
 #[cfg(unix)]
 fn e9_real_reader_blocked_pipe_delays_seal_and_is_not_a_failure() {
@@ -1707,8 +1718,9 @@ fn e9_real_reader_stderr_healthy_sight_control() {
 
 // --- E-8: main-thread report sites against real broken pipes -----------------
 
-// PROPERTY/AUTHORITY: B6 / E-8 (reconciliation §8; implementation-record
-// §14.4) — the machine transport's own report rows (#4 `source:`/`playing`,
+// PROPERTY (round-frozen scenario B6 / E-8; normative source: reconciliation
+// §8; site inventory: implementation-record §14.4) — the machine transport's
+// own report rows (#4 `source:`/`playing`,
 // entry.rs:529-535, BEFORE reader spawn and terminal wait) have NO catch: a
 // broken stdout pipe panics on MAIN, and the unwind skips wait_terminal,
 // dispose, seal AND the reader spawn (a real disposal-skip witness at L1:
@@ -1904,8 +1916,9 @@ fn spawn_e8_child(site: &str) -> std::process::Child {
 // PROPERTY: #4 on the REAL transport wiring — the rows print to the real
 // stdout; when that pipe closes before them (the marker already fired), MAIN
 // panics; the unwind skips the wait, the disposal, the seal, and the reader
-// spawn. Site attribution rides the default-hook panic text on the healthy
-// stderr (it names entry.rs and the failed stdout print).
+// spawn. Site attribution rides the healthy-sink controls' exact rows plus
+// the per-site witness values (implementation-record §14.8.6): the default
+// hook's panic location is std-internal, never the call site.
 #[test]
 #[cfg(unix)]
 fn e8_site4_source_playing_rows_panic_skip_disposal_on_broken_stdout() {

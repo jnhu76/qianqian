@@ -28,6 +28,8 @@
 > D-2/D-10, 2026-10-17) — each in its own labeled class so nothing silently
 > becomes adopted. Classes (a)–(d) keep their original meanings; adding (e)
 > changed no other class, and a ratified decision binds only its stated scope.
+> §7 is class (b)-shaped but stronger-labeled: a DECISION PACKAGE with the
+> ruling itself explicitly OWNER_RULING_PENDING.
 > The designs themselves live in the four
 > stable-named error-system documents; accepted architecture semantics live
 > only in the ADRs and documents `docs/README.md` lists as NORMATIVE
@@ -37,7 +39,8 @@
 **Version:** v1 — 2026-10-16 design round (post-#283); 2026-10-17 additions:
 §6 ratification proposals (superseded in place by the rulings below), §5
 implementation-state note; 2026-10-17 Gate B — §6 became OWNER_RATIFIED_DECISIONS
-and the companion authority clarifications were applied.
+and the companion authority clarifications were applied; 2026-10-17 #290 —
+§7 D-D decision package (OWNER_RULING_PENDING).
 **BASE_SHA:** `e44aa806def5729fa360be19daeb21f5436d7fd9` (all code anchors).
 **Inputs:** issue #283 REV.3 (final reports); the four error-system documents
 ([target contract](error-system-target-contract.md) / [reconciliation](error-system-reconciliation.md) /
@@ -415,8 +418,9 @@ T1  any production stdout writer that can emit a non-newline-terminated tail
 T2  any reshaping of the :274 closure (write!+flush batching, a different
     writer, a buffered-by-default writer swap)
 T3  a std contract change to Stdout buffering (LineWriter)
-T4  native-Windows-console evidence of a flush Err on the real sink
-    (the §14.7 lane; the interop proxy cannot reach it)
+T4  flush-Err evidence from any §14.7 NOT_RUN lane — a native Windows
+    console session or a real terminal sink on any platform (the interop
+    proxy cannot reach either)
 ```
 
 ### 7.5 What this package does not decide
