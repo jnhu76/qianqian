@@ -1,72 +1,135 @@
-# RESULTS — f5-seek-discontinuity
+# RESULTS — f5-seek-discontinuity（含 #289 D-C pending-fatal 扩展）
 
 ## 运行记录
 
-- 日期：2026-09-18（F5-GATE-CORRECTIVE-1：三分类 provider outcome 模型）
-- 工具：tla2tools v1.7.4（Xenophanes，sha256 校验）；java -XX:+UseParallelGC，4 workers
-- 模块：`SeekDiscontinuity.tla`；bounds：`MAX_TAIL = 2`；safety-only（无 fairness）
-- 判定：**BOUNDED-CLEAN — base PASS + 6 witness 可达 + 7 mutation 全部 COUNTEREXAMPLE-WITNESSED**
+- 本轮日期：2026-10-17（D-C EXTEND_EXISTING_MODEL 执行轮；receipt
+  [issues/289#issuecomment-6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387)）
+- 历史基线：2026-09-18（F5-GATE-CORRECTIVE-1：三分类 provider outcome 模型；
+  672 distinct states / 7 mutation / 6 witness——原始 R0/F5-GATE 证据与旧
+  状态空间保留为历史记录，见文末）
+- 工具：tla2tools v1.7.4（Xenophanes，sha256 `936a2620…` 校验）；
+  TLC2 Version 2.19 (rev 5a47802)；java 17.0.20.1，-XX:+UseParallelGC，
+  4 workers
+- 模块：`SeekDiscontinuity.tla`；bounds：`MAX_TAIL = 2`；safety-only
+  （无 fairness；不以任何 fairness 假设代替真实同步事实）
+- 仓库基点：BASE_SHA `0e43ef0cbac6fe21d0cd83e14875ace98c73501a`（模型冻结
+  时点 origin/main；生产锚点行号见 PENDING_FATAL_DAG.md §0）
+- 判定：**BOUNDED-CLEAN — base PASS（11 条不变式）+ 11 witness 全部可达 +
+  11 mutation 全部 COUNTEREXAMPLE-WITNESSED（M1–M7 无回归；D-T1..D-T4 新增）**
 - 结果类：CHECKED-IN-MODEL（覆盖矩阵用语；不得升级为"架构已证明正确"）
 
 ```
-== 正常模型（必须 PASS：TypeOK + 五条安全不变式，探索完成）
-Base / safety（commit 后旧 PCM 不可能）                   PASS  2205 states generated, 672 distinct states found, 0 states left on queue.
+== 正常模型（必须 PASS：TypeOK + 基线五条 + pending-fatal 五条安全不变式，探索完成）
+Base / safety（commit 后旧 PCM 不可能；pending-fatal 格合法） PASS  13117 states generated, 5216 distinct states found, 0 states left on queue.
 == witness 探针（必须 MUST-FAIL：可达性证明，防空洞不变式）
 Witness / commit 可达                                          MUST-FAIL-OK（违反 ProbeNeverCommitted）
 Witness / pre-commit 旧输出可达（合法）                 MUST-FAIL-OK（违反 ProbeNoOldDrainEver）
 Witness / pre-commit edge 旧库可达                           MUST-FAIL-OK（违反 ProbeNoOldEdgeEver）
-Witness / seek 拒绝路径可达                                  MUST-FAIL-OK（违反 ProbeNoRefusalEver）
+Witness / seek 拒绝路径可达                                MUST-FAIL-OK（违反 ProbeNoRefusalEver）
 Witness / destructive failure 路线可达                       MUST-FAIL-OK（违反 ProbeNoDestructiveEver）
 Witness / 余量在外 seek 可达                               MUST-FAIL-OK（违反 ProbeNoPartialSeekEver）
+Witness / Applied 擦除→新 continuation Completed 可达（L1） MUST-FAIL-OK（违反 ProbeNoAppliedErasureCompleted）
+Witness / Refused 后 latch 保留可达（L2）                 MUST-FAIL-OK（违反 ProbeNoRefusedRetention）
+Witness / 真实 stop-exit 的 Stopped 可达（L4）            MUST-FAIL-OK（违反 ProbeNoStoppedEver）
+Witness / pending fatal surfacing 可达（L5）                 MUST-FAIL-OK（违反 ProbeNoFatalSurfacing）
+Witness / MutatedThenFailed 可达（L3）                       MUST-FAIL-OK（违反 ProbeNoMutatedExit）
 == 负控制（每个 mutation 必须被抓住）
 Mutation / M1 CommitBeforeTailPurge（不等尾排空）         MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput）
-Mutation / M2 SeekMidWrite（staging 未丢弃）                 MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput）
+Mutation / M2 SeekMidWrite（staging 未丢弃）                MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput）
 Mutation / M3 ParkWhileHeld（held block 跨 park）             MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput）
 Mutation / M4 StalePositionWriter（旧 basis 复用）          MUST-FAIL-OK（违反 InvPositionNoMixing）
 Mutation / M5 CommitBeforeLanding（未 reposition）            MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput）
 Mutation / M6 RefusalDropsRemainder（拒绝丢余量）         MUST-FAIL-OK（违反 InvRefusalContentContinuous）
 Mutation / M7 ResumeAfterMutatedSeek（失败后复活）        MUST-FAIL-OK（违反 InvFailClosed）
+Mutation / D-T1 OldCursorResumeAfterApplied（cut 后旧 cursor 复活） MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput,NoOldCursorResumeAfterApplied,NoOldFatalAfterApplied）
+Mutation / D-T2 RefusedClearsLatch（拒绝误擦 latch）       MUST-FAIL-OK（违反 RetainLatchOnRefused）
+Mutation / D-T3 LoopTopStopExit（取消位伪造 stop 退出） MUST-FAIL-OK（违反 TerminalCellConformance）
+Mutation / D-T4 AppliedKeepsLatch（旧 fatal 落入新 continuation） MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput,NoOldCursorResumeAfterApplied,NoOldFatalAfterApplied）
 F5-SEEK-DISCONTINUITY: ALL PASS
 ```
 
 ## 状态空间
 
-- base：2205 states generated / **672 distinct**（穷举完成，0 on queue）
+- base：13117 states generated / **5216 distinct**（穷举完成，0 on queue）；
+  相对 2026-09-18 基线（2205/672）的增长来自本轮新增的真实维度：
+  pendingFatal × stopIntent/edgeTerminal（intent→edge stop 窗口）×
+  workerGone/exitPath（六个真实退出位置）× drainVerdict/committedOutcome
+  （terminal 投影）——全部是有界交错的真实增长，未融合任何可交错动作来
+  缩小空间，也未降低 bound（MAX_TAIL 保持 2）
 - 每个 mutation / witness run 独立探索完成（"Finished in" 收尾，fail-closed）
+- 反例轨迹归档：D-T1..D-T4 的 TLC 反例逐状态保存在执行轮证据目录
+  （counterexample-DT*.log；含每步动作名与变量值，供独立审查核对交错链）
 
 ## 判读
 
-1. **Base PASS**：在三分类冻结护栏（park 不持块、worker 串行化点先
-   `song_seek` 后才做唯一的 worker 侧 edge purge、RefusedUnchanged 即
-   pre-cut 惰性且保留余量原样补完、MutatedThenFailed 即既有
-   decode-failure 路线且绝不恢复旧游标生产、commit = landing ∧ edge 干净
-   ∧ 尾排空 ∧ parked、stop 恒赢）下，`InvStaleOutput` /
-   `InvPositionNoMixing` / `InvCommitPurged` / `InvRefusalContentContinuous`
-   / `InvFailClosed` 在全部 672 个可达状态上成立。
-2. **Witness 全部可达**：commit、pre-commit 旧输出（合法）、pre-commit
-   edge 旧库、RefusedUnchanged 拒绝路径、destructive failure 路线、
-   writing_partial（余量在外）进入的 seek 都真实出现——不变式不是空洞的：
-   它禁的是 commit 之后的旧输出、拒绝路径的内容损失、失败路线的伪装复活。
-3. **Mutation 全部被抓住**：七条护栏各被一个负控制证明承重——
-   - M1（commit 不等尾排空）、M2（staging 未丢弃就 cut）、M3（held block
-     跨 park）、M5（未 reposition 就 commit）都让旧 PCM 在 commit 后复活；
-   - M4（stale writer 复用旧 basis）单独击穿 D14.8 no-mixing；
-   - M6（refusal 丢弃保留余量）击穿 InvRefusalContentContinuous——
-     refused 输出与无 seek 对照不连续（E2 drop-remainder must-fire
-     控制的模型对应物）；
-   - M7（destructive failure 后恢复旧游标生产）击穿 InvFailClosed——
-     正是 round-3 review MAJOR-2 指出的 pre/post 无 cutover 混合形状。
-   - 其中 M1/M2/M3/M5 同时先触发 InvCommitPurged（commit 前置自检报警），预期。
+1. **Base PASS**：在冻结护栏（park 不持块、worker 串行化点先 song_seek
+   且 begin/返回分离、RefusedUnchanged 即 pre-cut 惰性且保留余量补完且
+   **不触碰 latch**、MutatedThenFailed 即 fail-closed 且绝不恢复旧游标
+   生产、Applied 即 purge+landing+**latch 擦除**、stop intent 与 edge stop
+   两步分离、worker 只在六个真实位置退出、canceled seek 只是 bookkeeping、
+   terminal commit 按冻结 resolver 次序）下，全部 11 条不变式在 5216 个
+   可达状态上成立。pending-fatal 的核心事实被模型逐格复现：
+   - default position 上 latch 胜 stop（read 无前置 terminal 检查，
+     worker_failure 先于一切 stop-intent 咨询）；
+   - Applied 合法吞没旧 fatal（L1 witness：latch→擦除→新 continuation→
+     Completed 可达——scoped safety 未误杀新 continuation）；
+   - Refused 保留 latch（L2）；Mutated fail-closed（L3）；真实退出位上的
+     Stopped 可达（L4）；surfacing-Failed 可达（L5）。
+2. **Witness 全部可达**：11 条探针证明不变式非空洞——特别是
+   W_APPLIED_ERASURE_COMPLETED（强制验收项）：作用域化安全
+   （ScopedLatchedFatalNoComplete 只约束 ¬landing 的旧 continuation）没有
+   把「曾 latch ⇒ 永不 Completed」的过强断言引入模型。
+3. **Mutation 全部被抓住，M1–M7 无回归**：
+   - 基线七条护栏各被负控制证明承重（语义同 2026-09-18 基线；M2/M3/M5
+     的被击路径在新结构下复现）；
+   - D-T1（cut 后旧 cursor 生产复活）被 NoOldCursorResumeAfterApplied
+     抓住，且连带触发 InvCommitPurged/InvStaleOutput——注入的旧行为
+     真实把旧 PCM 写回了数据面（行为级击中，非仅 ghost 位）；
+   - D-T2（refused 误擦 latch）被 RetainLatchOnRefused 干净抓住；
+   - D-T3（canceled-seek 的 bookkeeping 位置被改成 worker 退出——
+     pre-R1.1 错误措辞的复活）被 TerminalCellConformance 干净抓住。归档了
+     两条反例：gate 配置下最短反例在伪造退出处被「冻结退出清单」半边抓住
+     （6 态）；诊断运行（仅保留 committed-cell 半边，非 gate 配置）强制
+     反例走完全链（9 态）：RequestSeek → RecordStopIntent（intent 可见而
+     edge 仍 open 的真实窗口）→ EdgeStopFromStop → LegObserveAborted →
+     伪造退出 → TerminalCommit=stopped——committed outcome 经一个生产中
+     不存在的退出位置落格，违反冻结矩阵。latch 与该缺陷机制正交（有 latch
+     时合法格是 failedDecode；无 latch 且余量在外时合法格是经由
+     remainderBreak 的 Stopped——两种情况下该 exitPath 都在矩阵外），
+     前提修订已记录在 PENDING_FATAL_DAG §8；
+   - D-T4（Applied 不擦 latch 且旧循环复跑）被 NoOldFatalAfterApplied
+     抓住——旧 fatal 落入新 continuation 的 surfacing 在反例中真实发生。
+
+## 校准关系（如实声明）
+
+E1-ABI（双腿绿）与 E1-WORKER（W1–W6 落入 §2.3.1 预测格）是 **Rust 真实
+行为校准**（#287 证据，2026-10-16 记录；D-C receipt 引用）：它们证明模型
+的 ground truth 与真实 SongCore latch 行为、真实 Session/worker 退出面
+一致。本模型的 TLC 结果**不取代**它们，也不是 production 正确性证明；
+stop-race 的一半仍以 Rust 验证为主（E1-WORKER 观察真实锁与退出面，
+一次一个调度；TLC 穷举的是有界抽象交错矩阵）。
 
 ## 边界（结论的适用范围）
 
-- 本结论只在模型的显式 abstraction 下成立：布尔化的三库、无容量/游标、
-  无 fairness、无 WASAPI 流状态机、无请求语法；position no-mixing 的
-  base 保证是构造性的（单写者），M4 只是注入缺陷写者的诊断
-  （见模块头诚实注记）。它证明的是**协议形状的 safety 护栏集充分**，
-  不是 production 实现的正确性；实现门还需 loom（真 edge 并发）+
-  物理 gate（audible cutover）。
-- 本模型不是第二份 authority；语义真相在 ADR-PBK-002 D14.5/D14.8。
-- 早期记录（旧两相序模型：997/300、3 witness、M2 CutMidWrite；以及
-  2026-09-17 的 refusal-first 模型：1349/426、4 witness、5 mutation）已被
-  本三分类模型取代，不再保留为当前记录。
+- 本结论只在模型的显式 abstraction 下成立：布尔化三库、无容量/游标、
+  无 fairness、无 WASAPI 流状态机、无请求语法、**设备中断不建模**
+  （resolver 的 Failed{device} 格模型内不可达，分支保留为冻结表转写）、
+  **新 continuation 自身无解码故障**（因此 NoOldFatalAfterApplied 是模型内
+  全称命题，不是生产全称命题——生产上新 continuation 的真实故障走正常
+  Failed 路线，与本模型的 latch 归因抽象正交）、position no-mixing 的
+  base 保证仍是构造性的（单写者），M4 只是注入缺陷写者的诊断。
+  它证明的是**协议形状的 safety 护栏集在 pending-fatal 窗口内仍充分**，
+  不是 production 实现的正确性。
+- 本模型不是第二份 authority；语义真相在 ADR-PBK-002 D14.5/D14.8 + D11
+  与 reconciliation §2.3/§2.3.1。committedOutcome 是 D11 的最小受约束
+  投影（TERMINAL_DECISION_MAP），不复制 episode-terminal-settlement 的
+  settlement 模型，不产生第二套裁决语义。
+- D-C 执行轮的调试记录：base 首跑曾红一次——RetainLatchOnRefused 初版
+  写成 `(seekFailed ∧ ¬landing) ⇒ pendingFatal`，被「从未 latch 过的普通
+  refusal」合法反例击中（模型缺陷注入不可能、不变式过强）；修正为以
+  fatalLatchedEver 见证「refusal 时点上 latch 已存在」。首跑日志按证据
+  契约归档（base-attempt1-RetainLatchOnRefused-violated.log），未以重跑
+  洗绿。
+- 历史记录：早期记录（旧两相序模型 997/300；2026-09-17 refusal-first 模型
+  1349/426；2026-09-18 三分类模型 2205/672、7 mutation、6 witness）已被
+  本轮扩展模型取代，保留为历史基线，不再作为当前记录。

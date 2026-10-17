@@ -887,6 +887,16 @@ not serve as another's proof); W5a's single-legal-outcome row (`Stopped`, with
 > weighing (residual interleaving risk vs harness adequacy vs model maintenance cost);
 > no model action was changed and the F5 suite passes unchanged. See
 > `error-system-implementation-record.md` §6.
+> **Execution status (2026-10-17, #289)**: D-C DECIDED = EXTEND_EXISTING_MODEL
+> (receipt [issue #289 comment 6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387);
+> decision-record §6.4). The extension is BUILT and CHECKED: the trace-first frozen
+> ledger (EXECUTION_DAG / LOCK_BOUNDARY_MAP / WORKER_POSITION_MAP /
+> PROVIDER_OUTCOME_MAP / LATCH_LIFETIME_MAP / TERMINAL_DECISION_MAP, legal families
+> L1–L6, defect traces D-T1..D-T4) lives in `specs/f5-seek-discontinuity/PENDING_FATAL_DAG.md`;
+> the extended model, mutations and executed TLC evidence live in that directory
+> (RESULTS.md). All obligations below were discharged as written, including the
+> scoped safety with the Applied-erasure witness retained and every mutation tied to
+> its defect trace.
 
 
 **Recommendation: EXTEND_EXISTING_MODEL** — extend `f5-seek-discontinuity` with the

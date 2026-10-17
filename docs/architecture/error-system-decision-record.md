@@ -137,6 +137,9 @@ Implementation state (2026-10-17, from #287 and the #283 closeout): D-2, D-3
 and D-10 have landed implementations — D-2/D-10 now RATIFIED by the owner
 (§6, receipt PR #291 comment 6229433676), D-3's acceptance riding #288 A4;
 D-4/D-5/D-7/D-9/D-11 have no landed implementation and no new evidence.
+(2026-10-17 addition: D-C was subsequently decided by the owner in its own
+receipt — §6.4 below; the "not adopted" sentence in the D-2/D-10 receipt and
+in §6.3 remains the correct history for that ruling's scope.)
 
 ## 6. OWNER_RATIFIED_DECISIONS (ratified 2026-10-17; receipt: [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676))
 
@@ -287,3 +290,41 @@ architecture §6.2 note + table rows (binding-internal retention, canonical ABI
 unchanged, no parity obligation). Both cite the receipt. Explicitly NOT
 adopted by the same ruling: D-9 (open), D-C (#289), D-D (#290), Windows
 runtime acceptance (#288), T1-3 public fields, and any recovery policy.
+
+### 6.4 D-C — F5 pending-fatal model extension (#289) — EXTEND_EXISTING_MODEL (decided 2026-10-17)
+
+```text
+D-C_DECISION        = EXTEND_EXISTING_MODEL (2026-10-17)
+D-C_TARGET          = specs/f5-seek-discontinuity/
+D-C_ISSUE           = #289
+D-C_CALIBRATION     = E1_ABI_PRIOR_RECORDED_PASS + E1_WORKER_PRIOR_RECORDED_PASS
+D-C_STOP_RACE       = RUST_VERIFICATION_PRIMARY (TLC = bounded safety search)
+D-C_SEMANTIC_AUTHORITY = ADR-PBK-002 D14.5/D14.8 + D11 (MODEL_IS_AUTHORITY = NO)
+D-C_NOT_AUTHORIZED  = production change / ABI change / K0 change
+D-C_RECEIPT         = issue #289 comment 6229433676+44 (6229911387)
+```
+
+Receipt: [issue #289 comment 6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387)
+(posted 2026-10-17 from the owner-authenticated account; the decision source is
+that explicit instruction for #289 — a NEW decision, not a backfilled ruling of
+the #287 implementation round, and not implied by the D-2/D-10 receipt, which
+listed D-C among its explicitly-not-adopted items).
+
+What the decision covers: extending the existing F5 model with the GAP-01
+pending-fatal window per #283 FORMAL-PLAN §3.1 — Q5 minimal state budget
+(each variable justified or dropped), Q6 lock-cited atomicity splits
+(`edge.stop()` separate from intent recording; provider begin/return split;
+fusions only where a lock hold is cited), Q9 scoped safety with the mandatory
+Applied-erasure Completed witness, Q10 trace-first defect ledger D-T1..D-T4
+written before any mutation, Q11 retained witnesses — with the acceptance-
+gated trigger of migration §7.6 recorded as satisfied (E1-ABI green on both
+legs; E1-WORKER W1–W6 in their predicted §2.3.1 cells; the trigger's
+verification is part of the implementation record's 2026-10-16 note, re-cited
+by the receipt). The stop-race half stays primarily Rust-verified; TLC results
+are bounded interleaving-search evidence, never architecture acceptance, and a
+model counterexample authorizes no production change.
+
+Execution record: the implementing round and its evidence live in
+`error-system-implementation-record.md` (§12) and
+`specs/f5-seek-discontinuity/` (PENDING_FATAL_DAG.md frozen ledger; extended
+SeekDiscontinuity.tla; RESULTS.md).

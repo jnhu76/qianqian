@@ -548,3 +548,83 @@ Verified on the fixed tree: the loom suite 12 passed / 0 failed with **zero warn
 12 passed + 1 warning); `cargo test -p qianqian-playback --lib` 207 passed / 0 failed; clippy
 `--all-targets -- -D warnings` clean; `cargo fmt --all --check` clean; `specs/check.sh rust`
 re-run — LANE_RC=0 with the unchanged `RESULT` set and no warnings in the lane log.
+
+## 13. D-C execution round (#289, 2026-10-17) — the pending-fatal model extension
+
+The owner decided D-C = EXTEND_EXISTING_MODEL on 2026-10-17 (receipt
+[issue #289 comment 6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387);
+decision-record §6.4; a new decision, not a backfilled #287 ruling). This round
+executed it against `origin/main` frozen at
+`0e43ef0cbac6fe21d0cd83e14875ace98c73501a`. Scope discipline held: **no
+production code, ABI, K0 or ADR change; no new taxonomy; specs-local
+representations only** (`f5-seek-implementation/` untouched — its M1–M7
+production-patch correspondence is name-stable).
+
+### 13.1 Trace-first frozen ledger (before any mutation)
+
+`specs/f5-seek-discontinuity/PENDING_FATAL_DAG.md` — the six Phase-A maps
+(EXECUTION_DAG / LOCK_BOUNDARY_MAP / WORKER_POSITION_MAP / PROVIDER_OUTCOME_MAP
+/ LATCH_LIFETIME_MAP / TERMINAL_DECISION_MAP), every line re-anchored at the
+frozen BASE_SHA (the reconciliation/migration line numbers were NOT reused),
+legal families L1–L6 and defect traces D-T1..D-T4 with the six mandatory
+fields each. The Q6 atomicity splits are load-bearing in the model:
+`RecordStopIntent` and `EdgeStopFromStop` are separate actions (the intent-
+visible-but-edge-open window exists); `WorkerSeek` (eligibility + begin) is
+separate from the three provider-return actions (stop may land mid-FFI, and
+the return actions are deliberately NOT gated on stop intent); fusions carry
+lock citations (`publish_evidence`'s single hold justifies surfacing ⊕ commit).
+
+### 13.2 Model extension and executed evidence
+
+Extended `SeekDiscontinuity.tla` (11 invariants = baseline 6 + pending-fatal
+5: `NoOldCursorResumeAfterApplied`, `RetainLatchOnRefused`,
+`NoOldFatalAfterApplied`, `ScopedLatchedFatalNoComplete`,
+`TerminalCellConformance`), 12 new actions with 1 removal (`Stop`) and every
+baseline action re-gated (read split three ways, stop split
+two ways, six real exit positions incl. the bookkeeping-only cancel, leg
+verdicts, one-shot TerminalCommit), 26 variables each justified against the
+Q5 six-question budget (rejected candidates documented: latchRetained,
+stopSeen, providerOutcome, a separate workerPos). TerminalCommit is a MINIMAL
+constrained D11 projection (frozen resolver transcription; CommitCut ≠
+TerminalCommit; protocol Stop never read as D11 Stopped; the Failed{device}
+cells kept as unreachable-in-model frozen-table branches).
+
+Executed (tla2tools v1.7.4 / TLC2 2.19 / java 17.0.20.1, 4 workers, safety
+only, no fairness): **base PASS with 5216 distinct states** (13117 generated,
+exhausted; baseline was 672 — the growth is the pending-fatal × stop-window ×
+exit-position × terminal-projection dimension, no real interleaving fused away,
+no bound lowered); **11/11 witnesses reachable** (incl. the mandatory
+`W_APPLIED_ERASURE_COMPLETED` — the scoped safety did not kill the legal
+new-continuation Completed); **11/11 mutations COUNTEREXAMPLE-WITNESSED**
+with M1–M7 showing NO regression and D-T1..D-T4 each caught by its frozen
+target (D-T3 additionally evidenced by a diagnostic commit-completing trace:
+intent → edge stop → aborted drain → bogus-position exit → TerminalCommit=
+stopped, archived separately from the gate config). Calibration facts stand
+unmodified: E1-ABI/E1-WORKER remain the Rust real-behavior calibration; TLC
+results do not replace them.
+
+Round-honesty records: (1) the base run went red ONCE — the first
+`RetainLatchOnRefused` formulation was too strong and was refuted by the
+LEGAL never-latched refusal; reformulated with `fatalLatchedEver` as the
+"latch existed at refusal time" witness; the red log is archived, not washed
+by a rerun. (2) The D-T3 ledger precondition was revised after counterexample
+review (the bogus-exit mechanism is latch-orthogonal); both traces are
+archived. (3) Four D-T cfgs initially shipped with an incomplete mutation-
+constant block and failed for a configuration reason before any exploration;
+regenerated and disclosed here.
+
+### 13.3 Executed verification of this round
+
+| Target | Command | Result | Limits |
+|---|---|---|---|
+| F5 suite (base + 11 probes + 11 mutations) | `specs/f5-seek-discontinuity/check.sh` | `F5-SEEK-DISCONTINUITY: ALL PASS` (SUITE_RC=0); base 5216 distinct / 0 on queue; per-run "Finished in" observed | CHECKED-IN-MODEL bounds (MAX_TAIL=2); not production evidence |
+| Counterexample trace capture | 4 × targeted TLC runs (D-T1..D-T4) + 1 diagnostic run (D-T3 committed-cell chain) | each violates its frozen target; traces archived | evidence artifacts, not gate runs |
+| Production tree | untouched (git diff scoped to `specs/f5-seek-discontinuity/**`, `specs/README.md`, three error-system docs) | SOURCE_CHANGES=NONE / ABI_CHANGES=NONE / ADR_CHANGES=NONE | — |
+
+### 13.4 Still NOT_RUN (unchanged)
+
+Nothing new goes unexecuted by this round; the extension adds no Rust
+harness obligation (the existing E-1 harness is the calibration baseline, not
+rewritten). The pre-existing NOT_RUN items (§12.5: Windows runtime
+acceptance for cone / E-7 / carrier-B reason / close protocol) are unchanged
+and remain owned by #288/#290.
