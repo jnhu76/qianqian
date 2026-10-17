@@ -386,6 +386,8 @@ Transformations performed, each classified:
 | RAII: `Drop` → `song_close`; `Box<File>` kept alive for the handle lifetime | allowed adapter |
 | null-handle fail-closed guard on `SONG_OK` | defensive, representation-only |
 | status → `DecodeOpenError`/`DecodeError` (product types from `qianqian-audio-api`); message copied to owned `String` before the next native call | allowed adapter; product taxonomy is the product contract's, not the binding's |
+| adapter-internal typed fault retention — `DecodeFault{status, native_code, message}` copied at the error point inside the ABI's diagnostic-lifetime window, consumed by the diagnostic outlet and the App message text; no public field added | binding-internal realization — **not** a binding-parity obligation (D-2 ruling note, 2026-10-17) |
+| probe failure reads the borrowed diagnostic via `song_last_error` before `song_close`; the owned copy rides the message text | binding-internal realization — not a parity obligation (same note) |
 | `SONG_EOF` → `DecodeOutcome::Eof`, distinct from error | required preservation |
 | seek status → three-class `SeekClass` (`Applied`/`RefusedUnchanged`/`MutatedThenFailed`) | layer-5 realization of **ADR-PBK-002 D14.5** — not binding-owned policy |
 | `duration_us` negative → `None`, `0` → `Some(0)`; never corrected against decoded totals | layer-5 realization of **ADR-PBK-002 D14.8** sentinel treatment |
@@ -396,6 +398,15 @@ Transformations performed, each classified:
 No resampling, no channel remapping, no retry, no codec/format fallback,
 no stream re-selection, no async scheduling: the PCM format comes straight
 from `song_info` and frames pass through untouched.
+
+**Binding-internal diagnostic retention (D-2 ruling note, 2026-10-17; owner
+decision record [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676)).**
+The reference Rust binding retains typed status/native_code internally for
+diagnostics — a binding-internal realization choice. The canonical ABI
+(`native/include/songcore.h`) is unchanged, and other language bindings are
+not obligated to replicate this internal representation. Binding parity
+remains governed by the existing ABI semantics and the status/PCM/seek/EOF
+contracts (the §7 oracle), not by any binding's internal diagnostic plumbing.
 
 **Classification verdict:** the model in §3 of #173 is accurate —
 `qianqian-songcore-sys` is the raw binding, `qianqian-decode-songcore` is

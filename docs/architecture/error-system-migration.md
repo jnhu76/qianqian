@@ -22,10 +22,14 @@
 >                                     pre-implementation baseline and were NOT rewritten
 > CURRENT_ACCEPTANCE_BOUNDARY       = Windows acceptance designs pending #288; the §7.6 F5
 >                                     obligations pending the D-C ruling #289
-> UNRESOLVED_OWNER_DECISIONS        = D-2/D-10 substance landed, formal ratification PENDING
->                                     (error-system-decision-record.md); the §3 conditional
->                                     amendment texts remain candidates with their own
->                                     triggers — §3.4 rides the D-10 ruling, §3.5 rides D-2
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt PR #291 comment 6229433676). The §3
+>                                     conditional texts those rulings adopted are now
+>                                     applied: §3.4 as the PBK-003 §5 minimal
+>                                     clarification, §3.5 as the binding note in
+>                                     songcore-binding-architecture §6.2
+> UNRESOLVED_OWNER_DECISIONS        = §3.2/§3.3 candidates keep their own triggers
+>                                     (C-9 / D-4); D-4/D-5/D-7/D-9/D-11 unchanged
 > ```
 >
 > Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
@@ -363,13 +367,12 @@ recorded.
 
 2026-10-17 implementation note: carrier B is now the LANDED shape (PR #287, `b86a9ce`
 — `DrainVerdict::Aborted { reason: Option<AbortReason> }`, 512-byte cap, backend-neutral
-`OutputAbortClass`). This candidate note remains CONDITIONAL / PROPOSED_ONLY: whether
-it is adopted as normative PBK-003 text, or the existing PBK-003 §5 TERMINAL EVIDENCE
-clause ("report drain/abort mechanism evidence through the existing owner seam without
-becoming D11 semantic authority") is judged to already cover the attachment, is part of
-the D-10 owner ruling — see the ratification proposal in
-`error-system-decision-record.md` §6.2. No ACCEPTED ADR text was changed by the
-implementation or by this note.
+`OutputAbortClass`). 2026-10-17 owner ruling: D-10 = RATIFIED_CARRIER_B and this
+candidate note is ADOPTED as the PBK-003 §5 minimal clarification (applied verbatim in
+substance as an Amendment note under TERMINAL EVIDENCE; receipt
+[PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676),
+decision-record §6.2/§6.3). This section remains the historical candidate record; the
+normative home of the adopted text is now ADR-PBK-003 §5.
 
 ### 3.5 NOTE-LEVEL — songcore-binding-architecture
 
@@ -377,9 +380,11 @@ If T1-1/T1-2 are adopted, add one paragraph to the binding-class notes: "the ref
 Rust binding retains typed status/native_code internally for diagnostics; this is a
 binding-internal realization choice, not a binding-parity obligation; the canonical ABI
 (songcore.h) is unchanged." No authority hierarchy change. (2026-10-17: T1-1/T1-2
-substance landed via #287, but the paragraph is NOT yet added — the D-2 ruling is
-still pending; see decision-record §6.1. The landed retention is in every other
-respect the shape this note describes.)
+substance landed via #287, and the D-2 ruling — RATIFIED_OPTION_A, receipt
+[PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676) —
+adopts this note; it is applied in songcore-binding-architecture §6.2 as the
+binding-internal-retention note plus two classified table rows. This section remains
+the historical candidate record.)
 
 ### 3.6 K0 documents — intentionally not drafted
 

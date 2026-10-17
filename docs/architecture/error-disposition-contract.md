@@ -25,10 +25,11 @@
 >                                     = error-system-implementation-record.md
 > CURRENT_ACCEPTANCE_BOUNDARY       = executed evidence Linux-only; Windows runtime
 >                                     acceptance pending #288; F5 D-C ruling #289; E-9/D-D #290
-> UNRESOLVED_OWNER_DECISIONS        = D-2/D-10 substance landed, formal ratification PENDING
->                                     (error-system-decision-record.md); D-4/D-5/D-7/D-9/D-11
->                                     and #277 unchanged; every §3/§4 NOT_EARNED recovery
->                                     admission remains unimplemented and forbidden
+> RESOLVED_BY_OWNER_RULING         = D-2/D-10 (RATIFIED 2026-10-17; decision-record §6;
+>                                     receipt PR #291 comment 6229433676)
+> UNRESOLVED_OWNER_DECISIONS        = D-4/D-5/D-7/D-9/D-11 and #277 unchanged; every
+>                                     §3/§4 NOT_EARNED recovery admission remains
+>                                     unimplemented and forbidden
 > ```
 >
 > Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527)

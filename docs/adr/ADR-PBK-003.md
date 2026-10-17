@@ -195,6 +195,23 @@ TEARDOWN
     existing Playback Session / Output Plugin ownership ordering
 ```
 
+> **Amendment (2026-10-17, D-10 ruling — terminal-evidence diagnostic attachment;
+> owner decision record [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676);
+> implemented by PR #287 as the ratified carrier B).** The TERMINAL EVIDENCE
+> completion boundary MAY carry an optional, bounded, owned diagnostic reason
+> attached to the verdict — the attachment rides inside the drain-verdict value
+> on the single existing completion seam (the owner seam named above), never on
+> a second delivery channel or parameter. The attachment is mechanism evidence
+> only: its absence MUST remain legal, and it MUST NOT alter the drain verdict's
+> semantic meaning, D11 terminal classification, control decisions, or the
+> owning lifecycle. It MUST NOT introduce backend-specific identity into
+> playback semantics; any attachment class vocabulary stays backend-neutral.
+> No backend is obligated to construct a reason, and no reason-driven control
+> policy exists or is implied by this clause. Scope guard, unchanged by this
+> amendment: Output Plugin identity, backend ownership, the AudioOutput role,
+> D11 authority, verdict semantics and control decisions are all untouched;
+> Windows runtime acceptance of the implemented carrier remains pending (#288).
+
 A backend is free to use a push loop, callback, event-driven engine, graph scheduler, or other native mechanism provided these obligations are refined correctly.
 
 **Mechanism shape need not be identical across platforms. Semantic/mechanism obligations must be.**

@@ -150,23 +150,24 @@ and the boundary gate's own negative-control suite.
 | Kani | toolchain not available on this host (declared CI formal-lane tool) | bounded proof of the pool protocol under Kani's model |
 | Windows device/audible evidence for the new carrier B reason | no Windows host | that a real device abort's reason reaches the presentation surface |
 
-## 6. Open owner rulings (presented, not decided here)
+## 6. Owner rulings (D-2/D-10 ratified 2026-10-17, receipt PR #291 comment 6229433676; the rest presented, not decided by any implementation)
 
-**D-2 — probe diagnostic read / adapter retention.** Substance landed (§1 M1/M4:
-`DecodeFault{status, native_code, message}` copied at the error point; probe reads
-`song_last_error` before `song_close`; public shapes unchanged; SongCore ABI untouched).
-The formal decision line remains OPEN — the #283 closeout records it as pending.
-Ratification proposal: `error-system-decision-record.md` §6.1 (RATIFY_OPTION_A; scope =
-local representation + diagnostic retention only; no T1-3/D-9/recovery approval).
+**D-2 — probe diagnostic read / adapter retention — RATIFIED 2026-10-17.**
+Substance landed (§1 M1/M4: `DecodeFault{status, native_code, message}` copied at
+the error point; probe reads `song_last_error` before `song_close`; public shapes
+unchanged; SongCore ABI untouched). The owner ruled RATIFY_OPTION_A (scope =
+local representation + diagnostic retention only; no T1-3/D-9/recovery approval):
+receipt [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676),
+record `error-system-decision-record.md` §6.1. The binding note (migration §3.5)
+is applied in songcore-binding-architecture §6.2 by the same ruling.
 
-**D-10 — output reason snapshot carrier.** Carrier B landed (§1 M2/M3: bounded
-`AbortReason` inside `DrainVerdict::Aborted` on the existing completion seam;
-discriminant-only resolve; drop+count late policy; control-inertness witness). The
-formal decision line remains OPEN — including whether migration §3.4's PBK-003 note is
-adopted or the existing PBK-003 §5 TERMINAL EVIDENCE clause is judged to cover the
-attachment. That note stays PROPOSED_ONLY; no ACCEPTED ADR text was modified by the
-implementation or by the status records. Ratification proposal:
-`error-system-decision-record.md` §6.2 (RATIFY_CARRIER_B).
+**D-10 — output reason snapshot carrier — RATIFIED 2026-10-17.** Carrier B landed
+(§1 M2/M3: bounded `AbortReason` inside `DrainVerdict::Aborted` on the existing
+completion seam; discriminant-only resolve; drop+count late policy;
+control-inertness witness). The owner ruled RATIFY_CARRIER_B together with the
+PBK-003 minimal clarification, applied as the ADR-PBK-003 §5 TERMINAL EVIDENCE
+Amendment note (same receipt; decision-record §6.2/§6.3). The ratified shape
+changes no production behavior and adds no obligation on future backends.
 
 **D-C — F5 model extension for the pending-fatal × seek × stop window.** The
 design's acceptance-gated trigger is NOW SATISFIED, and this round verified it

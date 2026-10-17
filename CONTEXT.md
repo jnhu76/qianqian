@@ -552,9 +552,10 @@ E-1 / E-3   — EXECUTED ON LINUX
 WINDOWS_RUNTIME — ACCEPTANCE_PENDING (#288)
 F5 D-C      — OWNER_RULING_PENDING (#289)
 E-9 / D-D   — PENDING (#290)
-D-2 / D-10  — IMPLEMENTATION_LANDED; FORMAL RATIFICATION PENDING (ratification
-              proposals in the decision record §6; substance verified by the
-              #283 closeout, which explicitly left both rulings to the owner)
+D-2 / D-10  — RATIFIED 2026-10-17 (D-2 option a adapter diagnostic retention;
+              D-10 carrier B verdict-borne reason; PBK-003 §5 terminal-evidence
+              diagnostic-attachment clarification + songcore binding note applied
+              by the same ruling; receipt: PR #291 owner decision record)
 ```
 
 --- Historical design-round record (PR #284; kept because it explains why the

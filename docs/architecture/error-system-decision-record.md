@@ -5,25 +5,39 @@
 > mechanism choices, executed evidence, NOT_RUN items and the still-open rulings (D-C above
 > all) are indexed in `error-system-implementation-record.md`. This record's classifications
 > are unchanged, and an OPEN item stays un-authorized.
-> **Ratification round (2026-10-17)**: D-2 and D-10 remain formally OPEN. Their
-> implementation substance landed with #287, and the #283 closeout verified exactly that
-> differential while explicitly declining to rule ("D-C/D-D/D-2/D-4/D-7/D-9/D-10 的 owner
-> 裁决（全部仍待裁，本文仅核实状态）"). Prepared ratification proposals now sit in §6;
-> nothing there is adopted until the owner answers. IMPLEMENTED != OWNER_RATIFIED.
+> **Ratification round (2026-10-17)**: D-2 and D-10 remained formally OPEN until
+> this round. Their implementation substance landed with #287, and the #283 closeout
+> verified exactly that differential while explicitly declining to rule ("D-C/D-D/D-2/
+> D-4/D-7/D-9/D-10 的 owner 裁决（全部仍待裁，本文仅核实状态）"). This record first
+> carried prepared ratification proposals; the owner then ruled — **Gate B closed
+> 2026-10-17**: D-2 = RATIFY_OPTION_A, D-10 = RATIFY_CARRIER_B, plus the PBK-003
+> minimal clarification (migration §3.4 candidate, applied as the ADR §5 amendment)
+> and the binding note (§3.5, applied in songcore-binding-architecture §6.2). Receipt:
+> [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676)
+> (posted from the owner-authenticated account; the decision source is that explicit
+> instruction, not a backfilled historical approval). The four historical classes
+> below (§1–§4) keep their original meanings; §5/§6 are later additions — proposals
+> first, now the ratified decisions — and nothing outside D-2/D-10 changed class.
+> IMPLEMENTED != OWNER_RATIFIED remains the rule; here the two finally coincide,
+> with the ratification effective from the receipt, not from #287's merge.
 
 > **Truth class: DECISION RECORD / ROUTING INDEX. NOT AUTHORITY.**
 > This file records (a) directions the owner has approved, (b) mechanism
 > recommendations produced by design rounds, (c) authority-amendment
-> candidates, and (d) pending evidence — each in its own labeled class so
-> nothing silently becomes adopted. The designs themselves live in the four
+> candidates, (d) pending evidence, and (e) owner-ratified decisions (§6:
+> D-2/D-10, 2026-10-17) — each in its own labeled class so nothing silently
+> becomes adopted. Classes (a)–(d) keep their original meanings; adding (e)
+> changed no other class, and a ratified decision binds only its stated scope.
+> The designs themselves live in the four
 > stable-named error-system documents; accepted architecture semantics live
 > only in the ADRs and documents `docs/README.md` lists as NORMATIVE
 > AUTHORITY. Nothing here changes D11, D14.*, U2, the SongCore ABI, K0
 > semantics, or any accepted document.
 
-**Version:** v1 — 2026-10-16 design round (post-#283); 2026-10-17 addition:
-§6 ratification proposals for D-2/D-10 (prepared, not adopted) and the §5
-implementation-state note.
+**Version:** v1 — 2026-10-16 design round (post-#283); 2026-10-17 additions:
+§6 ratification proposals (superseded in place by the rulings below), §5
+implementation-state note; 2026-10-17 Gate B — §6 became OWNER_RATIFIED_DECISIONS
+and the companion authority clarifications were applied.
 **BASE_SHA:** `e44aa806def5729fa360be19daeb21f5436d7fd9` (all code anchors).
 **Inputs:** issue #283 REV.3 (final reports); the four error-system documents
 ([target contract](error-system-target-contract.md) / [reconciliation](error-system-reconciliation.md) /
@@ -110,32 +124,36 @@ F5 recommendation with its acceptance-gated triggers. All remain owner
 rulings; this record attaches recommendations to them, not outcomes.
 
 Implementation state (2026-10-17, from #287 and the #283 closeout): D-2, D-3
-and D-10 have landed implementations — D-2/D-10 as the §6 ratification
-proposals, D-3's acceptance riding #288 A4; D-4/D-5/D-7/D-9/D-11 have no landed
-implementation and no new evidence.
+and D-10 have landed implementations — D-2/D-10 now RATIFIED by the owner
+(§6, receipt PR #291 comment 6229433676), D-3's acceptance riding #288 A4;
+D-4/D-5/D-7/D-9/D-11 have no landed implementation and no new evidence.
 
-## 6. RATIFICATION_PROPOSAL (prepared 2026-10-17; NOT adopted — owner-gated)
+## 6. OWNER_RATIFIED_DECISIONS (ratified 2026-10-17; receipt: [PR #291 comment 6229433676](https://github.com/jnhu76/qianqian/pull/291#issuecomment-6229433676))
 
-Two decisions now have landed implementations but no recorded owner ruling. The
-#283 closeout verified exactly that differential and explicitly declined to
-rule; no ruling exists elsewhere in the round record either — #283's comments
-are the owner's audit reports and closeout (recommendations and status
-verifications only), and the #284/#287 conversations carry no human ruling.
-Each proposal below states what a YES ratifies, what it does not, and what
-happens on a NO. The owner may answer each independently. Until an answer is
-recorded here, both formal lines stay PENDING and no ACCEPTED ADR text changes.
+Two decisions had landed implementations but no recorded owner ruling; the
+#283 closeout verified that differential and explicitly declined to rule, and
+no ruling existed elsewhere in the round record — #283's comments are the
+owner's audit reports and closeout (recommendations and status verifications
+only), and the #284/#287 conversations carry no human ruling. This record
+therefore carried prepared proposals; the owner then ruled on 2026-10-17
+(D-2 = RATIFY_OPTION_A, D-10 = RATIFY_CARRIER_B, plus the two companion
+clarifications in §6.3). The proposals' verification bullets are preserved
+below as the ratified scope's audit basis — they were re-verified at
+`b86a9ce` before the ruling was recorded. The ratification is effective from
+the receipt, not from #287's merge: implemented facts are #287's; formal
+approval starts here.
 
-### 6.1 D-2 — probe diagnostic read + adapter retention (T1-1/T1-2, CC-4, DG-3)
+### 6.1 D-2 — probe diagnostic read + adapter retention (T1-1/T1-2, CC-4, DG-3) — RATIFIED_OPTION_A
 
 ```text
-D-2_RECOMMENDATION       = RATIFY_OPTION_A
-SCOPE                    = LOCAL_REPRESENTATION_AND_DIAGNOSTIC_RETENTION
-PUBLIC_ABI_CHANGE        = NONE
-PLAYBACK_SEMANTIC_CHANGE = NONE
+D-2_DECISION        = RATIFIED_OPTION_A (2026-10-17)
+D-2_IMPLEMENTATION  = LANDED_PR_287 (DG-3 shape (a))
+D-2_AUTHORITY_SCOPE = LOCAL_REPRESENTATION_ONLY
+D-2_ACCEPTANCE      = EXISTING_LINUX_EVIDENCE
 ```
 
-What a YES ratifies — each item verified by reading `b86a9ce` (this round, not
-assumed from the implementation record):
+What the ratification covers — each item verified by reading `b86a9ce` before
+the ruling (not assumed from the implementation record):
 
 - Adapter-internal `DecodeFault{status, native_code, message}` copied at the
   error point (`qianqian-decode-songcore/src/lib.rs:238`), consumed
@@ -156,31 +174,29 @@ assumed from the implementation record):
   E1-ABI 8/8 and the typed-fault outlet witness
   (`e1_abi_tests.rs:585 adapter_read_failure_emits_the_typed_fault_to_the_diagnostic_outlet`).
 
-What a YES does NOT do: approve D-9, T1-3 public fields, or any recovery
-policy; create a binding-parity obligation for other bindings (the migration
-§3.5 note-level text — "binding-internal realization choice, not a
-binding-parity obligation; the canonical ABI is unchanged" — is the companion
-that lands only upon this YES); change `songcore.h` or any accepted document.
+What the ratification does NOT do: approve D-9, T1-3 public fields, or any
+recovery policy; create a binding-parity obligation for other bindings; change
+`songcore.h` or any accepted document beyond the note-level clarification
+applied in songcore-binding-architecture §6.2 (§6.3 below) — "binding-internal
+realization choice, not a binding-parity obligation; the canonical ABI is
+unchanged".
 
-On a NO: option (b) is recorded; the landed retention is unbundled from the
-formal decision and the resulting authority differential returns to the owner
-(reverting production is a separate instruction, not a docs action).
+Alternative not taken: option (b) record-only (the decision fork is preserved
+in the owner-decision table and the migration §1.1 history).
 
-### 6.2 D-10 — Output reason snapshot carrier (T2-5, DG-2)
+### 6.2 D-10 — Output reason snapshot carrier (T2-5, DG-2) — RATIFIED_CARRIER_B
 
 ```text
-D-10_RECOMMENDATION      = RATIFY_CARRIER_B
-CARRIER                  = EXISTING_DRAIN_COMPLETION
-REASON                   = BOUNDED_DIAGNOSTIC_ATTACHMENT
-CLASS                    = CLASS_C
-D11_EFFECT               = NONE
-BACKEND_AUTHORITY        = NONE
-NEW_PUBLIC_PLUGIN        = NONE
-D9_DECISION              = UNCHANGED
+D-10_DECISION       = RATIFIED_CARRIER_B (2026-10-17)
+D-10_CARRIER        = EXISTING_DRAIN_COMPLETION
+D-10_REASON_CLASS   = DIAGNOSTIC_ONLY
+D-10_REASON_OPTIONAL= YES
+D-10_D11_EFFECT     = NONE
+D-10_IMPLEMENTATION = LANDED_PR_287
 ```
 
-What a YES ratifies — the eight correspondence questions, each answered
-against `b86a9ce` (this round):
+What the ratification covers — the eight correspondence questions, each
+answered against `b86a9ce` before the ruling:
 
 1. **Single completion interface?** Yes: the reason is a payload inside
    `DrainVerdict::Aborted { reason: Option<AbortReason> }` (ports.rs:162-167)
@@ -214,27 +230,50 @@ against `b86a9ce` (this round):
    obliges "report drain/abort mechanism evidence through the existing owner
    seam without becoming D11 semantic authority". Carrier B satisfies that
    clause as written (same seam, evidence-only payload, no D11 authority).
-   Whether that reading suffices, or migration §3.4's candidate note should
-   be adopted to make the bounded-diagnostic-attachment permission explicit
-   normative text, is part of THIS ruling, not pre-decided (migration §3.1
-   already says so).
+   The owner's ruling adopts the explicit clarification (§6.3) so the
+   bounded-diagnostic-attachment permission is stated normatively instead of
+   resting on interpretation.
 8. **D-9 stays independently OPEN?** Yes: the presentation-consumer bar is
    untouched; carrier B's exposure on the public observation plane rides the
    same `failure_diagnostic: Option<String>` surface that already existed.
 
-Until the owner rules:
+Ruling outcome (2026-10-17):
 
 ```text
 D10_IMPLEMENTATION = LANDED (carrier B, #287, b86a9ce)
-D10_RATIFICATION   = PENDING_OWNER
-ADR_AMENDMENT      = PROPOSED_ONLY (migration §3.4 candidate; ADR-PBK-003
-                     itself is untouched by the implementation and by this PR)
+D10_RATIFICATION   = RATIFIED_CARRIER_B (receipt PR #291 comment 6229433676)
+ADR_AMENDMENT      = APPLIED — PBK-003 §5 TERMINAL EVIDENCE now carries the
+                     minimal clarification, adopted from migration §3.4's
+                     candidate text (§6.3)
 ```
 
-On a YES: a follow-up reviewed commit applies the minimal §3.4 differential —
-existing completion boundary MAY carry a bounded control-inert diagnostic
-attachment; verdict semantics unchanged; attachment absence MUST be legal;
-backend identity stays non-semantic; the reason never participates in terminal
-classification or control — and records the ruling here. It does NOT touch
-Output Plugin identity, D11, K0 or backend ownership. On a NO: same
-differential-return path as D-2.
+The ratified shape keeps everything the questions verified: the
+backend-neutral `OutputAbortClass`, the bounded owned reason, the
+discriminant-only `resolve()`, the late-verdict drop + count policy, the
+existing output/playback authority relationship, and the presentation
+projection semantics. Alternative not taken: carrier (a') the
+`RenderRequest`-field cell (decision fork preserved in the owner-decision
+table and migration §1.4).
+
+### 6.3 Companion authority clarifications applied by the same ruling
+
+```text
+PBK-003
+  DECISION       = ADOPT_MINIMAL_CLARIFICATION
+  SOURCE         = ERROR_SYSTEM_MIGRATION_SECTION_3_4
+  SCOPE          = OPTIONAL_CONTROL_INERT_DIAGNOSTIC_ATTACHMENT
+  NEW_AUTHORITY  = NONE
+
+SONGCORE_BINDING
+  DECISION       = ADOPT_NOTE_LEVEL_CLARIFICATION
+  SOURCE         = ERROR_SYSTEM_MIGRATION_SECTION_3_5
+  CROSS_BINDING_PARITY_OBLIGATION = NONE
+```
+
+Applied as: the ADR-PBK-003 §5 amendment note (terminal-evidence diagnostic
+attachment; MAY-carry, absence-legal, no D11/control effect, backend-neutral,
+no backend obligated to construct a reason) and the songcore-binding-
+architecture §6.2 note + table rows (binding-internal retention, canonical ABI
+unchanged, no parity obligation). Both cite the receipt. Explicitly NOT
+adopted by the same ruling: D-9 (open), D-C (#289), D-D (#290), Windows
+runtime acceptance (#288), T1-3 public fields, and any recovery policy.
