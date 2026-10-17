@@ -15,12 +15,13 @@
 - 仓库基点：BASE_SHA `0e43ef0cbac6fe21d0cd83e14875ace98c73501a`（模型冻结
   时点 origin/main；生产锚点行号见 PENDING_FATAL_DAG.md §0）
 - 判定：**BOUNDED-CLEAN — base PASS（11 条不变式）+ 11 witness 全部可达 +
-  11 mutation 全部 COUNTEREXAMPLE-WITNESSED（M1–M7 无回归；D-T1..D-T4 新增）**
+  11 mutation 全部 COUNTEREXAMPLE-WITNESSED（M1–M7 无回归；D-T1..D-T4 新增；
+  2026-10-17 审查修正轮后复跑确认）**
 - 结果类：CHECKED-IN-MODEL（覆盖矩阵用语；不得升级为"架构已证明正确"）
 
 ```
 == 正常模型（必须 PASS：TypeOK + 基线五条 + pending-fatal 五条安全不变式，探索完成）
-Base / safety（commit 后旧 PCM 不可能；pending-fatal 格合法） PASS  13117 states generated, 5216 distinct states found, 0 states left on queue.
+Base / safety（commit 后旧 PCM 不可能；pending-fatal 格合法） PASS  15667 states generated, 6330 distinct states found, 0 states left on queue.
 == witness 探针（必须 MUST-FAIL：可达性证明，防空洞不变式）
 Witness / commit 可达                                          MUST-FAIL-OK（违反 ProbeNeverCommitted）
 Witness / pre-commit 旧输出可达（合法）                 MUST-FAIL-OK（违反 ProbeNoOldDrainEver）
@@ -46,19 +47,30 @@ Mutation / D-T2 RefusedClearsLatch（拒绝误擦 latch）       MUST-FAIL-OK（
 Mutation / D-T3 LoopTopStopExit（取消位伪造 stop 退出） MUST-FAIL-OK（违反 TerminalCellConformance）
 Mutation / D-T4 AppliedKeepsLatch（旧 fatal 落入新 continuation） MUST-FAIL-OK（违反 InvCommitPurged,InvStaleOutput,NoOldCursorResumeAfterApplied,NoOldFatalAfterApplied）
 F5-SEEK-DISCONTINUITY: ALL PASS
+SUITE_RC=0
 ```
 
 ## 状态空间
 
-- base：13117 states generated / **5216 distinct**（穷举完成，0 on queue）；
+- base：15667 states generated / **6330 distinct**（穷举完成，0 on queue；
+  审查修正轮加入 refusedWhileLatched 见证前的首轮为 13117/5216）；
   相对 2026-09-18 基线（2205/672）的增长来自本轮新增的真实维度：
   pendingFatal × stopIntent/edgeTerminal（intent→edge stop 窗口）×
   workerGone/exitPath（六个真实退出位置）× drainVerdict/committedOutcome
-  （terminal 投影）——全部是有界交错的真实增长，未融合任何可交错动作来
-  缩小空间，也未降低 bound（MAX_TAIL 保持 2）
+  （terminal 投影）+ witness 精度见证——全部是有界交错/见证的真实增长，
+  未融合任何可交错动作来缩小空间，也未降低 bound（MAX_TAIL 保持 2）
 - 每个 mutation / witness run 独立探索完成（"Finished in" 收尾，fail-closed）
-- 反例轨迹归档：D-T1..D-T4 的 TLC 反例逐状态保存在执行轮证据目录
-  （counterexample-DT*.log；含每步动作名与变量值，供独立审查核对交错链）
+- 反例轨迹归档：D-T1..D-T4 的 TLC 反例逐状态保存在执行轮本地证据目录
+  `/home/hoo/Source/qianqian-289-evidence/`（未入库；同轮其他证据：
+  f5-full-suite-run.log / f5-full-suite-run2.log = 修复 cfg 前后两次全套件
+  完整输出、base-attempt1-RetainLatchOnRefused-violated.log = 首跑红色日志、
+  counterexample-DT*.log = 四条反例逐状态轨迹、counterexample-DT3-committed-
+  cell-chain.log = D-T3 的 commit 完整链诊断运行、lefthook-pre-push-all*.log
+  = 本地 gate 日志、dt-run-* = 首次 D-T cfg 配置错误的失败现场）。诊断运行的
+  复现配方：拷贝本目录 .tla + mutations/DT3LoopTopStopExit.cfg 后，把
+  `TerminalCellConformance` 替换为仅保留其 (2e) committed-cell 合取项的形式
+  （PENDING_FATAL_DAG §8 注明「非 gate 配置」）——gate 配置本身不变。
+  2026-10-17 审查 F3 修复注记。
 
 ## 判读
 
@@ -67,7 +79,7 @@ F5-SEEK-DISCONTINUITY: ALL PASS
    **不触碰 latch**、MutatedThenFailed 即 fail-closed 且绝不恢复旧游标
    生产、Applied 即 purge+landing+**latch 擦除**、stop intent 与 edge stop
    两步分离、worker 只在六个真实位置退出、canceled seek 只是 bookkeeping、
-   terminal commit 按冻结 resolver 次序）下，全部 11 条不变式在 5216 个
+   terminal commit 按冻结 resolver 次序）下，全部 11 条不变式在 6330 个
    可达状态上成立。pending-fatal 的核心事实被模型逐格复现：
    - default position 上 latch 胜 stop（read 无前置 terminal 检查，
      worker_failure 先于一切 stop-intent 咨询）；
@@ -75,7 +87,9 @@ F5-SEEK-DISCONTINUITY: ALL PASS
      Completed 可达——scoped safety 未误杀新 continuation）；
    - Refused 保留 latch（L2）；Mutated fail-closed（L3）；真实退出位上的
      Stopped 可达（L4）；surfacing-Failed 可达（L5）。
-2. **Witness 全部可达**：11 条探针证明不变式非空洞——特别是
+2. **Witness 全部可达**：11 条探针证明不变式非空洞（注：WitnessSeekDestructive
+   的探针变量由基线 episodeFailed 换为 workerFailurePublished——超集；
+   mutated 路径的精确可达由 W_MUTATED_THEN_FAILED 另行钉住）——特别是
    W_APPLIED_ERASURE_COMPLETED（强制验收项）：作用域化安全
    （ScopedLatchedFatalNoComplete 只约束 ¬landing 的旧 continuation）没有
    把「曾 latch ⇒ 永不 Completed」的过强断言引入模型。
@@ -98,7 +112,9 @@ F5-SEEK-DISCONTINUITY: ALL PASS
      remainderBreak 的 Stopped——两种情况下该 exitPath 都在矩阵外），
      前提修订已记录在 PENDING_FATAL_DAG §8；
    - D-T4（Applied 不擦 latch 且旧循环复跑）被 NoOldFatalAfterApplied
-     抓住——旧 fatal 落入新 continuation 的 surfacing 在反例中真实发生。
+     抓住——反例终止于「landing ∧ pendingFatal 残留」状态（不变式的保留
+     半边，2026-10-17 审查 F1 修正）；surfacing 随后必然发生（ReadSurfacesFatal
+     的 guard 在该状态直接放行），但归档轨迹未走完那一步，如实声明。
 
 ## 校准关系（如实声明）
 

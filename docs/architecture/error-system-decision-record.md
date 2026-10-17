@@ -301,7 +301,7 @@ D-C_CALIBRATION     = E1_ABI_PRIOR_RECORDED_PASS + E1_WORKER_PRIOR_RECORDED_PASS
 D-C_STOP_RACE       = RUST_VERIFICATION_PRIMARY (TLC = bounded safety search)
 D-C_SEMANTIC_AUTHORITY = ADR-PBK-002 D14.5/D14.8 + D11 (MODEL_IS_AUTHORITY = NO)
 D-C_NOT_AUTHORIZED  = production change / ABI change / K0 change
-D-C_RECEIPT         = issue #289 comment 6229433676+44 (6229911387)
+D-C_RECEIPT         = issue #289 comment 6229911387
 ```
 
 Receipt: [issue #289 comment 6229911387](https://github.com/jnhu76/qianqian/issues/289#issuecomment-6229911387)
@@ -325,6 +325,6 @@ are bounded interleaving-search evidence, never architecture acceptance, and a
 model counterexample authorizes no production change.
 
 Execution record: the implementing round and its evidence live in
-`error-system-implementation-record.md` (§12) and
+`error-system-implementation-record.md` (§13) and
 `specs/f5-seek-discontinuity/` (PENDING_FATAL_DAG.md frozen ledger; extended
 SeekDiscontinuity.tla; RESULTS.md).

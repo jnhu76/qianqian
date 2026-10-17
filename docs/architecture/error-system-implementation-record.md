@@ -582,16 +582,19 @@ Extended `SeekDiscontinuity.tla` (11 invariants = baseline 6 + pending-fatal
 `TerminalCellConformance`), 12 new actions with 1 removal (`Stop`) and every
 baseline action re-gated (read split three ways, stop split
 two ways, six real exit positions incl. the bookkeeping-only cancel, leg
-verdicts, one-shot TerminalCommit), 26 variables each justified against the
-Q5 six-question budget (rejected candidates documented: latchRetained,
+verdicts, one-shot TerminalCommit), 27 variables each justified against the
+Q5 six-question budget (27th = `refusedWhileLatched`, added by the
+2026-10-17 independent-review F2 fix to pin W_REFUSED_FATAL_RETAINED's
+shape; rejected candidates documented: latchRetained,
 stopSeen, providerOutcome, a separate workerPos). TerminalCommit is a MINIMAL
 constrained D11 projection (frozen resolver transcription; CommitCut ≠
 TerminalCommit; protocol Stop never read as D11 Stopped; the Failed{device}
 cells kept as unreachable-in-model frozen-table branches).
 
 Executed (tla2tools v1.7.4 / TLC2 2.19 / java 17.0.20.1, 4 workers, safety
-only, no fairness): **base PASS with 5216 distinct states** (13117 generated,
-exhausted; baseline was 672 — the growth is the pending-fatal × stop-window ×
+only, no fairness): **base PASS with 6330 distinct states** (15667 generated,
+exhausted; 13117/5216 before the review-round `refusedWhileLatched` witness;
+baseline was 672 — the growth is the pending-fatal × stop-window ×
 exit-position × terminal-projection dimension, no real interleaving fused away,
 no bound lowered); **11/11 witnesses reachable** (incl. the mandatory
 `W_APPLIED_ERASURE_COMPLETED` — the scoped safety did not kill the legal
@@ -617,7 +620,7 @@ regenerated and disclosed here.
 
 | Target | Command | Result | Limits |
 |---|---|---|---|
-| F5 suite (base + 11 probes + 11 mutations) | `specs/f5-seek-discontinuity/check.sh` | `F5-SEEK-DISCONTINUITY: ALL PASS` (SUITE_RC=0); base 5216 distinct / 0 on queue; per-run "Finished in" observed | CHECKED-IN-MODEL bounds (MAX_TAIL=2); not production evidence |
+| F5 suite (base + 11 probes + 11 mutations) | `specs/f5-seek-discontinuity/check.sh` | `F5-SEEK-DISCONTINUITY: ALL PASS` (SUITE_RC=0, rerun after the review fixes); base 6330 distinct / 0 on queue; per-run "Finished in" observed | CHECKED-IN-MODEL bounds (MAX_TAIL=2); not production evidence |
 | Counterexample trace capture | 4 × targeted TLC runs (D-T1..D-T4) + 1 diagnostic run (D-T3 committed-cell chain) | each violates its frozen target; traces archived | evidence artifacts, not gate runs |
 | Production tree | untouched (git diff scoped to `specs/f5-seek-discontinuity/**`, `specs/README.md`, three error-system docs) | SOURCE_CHANGES=NONE / ABI_CHANGES=NONE / ADR_CHANGES=NONE | — |
 
@@ -628,3 +631,35 @@ harness obligation (the existing E-1 harness is the calibration baseline, not
 rewritten). The pre-existing NOT_RUN items (§12.5: Windows runtime
 acceptance for cone / E-7 / carrier-B reason / close protocol) are unchanged
 and remain owned by #288/#290.
+
+### 13.5 Independent review round and fixes (2026-10-17)
+
+Three-slice fresh-context adversarial review per the campaign checklist
+(R1–R10). Delivered verdicts: authority/baseline/minimality slice **APPROVE**;
+mutation/witness/evidence slice **REVISE (3×P2, all fixed)**; the
+causal/matrix slice was interrupted by the account's 5-hour quota and is
+re-run before final verdict (its slice had no findings recorded). All seven
+P2s across the two delivered slices were fixed and the full suite re-executed
+(ALL PASS, 6330 distinct — numbers above updated):
+
+- decision-record §6.4: wrong section pointer (§12→§13) and a garbled
+  machine-parsable receipt id (now `issue #289 comment 6229911387`).
+- f5 .tla: DrainOld's comment had kept the baseline's "tail still plays out
+  after failure" rationale while the guard had moved to terminal-before-data;
+  comment corrected to the production-faithful reading (no invariant/probe
+  depended on post-failure drains).
+- ProbeNoDestructiveEver's variable was redefined (episodeFailed→
+  workerFailurePublished, a superset); the mutated-route pin now carried by
+  W_MUTATED_THEN_FAILED — redefinition documented in f5 README/RESULTS.
+- RESULTS: the D-T4 evidence sentence overclaimed (the archived trace ends at
+  the latch-retention violation; the surfacing follows by the guard but was
+  not walked) — reworded.
+- Two witnesses were shape-blind (review F2): W_REFUSED_FATAL_RETAINED now
+  pinned by the `refusedWhileLatched` ghost (the "refuse-then-latch" equal-
+  depth path no longer satisfies the antecedent), and W_FAILED_FROM_PENDING_
+  FATAL now requires `surfacedFatal ∧ stopIntent` (the L5 fatal-beats-stop
+  shape; a regression gating surfacing on ¬stopIntent would turn the witness
+  green and fail the suite). Model, probes and cfgs updated; full suite
+  re-run.
+- Evidence-retention location (local archive path + per-file inventory +
+  the D-T3 diagnostic-run recipe) now recorded in RESULTS (review F3).

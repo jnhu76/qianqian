@@ -125,6 +125,7 @@ Ghost 变量（`oldDrainEver`/`oldAfterCommit`/`posMixAfterCommit`/`seekFromPart
 | `exitPath` | worker 从哪个真实位置退出 | —（verifier-only） | 六个退出动作 | TCC 的冻结退出清单半边（D-T3 靶） | 否 | ghost |
 | `oldCursorResumed` | Applied 后旧 cursor 生产复活 | —（verifier-only） | WriteOld（landing 时置位） | NoOldCursorResumeAfterApplied | 否 | ghost |
 | `fatalLatchedEver` | pending fatal 曾被 latch | —（verifier-only） | ReadPartialSuccess | W_APPLIED_ERASURE_COMPLETED；RetainLatchOnRefused 的「refusal 时已存在」见证 | 否（见其不变式注释：普通 refusal 合法，反例 attempt-1） | ghost |
+| `refusedWhileLatched` | RefusedUnchanged 在 latch 已存在时发生 | —（verifier-only） | SeekRefusedUnchanged | W_REFUSED_FATAL_RETAINED 的精确形状（无它则「先拒绝后 latch」的等深合法路径使 witness 形状失明——2026-10-17 审查 F2 修正） | 否 | ghost |
 
 拒绝的候选变量（照抄 Q5 候选表被否决的项）：`latchRetained`（保留 =
 Refused 动作对 pendingFatal 的 UNCHANGED，由 RetainLatchOnRefused +
@@ -183,18 +184,24 @@ ReachCommit                  cutover commit 可达
 WitnessOldDrainPreCommit     pre-commit 旧 PCM audible drain 可达（合法）
 WitnessOldEdgePreCommit      pre-commit edge 旧库可达
 WitnessSeekRefused           seek 拒绝路径可达
-WitnessSeekDestructive       destructive failure 路线可达
+WitnessSeekDestructive       destructive failure 路线可达（探针变量由基线
+                             episodeFailed 换为 workerFailurePublished——超集；
+                             mutated 路径的精确钉住另由 W_MUTATED_THEN_FAILED
+                             承载，2026-10-17 审查 B-3 注记）
 WitnessPartialSeek           余量在外 seek 可达
 
 D-C 扩展五条（L1–L5 legal families 的可达证明；PENDING_FATAL_DAG §7）：
 W_APPLIED_ERASURE_COMPLETED  latch→Applied 擦除→新 continuation→EOF→
                              Completed 可达（L1；强制验收项——若过强断言
                              杀死合法新 continuation，此探针红）
-W_REFUSED_FATAL_RETAINED     Refused 后 latch 仍在可达（L2）
+W_REFUSED_FATAL_RETAINED     latch 已存在时的拒绝之后 latch 仍在可达
+                             （L2 精确形状；refusedWhileLatched 见证）
 W_MUTATED_THEN_FAILED        MutatedThenFailed 可达（L3）
 W_STOPPED_FROM_REAL_EXIT     真实 stop-exit 上的 Stopped 可达（L4）
-W_FAILED_FROM_PENDING_FATAL  pending fatal surfacing 可达（L5；
-                             default position 上 fatal 胜 stop）
+W_FAILED_FROM_PENDING_FATAL  stop intent 已记录而 surfacing 仍发生可达
+                             （L5 精确形状；default position 上 fatal 胜
+                             stop——若 surfacing 被错误门控在 ¬stopIntent，
+                             本 witness 变绿、套件红）
 ```
 
 ## 运行
