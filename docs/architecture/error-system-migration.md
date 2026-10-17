@@ -1,12 +1,34 @@
 # Error-system migration and acceptance (#231, #280)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.**
 > This file plans how the candidate goals in
 > [error-system-target-contract.md](error-system-target-contract.md) would be
 > adopted, what would break, and what evidence each adoption would owe. It performs no
 > migration, changes no authority, and approves nothing. Baseline:
 > `5e60da4c3bd5f0fa93b4215670f4e898e2ac844e` (facts in
 > [error-system-reconciliation.md](error-system-reconciliation.md)).
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = per-boundary migration + acceptance-by-nature plan
+> DOCUMENT_AUTHORITY                = UNCHANGED: DESIGN_CANDIDATE / NOT_NORMATIVE_AUTHORITY
+> ORIGINAL_BASELINE                 = 5e60da4c facts; plan text frozen at the PR #280 round
+> CURRENT_IMPLEMENTATION_REFERENCE  = the migrations whose goals landed via PR #287 (merged
+>                                     b86a9ce 2026-10-16) are indexed, with the actual
+>                                     deletions/replacements, in
+>                                     error-system-implementation-record.md §1/§3; this
+>                                     plan's own "Current" columns still describe the
+>                                     pre-implementation baseline and were NOT rewritten
+> CURRENT_ACCEPTANCE_BOUNDARY       = Windows acceptance designs pending #288; the §7.6 F5
+>                                     obligations pending the D-C ruling #289
+> UNRESOLVED_OWNER_DECISIONS        = D-2/D-10 substance landed, formal ratification PENDING
+>                                     (error-system-decision-record.md); the §3 conditional
+>                                     amendment texts remain candidates with their own
+>                                     triggers — §3.4 rides the D-10 ruling, §3.5 rides D-2
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
 
 ## 1. Per-boundary migration matrix
 

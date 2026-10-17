@@ -1,7 +1,9 @@
 # Error-system target contracts (#231, #280)
 
-> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY / NOT IMPLEMENTED.**
-> Every goal below is a **candidate obligation**. Nothing here changes D11, D14.*, U2,
+> **Truth class: DESIGN_CANDIDATE / NOT AUTHORITY.** Every goal below remains a
+> **candidate obligation** — the DG-1..DG-4c mechanisms have since been implemented
+> in a defined scope (status block below), and that fact adopts no goal and
+> promotes nothing here to authority. Nothing in this file changes D11, D14.*, U2,
 > the SongCore ABI, K0 semantics, or any accepted document; merging or reviewing this file
 > authorizes no implementation and adopts no policy. Where a goal would change frozen
 > behavior or accepted authority, it is marked `AUTHORITY-AMENDMENT-REQUIRED` and its
@@ -10,6 +12,28 @@
 > **Evidence basis:** the frozen facts in
 > [error-system-reconciliation.md](error-system-reconciliation.md) (R1) at
 > `5e60da4c3bd5f0fa93b4215670f4e898e2ac844e`; scans #281/#282; #231 audit + erratum.
+
+> **Status (2026-10-17) — document authority vs implementation state, kept separate:**
+>
+> ```text
+> DOCUMENT_ROLE                     = six-module target contracts + DG-1..DG-4c designs
+> DOCUMENT_AUTHORITY                = UNCHANGED: DESIGN_CANDIDATE / NOT_NORMATIVE_AUTHORITY
+>                                     (LANDED per-goal notes record implementation facts,
+>                                     not adoption of the candidate obligations)
+> ORIGINAL_BASELINE                 = 5e60da4c evidence basis; DG designs BASE e44aa80
+> CURRENT_IMPLEMENTATION_REFERENCE  = DG-1..DG-4c LANDED in defined scope by PR #287
+>                                     (merged b86a9ce 2026-10-16); per-goal status notes
+>                                     sit under each DG heading; index =
+>                                     error-system-implementation-record.md
+> CURRENT_ACCEPTANCE_BOUNDARY       = LANDED is not accepted: executed evidence Linux-only;
+>                                     Windows runtime acceptance pending #288; goals outside
+>                                     the DG scope remain unimplemented candidates
+> UNRESOLVED_OWNER_DECISIONS        = D-2/D-10 substance landed, formal ratification PENDING
+>                                     (error-system-decision-record.md); D-4/D-7/D-9/D-11
+>                                     unchanged
+> ```
+>
+> Round closeout: [#283](https://github.com/jnhu76/qianqian/issues/283#issuecomment-6228758527).
 
 ## 0. How to read a goal
 
