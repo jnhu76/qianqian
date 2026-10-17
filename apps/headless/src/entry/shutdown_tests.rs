@@ -84,6 +84,9 @@ fn host_shutdown_report_child_witness() {
 /// kills it.
 #[test]
 fn an_abandoned_drainer_never_makes_the_host_exit_path_wait_on_its_sink() {
+    // Forkling-window exclusion (see machine_input::tests::test_spawn_lock):
+    // this process's spawn windows must not overlap another test's pipe close.
+    let _spawn_guard = crate::machine_input::test_spawn_lock();
     let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args([
             "--exact",
@@ -287,6 +290,9 @@ fn wait_for_stall(written: &std::sync::atomic::AtomicU64, deadline: Instant, wha
 /// the deadline below kills it.
 #[test]
 fn a_drained_report_never_makes_the_host_exit_path_wait_on_its_sink() {
+    // Forkling-window exclusion (see machine_input::tests::test_spawn_lock):
+    // this process's spawn windows must not overlap another test's pipe close.
+    let _spawn_guard = crate::machine_input::test_spawn_lock();
     let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args([
             "--exact",
