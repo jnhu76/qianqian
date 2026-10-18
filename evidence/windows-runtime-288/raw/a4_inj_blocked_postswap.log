@@ -1,0 +1,26 @@
+ROW_ID=a4_inj_blocked_postswap
+UTC=2026-10-18T05:06:33Z
+HEAD=a53ffbf57480954129d88655d348b922dc6a8013
+BIN_SHA256=247ba0852f15d9a8bbea5a60b716c954993cae73d16680ce1efd04adfc2b1490
+PARAMS filter=a4_child_cone_injected mode=blocked gate=1 facility=1 hook=dg4b volume_fault=0
+---
+===ROW_BEGIN===
+exit_code=0
+duration_ms=1958
+timed_out=False
+--- stdout ---
+
+running 1 test
+test a4_sink_controls::a4_child_cone_injected ... [a4 premise] blocked-sink confirmed: flooding write #2 of 512 parked (counter frozen across the 400 ms observation window)
+[a4 hook] DG-4b posture installed (product shape)
+[a4 facility] real diagnostics facility installed (stderr exporter)
+[a4 blocked] settled in 15.2836ms: terminal=Failed injected=true edge_cuts=1 verdict_snapshot=1
+[a4 blocked] facility shutdown(1s) took 1.0001354s: drained=false abandoned=true undelivered=2 counters(copied_out=0 exported=0 export_failed=0 alpha_rejected=1 beta_queued=0 critical_panics=1 self_diagnostics=0)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 1.92s
+
+
+--- stderr ---
+
+===ROW_END===

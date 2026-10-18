@@ -1,0 +1,25 @@
+ROW_ID=a6_device_reason_pipeline
+UTC=2026-10-18T05:20:22Z
+HEAD=bf1f9f3e3fd415d5028055a006c53c1219ceb57b
+BIN_SHA256=8d4851db462fefed10e4bf6a7ab8dae346973bd10679601015a56f2d3bf0a8b4
+PARAMS filter=a6_child_device_reason mode=healthy gate=1 facility=0 hook='dg4b' volume_fault=0 extra=''
+---
+===ROW_BEGIN===
+exit_code=0
+duration_ms=2890
+timed_out=False
+--- stdout ---
+
+running 1 test
+test a4_sink_controls::a6_child_device_reason_enrichment ... [a4 premise] healthy-sink row (no premise to prove)
+[a4 hook] DG-4b posture installed (product shape)
+[a6 seam] volume-apply fault armed (AUDCLNT_E_DEVICE_INVALIDATED â€?device-loss grade)
+[a6 healthy] terminal=Failed failure_diagnostic=Some("device: stream volume apply failed (device invalidated): 0x88890004") relayed_verdict=Some(Aborted { reason: Some(AbortReason { class: Device, message: "stream volume apply failed (device invalidated): 0x88890004" }) })
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.45s
+
+
+--- stderr ---
+
+===ROW_END===

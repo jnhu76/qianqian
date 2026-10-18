@@ -1,0 +1,25 @@
+ROW_ID=a4_pre9_vs_healthy_nocap
+UTC=2026-10-18T05:18:01Z
+HEAD=bf1f9f3e3fd415d5028055a006c53c1219ceb57b
+BIN_SHA256=bf0d902ae53d647f44a50adf83b0f183cf595607b209e2b0f88855f0b20be2ef
+PARAMS filter=a4_child_cone_volume_stop mode=healthy gate=1 facility=0 hook='dg4b' volume_fault=0 extra='--nocapture'
+---
+===ROW_BEGIN===
+exit_code=0
+duration_ms=3348
+timed_out=False
+--- stdout ---
+
+running 1 test
+test a4_sink_controls::a4_child_cone_volume_stop ... [a4 premise] healthy-sink row (no premise to prove)
+[a4 hook] DG-4b posture installed (product shape)
+[a4 healthy] stopped-episode settled in 23.2243ms: terminal=Stopped (healthy expectation: Stopped; a Failed here is the pre-swap #9/#10 misattribution signature)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.97s
+
+
+--- stderr ---
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 1036 frames (shared, event-driven, engine SRC)
+
+===ROW_END===

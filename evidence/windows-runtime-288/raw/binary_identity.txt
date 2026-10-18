@@ -1,0 +1,8 @@
+fc2e17283baca52f72a5bc7ae0f5edcf6575f704cb80ce0dc22a9194f577f439  target/x86_64-pc-windows-gnu/debug/deps/qianqian_output_wasapi-5d32458232b8e278.exe
+fc81b68b9ebd1cf7624b217ad04872d12b3e0395
+BUILD_UTC=2026-10-18T03:25:12Z
+适用于蓝牙® 音频的英特尔® 智音技术 | status=OK
+Realtek High Definition Audio | status=OK
+适用于数字麦克风的英特尔® 智音技术 | status=OK
+NVIDIA Virtual Audio Device (Wave Extensible) (WDM) | status=OK
+适用于 USB 音频的英特尔® 智音技术 | status=OK

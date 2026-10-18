@@ -61,6 +61,12 @@ mod event_handle_lifetime_tests;
 #[cfg(all(test, windows))]
 mod cone_oracle_tests;
 
+// A4/E-7 tier-1 writer-swap sink controls (error-system-migration §7.3),
+// #288: child-process oracles driven by the campaign harness through
+// QIANQIAN_A4_* environment variables; inert without them.
+#[cfg(all(test, windows))]
+mod a4_sink_controls;
+
 /// The Host Render Backend this host assembly selects (PBK-003 §9):
 /// the owned Windows backend mechanism. Selection is configuration of
 /// the assembly, not composition truth; a future platform backend
