@@ -56,8 +56,15 @@ mutation/pre-swap hashes   mutation_base_hash.txt (433bd0ff) = fc81b68's
                            bf1f9f3e's wasapi.rs blob — both independently
                            re-hashed from the worktree during review
 review-round rows          a4_vol1_healthy_postswap_v2, a4_vol0_healthy_postswap,
-                           a4_vol1_broken_gateoff_v2: HEAD = the delivered
-                           branch tip + the seam apply_calls counter only
+                           a4_vol1_broken_gateoff_v2: executed source = the
+                           delivered branch tip's CRATE SOURCE in full
+                           (fac80c6 + the complete review-round crate delta:
+                           the seam apply_calls counter AND the child's
+                           seam_apply_calls print/assert) — the only campaign
+                           row family whose binaries carry the delivered
+                           branch's source; the receipts' shorthand
+                           "76514dd + seam counter" understates this and is
+                           corrected here (receipts retained unedited)
 ```
 
 Re-running a row from the delivered branch reproduces the CODE but not the
