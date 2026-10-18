@@ -108,6 +108,67 @@ fn mechanism_log_enabled() -> bool {
     std::env::var_os("QIANQIAN_AUDIO_LOG").is_some_and(|v| v != "0")
 }
 
+/// The loop-top volume apply, routed through a test-only seam.
+///
+/// #288 A4 (site #10) must force a RECOVERABLE `SetAllVolumes` failure
+/// deterministically. On a healthy real endpoint the call is not
+/// constructibly fallible: levels come from the `u8`-routed `OutputLevel`
+/// cell (always valid), the channel count is the service's own, and every
+/// non-device-loss failure mode the mechanism grades recoverable (D14.9)
+/// requires the device itself to refuse a legal value. The seam is the
+/// design-named minimal injection (error-system-migration §7.3): a
+/// `cfg(test)`-only override table in front of the REAL COM call. It adds
+/// no public API, no production call indirection (the non-test body is the
+/// direct call), and no resident runtime state in production builds. The
+/// open-time initial apply (D14.9: one-shot before first submission) is
+/// deliberately NOT seamed: an open apply failure is an open failure by
+/// design, a different site from #10.
+#[cfg(test)]
+pub(crate) mod volume_apply_seam {
+    use std::sync::Mutex;
+
+    use windows::Win32::Media::Audio::IAudioStreamVolume;
+
+    type ApplyFn = fn(&IAudioStreamVolume, &[f32]) -> windows::core::Result<()>;
+
+    static OVERRIDE: Mutex<Option<ApplyFn>> = Mutex::new(None);
+
+    /// Arm a test override, or restore the real call with `None`.
+    pub(crate) fn set_override(f: Option<ApplyFn>) {
+        *OVERRIDE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = f;
+    }
+
+    pub(crate) fn apply(service: &IAudioStreamVolume, levels: &[f32]) -> windows::core::Result<()> {
+        let guard = OVERRIDE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match *guard {
+            Some(f) => f(service, levels),
+            None => unsafe { service.SetAllVolumes(levels) },
+        }
+    }
+}
+
+/// The loop-top volume apply call. Test builds route through the seam
+/// (which defaults to the real call); production builds are the direct
+/// call — no indirection, no behavior change.
+#[cfg_attr(not(test), inline)]
+fn apply_stream_volume(
+    service: &windows::Win32::Media::Audio::IAudioStreamVolume,
+    levels: &[f32],
+) -> windows::core::Result<()> {
+    #[cfg(test)]
+    {
+        volume_apply_seam::apply(service, levels)
+    }
+    #[cfg(not(test))]
+    {
+        unsafe { service.SetAllVolumes(levels) }
+    }
+}
+
 /// The render thread's class-α registration with the host diagnostic outlet.
 /// Registered once at thread start (the cold path): the pool is preallocated
 /// and every later `emit` on this thread is a bounded atomics-only publish.
@@ -731,7 +792,7 @@ fn steady_loop(
             let routed_bits = routed.to_bits();
             if routed_bits != session.applied_bits.get() {
                 let routed_levels = vec![routed; session.channels as usize];
-                match unsafe { session.stream_volume.SetAllVolumes(&routed_levels) } {
+                match apply_stream_volume(&session.stream_volume, &routed_levels) {
                     Ok(()) => session.applied_bits.set(routed_bits),
                     Err(e) if e.code() == AUDCLNT_E_DEVICE_INVALIDATED => {
                         break abort_msg(format!(
