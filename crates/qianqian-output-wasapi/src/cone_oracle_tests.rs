@@ -125,7 +125,7 @@ const PRECONDITION_BOUND: Duration = Duration::from_secs(10);
 /// Bound for the settlement observation. Generous on purpose: its firing is the
 /// oracle's red, and a timed-out healthy run would otherwise be inconclusive
 /// rather than a failure.
-const SETTLE_BOUND: Duration = Duration::from_secs(15);
+pub(crate) const SETTLE_BOUND: Duration = Duration::from_secs(15);
 
 // --- the healthy, never-terminal decode source -------------------------------
 
@@ -171,18 +171,50 @@ impl DecodedPcmStream for InfiniteStream {
 // --- the injection + order witness ------------------------------------------
 
 #[derive(Default)]
-struct Witness {
+pub(crate) struct Witness {
     /// The render leg's `read_frames` call count (observation (ii)).
     reads: AtomicUsize,
     /// Set immediately before the injected panic, on the render thread: the
     /// same-thread happens-before edge into the cone's catch (observation (i)).
-    injected: AtomicBool,
+    pub(crate) injected: AtomicBool,
     /// Counter A: completed edge cuts (the wrapper's `stop()` forwarding).
-    edge_cuts: AtomicUsize,
+    pub(crate) edge_cuts: AtomicUsize,
     /// Counter B: set by the relay observer inside `complete()`.
-    verdict_reached: AtomicBool,
+    pub(crate) verdict_reached: AtomicBool,
     /// B's snapshot of A, taken inside `complete()` before it returns.
-    verdict_snapshot: AtomicUsize,
+    pub(crate) verdict_snapshot: AtomicUsize,
+    /// The verdict the relay observed inside `complete()` — the carrier B
+    /// payload as it crossed the completion seam (A6 pipeline witness).
+    /// Written only by the relay (synchronously inside `complete()`), read
+    /// only by the test thread after settlement.
+    pub(crate) relayed_verdict: std::sync::Mutex<Option<DrainVerdict>>,
+}
+
+/// Evidence printout for the Windows runtime campaign (#288): one bounded
+/// line per oracle run, written with the NON-panicking writer so a
+/// broken/blocked stderr can never turn an evidence row into a false red
+/// (`eprintln!` would panic on a failing write; this is test-main-thread
+/// code, but the campaign's sink-control children run these same tests).
+fn print_cone_witness(tag: &str, witness: &Witness, terminal: EpisodeTerminalOutcome) {
+    use std::io::Write;
+    let verdict = witness
+        .relayed_verdict
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_ref()
+        .map(|v| format!("{v:?}"));
+    let _ = writeln!(
+        std::io::stderr(),
+        "[cone-evidence {tag}] reads={} injected={} edge_cuts={} verdict_reached={} \
+         verdict_snapshot={} terminal={terminal:?} relayed_verdict={}",
+        witness.reads.load(Ordering::Acquire),
+        witness.injected.load(Ordering::Acquire),
+        witness.edge_cuts.load(Ordering::Acquire),
+        witness.verdict_reached.load(Ordering::Acquire),
+        witness.verdict_snapshot.load(Ordering::Acquire),
+        verdict.unwrap_or_else(|| "<none>".to_owned()),
+    );
+    let _ = std::io::stderr().flush();
 }
 
 /// The session's real edge-backed input, wrapped so the k-th read panics and
@@ -217,6 +249,7 @@ impl RenderPcmInput for InjectingInput {
 /// production cone runs unmodified.
 struct ConeProbeOutput {
     witness: Arc<Witness>,
+    inject_at: usize,
 }
 
 impl AudioOutput for ConeProbeOutput {
@@ -232,7 +265,7 @@ impl AudioOutput for ConeProbeOutput {
         let injecting: Arc<dyn RenderPcmInput> = Arc::new(InjectingInput {
             inner: input,
             witness: Arc::clone(&self.witness),
-            inject_at: INJECT_AT,
+            inject_at: self.inject_at,
         });
         // Witness B: an observer on a relayed signal. It runs synchronously
         // inside the cone's `complete()`, snapshots A there, and only then
@@ -241,6 +274,10 @@ impl AudioOutput for ConeProbeOutput {
         let session_signal = drain.clone();
         let witness = Arc::clone(&self.witness);
         let relayed = DrainSignal::with_on_complete(move |verdict| {
+            *witness
+                .relayed_verdict
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(verdict.clone());
             witness
                 .verdict_snapshot
                 .store(witness.edge_cuts.load(Ordering::Acquire), Ordering::Release);
@@ -262,14 +299,22 @@ impl AudioOutput for ConeProbeOutput {
 
 // --- the fixture -------------------------------------------------------------
 
-struct ConeFixture {
+pub(crate) struct ConeFixture {
     runtime: QianqianApp,
-    handle: PlaybackSessionHandle,
-    witness: Arc<Witness>,
+    pub(crate) handle: PlaybackSessionHandle,
+    pub(crate) witness: Arc<Witness>,
 }
 
 impl ConeFixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
+        Self::with_inject_at(INJECT_AT)
+    }
+
+    /// The A4 sink-control children drive the same fixture with the
+    /// injection disabled (`usize::MAX` never fires) so the episode ends by
+    /// external stop — the settle class that exposes the #9/#10 pre-swap
+    /// misattribution hazards.
+    pub(crate) fn with_inject_at(inject_at: usize) -> Self {
         let witness = Arc::new(Witness::default());
         let handle = PlaybackSessionHandle::new();
         let mut runtime = QianqianApp::new();
@@ -293,6 +338,7 @@ impl ConeFixture {
                         move |ctx| {
                             ctx.provide::<AudioOutputCapability>(Rc::new(ConeProbeOutput {
                                 witness: Arc::clone(&witness),
+                                inject_at,
                             }))
                             .map_err(|e| ActivationError::new(format!("{e:?}")))?;
                             Ok(())
@@ -313,7 +359,7 @@ impl ConeFixture {
         }
     }
 
-    fn activate(&mut self) {
+    pub(crate) fn activate(&mut self) {
         self.runtime
             .revise_desired(vec![
                 DesiredEntry::enabled("decode", "oracle_decode", Revision::new(1)),
@@ -327,7 +373,7 @@ impl ConeFixture {
     /// Not reaching it means the endpoint never delivered PCM to the render leg
     /// (no usable device, or an activation refusal) — a precondition failure,
     /// never a pass and never evidence about the property.
-    fn await_injection(&self) -> Result<(), String> {
+    pub(crate) fn await_injection(&self) -> Result<(), String> {
         let deadline = std::time::Instant::now() + PRECONDITION_BOUND;
         while std::time::Instant::now() < deadline {
             if self.witness.injected.load(Ordering::Acquire) {
@@ -351,7 +397,7 @@ impl ConeFixture {
     /// The settlement observation. Runs `wait_terminal` on a helper thread so a
     /// missing settle is bounded instead of hanging the suite; a timeout is the
     /// oracle's red.
-    fn settled_within(&self, limit: Duration) -> Option<EpisodeTerminalOutcome> {
+    pub(crate) fn settled_within(&self, limit: Duration) -> Option<EpisodeTerminalOutcome> {
         let handle = self.handle.clone();
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
@@ -363,14 +409,14 @@ impl ConeFixture {
     /// The teardown relation, observed AFTER the settle assertions: releasing
     /// the episode joins the render leg, so a returned-and-quiet disposal is the
     /// render-thread-join evidence.
-    fn dispose_quietly(&mut self) -> bool {
+    pub(crate) fn dispose_quietly(&mut self) -> bool {
         self.runtime.dispose().snapshot.quiet
     }
 
     /// Fixture release for a RED run only: an external stop so the run can end.
     /// Never asserted as a success path, and never called between the injection
     /// and the settlement observation.
-    fn release_fixture(&mut self) {
+    pub(crate) fn release_fixture(&mut self) {
         self.handle.request_stop();
         let _ = self.runtime.dispose();
     }
@@ -404,6 +450,7 @@ fn o_cone_necessity_the_real_cone_settles_without_an_external_stop() {
     );
     let quiet = fixture.dispose_quietly();
     assert!(quiet, "releasing the settled episode must dispose quietly");
+    print_cone_witness("o-cone-necessity", &fixture.witness, terminal);
 }
 
 /// O-CONE-ORDER: the verdict becomes visible only after the edge was cut.
@@ -440,6 +487,7 @@ fn o_cone_order_the_verdict_becomes_visible_only_after_the_edge_cut() {
     );
     let quiet = fixture.dispose_quietly();
     assert!(quiet, "releasing the settled episode must dispose quietly");
+    print_cone_witness("o-cone-order", &fixture.witness, terminal);
 }
 
 /// The relay's own contract, witnessed without any device: the observer runs
@@ -482,4 +530,88 @@ fn o_cone_order_the_relay_is_synchronous_and_forwards_the_verdict() {
     );
     assert!(witness.verdict_reached.load(Ordering::Acquire));
     assert_eq!(witness.verdict_snapshot.load(Ordering::Acquire), 1);
+}
+
+/// Evidence leg for the #288 Windows runtime campaign: the same cone drive
+/// with the host diagnostic facility INSTALLED (stderr exporter), so the
+/// class-α records the cone sites publish (#9 open line, #8 abort record)
+/// are rendered by the real drainer on Windows, and the bounded shutdown
+/// report is observed at the real Windows exit boundary. This is an
+/// evidence row, not a property oracle: it re-asserts only the necessity
+/// invariants and otherwise prints what the campaign ledger records.
+///
+/// Process-global note: installing the facility is once-only for the whole
+/// test binary. This test must therefore be run in its OWN process when
+/// filtered (`cargo test o_cone_evidence -- --exact` semantics), which is
+/// how the campaign drives it; if another test happened to install first,
+/// the installation is refused and this row degrades to the no-facility
+/// shape — asserted here so the degradation is loud, never silent.
+#[test]
+fn o_cone_evidence_facility_leg_witnesses_records_and_shutdown() {
+    use std::io::Write;
+    let diagnostics = qianqian_diagnostics::Diagnostics::install(
+        Box::new(qianqian_diagnostics::StderrExporter::default()),
+        qianqian_diagnostics::Config::default(),
+    )
+    .expect("evidence leg owns the facility installation of its process");
+    assert!(qianqian_diagnostics::Diagnostics::is_installed());
+
+    let mut fixture = ConeFixture::new();
+    fixture.activate();
+    if let Err(message) = fixture.await_injection() {
+        fixture.release_fixture();
+        panic!("{message}");
+    }
+    let Some(terminal) = fixture.settled_within(SETTLE_BOUND) else {
+        fixture.release_fixture();
+        panic!("EVIDENCE LEG: the episode did not settle within {SETTLE_BOUND:?}");
+    };
+    assert_eq!(terminal, EpisodeTerminalOutcome::Failed);
+    let observation = fixture.handle.observe();
+    let quiet = fixture.dispose_quietly();
+    assert!(quiet, "releasing the settled episode must dispose quietly");
+
+    // The α records (#9 open, #8 abort) may still be in flight on the
+    // drainer's 50 ms poll cadence: the bounded shutdown's final sweep is
+    // the deterministic delivery boundary for this evidence row.
+    let report = diagnostics.shutdown(Duration::from_secs(2));
+    let counters = report.counters;
+    let _ = writeln!(
+        std::io::stderr(),
+        "[cone-evidence facility-leg] terminal={terminal:?} \
+         failure_diagnostic={:?} stop_requested={} relayed_verdict={:?} \
+         shutdown(drained={} abandoned={} undelivered={}) \
+         counters(copied_out={} exported={} export_failed={} alpha_rejected={} \
+         beta_queued={} critical_panics={})",
+        observation.failure_diagnostic,
+        observation.stop_requested,
+        fixture
+            .witness
+            .relayed_verdict
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .map(|v| format!("{v:?}")),
+        report.drained,
+        report.abandoned,
+        report.undelivered_at_exit,
+        counters.copied_out,
+        counters.exported,
+        counters.export_failed,
+        counters.alpha_rejected,
+        counters.beta_queued,
+        counters.critical_panics,
+    );
+    let _ = std::io::stderr().flush();
+    print_cone_witness("facility-leg", &fixture.witness, terminal);
+    // The facility leg's own honesty bounds: the sweep must be a complete
+    // drain (every α record the cone sites published was delivered or
+    // counted), and the drain identity must hold.
+    assert!(report.drained, "the evidence leg's shutdown must drain");
+    assert_eq!(report.undelivered_at_exit, 0);
+    assert_eq!(
+        counters.copied_out + counters.beta_queued,
+        counters.exported + counters.export_failed + report.undelivered_at_exit,
+        "drain boundary identity (copied_out + beta_queued = exported + export_failed)"
+    );
 }
