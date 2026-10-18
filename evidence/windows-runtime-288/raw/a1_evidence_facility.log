@@ -1,0 +1,31 @@
+RUN_ID=a1_evidence_facility
+UTC=2026-10-18T04:55:53Z
+HEAD=fc81b68b9ebd1cf7624b217ad04872d12b3e0395
+BIN_SHA256=c8905686ded4bb417d895965b584f31cea24a553899b38aceb883569fe2c3979
+TARGET=x86_64-pc-windows-gnu
+OS=Windows 11 Pro build 26300 (real host)
+GATE=gate TESTS=o_cone_evidence_facility_leg (substring filter, own process)
+---
+
+running 1 test
+wasapi_tests.exe : [qianqian-wasapi] info ts_us=133471 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames 
+(shared, event-driven, engine SRC)
+所在位置 行:1 字符: 104
++ ... IO_LOG='1'; & 'C:\Users\fred1\AppData\Local\Temp\qn288\bin\wasapi_tes ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([qianqian-wasap...en, engine SRC):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[qianqian-wasapi] error ts_us=192068 render aborted: render loop panicked
+[cone-evidence facility-leg] terminal=Failed failure_diagnostic=Some("device") stop_requested=false 
+relayed_verdict=Some("Aborted { reason: Some(AbortReason { class: Panic, message: \"render loop panicked\" }) }") 
+shutdown(drained=true abandoned=false undelivered=0) counters(copied_out=2 exported=2 export_failed=0 alpha_rejected=0 
+beta_queued=0 critical_panics=0)
+[cone-evidence facility-leg] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=1 terminal=Failed 
+relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+test cone_oracle_tests::o_cone_evidence_facility_leg_witnesses_records_and_shutdown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.24s
+
+
+EXIT=0

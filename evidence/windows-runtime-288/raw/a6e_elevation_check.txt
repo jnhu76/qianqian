@@ -1,0 +1,97 @@
+False
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...00A0C922319...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...KTYPE_03&DE...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...DEV_0897&SU...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...KTYPE_02&DE...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...D_DEVICE\0000"):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...8000-00805F...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 
+Select-Object : 找不到属性“InstanceId”。
+所在位置 行:1 字符: 286
++ ... -Filter "PNPClass='MEDIA'" | Select-Object -ExpandProperty InstanceId
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Win32_PnPEntity...KTYPE_06&DE...):PSObject) [Select-Object]，PSArgument 
+   Exception
+    + FullyQualifiedErrorId : ExpandPropertyNotFound,Microsoft.PowerShell.Commands.SelectObjectCommand
+ 

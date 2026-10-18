@@ -1,0 +1,14 @@
+RUN_ID=a7_diagnostics_stderr_delivery_failure
+UTC=2026-10-18T05:21:03Z
+HEAD=bf1f9f3e3fd415d5028055a006c53c1219ceb57b
+TARGET=x86_64-pc-windows-gnu  OS=Windows 11 Pro build 26300
+---
+EXIT=0
+
+running 2 tests
+test broken_stderr_child_witness ... ok
+test a_broken_stderr_descriptor_is_counted_as_a_failed_delivery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+--- stderr ---

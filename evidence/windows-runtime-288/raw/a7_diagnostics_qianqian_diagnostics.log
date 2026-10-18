@@ -1,0 +1,14 @@
+RUN_ID=a7_diagnostics_qianqian_diagnostics
+UTC=2026-10-18T05:21:00Z
+HEAD=bf1f9f3e3fd415d5028055a006c53c1219ceb57b
+TARGET=x86_64-pc-windows-gnu  OS=Windows 11 Pro build 26300
+---
+Start-Process : 由于出现以下错误，无法运行此命令: 拒绝访问。。
+所在位置 行:1 字符: 6
++ $p = Start-Process -FilePath 'C:\Users\fred1\AppData\Local\Temp\qn288 ...
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Start-Process]，InvalidOperationException
+    + FullyQualifiedErrorId : InvalidOperationException,Microsoft.PowerShell.Commands.StartProcessCommand
+ 
+EXIT=0
+--- stderr ---

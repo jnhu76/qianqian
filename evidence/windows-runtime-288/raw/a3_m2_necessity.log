@@ -1,0 +1,17 @@
+RUN_ID=a3_m2_necessity
+UTC=2026-10-18T04:58:38Z
+HEAD=a53ffbf57480954129d88655d348b922dc6a8013
+BIN_SHA256=abfaf8d18ae0d91d1fdfd09a7611f3ebb28978a1868d3ae0c249c056f4eec341
+TARGET=x86_64-pc-windows-gnu
+OS=Windows 11 Pro build 26300 (real host)
+GATE=gate TESTS=o_cone_necessity EXTRA=
+---
+
+running 1 test
+test cone_oracle_tests::o_cone_necessity_the_real_cone_settles_without_an_external_stop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.14s
+
+--- stderr ---
+[cone-evidence o-cone-necessity] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=0 terminal=Failed relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+EXIT=0

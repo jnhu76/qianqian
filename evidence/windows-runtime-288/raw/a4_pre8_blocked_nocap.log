@@ -1,0 +1,20 @@
+ROW_ID=a4_pre8_blocked_nocap
+UTC=2026-10-18T05:16:12Z
+HEAD=bf1f9f3e3fd415d5028055a006c53c1219ceb57b
+BIN_SHA256=bd74338eccedccc25346698933426b7e0ea6c68d9f68cb83bcbbe3a381df5136
+PARAMS filter=a4_child_cone_injected mode=blocked gate=1 facility=0 hook='dg4b' volume_fault=0 extra='--nocapture'
+---
+===ROW_BEGIN===
+exit_code=-1
+duration_ms=90036
+timed_out=True
+--- stdout ---
+
+running 1 test
+test a4_sink_controls::a4_child_cone_injected ... [a4 premise] blocked-sink confirmed: flooding write #2 of 512 parked (counter frozen across the 400 ms observation window)
+[a4 hook] DG-4b posture installed (product shape)
+[a4 blocked] A4-POSTSWAP-CONTRACT RED: wait_terminal did not return within 15s â€?the diagnostic sink state changed the failure cone's progress (this is the expected N-01-class signature on a PRE-SWAP lane)
+
+--- stderr ---
+
+===ROW_END===

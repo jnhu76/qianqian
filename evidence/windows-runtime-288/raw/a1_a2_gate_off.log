@@ -1,0 +1,28 @@
+RUN_ID=a1_a2_gate_off
+UTC=2026-10-18T04:54:53Z
+HEAD=fc81b68b9ebd1cf7624b217ad04872d12b3e0395
+BIN_SHA256=c8905686ded4bb417d895965b584f31cea24a553899b38aceb883569fe2c3979
+TARGET=x86_64-pc-windows-gnu
+OS=Windows 11 Pro build 26300 (real host)
+GATE=nogate TESTS=cone_oracle_tests::o_cone_necessity cone_oracle_tests::o_cone_order_the_verdict
+---
+
+running 2 tests
+wasapi_tests.exe : [cone-evidence o-cone-necessity] reads=3 injected=true edge_cuts=2 verdict_reached=true 
+verdict_snapshot=1 terminal=Failed relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render 
+loop panicked" }) }
+所在位置 行:1 字符: 141
++ ... lyContinue; & 'C:\Users\fred1\AppData\Local\Temp\qn288\bin\wasapi_tes ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([cone-evidence ... panicked" }) }:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test cone_oracle_tests::o_cone_necessity_the_real_cone_settles_without_an_external_stop ... ok
+[cone-evidence o-cone-order] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=1 terminal=Failed 
+relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+test cone_oracle_tests::o_cone_order_the_verdict_becomes_visible_only_after_the_edge_cut ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.53s
+
+
+EXIT=0
