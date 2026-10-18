@@ -132,6 +132,7 @@ pub(crate) mod volume_apply_seam {
     type ApplyFn = fn(&IAudioStreamVolume, &[f32]) -> windows::core::Result<()>;
 
     static OVERRIDE: Mutex<Option<ApplyFn>> = Mutex::new(None);
+    static APPLY_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
     /// Arm a test override, or restore the real call with `None`.
     pub(crate) fn set_override(f: Option<ApplyFn>) {
@@ -140,7 +141,15 @@ pub(crate) mod volume_apply_seam {
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = f;
     }
 
+    /// Fires of the loop-top apply through this seam, this process. The #288
+    /// volume rows assert on this so "the faulted call actually executed" is
+    /// synchronization-observed, never a timing assumption.
+    pub(crate) fn apply_calls() -> usize {
+        APPLY_CALLS.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub(crate) fn apply(service: &IAudioStreamVolume, levels: &[f32]) -> windows::core::Result<()> {
+        APPLY_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let guard = OVERRIDE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());

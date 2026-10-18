@@ -23,10 +23,45 @@ AUDIO_DEVICE          = Realtek High Definition Audio (status OK; the open line'
                         (shared, event-driven, engine SRC)")
 BUILD_LANE            = cross-compiled in WSL2, executed on the real Windows host
                         via PowerShell (.NET Process pipes for sink control)
-BUILD_IDENTITY        = cargo test --no-run, debug profile; per-run BIN_SHA256 in
-                        each raw log
+BUILD_IDENTITY        = cargo test --no-run, debug profile; every cone/A4/A6 row
+                        record carries its own BIN_SHA256 (five A7-era receipts
+                        predate that field: a7_diagnostics_shutdown_admission,
+                        a7_diagnostics_stderr_delivery_failure,
+                        a7_qianqian_playback_suite, and the two superseded
+                        attempts listed under "Retained failed receipts")
 ELEVATION             = FALSE (non-admin session; matters only for A6-E)
 ```
+
+### Executed-source provenance (review addendum)
+
+The rows executed before the branch was finalized ran on uncommitted
+intermediate trees, and their `HEAD=` fields under-report that state. The
+binding identity for every row is its per-run `BIN_SHA256`; the tree chain is
+reconstructed as follows and was reviewer-verified against the object store:
+
+```text
+a1/a2/full-suite rows      HEAD field fc81b68 + dirty tree; the exact executed
+                           source was committed 33 s later as a53ffbf (object
+                           store; wasapi.rs byte-identical to branch 544ab17,
+                           cone_oracle_tests.rs differs by the later
+                           relay/witness evolution)
+a4/a6 rows (first binary)  a53ffbf + uncommitted a4_sink_controls.rs/seam
+a4/a6 rows (second binary) bf1f9f3e + the uncommitted a6 row (25 filtered out
+                           in its runner = 26 tests in that tree); bf1f9f3e +
+                           the landed a4/seam hunks = branch 76514dd (the
+                           wasapi.rs delta between them is a rustfmt-only join
+                           inside the cfg(test) seam)
+mutation/pre-swap hashes   mutation_base_hash.txt (433bd0ff) = fc81b68's
+                           wasapi.rs blob; preswap_branch_sha.txt (47225c68) =
+                           bf1f9f3e's wasapi.rs blob — both independently
+                           re-hashed from the worktree during review
+review-round rows          a4_vol1_healthy_postswap_v2, a4_vol0_healthy_postswap,
+                           a4_vol1_broken_gateoff_v2: HEAD = the delivered
+                           branch tip + the seam apply_calls counter only
+```
+
+Re-running a row from the delivered branch reproduces the CODE but not the
+historical binaries; the per-row BIN_SHA256 is the executed-truth anchor.
 
 Evidence levels used below (never mutually promoted):
 `WINDOWS_REAL_ENDPOINT` (a real device open occurred), `DETERMINISTIC_FAULT_INJECTION`
@@ -95,7 +130,7 @@ Post-swap rows (CURRENT implementation; sites #8/#9/#10 are class-α records):
 ```text
 ROW (raw log)                                 DRIVE      SINK     GATE  EXIT  SETTLE/TERMINAL                          ACCOUNTING
 a4_inj_healthy_postswap                       injected   healthy  on    0     33 ms / Failed                            #9+#8 rendered; drained, exported=2
-a4_inj_broken_postswap (dg4b)                 injected   broken   on    0     33 ms / Failed  (== healthy)             copied_out=2 export_failed=2 self_diag=1 critical_panics=1; drained
+a4_inj_broken_postswap (dg4b)                 injected   broken   on    0     16 ms / Failed  (== healthy)             copied_out=2 export_failed=2 self_diag=1 critical_panics=1; drained
 a4_inj_broken_postswap_defhook (dg4b arm had  injected   broken   on    0     33 ms / Failed  (== healthy)             copied_out=2 export_failed=2 self_diag=1 critical_panics=0
   not fired: true default hook — kept as the
   default-hook broken row)
@@ -107,18 +142,26 @@ a4_vol_blocked_postswap                       vol-stop   blocked  on    0     23
 a4_vol_broken_gateoff                         vol-stop   broken   off   0     21 ms / Stopped  (== healthy)            no site records (gate off)
 ```
 
-Terminal class / exit code / settle latency are identical across sink states —
-the T5-4/T5-5 claims hold on real Windows for all three sites, both drives,
-both gate states. Blocked rows document the residual exactly as scoped: the
+Terminal class and exit code are identical across sink states; settle latency
+stays same-scale (14–33 ms, run-to-run jitter of the same magnitude across
+sink states — a latency-identity claim is NOT made). The T5-4/T5-5 claims hold
+on real Windows for all three sites, both drives, both gate states. Blocked
+rows document the residual exactly as scoped: the
 DRAINER wedges inside the sink (its own export), shutdown is bounded-or-honest
 (abandoned at the deadline, undelivered counted, report attempted off-path),
 and producers stay isolated.
 
 Pre-swap controls (worktree builds restoring the verbatim `b86a9ce^` shapes;
-each restored byte-identical after its rows; all rows `--nocapture`):
+each restored byte-identical after its rows). The hazard rows require
+`--nocapture` (libtest capture would otherwise route the pre-swap `eprintln!`
+away from fd 2); `a4_pre8_healthy_control` ran WITH capture active
+(`extra=''`) as a capture-path control and is expected-green for that reason —
+the fd-2 healthy control is `a4_pre8_healthy_nocap_control`:
 
 ```text
 ROW (raw log)                       SITE   SINK     CONTROL/EXPECTED HAZARD                  OBSERVED
+a4_pre8_healthy_control             #8     healthy  capture-active control (eprintln         GREEN (Failed; eprintln went to the
+                                                    captured, not fd 2)                       capture buffer, no hazard reachable)
 a4_pre8_healthy_nocap_control       #8     healthy  control: settle normal                  GREEN (17 ms, Failed; eprintln wrote to real stderr)
 a4_pre8_broken_n01                  #8     broken   N-01: eprintln panics BEFORE stop/       RED at the 15 s bound, exit 101: "wait_terminal did not
                                              complete → both publications skipped            return within 15s" — the N-01 hang, bounded by the oracle
@@ -143,8 +186,34 @@ the only observable failure grade that is not device loss requires the device
 to refuse a legal value. The design names the seam as the one minimal
 injection (migration §7.3); it landed as `volume_apply_seam` — `cfg(test)`-only,
 no public API, no production indirection (non-test builds keep the direct COM
-call), armed only by the campaign children with a declared HRESULT. Negative
-controls: VF=0 vs VF=1 rows (record appears/disappears; terminal never moves).
+call), armed only by the campaign children with a declared HRESULT.
+
+**Seam-arm negative control, matched pair (review round)**: the first-round
+sentence pointed at VF=0 rows that ran on a PRE-SWAP lane binary — a
+cross-build inference, not the frozen decision-5 pair. The review round closed
+this with a dedicated seam-counter build (BIN `f4ca07cd…` = branch + an
+`apply_calls` counter in the seam) on the POST-SWAP volume-drive lane, same
+host/endpoint, same child, differing ONLY in the arm:
+
+```text
+ROW (raw log)                       VF   SINK     GATE  OBSERVED
+a4_vol1_healthy_postswap_v2         1    healthy  on    seam_apply_calls=1 (assert); #10 record
+                                                        rendered (E_INVALIDARG -2147024809);
+                                                        copied_out=3; Stopped; exit 0
+a4_vol0_healthy_postswap            0    healthy  on    seam_apply_calls=1 (the REAL SetAllVolumes
+                                                        executed through the same seam path);
+                                                        NO #10 record (copied_out=2); Stopped; exit 0
+a4_vol1_broken_gateoff_v2           1    broken   off   seam_apply_calls=1 (assert); premise proven
+                                                        in-child (os error 232); Stopped; exit 0
+```
+
+The pair establishes exactly decision 5: arm vs no-arm flips the #10 record's
+presence with the call path identical (`seam_apply_calls=1` in both) and the
+terminal never moving. The in-child `apply_calls` assert also converts the
+fault-firing premise from a timing assumption to a synchronization-observed
+fact in EVERY volume row, including the facility-silent gate-off lane
+(`a4_vol1_broken_gateoff_v2` supersedes `a4_vol_broken_gateoff`'s
+timing-only premise; the earlier row is retained as the historical record).
 
 **Observed residual, honestly scoped (NOT a writer-swap regression)**: with a
 BLOCKED sink and the DEFAULT panic hook and `--nocapture`
@@ -158,7 +227,11 @@ any emitting thread, machine_input.rs:217) eliminates it:
 `a4_inj_blocked_dg4b_nocapture` settles normally. Controls:
 `a4_inj_healthy_defhook_nocapture` green; with libtest capture active
 (no `--nocapture`) the default hook never touches fd 2 — a harness fact, not a
-product claim.
+product claim. (Receipts note: the two residual rows embed the shared child
+oracle's sentence "expected N-01-class signature on a PRE-SWAP lane"; that
+wording is stale for these rows — they are POST-SWAP binaries, keyed by
+blocked ∧ default hook ∧ nocapture as scoped here. The receipts are retained
+unedited.)
 
 ### A5 — N-01 FOUR-PREMISE OBSERVATION = PREMISES_CONFIRMED (pre-swap) / ELIMINATED (post-swap)
 
@@ -201,15 +274,24 @@ REAL cone/session/presentation on a real opened endpoint):
   `failure_diagnostic = "device: stream volume apply failed (device
   invalidated): 0x88890004"`. The full C1→C7 chain (EXECUTION_DAGS DAG-3) on
   real Windows; display did not bend the session authority (terminal class
-  unchanged by the reason's presence).
+  unchanged by the reason's presence). Receipt note: that row ran with the
+  facility off, so its own stderr is empty (the gate-gated open line is
+  unpublished there); the WINDOWS_REAL_ENDPOINT component — a real device
+  open on this host — is corroborated by the same-drive facility-on rows'
+  `opened: … engine SRC` records (e.g. `a4_vol1_healthy_postswap_v2`), not
+  displayed in the a6 receipt itself.
 
 A6-E (device-initiated abort on the real endpoint): `BLOCKED_ENVIRONMENT` —
 the host session is non-elevated (`raw/a6e_elevation_check.txt`:
 `IsInRole(Administrator) = False`); `Disable-PnpDevice` requires elevation,
 and autonomously triggering an interactive UAC prompt on the owner's desktop
-is out of scope. The pipeline row above opened the real endpoint (that part is
-WINDOWS_REAL_ENDPOINT); the device-INITIATED failure row stays honestly
-NOT_RUN/BLOCKED. An elevated owner rerun is the remaining gap.
+is out of scope. The probe itself is partially errored: its device-inventory
+step (`Select-Object InstanceId`) failed and no `Disable-PnpDevice` attempt
+was ever logged — the BLOCKED verdict rests on the elevation check alone,
+which is the gating condition. The pipeline row above opened the real
+endpoint (that part is WINDOWS_REAL_ENDPOINT); the device-INITIATED failure
+row stays honestly NOT_RUN/BLOCKED. An elevated owner rerun is the remaining
+gap.
 
 ### A7 — WINDOWS CLOSE PROTOCOL = PASS (WINDOWS_DEVICE_FREE_RUNTIME + subprocess witnesses)
 
@@ -291,9 +373,17 @@ CONFIRMED_PRODUCT_DEFECTS = 0 (current implementation; pre-swap hazards reproduc
 ORACLE_DEFECTS            = 0 (every oracle that fired red did so at its designed
                              bound with the designed signature; A3 matrix clean)
 PREMISE_REFUTATIONS       = 0 sink premises refuted (one harness self-correction
-                             before any row was recorded: the `-Hook none`
-                             convention bug — fixed, affected row renamed and kept
-                             as the genuine default-hook variant, then re-run)
+                             during the first rows: the `-Hook none` convention
+                             bug. Timeline, disclosed: two rows ran on the
+                             pre-fix binary 0d95a105 — `a4_inj_healthy_postswap`
+                             and the row now named
+                             `a4_inj_broken_postswap_defhook`, whose receipt
+                             header was annotated post-run; the former was
+                             re-run on the fixed binary, the latter was kept
+                             and re-labeled as the genuine default-hook broken
+                             variant it factually is (no hook-install line in
+                             its receipt). All rows after 05:06:30 UTC ran the
+                             fixed binary)
 ```
 
 ## Claim ceiling (what this round does NOT claim)
@@ -309,3 +399,28 @@ PREMISE_REFUTATIONS       = 0 sink premises refuted (one harness self-correction
   in the non-test build `wasapi.rs` gains only the inlined
   `apply_stream_volume` wrapper whose `cfg(not(test))` body is the identical
   direct COM call it replaced — no gate, no branch, no state.
+
+## Retained failed/superseded receipts (explained, kept for honesty)
+
+```text
+a7_qianqian_app_suite.log        first attempt at the headless-app suite row:
+                                 Start-Process refused the file ("%1 is not a
+                                 valid Win32 application" — the wrong artifact
+                                 was passed); superseded by
+                                 a7_qianqian_playback_suite.log
+a7_diagnostics_qianqian_diagnostics.log
+                                 first attempt at the diagnostics unit row:
+                                 Start-Process access-denied (transient file
+                                 lock); superseded by a7_diagnostics_units.log
+full_suite.log                   first full-suite attempt: runner passed a
+                                 malformed --skip argument, exit 101 before any
+                                 test ran; superseded by
+                                 full_suite_gate_on.log (23/23 green)
+a1_a2_first_run.log              first execution of the two cone oracles (2/2
+                                 green, 22-test tree) before the gate
+                                 parameterization and witness rows existed;
+                                 superseded by the gate on/off v2 rows
+binary_identity.txt              a convenience listing of one earlier build;
+                                 its exe hash matches no executed row — the
+                                 per-row BIN_SHA256 fields are the anchors
+```

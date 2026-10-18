@@ -331,11 +331,23 @@ fn a4_child_cone_volume_stop() {
     };
     let stopped_in = started.elapsed();
     crate::wasapi::volume_apply_seam::set_override(None);
+    // The fault premise is synchronization-observed, not a timing
+    // assumption: the loop-top apply must have executed through the seam at
+    // least once (faulted when armed, real when not) — read AFTER the stop
+    // settled, across the cone's own happens-before.
+    let seam_calls = crate::wasapi::volume_apply_seam::apply_calls();
     row(&format!(
         "[a4 {mode_name}] stopped-episode settled in {stopped_in:?}: terminal={terminal:?} \
+         seam_apply_calls={seam_calls} volume_fault_armed={} \
          (healthy expectation: Stopped; a Failed here is the pre-swap #9/#10 \
-         misattribution signature)"
+         misattribution signature)",
+        flag("QIANQIAN_A4_VOLUME_FAULT")
     ));
+    assert!(
+        seam_calls >= 1,
+        "A4-POSTSWAP-CONTRACT RED ({mode_name}): the loop-top volume apply never executed \
+         through the seam — the #10 arm's premise is unfounded in this row"
+    );
     assert_eq!(
         terminal,
         EpisodeTerminalOutcome::Stopped,
