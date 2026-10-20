@@ -538,6 +538,18 @@ pub enum OutputBehavior {
     /// session episode, its gate can never park again, and no decode
     /// worker exists yet (activation never got that far).
     OpenTimeoutAbort,
+    /// Open SUCCEEDS with a seek hold already routed: the open window is
+    /// the rendezvous. The double signals `seek_plant_window.0` once
+    /// inside `open_stream` (`bind_stop_target` has run), waits for the
+    /// driving test's REAL `request_seek` to return on
+    /// `seek_plant_window.1` (the plant + hold routing completed inside
+    /// the admission unit), and only then spawns the leg, whose FIRST
+    /// loop-top sees the routed hold and parks deterministically. The
+    /// armed tail probe proves the park; the stream is handed to the
+    /// session unchanged, so a later activation raise exercises the
+    /// session teardown relation (`release_pause_gate` then
+    /// `stop_and_join`) on a genuinely parked leg.
+    OpenAfterSeekPlant,
 }
 
 pub type CommittedOffsets = Arc<Mutex<Vec<(Option<u64>, usize)>>>;
@@ -580,6 +592,12 @@ pub struct TestOutput {
     /// precondition of the never-activated oracle.
     pub open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
     pub lifecycle: StreamLifecycle,
+    /// Establishment-window rendezvous for
+    /// [`OutputBehavior::OpenAfterSeekPlant`] only (`None` otherwise):
+    /// (window-open signal to the driving test, plant latch from it —
+    /// sent after the real `request_seek` returned). The receiver is
+    /// only touched inside `open_stream` on the activation thread.
+    pub seek_plant_window: Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
     /// On-leg commit receipt paired with the next submission index. This
     /// test observation is not a new product acknowledgement or authority.
     pub committed_offsets: CommittedOffsets,
@@ -618,6 +636,33 @@ impl TestOutput {
             tail_probe: TailProbe::default(),
             open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             lifecycle: StreamLifecycle::default(),
+            seek_plant_window: None,
+            committed_offsets: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// [`TestOutput::observed_with_tail`] with the establishment-window
+    /// rendezvous for [`OutputBehavior::OpenAfterSeekPlant`]: see that
+    /// variant. `lifecycle` is caller-owned so the test can witness the
+    /// later `stop_and_join`; the window channels are the rendezvous
+    /// owned by the driving test.
+    pub fn open_after_seek_plant(
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+        device_tail: DeviceTail,
+        tail_probe: TailProbe,
+        lifecycle: StreamLifecycle,
+        window: (std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>),
+    ) -> TestOutput {
+        TestOutput {
+            behavior: OutputBehavior::OpenAfterSeekPlant,
+            consumed,
+            consumed_values: Arc::new(Mutex::new(Vec::new())),
+            consumed_values_ch1: Arc::new(Mutex::new(Vec::new())),
+            device_tail,
+            tail_probe,
+            open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            lifecycle,
+            seek_plant_window: Some(window),
             committed_offsets: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -676,6 +721,7 @@ impl TestOutput {
             tail_probe,
             open_abort_engaged,
             lifecycle: StreamLifecycle::default(),
+            seek_plant_window: None,
             committed_offsets: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -865,6 +911,62 @@ impl AudioOutput for TestOutput {
                 Err(OutputError {
                     message: "test open timeout abort".to_owned(),
                 })
+            }
+            OutputBehavior::OpenAfterSeekPlant => {
+                // The establishment-window rendezvous: signaling the
+                // window implies `bind_stop_target` already ran, so the
+                // driving test's REAL `request_seek` finds its stop
+                // target; the plant latch returning implies the admission
+                // unit completed (slot planted + hold routed inside its
+                // lock hold). The 10s deadline is a fail-fast premise
+                // watchdog, never an ordering edge.
+                let (window_tx, plant_rx) = self
+                    .seek_plant_window
+                    .as_ref()
+                    .expect("OpenAfterSeekPlant needs a seek-plant window");
+                let _ = window_tx.send(());
+                assert!(
+                    plant_rx.recv_timeout(Duration::from_secs(10)).is_ok(),
+                    "the driving test never completed its seek plant"
+                );
+                let RenderRequest {
+                    input,
+                    drain,
+                    gate,
+                    position,
+                    level: _,
+                    format: _,
+                } = request;
+                // Spawn only AFTER the plant: the leg's FIRST loop-top
+                // observes the routed hold and parks deterministically
+                // (a legal production interleaving — a plant between
+                // `bind_stop_target` and the worker spawn — pinned by a
+                // test-controlled edge; production does not guarantee
+                // this order).
+                let thread = spawn_test_leg(
+                    input.clone(),
+                    gate.clone(),
+                    drain,
+                    position,
+                    None,
+                    None,
+                    self,
+                )
+                .map_err(|e| OutputError {
+                    message: format!("test render spawn failed: {e}"),
+                })?;
+                // Park premise: the gate calls the armed observation only
+                // from inside a park, after `SeekEngaged`.
+                assert!(
+                    self.tail_probe.wait_held_within(Duration::from_secs(5)),
+                    "the seek-planted leg never parked at the gate"
+                );
+                Ok(Box::new(TestStream {
+                    input,
+                    thread: Some(thread),
+                    gate,
+                    lifecycle: self.lifecycle.clone(),
+                }) as Box<dyn RenderStream>)
             }
             OutputBehavior::Consume
             | OutputBehavior::SlowConsume { .. }
