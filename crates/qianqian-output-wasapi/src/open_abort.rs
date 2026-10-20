@@ -44,7 +44,9 @@ pub(crate) fn abort_render_thread(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qianqian_audio_api::ports::{GateEvent, GateSlice, PcmPull, TailProbeOutcome};
+    use qianqian_audio_api::ports::{
+        GateEvent, GateSlice, PcmPull, SeekParkRelease, TailProbeOutcome,
+    };
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
     use std::sync::{Condvar, Mutex};
@@ -157,6 +159,136 @@ mod tests {
             "the leg did not exit through its expected post-park path: the \
              abort join swallows a panicked leg, so only this witness \
              proves a normal exit"
+        );
+    }
+
+    /// Given a seek hold routed before any leg exists (the pre-worker
+    /// establishment window's plant shape: `set_seek_hold(true)` inside
+    /// the admission unit), and a leg whose first loop-top therefore
+    /// seek-parks, when the open abort runs, then the permanent close must
+    /// release the parked leg BEFORE the join, the leg must exit through
+    /// its normal post-park path (not a panic the abort join swallows),
+    /// and the gate must record exactly one seek engagement and one
+    /// disengagement.
+    ///
+    /// PROPERTY / AUTHORITY: the D14.7 open-abort order pinned at the real
+    /// [`abort_render_thread`] for the SEEK attribution (D14.5 owns the
+    /// seek park itself; the pause-attribution fixtures in this module
+    /// cover the pause park). A seek hold has no other discharge on the
+    /// open-failure path: no decode worker exists (no exit funnel) and
+    /// the session's teardown release is registered only after a
+    /// successful open.
+    ///
+    /// REACHABILITY QUALIFIER (E2-C1 Stage 0, #298): a seek-parked leg at
+    /// abort-close is production-reachable in the open-failure family
+    /// only through the late-success-after-timeout race (a leg aborted on
+    /// the Failed verdict never reaches its first gate visit). This
+    /// fixture constructs the parked posture at the protocol seam; it
+    /// does not claim every aborted leg parked.
+    ///
+    /// FALSIFIER (executed negative control, M-h): delete the
+    /// `close_and_release` call in `abort_render_thread` and this test
+    /// wedges at the join watchdog — no releaser exists on any schedule
+    /// in this fixture world. Claim ceiling: that mutant reds the join
+    /// watchdog before the post-join assertions, so it validates the
+    /// close-before-join property, not the exit witness or the release
+    /// payload (those are guarded by construction and inspection).
+    #[test]
+    fn aborting_a_seek_parked_leg_releases_the_gate_before_the_join() {
+        // Given: a seek hold routed before the leg exists (the
+        // pre-worker window's plant shape).
+        let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorder = events.clone();
+        let gate = RenderGate::with_observer(move |event| {
+            recorder.lock().expect("events lock").push(event);
+        });
+        let _gate_release = ReleaseGateOnDrop(gate.clone());
+        gate.set_seek_hold(true);
+
+        // When: the steady loop's first gate visit parks on that hold.
+        let releases = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let (exit_tx, exit_rx) = mpsc::channel();
+        let leg = {
+            let gate = gate.clone();
+            let releases = releases.clone();
+            std::thread::spawn(move || {
+                gate.park_loop_top(|slice| match slice {
+                    GateSlice::TailProbe => TailProbeOutcome::Pending,
+                    GateSlice::SeekRelease(release) => {
+                        releases.lock().expect("release log").push(release);
+                        TailProbeOutcome::Pending
+                    }
+                });
+                // Normal-exit witness: sent ONLY past the expected
+                // post-park exit. abort_render_thread swallows a panicked
+                // leg (`let _ = handle.join()`), so join success alone
+                // cannot tell a normal exit from a panic; the post-join
+                // assert on this witness turns an abnormal exit into a
+                // test failure instead of a silent pass.
+                let _ = exit_tx.send(());
+            })
+        };
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
+        let parked = {
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::SeekEngaged)
+                {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(parked, "the leg never seek-parked at the gate");
+
+        // Then: the abort's close releases the seek park before its join.
+        let input: Arc<dyn RenderPcmInput> = Arc::new(IdleInput);
+        join_within(Duration::from_secs(5), move || {
+            abort_render_thread(leg, &input, &gate)
+        });
+
+        // Settlement boundary: the abort joined the leg, so its exit is
+        // final; only this witness separates a normal exit from a panic
+        // the join swallowed.
+        assert_eq!(
+            exit_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg did not exit through its expected post-park path"
+        );
+        // One park cycle, one disengagement: the closed exit consumed the
+        // synthesized abort release. (This fixture has a single loop-top
+        // visit, so it does not itself witness a re-park attempt; the
+        // closed-gate immunity is pinned by the hostile-re-pause fixture
+        // below, where the leg is forced around another visit.)
+        let recorded = events.lock().expect("events lock");
+        assert_eq!(
+            *releases.lock().expect("release log"),
+            vec![SeekParkRelease::Aborted],
+            "the closed exit must consume exactly the synthesized abort release"
+        );
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|e| **e == GateEvent::SeekEngaged)
+                .count(),
+            1,
+            "exactly one seek engagement: {recorded:?}"
+        );
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|e| **e == GateEvent::SeekDisengaged)
+                .count(),
+            1,
+            "the seek-parked leg disengaged exactly once: {recorded:?}"
         );
     }
 
