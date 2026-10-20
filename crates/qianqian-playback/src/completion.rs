@@ -749,8 +749,14 @@ impl SessionCompletion {
             // The cut's park routes INSIDE this hold, so it can never
             // lag the plant: the worker-exit cleanup always finds and
             // releases exactly what an internal record routed.
-            self.state.gate.set_seek_hold(true);
+            self.route_new_seek_hold();
         }
+    }
+
+    fn route_new_seek_hold(&self) {
+        #[cfg(all(test, not(loom)))]
+        test_sync::pause_before_seek_hold_route(self);
+        self.state.gate.set_seek_hold(true);
     }
 
     /// The decode worker's loop-top pickup: take the planted command, if
@@ -1432,13 +1438,15 @@ pub(crate) mod test_sync {
         pub(crate) slot_in_flight: bool,
     }
 
-    /// Which real suspension point a fence covers. Both are windows a
+    /// Which real suspension point a fence covers. These are windows a
     /// lock-holding fixture cannot populate; each is keyed by its own
     /// site so one arming never displaces the other (E1-WORKER W4).
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum Site {
         /// `request_seek`: after the Open sample, before the second hold.
         SeekStraddle,
+        /// `request_seek`: immediately before routing the newly planted hold.
+        SeekRoute,
         /// `request_stop`: after intent recording, before this request's
         /// own data-plane stop.
         StopWindow,
@@ -1536,6 +1544,19 @@ pub(crate) mod test_sync {
             }
         }
 
+        pub(crate) fn spawn_at_seek_route(
+            completion: &SessionCompletion,
+            target: Duration,
+        ) -> FencedRequest {
+            let fence = arm_seek_route(completion);
+            let completion = completion.clone();
+            let requester = std::thread::spawn(move || completion.request_seek(target));
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
         /// [`FencedRequest::spawn`] for the stop window: the real
         /// `request_stop` parks between recording intent and running its
         /// own data-plane stop.
@@ -1597,6 +1618,10 @@ pub(crate) mod test_sync {
         arm_at(completion, Site::StopWindow)
     }
 
+    fn arm_seek_route(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::SeekRoute)
+    }
+
     fn arm_at(completion: &SessionCompletion, site: Site) -> Fence {
         let (parked_tx, parked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -1626,14 +1651,19 @@ pub(crate) mod test_sync {
     }
 
     /// The recorded suspension point. Inert unless a fence is armed for
-    /// this exact completion and site, and never called with any lock
-    /// held: the publications that must land inside the window have to
-    /// be able to run while the request parks here. The arrival send
+    /// this exact completion and site. SeekStraddle and StopWindow hold
+    /// no lock because their counterpart publication must enter the window;
+    /// SeekRoute deliberately preserves whether the production route helper
+    /// is still under the completion lock. The arrival send
     /// cannot block the request; the release receive ends on an explicit
     /// release or on the arming test dropping its handle (unwinding
     /// included).
     pub(super) fn pause_between_open_sample_and_second_hold(completion: &SessionCompletion) {
         pause_at(completion, Site::SeekStraddle);
+    }
+
+    pub(super) fn pause_before_seek_hold_route(completion: &SessionCompletion) {
+        pause_at(completion, Site::SeekRoute);
     }
 
     /// [`pause_between_open_sample_and_second_hold`] for the
@@ -1722,6 +1752,79 @@ pub(crate) mod tests {
             "duplicate release callback: {captured:?}"
         );
         captured.pop()
+    }
+
+    #[cfg(not(loom))]
+    fn observe_post_cleanup_render_leg(
+        completion: &SessionCompletion,
+    ) -> Result<qianqian_audio_api::ports::ParkOutcome, &'static str> {
+        struct LegCleanup {
+            gate: RenderGate,
+            leg: Option<std::thread::JoinHandle<()>>,
+        }
+
+        impl LegCleanup {
+            fn finish(&mut self) {
+                self.gate.close_and_release();
+                if let Some(leg) = self.leg.take() {
+                    leg.join()
+                        .expect("render leg joined after oracle observation");
+                }
+            }
+        }
+
+        impl Drop for LegCleanup {
+            fn drop(&mut self) {
+                self.gate.close_and_release();
+                if let Some(leg) = self.leg.take() {
+                    let _ = leg.join();
+                }
+            }
+        }
+
+        let gate = completion.render_gate();
+        let leg_gate = gate.clone();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (returned_tx, returned_rx) = std::sync::mpsc::channel();
+        let leg = std::thread::spawn(move || {
+            started_tx.send(()).expect("leg start witness");
+            let outcome = leg_gate.park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => TailProbeOutcome::Pending,
+                GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
+            });
+            returned_tx.send(outcome).expect("leg return witness");
+        });
+        let mut cleanup = LegCleanup {
+            gate: gate.clone(),
+            leg: Some(leg),
+        };
+        started_rx.recv().expect("render leg started");
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let observation = loop {
+            if let Ok(outcome) = returned_rx.try_recv() {
+                break Ok(outcome);
+            }
+            if completion
+                .state
+                .state
+                .lock()
+                .expect("completion lock")
+                .seek_engaged
+            {
+                break Err("SeekEngaged after worker cleanup");
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "render-leg oracle watchdog expired without return or park evidence"
+            );
+            std::thread::yield_now();
+        };
+
+        // Emergency process hygiene, after the property verdict is captured.
+        // This release cannot turn Err into Ok and is not credited to MC-P1.
+        cleanup.finish();
+        observation
     }
 
     /// S6-F01: one consumer can hold a fetched chunk while the ring is
@@ -2006,6 +2109,109 @@ pub(crate) mod tests {
             assert_eq!(consume_release(&completion.render_gate()), None);
             assert_eq!(completion.seek_protocol_state(), (false, false, None));
         });
+    }
+
+    /// MC-P1/MC-P2/MC-P3 dual-arm oracle (#298 M-c gate).
+    ///
+    /// PROPERTY: an internally planted seek's hold routing is part of the
+    /// completion-lock admission unit. Worker exit cleanup cannot finish and
+    /// then be followed by a newly routed hold whose resolver is gone.
+    ///
+    /// PRECONDITION / DAG: the request is fenced at the actual hold-routing
+    /// helper, after plant/evidence reset and immediately before the real gate
+    /// call. A non-blocking completion-lock probe selects the only reachable
+    /// schedule: baseline still owns the lock, so routing finishes before worker
+    /// cleanup; moving only the helper call outside the lock lets the real worker
+    /// cleanup join before routing is released. Lock availability constructs the
+    /// schedule; it is not the property oracle.
+    ///
+    /// OBSERVATION: after both calls return, the slot/command and D11 read side
+    /// are sampled, then a real RenderGate leg visits loop-top. Proceeded is the
+    /// only legal outcome. SeekEngaged is a persistent witness that a late hold
+    /// stranded the leg; emergency close happens only after that verdict.
+    ///
+    /// FALSIFIER: move only `route_new_seek_hold()` outside the completion-lock
+    /// scope. Its operation-local fence moves with the real routing call, and the
+    /// same test must observe SeekEngaged after joining the emergency-released leg.
+    #[cfg(not(loom))]
+    #[test]
+    fn worker_exit_cleanup_cannot_be_followed_by_late_seek_hold_routing() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(2, 8));
+            completion.bind_stop_target(edge.clone());
+            let mut request =
+                test_sync::FencedRequest::spawn_at_seek_route(&completion, Duration::from_secs(7));
+            request.wait_parked();
+            let slot = completion.state.seek_slot.lock().expect("seek slot lock");
+            assert!(slot.in_flight, "the route fence observed no seek plant");
+            assert_eq!(slot.command, Some(Duration::from_secs(7)));
+            drop(slot);
+
+            // Scheduling probe only. It runs while the request is parked and
+            // before the worker exists, so there is no competing acquisition:
+            // baseline deterministically reports occupied-by-request, whereas
+            // M-c deterministically exposes the newly unlocked interval.
+            let cleanup_before_routing = match completion.state.state.try_lock() {
+                Ok(guard) => {
+                    drop(guard);
+                    true
+                }
+                Err(std::sync::TryLockError::WouldBlock) => false,
+                Err(std::sync::TryLockError::Poisoned(_)) => {
+                    panic!("completion lock poisoned during scheduling probe")
+                }
+            };
+
+            std::thread::scope(|scope| {
+                let worker_exit = scope.spawn(|| {
+                    completion.worker_exited(EdgeTerminal::Eof);
+                    completion.abort_stranded_seek();
+                });
+                if cleanup_before_routing {
+                    worker_exit.join().expect("worker exit cleanup returned");
+                    request.release();
+                    request.join();
+                } else {
+                    request.release();
+                    request.join();
+                    worker_exit.join().expect("worker exit cleanup returned");
+                }
+            });
+
+            assert!(
+                !completion.seek_in_flight(),
+                "worker exit cleanup must clear the planted slot"
+            );
+            assert_eq!(completion.take_seek_command(), None);
+            assert_eq!(completion.seek_protocol_state(), (false, false, None));
+            assert_eq!(
+                completion.observe_snapshot().terminal_outcome,
+                None,
+                "seek plant/cleanup must not forge a terminal Fact"
+            );
+
+            let observation = observe_post_cleanup_render_leg(&completion);
+            assert_eq!(
+                observation,
+                Ok(qianqian_audio_api::ports::ParkOutcome::Proceeded),
+                "cleanup completed before a late hold routed; no live resolver can release it"
+            );
+        });
+    }
+
+    /// Independent negative control for the post-cleanup leg detector. It
+    /// deliberately routes a hold through the real gate, confirms the shared
+    /// detector reports SeekEngaged, and only then performs emergency cleanup.
+    #[cfg(not(loom))]
+    #[test]
+    fn mc_oracle_negative_control_detects_a_stranded_seek_park() {
+        let completion = SessionCompletion::new();
+        completion.render_gate().set_seek_hold(true);
+        assert_eq!(
+            observe_post_cleanup_render_leg(&completion),
+            Err("SeekEngaged after worker cleanup")
+        );
     }
 
     /// Executable cleanup witness for the failure-path contract: a body
