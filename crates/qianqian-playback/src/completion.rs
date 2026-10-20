@@ -2115,11 +2115,12 @@ pub(crate) mod tests {
 
     /// Every frozen acceptance condition fails closed: no data plane,
     /// a non-Open edge (EOF drain window, failed edge), recorded stop
-    /// intent, the teardown release, and a settled episode each leave
-    /// the slot unoccupied — and a PAUSED episode is seekable (positive
-    /// control: pause intent is not an acceptance condition). The
-    /// sequential teardown case covers H1; the straddling test below
-    /// isolates H2 after H1 passed and the edge was sampled Open.
+    /// intent, the teardown release, a recorded activation failure, and
+    /// a settled episode each leave the slot unoccupied — and a PAUSED
+    /// episode is seekable (positive control: pause intent is not an
+    /// acceptance condition). The sequential teardown case covers H1; the
+    /// straddling test below isolates H2 after H1 passed and the edge was
+    /// sampled Open.
     #[cfg(not(loom))]
     #[test]
     fn seek_acceptance_fails_closed_on_every_frozen_condition() {
@@ -2161,6 +2162,47 @@ pub(crate) mod tests {
         assert!(
             !completion.seek_in_flight(),
             "a seek after the teardown release must never plant"
+        );
+
+        // A recorded activation failure: an episode that never
+        // established has no resolver, so a request fails closed at both
+        // holds. The failure is a diagnostic, not a terminal Fact (D11
+        // activation firewall).
+        //
+        // Claim ceiling: this sequential row does NOT mutation-pin either
+        // hold independently — deleting EITHER single conjunct still
+        // leaves the other hold rejecting the request, so the row pins
+        // only the conjunction. Full H1/H2 straddle coverage would need a
+        // separate controlled between-holds fixture and is NOT_PROVEN
+        // here.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.activation_failed("render stream open failed: test");
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            !completion.seek_in_flight(),
+            "a seek on a never-established episode must never plant"
+        );
+        assert_eq!(
+            completion.take_seek_command(),
+            None,
+            "the rejected request planted no command"
+        );
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            None,
+            "an activation failure is not a terminal Fact"
+        );
+
+        // Positive control for the row above: the same Open edge and
+        // binding WITHOUT the recorded failure accepts, so the rejection
+        // is attributable to the failure and not to the fixture shape.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            completion.seek_in_flight(),
+            "the same open edge without an activation failure accepts"
         );
 
         // A settled episode: decode failure settles synchronously, and
