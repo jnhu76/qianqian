@@ -956,11 +956,22 @@ impl AudioOutput for TestOutput {
                     message: format!("test render spawn failed: {e}"),
                 })?;
                 // Park premise: the gate calls the armed observation only
-                // from inside a park, after `SeekEngaged`.
-                assert!(
-                    self.tail_probe.wait_held_within(Duration::from_secs(5)),
-                    "the seek-planted leg never parked at the gate"
-                );
+                // from inside a park, after `SeekEngaged`. If the premise
+                // fails, no TestStream exists to own this leg, so the
+                // failure path must tear it down before panicking: a
+                // detached join handle may be blocked in `read_frames` on
+                // an empty edge, which a gate close alone cannot wake,
+                // and a surviving leg would be attributed to a later
+                // test's leak oracle. Same order as the open-abort
+                // protocol — close, release the probe hold, stop the
+                // data plane, join.
+                if !self.tail_probe.wait_held_within(Duration::from_secs(5)) {
+                    gate.close_and_release();
+                    self.tail_probe.unhold();
+                    input.stop();
+                    let _ = thread.join();
+                    panic!("the seek-planted leg never parked at the gate");
+                }
                 Ok(Box::new(TestStream {
                     input,
                     thread: Some(thread),
