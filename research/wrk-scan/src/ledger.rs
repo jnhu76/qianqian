@@ -1,5 +1,7 @@
 //! Dual ledgers for the independent oracle (SPEC §6.1, APP-A `ledger.rs`,
-//! file SHA256 33d154de…, reused verbatim).
+//! file SHA256 33d154de…): a semantics-identical reuse (rustfmt/clippy
+//! normalization + a `Default` impl), behavior guarded by the frozen
+//! fixture and golden tests.
 //!
 //! A. RAW_EFFECT_LOG — appended at real effect boundaries by executor
 //!    code (never "I am done" self-reports: each record corresponds to a
