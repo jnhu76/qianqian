@@ -1,0 +1,12 @@
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/ledger.rs:86:
+ impl Ledger {
+     pub fn new() -> Self {
+         Ledger {
+-            inner: Mutex::new(LedgerState { next_seq: 1, records: Vec::new() }),
++            inner: Mutex::new(LedgerState {
++                next_seq: 1,
++                records: Vec::new(),
++            }),
+         }
+     }
+ 
