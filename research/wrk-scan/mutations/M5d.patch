@@ -1,0 +1,33 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -281,16 +281,28 @@
+     /// the fan-in aggregate and the quiescence receipt as the LAST
+     /// record. Requires settlement.
+     pub fn await_quiescence(&mut self) -> Result<SessionStats, SessionError> {
+-        let stats = self.join_workers();
++        // MUTANT M5: publish quiescence while worker 4 is still parked —
++        // the receipt precedes the join.
++        {
++            let mut st = self.shared.state.lock().unwrap();
++            while st.m5_parked.is_none() {
++                st = self.shared.settle_cv.wait(st).unwrap();
++            }
++        }
+         let mut sorted = {
+             let st = self.shared.state.lock().unwrap();
+-            debug_assert!(st.pending.is_empty(), "quiescence requires settlement");
+             st.results.clone()
+         };
+         sorted.sort_by_key(|(id, _)| *id);
+         let agg = workload::aggregate(&sorted);
+         self.sink.aggregate(agg);
+         self.sink.quiescence_receipt();
++        {
++            let mut st = self.shared.state.lock().unwrap();
++            st.m5_release = true;
++        }
++        self.shared.settle_cv.notify_all();
++        let stats = self.join_workers();
+         Ok(stats)
+     }
+ 

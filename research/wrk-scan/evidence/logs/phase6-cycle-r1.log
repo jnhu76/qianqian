@@ -1,0 +1,14 @@
+A-green rc=101 VIOLATION (clean arm failed)
+M1 rc=101 VIOLATION (RED but designated O1_terminal_coverage not among: )
+M2 rc=101 VIOLATION (RED but designated O2_exactly_once_effects not among: )
+M3 rc=101 VIOLATION (RED but designated O4_no_effect_after_item_terminal not among: )
+M4 rc=101 VIOLATION (RED but designated O5_abandon_legitimacy not among: )
+M5 rc=101 VIOLATION (RED but designated O6_executors_joined_before_quiescence not among: )
+M6 rc=101 VIOLATION (RED but designated O3_content_vs_ref not among: )
+M7 rc=101 VIOLATION (RED but designated O7_no_admission_after_cancel not among: )
+M8 rc=101 VIOLATION (RED but designated O2_exactly_once_effects not among: )
+M9 rc=101 VIOLATION (RED but designated O3_content_vs_ref not among: )
+C-green rc=101 VIOLATION (clean arm failed)
+rc_legend: MET = green arm green / mutant arm RED with designated check
+total violations: 11
+worktree src/tests status: 2 entries (0 = untouched)

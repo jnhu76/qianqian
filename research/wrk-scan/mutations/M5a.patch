@@ -1,0 +1,12 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -115,6 +115,9 @@
+     admitted_total: usize,
+     results: Vec<(u32, u64)>,
+     panic_defect: Option<SessionError>,
++    /// MUTANT M5: parked-worker hold (defect machinery).
++    m5_parked: Option<u64>,
++    m5_release: bool,
+ }
+ 
+ struct Shared {

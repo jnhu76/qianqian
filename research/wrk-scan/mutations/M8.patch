@@ -1,0 +1,13 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -486,7 +486,9 @@
+         }
+     }
+     let s = &spec.items[item_id as usize];
+-    if s.wait_us > 0 {
++    if s.wait_us > 0 && item_id != 25 {
++        // MUTANT M8: item 25's synthetic wait and its IoWaitDone effect
++        // are both omitted.
+         // Synthetic logical I/O wait — a workload parameter (simulated
+         // pacing), never a synchronization premise (SPEC §3.2).
+         std::thread::sleep(Duration::from_micros(s.wait_us));

@@ -1,0 +1,14 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -227,8 +227,10 @@
+             // land in the window before the cut check; the re-check below
+             // is what makes the linearization observable.
+             h0_fence_park!("admit_pre_cut", st, &self.shared.state);
+-            if st.cancelled_groups.contains(&group) {
++            if st.cancelled_groups.contains(&group) && id != 27 {
+                 // Cut: the item stays Offered with no terminal obligation.
++                // (MUTANT M7: group-7 item 27 is admitted after the
++                // group cancel record.)
+                 drop(st);
+                 continue;
+             }

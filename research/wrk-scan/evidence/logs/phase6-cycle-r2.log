@@ -1,0 +1,86 @@
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+The text leading up to this was:
+--------------------------
+|--- a/src/h0.rs
+|+++ b/src/h0.rs
+--------------------------
+File to patch: 
+Skip this patch? [y] 
+1 out of 1 hunk ignored
+A-green rc=101 VIOLATION (clean arm failed)
+M1 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M1.patch
+M2 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M2.patch
+M3 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M3.patch
+M4 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M4.patch
+M5 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M5a.patch
+M6 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M6.patch
+M7 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M7.patch
+M8 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M8.patch
+M9 PATCH-FAILED on /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/mutations/M9.patch
+C-green rc=101 VIOLATION (clean arm failed)
+rc_legend: MET = green arm green / mutant arm RED with designated check
+total violations: 11
+worktree src/tests modifications: 0 entries (0 = untouched)

@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/mutation_harness.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/mutation_harness-26292b178c2c4d49)
+
+running 1 test
+ADMITTED=40 JOINED=4
+  O1_terminal_coverage                       PASS
+  O2_exactly_once_effects                    PASS
+  O3_content_vs_ref                          PASS
+  O4_no_effect_after_item_terminal           PASS
+  O5_abandon_legitimacy                      PASS
+  O6_executors_joined_before_quiescence      PASS
+  O7_no_admission_after_cancel               PASS
+  O8_batch_isolation                         PASS
+  O9_fanin_after_all_terminals               PASS
+  O10_no_effect_after_quiescence             PASS
+VERDICT = GREEN
+test probe_batch_oracle_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+

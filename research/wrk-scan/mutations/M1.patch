@@ -1,0 +1,23 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -235,11 +235,15 @@
+             // Admit: record, enqueue, take the obligation — all under the
+             // same cancel-order critical section.
+             self.sink.admit(id, group, 0);
+-            st.queue.push_back(id);
+-            st.pending.insert(id);
+-            st.admitted_not_terminal += 1;
+-            st.admitted_total += 1;
+-            st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            if id != 20 {
++                // MUTANT M1: item 20's admitted obligation is silently
++                // lost — never queued, never tracked, never terminal.
++                st.queue.push_back(id);
++                st.pending.insert(id);
++                st.admitted_not_terminal += 1;
++                st.admitted_total += 1;
++                st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            }
+             drop(st);
+             self.shared.work_cv.notify_one();
+             // (E) workload-owned cancel milestone: admission-count based,

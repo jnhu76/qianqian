@@ -1,0 +1,14 @@
+A-green rc=0 MET (VERDICT = GREEN)
+M1 rc=101 MET (RED; failed: O1_terminal_coverage O9_fanin_after_all_terminals )
+M2 rc=101 MET (RED; failed: O2_exactly_once_effects O3_content_vs_ref )
+M3 rc=101 MET (RED; failed: O2_exactly_once_effects O4_no_effect_after_item_terminal )
+M4 rc=101 MET (RED; failed: O5_abandon_legitimacy )
+M5 rc=101 MET (RED; failed: O6_executors_joined_before_quiescence O10_no_effect_after_quiescence )
+M6 rc=101 MET (RED; failed: O3_content_vs_ref )
+M7 rc=101 MET (RED; failed: O7_no_admission_after_cancel )
+M8 rc=101 MET (RED; failed: O2_exactly_once_effects )
+M9 rc=101 MET (RED; failed: O3_content_vs_ref )
+C-green rc=0 MET (VERDICT = GREEN)
+rc_legend: MET = green arm green / mutant arm RED with designated check
+total violations: 0
+worktree src/tests modifications: 0 entries (0 = untouched)

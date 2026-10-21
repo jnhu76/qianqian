@@ -1,0 +1,24 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -412,6 +412,21 @@
+             st = shared.work_cv.wait(st).unwrap();
+         }
+         if st.shutdown_requested || (st.queue.is_empty() && st.producer_done) {
++            if worker == 4 {
++                // MUTANT M5: worker 4 parks at the drain instead of
++                // exiting; its exit lands strictly after quiescence.
++                st.m5_parked = Some(worker);
++                drop(st);
++                shared.settle_cv.notify_all();
++                let mut g = shared.state.lock().unwrap();
++                while !g.m5_release {
++                    g = shared.settle_cv.wait(g).unwrap();
++                }
++                drop(g);
++                sink.worker_exit(worker);
++                shared.work_cv.notify_all();
++                return;
++            }
+             // The single legal exit funnel: record ExecutorExited at the
+             // true lifecycle boundary (this thread returns right after)
+             // and wake the pool.
