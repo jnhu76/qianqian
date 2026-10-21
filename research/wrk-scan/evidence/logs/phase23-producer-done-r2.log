@@ -1,0 +1,25 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 1 test
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... [tr] test: waiting worker arrivals
+[tr] test: workers parked; waiting admit arrival
+[tr] S: admit_all begin
+[tr] test: admit parked; opening gates
+[tr] S: admit_all done; finish
+[tr] S: done flipped; settlement
+
+thread 'h0::tests::producer_done_with_queue_nonempty_still_drains' (149606) panicked at src/h0.rs:656:25:
+watchdog: control did not settle within 30s
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    h0::tests::producer_done_with_queue_nonempty_still_drains
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 30.05s
+
+error: test failed, to rerun pass `--lib`

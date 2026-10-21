@@ -1,0 +1,45 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+warning: unused variable: `spec`
+   --> src/h0.rs:486:5
+    |
+486 |     spec: &BatchSpec,
+    |     ^^^^ help: if this is intentional, prefix it with an underscore: `_spec`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `batch_id` is never read
+  --> src/observer.rs:80:11
+   |
+80 |     Off { batch_id: u64, receipt: Mutex<OffReceipt> },
+   |     ---   ^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `wrk-scan` (lib test) generated 2 warnings (run `cargo fix --lib -p wrk-scan --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.44s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 1 test
+[tr] install admit_pre_cut gate_at=0x7ff26c000c90
+[tr] wait_arrivals admit_pre_cut enter (poll mode)
+[tr] gate(admit_pre_cut) -> 0x7ff26c000c90
+[tr] gate(admit_pre_cut) -> 0x7ff26c000c90
+[tr] park admit_pre_cut
+[tr] park admit_pre_cut arrivals now 1
+[tr] gate(admit_pre_cut) -> 0x7ff26c000c90
+
+thread 'h0::tests::cancel_racing_admission_linearization' (146718) panicked at src/h0.rs:658:25:
+watchdog: control did not settle within 30s
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test h0::tests::cancel_racing_admission_linearization ... FAILED
+
+failures:
+
+failures:
+    h0::tests::cancel_racing_admission_linearization
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 30.04s
+
+error: test failed, to rerun pass `--lib`

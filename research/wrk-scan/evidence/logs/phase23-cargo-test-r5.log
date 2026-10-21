@@ -1,0 +1,13 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error: expected identifier, found keyword `let`
+  --> src/observer.rs:98:13
+   |
+97 |         ObserverSink {
+   |         ------------ while parsing this struct
+98 |             let _ = batch_id; // OFF receipt is batch-anonymous; identity
+   |             ^^^ expected identifier, found keyword
+
+error: could not compile `wrk-scan` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `wrk-scan` (lib test) due to 1 previous error
+rc=101

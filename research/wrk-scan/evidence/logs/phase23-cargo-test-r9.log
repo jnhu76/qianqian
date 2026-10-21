@@ -1,0 +1,70 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.58s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 12 tests
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::full_b_producer_blocks_and_recovers ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... FAILED
+test h0::tests::owner_panic_fails_session_loudly ... FAILED
+test h0::tests::h0_off_mode_receipt_structure ... FAILED
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... FAILED
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... FAILED
+test h0::tests::worker_wakeup_survives_notify_before_wait ... FAILED
+test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... FAILED
+
+failures:
+
+---- h0::tests::producer_done_with_queue_nonempty_still_drains stdout ----
+
+thread 'h0::tests::producer_done_with_queue_nonempty_still_drains' (149351) panicked at src/h0.rs:656:25:
+watchdog: control did not settle within 30s
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- h0::tests::owner_panic_fails_session_loudly stdout ----
+
+thread 'h0::tests::owner_panic_fails_session_loudly' (149350) panicked at src/h0.rs:779:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::h0_off_mode_receipt_structure stdout ----
+
+thread 'h0::tests::h0_off_mode_receipt_structure' (149346) panicked at src/h0.rs:707:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::settlement_survives_done_flip_while_waiter_parked stdout ----
+
+thread 'h0::tests::settlement_survives_done_flip_while_waiter_parked' (149354) panicked at src/h0.rs:857:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::s5_scenario_cell_cancel_oracle_green stdout ----
+
+thread 'h0::tests::s5_scenario_cell_cancel_oracle_green' (149352) panicked at src/h0.rs:732:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::worker_wakeup_survives_notify_before_wait stdout ----
+
+thread 'h0::tests::worker_wakeup_survives_notify_before_wait' (149356) panicked at src/h0.rs:817:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::h0_on_mode_no_cancel_full_oracle_green stdout ----
+
+thread 'h0::tests::h0_on_mode_no_cancel_full_oracle_green' (149348) panicked at src/h0.rs:674:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+
+failures:
+    h0::tests::h0_off_mode_receipt_structure
+    h0::tests::h0_on_mode_no_cancel_full_oracle_green
+    h0::tests::owner_panic_fails_session_loudly
+    h0::tests::producer_done_with_queue_nonempty_still_drains
+    h0::tests::s5_scenario_cell_cancel_oracle_green
+    h0::tests::settlement_survives_done_flip_while_waiter_parked
+    h0::tests::worker_wakeup_survives_notify_before_wait
+
+test result: FAILED. 5 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.51s
+
+error: test failed, to rerun pass `--lib`
+rc=101

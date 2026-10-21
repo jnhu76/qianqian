@@ -23,7 +23,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod h0;
 pub mod ledger;
+pub mod observer;
 pub mod oracle;
 pub mod scenario;
 pub mod workload;

@@ -1,0 +1,44 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+warning: unused imports: `AtomicU32` and `Ordering`
+  --> src/h0.rs:61:25
+   |
+61 | use std::sync::atomic::{AtomicU32, Ordering};
+   |                         ^^^^^^^^^  ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spec`
+   --> src/h0.rs:481:5
+    |
+481 |     spec: &BatchSpec,
+    |     ^^^^ help: if this is intentional, prefix it with an underscore: `_spec`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+error[E0502]: cannot borrow `r` as immutable because it is also borrowed as mutable
+   --> src/observer.rs:133:32
+    |
+133 |                 Some(f(&mut r, r.ordinal))
+    |                      ----------^---------
+    |                      | |       |
+    |                      | |       immutable borrow occurs here
+    |                      | mutable borrow occurs here
+    |                      mutable borrow later used here
+    |
+help: try adding a local storing this...
+   --> src/observer.rs:133:32
+    |
+133 |                 Some(f(&mut r, r.ordinal))
+    |                                ^^^^^^^^^
+help: ...and then using that local here
+   --> src/observer.rs:133:22
+    |
+133 |                 Some(f(&mut r, r.ordinal))
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0502`.
+warning: `wrk-scan` (lib) generated 2 warnings
+error: could not compile `wrk-scan` (lib) due to 1 previous error; 2 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `wrk-scan` (lib test) generated 1 warning (1 duplicate)
+error: could not compile `wrk-scan` (lib test) due to 1 previous error; 1 warning emitted

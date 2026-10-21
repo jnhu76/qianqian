@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 1 test
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... 
+thread 'h0::tests::producer_done_with_queue_nonempty_still_drains' (148376) panicked at src/h0.rs:649:25:
+watchdog: control did not settle within 30s
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    h0::tests::producer_done_with_queue_nonempty_still_drains
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 30.05s
+
+error: test failed, to rerun pass `--lib`
+rc=101

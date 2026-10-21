@@ -1,0 +1,143 @@
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:176:
+                     .expect("spawn h0 worker"),
+             );
+         }
+-        H0Executor { cfg, spec, sink, shared, handles }
++        H0Executor {
++            cfg,
++            spec,
++            sink,
++            shared,
++            handles,
++        }
+     }
+ 
+     /// Cloneable handle for the `request_cancel` role (SPEC §5.5 action 1).
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:183:
+     pub fn cancel_handle(&self) -> CancelHandle {
+-        CancelHandle { shared: Arc::clone(&self.shared), sink: self.sink.clone() }
++        CancelHandle {
++            shared: Arc::clone(&self.shared),
++            sink: self.sink.clone(),
++        }
+     }
+ 
+     /// Cloneable handle for the `await_settlement` role (SPEC §5.5 action
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:188:
+     /// 2) — callable from a thread that owns no `&mut` of the executor.
+     pub fn settlement_watch(&self) -> SettlementWatch {
+-        SettlementWatch { shared: Arc::clone(&self.shared) }
++        SettlementWatch {
++            shared: Arc::clone(&self.shared),
++        }
+     }
+ 
+     /// Producer role (session owner thread): admit every offered item
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:348:
+     pub fn wait(&self) -> Result<(), SessionError> {
+         let mut st = self.shared.state.lock().unwrap();
+         loop {
+-            if st.producer_done
+-                && (st.pending.is_empty() || st.panic_defect.is_some())
+-            {
++            if st.producer_done && (st.pending.is_empty() || st.panic_defect.is_some()) {
+                 break;
+             }
+             h0_fence_park!("settle_pre_wait", st, &self.shared.state);
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:357:
+             // Post-fence predicate re-check (lost-wakeup defense, same
+             // discipline as the worker loop): the fence may have released
+             // the lock, so a settle_cv notify may have landed while parked.
+-            if st.producer_done
+-                && (st.pending.is_empty() || st.panic_defect.is_some())
+-            {
++            if st.producer_done && (st.pending.is_empty() || st.panic_defect.is_some()) {
+                 break;
+             }
+             st = self.shared.settle_cv.wait(st).unwrap();
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:445:
+                         .unwrap_or_else(|| "opaque panic payload".to_string());
+                     let mut st = shared.state.lock().unwrap();
+                     if st.panic_defect.is_none() {
+-                        st.panic_defect = Some(SessionError { worker, item, message });
++                        st.panic_defect = Some(SessionError {
++                            worker,
++                            item,
++                            message,
++                        });
+                     }
+                     drop(st);
+                     shared.settle_cv.notify_all();
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:660:
+ 
+     const SEED: u64 = 0x00C0_FFEE_0304_0001;
+ 
+-    fn with_watchdog<T: Send + 'static>(
+-        secs: u64,
+-        f: impl FnOnce() -> T + Send + 'static,
+-    ) -> T {
++    fn with_watchdog<T: Send + 'static>(secs: u64, f: impl FnOnce() -> T + Send + 'static) -> T {
+         let (tx, rx) = mpsc::channel();
+         std::thread::spawn(move || {
+             let v = f();
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:686:
+     }
+ 
+     fn probe_cfg(p: usize, b: usize, cancel: Option<(u32, u32)>) -> H0Config {
+-        H0Config { p, b, cancel_milestone: cancel }
++        H0Config {
++            p,
++            b,
++            cancel_milestone: cancel,
++        }
+     }
+ 
+     // ---- lifecycle GREEN arms ----
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:698:
+         let sink = ObserverSink::on(spec.batch_id);
+         let stats = run_session(probe_cfg(4, 8, None), spec.clone(), &sink).expect("session");
+         assert_eq!(stats.admitted_count, 48);
+-        assert!(stats.b_high_water <= 8, "B bound violated: {}", stats.b_high_water);
++        assert!(
++            stats.b_high_water <= 8,
++            "B bound violated: {}",
++            stats.b_high_water
++        );
+         assert!(stats.active_execution_high_water <= 4);
+         assert_eq!(stats.workers_spawned, 4);
+         assert_eq!(stats.workers_joined, 4);
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:712:
+         // cancel after the 24th admission (group 7), the probe milestone.
+         let spec = BatchSpec::probe_batch();
+         let sink = ObserverSink::on(spec.batch_id);
+-        let stats = run_session(probe_cfg(4, 8, Some((24, 7))), spec.clone(), &sink)
+-            .expect("session");
++        let stats =
++            run_session(probe_cfg(4, 8, Some((24, 7))), spec.clone(), &sink).expect("session");
+         // Admission order is linear: items 0..=23 all admitted; after the
+         // milestone only group-1 items (id % 3 != 0) may be admitted.
+         let expected_admitted = 24 + (24..48u32).filter(|id| id % 3 != 0).count();
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/h0.rs:739:
+         // Terminal coverage: every admitted item exactly one terminal,
+         // ordinals/timestamps ordered, wait obligation retained per item.
+         for (id, it) in &receipt.items {
+-            assert!(it.terminal.is_some(), "item {id} without terminal in OFF receipt");
++            assert!(
++                it.terminal.is_some(),
++                "item {id} without terminal in OFF receipt"
++            );
+             assert!(it.terminal_ordinal.unwrap() > it.admitted_ordinal);
+             assert!(it.admitted_ts <= it.terminal_ts.unwrap());
+             let expect_wait = spec.items[*id as usize].wait_us;
+Diff in /home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/src/observer.rs:89:
+ impl ObserverSink {
+     pub fn on(batch_id: u64) -> Self {
+         ObserverSink {
+-            inner: std::sync::Arc::new(SinkInner::On { batch_id, ledger: Ledger::new() }),
++            inner: std::sync::Arc::new(SinkInner::On {
++                batch_id,
++                ledger: Ledger::new(),
++            }),
+         }
+     }
+ 
