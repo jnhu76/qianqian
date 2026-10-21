@@ -4,7 +4,7 @@ One file = one complete matrix run: 46 frozen scenario×P×B cells
 (SPEC §3.4 derivation at P_phys=10) × K0{ON,OFF}, executed sequentially in
 one debug-build binary by `tests/matrix.rs::matrix_92_cells_all_green`.
 The run is deterministic (see facts below); the committed file is the
-receipt of the latest full-suite run (phase6/9 logs). Whole-binary wall
+receipt of the latest full-suite run (phase6/9/10 logs). Whole-binary wall
 clock (~3 min debug) is harness overhead, not mechanism timing — Gate I
 is non-timed and no duration is evidence.
 
@@ -75,8 +75,9 @@ observables) using the implementation's formal record names.
   every admitted item reached a terminal. WHICH in-flight group-7 items
   Abandon vs complete is legal schedule-dependent nondeterminism (SPEC
   §6.3): the abandoned count grows with the in-flight window (1–4 across
-  P=4/5/10 in the committed run), and the ON/OFF arms of a cell may
-  legally diverge here — each row is independently GREEN via the oracle
+  P=4/5/10 in the archived runs), and the ON/OFF arms of a cell may
+  legally diverge here (or agree, as in the phase10 run) — each row is
+  independently GREEN via the oracle
   (ON) and the per-item legal-set audit (both).
 - `MAX_B_IN_FLIGHT ≤ B` and `MAX_ACTIVE_EXECUTION ≤ P` on every row.
 - No-cancel rows: identical `RESULT_DIGEST` and `AGGREGATE_DIGEST` across

@@ -1,0 +1,8 @@
+== env ==
+SHA=b14693560dce40e273e949949b656a6bf36789d8
+2026-10-21T23:03:41+08:00
+cargo 1.97.1 (c980f4866 2026-06-30)
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+== cmd ==
+cargo test --workspace (repo root)
+rc=0

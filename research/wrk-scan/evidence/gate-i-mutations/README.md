@@ -28,14 +28,14 @@ campaign's H0 executor (`src/h0.rs`).
   defect-path B-permit wedge. Both are caught by the fence/panic control
   tests' watchdogs (`cargo test --lib`), not by the oracle.
 
-## Results — three complete cycles (`cycle-summary.txt`, `cycle-summaryr2-.txt`, `cycle-summaryr3-.txt`)
+## Results — final cycles `cycle-summaryr4-.txt`, `cycle-summaryr5-.txt`, `cycle-summaryr6-.txt`
 
-Every cycle: A GREEN, C GREEN, all nine frozen mutants RED with the
+Each final cycle: A GREEN, C GREEN, all nine frozen mutants RED with the
 designated frozen check, both supplementary arms (LW, PB) RED via the
 control watchdogs, 0 violations, main-worktree `src`/`tests`
-modifications 0.
+modifications 0 (committed tree, witness line 0).
 
-| Arm | Defect (APP-C semantics) | Designated (frozen §C.6) | Observed failed checks (all 3 cycles) |
+| Arm | Defect (APP-C semantics) | Designated (frozen §C.6) | Observed failed checks (all 3 final cycles) |
 |---|---|---|---|
 | M1 | admitted obligation silently lost (never queued/tracked/terminal) — item 20 | O1 (+O9) | `O1_terminal_coverage` `O9_fanin_after_all_terminals` |
 | M2 | duplicate ResultPublished — item 10 | O2 (+O3) | `O2_exactly_once_effects` `O3_content_vs_ref` |
@@ -46,12 +46,26 @@ modifications 0.
 | M7 | post-cancel admission — group-7 item 27 after the cut | O7 | `O7_no_admission_after_cancel` |
 | M8 | wait + IoWaitDone both omitted — item 25 | O2 (wait dimension) | `O2_exactly_once_effects` |
 | M9 | error-lane contribution forgery — fault item 13 | O3 (Err branch) | `O3_content_vs_ref` |
-| LW | post-fence predicate re-check deleted (supplementary — kills the lost-wakeup defense's non-vacuity) | `worker_consumes_item_notified_during_fence_park` (dedicated: no alternative wakeup source in its schedule) | `worker never consumed` (deterministic; see `gate-i-finding-lost-wakeup.md` §RED-side status for the masked-sibling history) |
+| LW | post-fence predicate re-check deleted (supplementary — kills the lost-wakeup defense's non-vacuity) | `worker_consumes_item_notified_during_fence_park` (dedicated: no alternative wakeup source in its schedule) | `panic:worker never consumed` — the control's panic message, matched by the driver's `panic:` signature class (deterministic; see `gate-i-finding-lost-wakeup.md` §RED-side status for the masked-sibling history) |
 | PB | defect-path B-permit wedge reintroduced (supplementary — reverts the panic-path fix) | control watchdog | `watchdog:` (`owner_panic_with_saturated_b_fails_loudly` times out) |
 
 Signatures match the frozen probe receipt (APP-C §C.6) exactly, except
 M3 where this oracle additionally fires `O2` for the late effect — a
 superset of the frozen signature with the designated `O4` present.
+
+### Cycle history (retained, not discarded)
+
+`cycle-summary.txt`, `cycle-summaryr2-.txt`, `cycle-summaryr3-.txt` are
+the pre-fix cycles. r2 recorded a genuine LW escape: its sibling kills
+were premise-by-timing (masked by `finish_admission`'s `notify_all` +
+multi-worker drain), which led to the dedicated control. r3 killed LW
+3/3 with that control but recorded `LW … VIOLATION` — a DRIVER
+classification defect: the designated-hit grep matched only libtest
+FAIL-table rows, never panic messages. The mutant was killed; the
+recording was wrong. The driver gained the `panic:` signature class
+(commit b146935) and the r4–r6 cycles above are the corrected record.
+The r3 summary's `worktree … 1 entries` line is the honest witness that
+the dedicated-control h0.rs was in flight (uncommitted) at run time.
 
 ## Negative controls (Gate 授权) — mapping to executed evidence
 
