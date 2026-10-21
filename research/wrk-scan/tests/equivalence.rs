@@ -27,10 +27,9 @@ use wrk_scan::workload::{self, BatchSpec};
 
 const SEED: u64 = 0x00C0_FFEE_0304_0001;
 
-fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
-    let d = Sha256::digest(bytes);
-    let mut s = String::with_capacity(64);
-    for b in d {
+fn hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
         s.push_str(&format!("{b:02x}"));
     }
     s
@@ -42,7 +41,7 @@ fn result_digest(results: &[(u32, u64)]) -> String {
         h.update(id.to_le_bytes());
         h.update(c.to_le_bytes());
     }
-    format!("sha256:{}", sha256_hex(h.finalize()))
+    format!("sha256:{}", hex(&h.finalize()))
 }
 
 /// REF contributions per item (oracle side — never called by executor

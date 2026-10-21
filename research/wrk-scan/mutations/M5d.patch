@@ -1,10 +1,10 @@
 --- a/src/h0.rs
 +++ b/src/h0.rs
-@@ -281,16 +281,28 @@
-     /// the fan-in aggregate and the quiescence receipt as the LAST
-     /// record. Requires settlement.
+@@ -289,25 +289,28 @@
+     /// record. A caller that skipped settlement — or a worker that died
+     /// outside `catch_unwind` — is a loud `Err`, never a forged receipt.
      pub fn await_quiescence(&mut self) -> Result<SessionStats, SessionError> {
--        let stats = self.join_workers();
+-        let stats = self.join_workers()?;
 +        // MUTANT M5: publish quiescence while worker 4 is still parked —
 +        // the receipt precedes the join.
 +        {
@@ -15,7 +15,16 @@
 +        }
          let mut sorted = {
              let st = self.shared.state.lock().unwrap();
--            debug_assert!(st.pending.is_empty(), "quiescence requires settlement");
+-            if !st.pending.is_empty() {
+-                return Err(SessionError {
+-                    worker: 0,
+-                    item: u32::MAX,
+-                    message: "quiescence requires settlement (pending obligations remain)".into(),
+-                });
+-            }
+-            if let Some(defect) = st.panic_defect.clone() {
+-                return Err(defect);
+-            }
              st.results.clone()
          };
          sorted.sort_by_key(|(id, _)| *id);
@@ -27,7 +36,7 @@
 +            st.m5_release = true;
 +        }
 +        self.shared.settle_cv.notify_all();
-+        let stats = self.join_workers();
++        let stats = self.join_workers()?;
          Ok(stats)
      }
  

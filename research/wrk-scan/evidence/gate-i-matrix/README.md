@@ -3,8 +3,10 @@
 One file = one complete matrix run: 46 frozen scenario×P×B cells
 (SPEC §3.4 derivation at P_phys=10) × K0{ON,OFF}, executed sequentially in
 one debug-build binary by `tests/matrix.rs::matrix_92_cells_all_green`.
-Two full runs were executed: phase5-matrix-r3.log (186.02s) and
-phase5-matrix-r4.log (180.84s, after the ARM label fix); both 92/92 GREEN.
+The run is deterministic (see facts below); the committed file is the
+receipt of the latest full-suite run (phase6/9 logs). Whole-binary wall
+clock (~3 min debug) is harness overhead, not mechanism timing — Gate I
+is non-timed and no duration is evidence.
 
 ## What each arm runs
 
@@ -23,9 +25,10 @@ B/P semantics (SPEC §4.6 rule 5).
 
 | Field | Meaning | Source |
 |---|---|---|
-| `ARM` | `H0-{ON\|OFF}-{S#}-P{p}-B{b}` (stable arm identity, SPEC §3.5) | `Cell::arm_id` |
+| `ARM` | `H0-{ON\|OFF}-{S#}-P{p}-B{b}` (stable arm identity) | `Cell::arm_id` |
+| `ARM_ORDER_VALUE` | the frozen per-seed arm-order value, `SHA256(LE8(seed) ‖ 0x00 ‖ ASCII(arm_id))` first 8 bytes LE u64 (SPEC §7.3); recorded as identity, never ranked in Gate I | `arm_order_value` |
 | `SCENARIO`,`P`,`B` | the frozen cell | `Scenario::expand_cells(10)` |
-| `K0_MODE` | composition factor | — |
+| `K0_MODE` | composition factor (the K0 factor is paired diagonally with the observer factor — ON arms run the full ledger, OFF arms the minimal receipt; no-cancel cells pin BOTH faces to the same independent REF, which transitively establishes the instrument-only equivalence the mandate asks for) | — |
 | `SEED` | fixed public Gate-I seed | 0x00C0FFEE03040001 |
 | `BATCH_ID` | unique deterministic id per arm (1000 + 2·cell + mode) | harness |
 | `INPUT_DIGEST` | sha256 over item-ordered (LE4 id ‖ content_digest[32]); pins the input byte stream. Depends only on (seed, N), so same-N scenarios share a digest (4 distinct values across 7 scenarios is expected) | REF precompute |
@@ -42,6 +45,10 @@ B/P semantics (SPEC §4.6 rule 5).
 | `K0_DISPOSE_VERDICT` | kernel teardown verdict (ON only) | `DisposeVerdict` |
 | `ORACLE` | frozen O1–O10 adjudication (ON only; OFF has no ledger to adjudicate) | `oracle::adjudicate` |
 | `ORACLE_VERDICT` | the arm verdict (see below) | harness |
+
+Field provenance: the per-cell field list follows the Gate I mandate's
+record requirements (§10 of the campaign brief; OWNER-GATE §3.B
+observables) using the implementation's formal record names.
 
 ## Verdict semantics
 
@@ -63,9 +70,12 @@ B/P semantics (SPEC §4.6 rule 5).
 
 - All 92 rows `ORACLE_VERDICT=GREEN`; all 46 ON rows `Discharged` with
   `ORACLE=GREEN`.
-- S5 rows: admitted 220–231 of N=256; Abandons 1–2; every admitted item
-  reached a terminal.
+- S5 rows: admitted exactly 225 of N=256 (deterministic — the cut bites
+  at the frozen 164th admission and every later group-7 offer is cut);
+  Abandons 1 / 2 / 3 at P=4 / 5 / 10 respectively (the in-flight window
+  grows with P); every admitted item reached a terminal.
 - `MAX_B_IN_FLIGHT ≤ B` and `MAX_ACTIVE_EXECUTION ≤ P` on every row.
 - No-cancel rows: identical `RESULT_DIGEST` and `AGGREGATE_DIGEST` across
   K0 modes, P, B, and across the two independent runs — the deterministic
-  correctness baseline.
+  correctness baseline (one distinct digest per scenario; S5 has three,
+  one per legal abandoned-count outcome, identical across K0 modes).

@@ -1,0 +1,16 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -217,13 +217,6 @@
+             // so it covers queue resident + running + completed-not-ACK.
+             let mut st = self.shared.state.lock().unwrap();
+             while st.admitted_not_terminal >= self.cfg.b {
+-                // A latched defect has already failed the session: stop
+-                // admitting instead of blocking on permits that the dead
+-                // owner will never release — await_settlement reports the
+-                // defect and abort() joins everything (loud, never wedged).
+-                if st.panic_defect.is_some() {
+-                    return;
+-                }
+                 st = self.shared.slot_cv.wait(st).unwrap();
+             }
+             // (C) cancel-order critical section: the linearization point.

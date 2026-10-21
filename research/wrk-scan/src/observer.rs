@@ -22,12 +22,6 @@ use std::time::Instant;
 
 use crate::ledger::{EffectKind, Ledger, TerminalKind};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ObserverMode {
-    On,
-    Off,
-}
-
 /// Minimal per-item receipt (OFF mode).
 #[derive(Clone, Debug)]
 pub struct OffItem {
@@ -62,19 +56,6 @@ pub struct OffReceipt {
     pub quiescence_recorded: bool,
 }
 
-impl OffReceipt {
-    /// Admitted item ids, in admission-ordinal order.
-    pub fn admitted_set(&self) -> Vec<(u32, u64)> {
-        let mut v: Vec<(u32, u64)> = self
-            .items
-            .iter()
-            .map(|(id, it)| (*id, it.admitted_ordinal))
-            .collect();
-        v.sort_by_key(|(_, ord)| *ord);
-        v
-    }
-}
-
 enum SinkInner {
     On { batch_id: u64, ledger: Ledger },
     Off { receipt: Mutex<OffReceipt> },
@@ -103,13 +84,6 @@ impl ObserverSink {
             inner: std::sync::Arc::new(SinkInner::Off {
                 receipt: Mutex::new(OffReceipt::default()),
             }),
-        }
-    }
-
-    pub fn mode(&self) -> ObserverMode {
-        match &*self.inner {
-            SinkInner::On { .. } => ObserverMode::On,
-            SinkInner::Off { .. } => ObserverMode::Off,
         }
     }
 

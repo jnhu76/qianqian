@@ -212,7 +212,7 @@ pub struct Cell {
 
 impl Cell {
     /// Stable arm identity for the frozen per-seed arm-order rule
-    /// (SPEC §3.5: `SHA256(LE8(seed) || 0x00 || ASCII(arm_id))`, first 8
+    /// (SPEC §7.3: `SHA256(LE8(seed) || 0x00 || ASCII(arm_id))`, first 8
     /// bytes LE as u64, ascending). No ranking is performed in Gate I;
     /// the identity only has to exist and be stable for future gates.
     pub fn arm_id(self, k0_on: bool) -> String {

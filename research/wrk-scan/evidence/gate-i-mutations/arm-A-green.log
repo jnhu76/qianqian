@@ -1,15 +1,5 @@
-   Compiling typenum v1.20.1
-   Compiling const-oid v0.10.2
-   Compiling cfg-if v1.0.5
-   Compiling cpufeatures v0.3.1
-   Compiling qianqian-composition v0.1.0 (/tmp/wrk-scan-mutation-arms/clean-a/crates/qianqian-composition)
-   Compiling hybrid-array v0.4.15
-   Compiling block-buffer v0.12.1
-   Compiling crypto-common v0.2.2
-   Compiling digest v0.11.3
-   Compiling sha2 v0.11.1
    Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/clean-a/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.66s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.00s
      Running tests/mutation_harness.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/mutation_harness-26292b178c2c4d49)
 
 running 1 test

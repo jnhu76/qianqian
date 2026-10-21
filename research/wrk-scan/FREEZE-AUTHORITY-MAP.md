@@ -121,7 +121,7 @@ GV-7  输入顺序不变性：fold 按 item_id 升序，与完成顺序无关。
 1. **item_id 分布**：S0–S6 的类别映射按 SPEC §3.1 的 `item_id` 函数逐场景冻结
    （common_base5 / mod 5 == 3 残差 / mod 10 == 0 LongTail / 全 Trivial 等）。
    本轮不重新设计分布、不改随机分配、不改 Round Robin、不换哈希。
-2. **每 seed 的 arm 顺序**：SPEC §3.5 冻结规则
+2. **每 seed 的 arm 顺序**：SPEC §7.3 冻结规则
    `SHA256(LE8(seed) || 0x00 || ASCII(arm_id))` 前 8 字节 LE 解释 u64 升序。
    本轮不执行 arm 排名，但 arm identity/顺序规则必须在 92-cell 记录中保留
    （记录 `arm_id` 命名与该 seed 的冻结顺序值），供未来 Gate 使用。
@@ -156,6 +156,15 @@ cancel 仅 S5（第 164 次受理后，group 7）。
    （SPEC §7.5「三时间戳最小仪器」），同一执行器同一调用点，仅记录行为不同。
 3. **K0 ON**：冻结附录不含 K0 组合；按 SPEC §4.6 与仓库 K0 API 新增
    session 组合模块；K0 不进每 item 路径。
+
+依赖声明：`Cargo.lock` 将 sha2 固定到 0.11.1（冻结探针工件为 0.11.0）。
+语义同一性不由版本号承担，而由黄金向量（GV-2/GV-3，AGG =
+0x980a9dc0d8d8cee6）与独立 python 实现复核守护；此处仅声明锁级差异。
+
+回执落位：§5.2 承诺的「arm_id 命名与该 seed 的冻结顺序值」已在
+92-cell 回执中兑现（`cells.jsonl` 的 `ARM` 与 `ARM_ORDER_VALUE` 字段，
+顺序值 = `SHA256(LE8(seed) || 0x00 || ASCII(arm_id))` 前 8 字节 LE u64，
+本轮不做排名）。
 
 除此之外任何与冻结文本的冲突 => `PROTOCOL_AMENDMENT_REQUIRED`，停止并上报，
 不静默改规范。

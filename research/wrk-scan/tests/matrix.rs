@@ -76,7 +76,7 @@ fn build_ref(spec: &BatchSpec) -> ScenarioRef {
     let full: Vec<(u32, u64)> = contributions.iter().map(|(k, v)| (*k, *v)).collect();
     ScenarioRef {
         result_digest: result_digest(&full),
-        input_digest: format!("sha256:{}", sha256_hex(input_hasher.finalize())),
+        input_digest: format!("sha256:{}", hex(&input_hasher.finalize())),
         full_aggregate: workload::aggregate(&full),
         contributions,
     }
@@ -90,20 +90,30 @@ fn result_digest(results: &[(u32, u64)]) -> String {
         h.update(id.to_le_bytes());
         h.update(c.to_le_bytes());
     }
-    format!("sha256:{}", sha256_hex(h.finalize()))
+    format!("sha256:{}", hex(&h.finalize()))
 }
 
 fn agg_hex(v: u64) -> String {
     format!("0x{v:016x}")
 }
 
-fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
-    let d = Sha256::digest(bytes);
-    let mut s = String::with_capacity(64);
-    for b in d {
+fn hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
         s.push_str(&format!("{b:02x}"));
     }
     s
+}
+
+/// The frozen per-seed arm-order value (SPEC §7.3): first 8 bytes LE of
+/// `SHA256(LE8(seed) || 0x00 || ASCII(arm_id))`. Recorded alongside each
+/// arm as identity evidence; never exercised as ranking in Gate I.
+fn arm_order_value(arm_id: &str, seed: u64) -> u64 {
+    let mut h = Sha256::new();
+    h.update(seed.to_le_bytes());
+    h.update([0u8]);
+    h.update(arm_id.as_bytes());
+    u64::from_le_bytes(h.finalize()[0..8].try_into().unwrap())
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +269,7 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
     let _ = writeln!(
         out,
         concat!(
-            r#"{{"ARM":"{}","SCENARIO":"{}","P":{},"B":{},"K0_MODE":"{}","#,
+            r#"{{"ARM":"{}","ARM_ORDER_VALUE":"0x{:016x}","SCENARIO":"{}","P":{},"B":{},"K0_MODE":"{}","#,
             r#""SEED":"0x00c0ffee03040001","BATCH_ID":{},"INPUT_DIGEST":"{}","#,
             r#""ADMITTED_COUNT":{},"TERMINAL_COUNT":{},"COMPLETED_OK":{},"#,
             r#""COMPLETED_ERR":{},"ABANDONED":{},"RESULT_DIGEST":"{}","#,
@@ -269,6 +279,7 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
             r#""ORACLE_VERDICT":"{}"}}"#
         ),
         c.arm_id(rec.k0_on),
+        arm_order_value(&c.arm_id(rec.k0_on), SEED),
         c.scenario_label(),
         c.p,
         c.b,
@@ -436,6 +447,13 @@ fn matrix_92_cells_all_green() {
                     failures.push(format!(
                         "admitted face {} != stats {}",
                         face.admitted, stats.admitted_count
+                    ));
+                }
+                if face.completed_ok + face.completed_err + face.abandoned() != face.admitted {
+                    failures.push(format!(
+                        "terminal coverage {} != admitted {}",
+                        face.completed_ok + face.completed_err + face.abandoned(),
+                        face.admitted
                     ));
                 }
                 failures.extend(legal_set_audit(&face, r));

@@ -16,7 +16,7 @@ ADMITTED=40 JOINED=4
   O10_no_effect_after_quiescence             PASS
 VERDICT = RED
 
-thread 'probe_batch_oracle_green' (167620) panicked at tests/mutation_harness.rs:42:5:
+thread 'probe_batch_oracle_green' (211237) panicked at tests/mutation_harness.rs:42:5:
 ORACLE RED: [CheckResult { check: "O2_exactly_once_effects", pass: false, detail: "item 16: 2 TransformDone effects (expect 1)" }, CheckResult { check: "O4_no_effect_after_item_terminal", pass: false, detail: "item 16: effects at seq [165] after terminal ack at 164" }]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test probe_batch_oracle_green ... FAILED
@@ -26,6 +26,6 @@ failures:
 failures:
     probe_batch_oracle_green
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
 
 error: test failed, to rerun pass `--test mutation_harness`

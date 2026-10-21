@@ -22,11 +22,18 @@ campaign's H0 executor (`src/h0.rs`).
 - Target items follow APP-C's reachability discipline: all group-1 items
   admitted before the milestone, except M7's item 27 (group 7, after the
   milestone) by construction; M5 parks worker 4 (P=4).
+- Two SUPPLEMENTARY arms beyond the frozen families kill the campaign's
+  OWN defenses (never part of frozen M1–M9): `LW` removes the post-fence
+  predicate re-check (the lost-wakeup defense) and `PB` reintroduces the
+  defect-path B-permit wedge. Both are caught by the fence/panic control
+  tests' watchdogs (`cargo test --lib`), not by the oracle.
 
 ## Results — three complete cycles (`cycle-summary.txt`, `cycle-summaryr2-.txt`, `cycle-summaryr3-.txt`)
 
-Every cycle: A GREEN, C GREEN, all nine mutants RED with the designated
-frozen check, 0 violations, main-worktree `src`/`tests` modifications 0.
+Every cycle: A GREEN, C GREEN, all nine frozen mutants RED with the
+designated frozen check, both supplementary arms (LW, PB) RED via the
+control watchdogs, 0 violations, main-worktree `src`/`tests`
+modifications 0.
 
 | Arm | Defect (APP-C semantics) | Designated (frozen §C.6) | Observed failed checks (all 3 cycles) |
 |---|---|---|---|
@@ -39,6 +46,8 @@ frozen check, 0 violations, main-worktree `src`/`tests` modifications 0.
 | M7 | post-cancel admission — group-7 item 27 after the cut | O7 | `O7_no_admission_after_cancel` |
 | M8 | wait + IoWaitDone both omitted — item 25 | O2 (wait dimension) | `O2_exactly_once_effects` |
 | M9 | error-lane contribution forgery — fault item 13 | O3 (Err branch) | `O3_content_vs_ref` |
+| LW | post-fence predicate re-check deleted (supplementary — kills the lost-wakeup defense's non-vacuity) | control watchdog | `watchdog:` (fence control times out) |
+| PB | defect-path B-permit wedge reintroduced (supplementary — reverts the panic-path fix) | control watchdog | `watchdog:` (`owner_panic_with_saturated_b_fails_loudly` times out) |
 
 Signatures match the frozen probe receipt (APP-C §C.6) exactly, except
 M3 where this oracle additionally fires `O2` for the late effect — a
@@ -54,9 +63,9 @@ by every later gate round:
 
 | Control | Test(s) | Defense | Additional kill evidence |
 |---|---|---|---|
-| lost wakeup (worker / settlement) | `worker_wakeup_survives_notify_before_wait`, `settlement_survives_done_flip_while_waiter_parked` | post-fence predicate re-check | REAL defect found by this control: `evidence/gate-i-finding-lost-wakeup.md` |
+| lost wakeup (worker / settlement) | `worker_wakeup_survives_notify_before_wait`, `settlement_survives_done_flip_while_waiter_parked` | post-fence predicate re-check | REAL defect found by this control: `evidence/gate-i-finding-lost-wakeup.md`; non-vacuity: LW arm |
 | full-B backpressure blocks and recovers | `full_b_producer_blocks_and_recovers` | B = admitted-not-terminal accounting; permit released only after terminal ACK | — |
-| owner death fails the session loudly (no forged receipt) | `owner_panic_fails_session_loudly`, `k0_on_owner_death_teardown_violated_no_receipt` | panic-contained → explicit `SessionError` → abort joins all, no aggregate/receipt; K0 latches `TeardownViolated` | — |
+| owner death fails the session loudly (no forged receipt) | `owner_panic_fails_session_loudly`, `owner_panic_with_saturated_b_fails_loudly`, `k0_on_owner_death_teardown_violated_no_receipt` | panic-contained → explicit `SessionError` → abort joins all, no aggregate/receipt; K0 latches `TeardownViolated`; the B-saturated control pins that the defect path cannot wedge the producer on a leaked permit | non-vacuity: PB arm |
 | cancel racing admission (linearization) | `cancel_racing_admission_linearization` | cut check inside the cancel-order critical section; re-check after the fence | — |
 | producer done with queue non-empty still drains | `producer_done_with_queue_nonempty_still_drains` | single legal exit funnel requires drained queue | — |
 | shutdown with a worker unjoined | abort() path + M5 arm | `join_workers` joins every handle; `SessionStats.workers_joined` | M5 mutation arm: quiesce-without-join killed by `O6`+`O10` |

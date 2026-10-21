@@ -40,7 +40,23 @@ designated() {
     M7) echo "O7_no_admission_after_cancel" ;;
     M8) echo "O2_exactly_once_effects" ;;
     M9) echo "O3_content_vs_ref" ;;
+    # Supplementary arms (NOT frozen M1–M9 families): they kill the
+    # campaign's OWN defenses — LW removes the post-fence predicate
+    # re-check (the lost-wakeup defense), PB reintroduces the defect-path
+    # B-permit wedge. Both are detected by the fence/control tests'
+    # watchdog, never by the oracle.
+    LW) echo "watchdog:" ;;
+    PB) echo "watchdog:" ;;
     *) echo "" ;;
+  esac
+}
+
+# LW/PB run the LIB tests (the fence/panic controls live there), not the
+# mutation harness.
+arm_filter() {
+  case "$1" in
+    LW|PB) echo "--lib" ;;
+    *) echo "--test mutation_harness" ;;
   esac
 }
 
@@ -74,7 +90,7 @@ TOML
 
 run_arm() { # $1 name, $2 dir, $3 expect(green|red)
   local name=$1 dir=$2 expect=$3 log="$EV/arm-$ROUND$1.log"
-  (cd "$dir/research/wrk-scan" && timeout 120 cargo test --test mutation_harness -- --nocapture) > "$log" 2>&1
+  (cd "$dir/research/wrk-scan" && timeout 300 cargo test $(arm_filter "$name") -- --nocapture) > "$log" 2>&1
   local rc=$?
   local verdict
   verdict=$(grep -o '^VERDICT = .*' "$log" | head -1)
@@ -86,16 +102,21 @@ run_arm() { # $1 name, $2 dir, $3 expect(green|red)
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
   else
-    local primary failed
+    local primary failed hit
     primary=$(designated "$name")
     failed=$(grep '^  .* FAIL$' "$log" | awk '{print $1}' | tr '\n' ' ')
-    if [ "$rc" -ne 0 ] && grep -q "^  $primary  *FAIL$" "$log"; then
-      echo "$name rc=$rc MET (RED; failed: ${failed})" >> "$SUMMARY"
+    if [ "$primary" = "watchdog:" ]; then
+      hit=$(grep -c "watchdog:" "$log")
+    else
+      hit=$(grep -c "^  $primary  *FAIL$" "$log")
+    fi
+    if [ "$rc" -ne 0 ] && [ "$hit" -gt 0 ]; then
+      echo "$name rc=$rc MET (RED; failed: ${failed:-watchdog/control detection})" >> "$SUMMARY"
     elif [ "$rc" -eq 0 ]; then
       echo "$name rc=$rc VIOLATION (mutant ESCAPED: oracle GREEN)" >> "$SUMMARY"
       VIOLATIONS=$((VIOLATIONS + 1))
     else
-      echo "$name rc=$rc VIOLATION (RED but designated $primary not among: ${failed})" >> "$SUMMARY"
+      echo "$name rc=$rc VIOLATION (RED but designated '$primary' not in log; failed: ${failed})" >> "$SUMMARY"
       VIOLATIONS=$((VIOLATIONS + 1))
     fi
   fi
@@ -106,7 +127,7 @@ fresh_copy "$WORK/clean-a"
 run_arm A-green "$WORK/clean-a" green
 
 # ---- arm B: mutants ----
-for m in M1 M2 M3 M4 M5 M6 M7 M8 M9; do
+for m in M1 M2 M3 M4 M5 M6 M7 M8 M9 LW PB; do
   dir="$WORK/$m"
   fresh_copy "$dir"
   applied=0

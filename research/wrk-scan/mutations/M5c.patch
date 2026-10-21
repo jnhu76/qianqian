@@ -1,6 +1,6 @@
 --- a/src/h0.rs
 +++ b/src/h0.rs
-@@ -412,6 +412,21 @@
+@@ -448,6 +448,21 @@
              st = shared.work_cv.wait(st).unwrap();
          }
          if st.shutdown_requested || (st.queue.is_empty() && st.producer_done) {

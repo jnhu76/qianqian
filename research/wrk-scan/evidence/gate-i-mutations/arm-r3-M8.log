@@ -1,5 +1,5 @@
    Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/M8/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
      Running tests/mutation_harness.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/mutation_harness-8a12badfc2a56ed9)
 
 running 1 test
@@ -16,7 +16,7 @@ ADMITTED=40 JOINED=4
   O10_no_effect_after_quiescence             PASS
 VERDICT = RED
 
-thread 'probe_batch_oracle_green' (168846) panicked at tests/mutation_harness.rs:42:5:
+thread 'probe_batch_oracle_green' (212480) panicked at tests/mutation_harness.rs:42:5:
 ORACLE RED: [CheckResult { check: "O2_exactly_once_effects", pass: false, detail: "item 25: 0 IoWaitDone effects (expect 1 for wait_us=2000)" }]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test probe_batch_oracle_green ... FAILED
@@ -26,6 +26,6 @@ failures:
 failures:
     probe_batch_oracle_green
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
 
 error: test failed, to rerun pass `--test mutation_harness`

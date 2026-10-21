@@ -1,6 +1,6 @@
 --- a/src/h0.rs
 +++ b/src/h0.rs
-@@ -443,6 +443,11 @@
+@@ -479,6 +479,11 @@
              match outcome {
                  Ok((term, contribution)) => {
                      finish_terminal(&sink, &shared, item, term, worker, Some(contribution));

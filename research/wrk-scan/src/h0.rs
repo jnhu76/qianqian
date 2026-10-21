@@ -217,6 +217,13 @@ impl H0Executor {
             // so it covers queue resident + running + completed-not-ACK.
             let mut st = self.shared.state.lock().unwrap();
             while st.admitted_not_terminal >= self.cfg.b {
+                // A latched defect has already failed the session: stop
+                // admitting instead of blocking on permits that the dead
+                // owner will never release — await_settlement reports the
+                // defect and abort() joins everything (loud, never wedged).
+                if st.panic_defect.is_some() {
+                    return;
+                }
                 st = self.shared.slot_cv.wait(st).unwrap();
             }
             // (C) cancel-order critical section: the linearization point.
@@ -279,12 +286,22 @@ impl H0Executor {
     /// exits are recorded by the workers themselves strictly before their
     /// thread returns, and the join happens-before the receipt), publish
     /// the fan-in aggregate and the quiescence receipt as the LAST
-    /// record. Requires settlement.
+    /// record. A caller that skipped settlement — or a worker that died
+    /// outside `catch_unwind` — is a loud `Err`, never a forged receipt.
     pub fn await_quiescence(&mut self) -> Result<SessionStats, SessionError> {
-        let stats = self.join_workers();
+        let stats = self.join_workers()?;
         let mut sorted = {
             let st = self.shared.state.lock().unwrap();
-            debug_assert!(st.pending.is_empty(), "quiescence requires settlement");
+            if !st.pending.is_empty() {
+                return Err(SessionError {
+                    worker: 0,
+                    item: u32::MAX,
+                    message: "quiescence requires settlement (pending obligations remain)".into(),
+                });
+            }
+            if let Some(defect) = st.panic_defect.clone() {
+                return Err(defect);
+            }
             st.results.clone()
         };
         sorted.sort_by_key(|(id, _)| *id);
@@ -304,10 +321,29 @@ impl H0Executor {
             st.shutdown_requested = true;
         }
         self.shared.work_cv.notify_all();
-        self.join_workers()
+        self.join_all()
     }
 
-    fn join_workers(&mut self) -> SessionStats {
+    fn join_workers(&mut self) -> Result<SessionStats, SessionError> {
+        let stats = self.join_all();
+        if stats.workers_joined != self.cfg.p {
+            // A worker died outside `catch_unwind` (or was never joined):
+            // loud failure, never a receipt over an unjoined executor.
+            return Err(SessionError {
+                worker: 0,
+                item: u32::MAX,
+                message: format!(
+                    "only {}/{} workers joined cleanly",
+                    stats.workers_joined, self.cfg.p
+                ),
+            });
+        }
+        Ok(stats)
+    }
+
+    /// Join every handle and report the stats whatever happened — abort's
+    /// best-effort face (the failure is the caller's to publish).
+    fn join_all(&mut self) -> SessionStats {
         let mut joined = 0usize;
         for h in self.handles.drain(..) {
             if h.join().is_ok() {
@@ -460,6 +496,7 @@ fn worker_main(worker: u64, spec: BatchSpec, sink: ObserverSink, shared: Arc<Sha
                     }
                     drop(st);
                     shared.settle_cv.notify_all();
+                    shared.slot_cv.notify_all();
                 }
             }
         }
@@ -849,6 +886,42 @@ pub(crate) mod tests {
                     .iter()
                     .any(|r| r.kind == crate::ledger::EffectKind::QuiescenceReceipt),
                 "no receipt may follow an owner-death abort"
+            );
+        });
+    }
+
+    /// The B-saturated defect schedule: with B=1 the permit held by the
+    /// panicking item is the ONLY permit, so a defect path that leaks it
+    /// would wedge `admit_all` on `slot_cv` forever — a hang, not the
+    /// mandated loud failure. The slot predicate must observe the defect
+    /// latch and bail out (review P2: empirically reproduced before the
+    /// fix; this control pins it).
+    #[test]
+    fn owner_panic_with_saturated_b_fails_loudly() {
+        let _g = super::session_test_lock();
+        with_watchdog(30, move || {
+            let _injection = PanicInjectGuard(u32::MAX);
+            H0Executor::inject_owner_panic_at(0);
+            let spec = BatchSpec::probe_batch();
+            let sink = ObserverSink::on(spec.batch_id);
+            let err = run_session(probe_cfg(1, 1, None), spec.clone(), &sink)
+                .expect_err("session must fail on owner death");
+            assert_eq!(err.item, 0);
+            // Abort already ran inside run_session: everything joined, no
+            // aggregate, no receipt.
+            let ledger = sink.ledger().unwrap();
+            let snap = ledger.snapshot();
+            assert!(
+                !snap
+                    .iter()
+                    .any(|r| r.kind == crate::ledger::EffectKind::QuiescenceReceipt),
+                "no receipt may follow an owner-death abort"
+            );
+            assert!(
+                !snap
+                    .iter()
+                    .any(|r| r.kind == crate::ledger::EffectKind::AggregatePublished),
+                "no aggregate may follow an owner-death abort"
             );
         });
     }

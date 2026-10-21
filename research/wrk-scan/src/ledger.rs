@@ -155,11 +155,6 @@ impl Ledger {
     pub fn snapshot(&self) -> Vec<LedgerRecord> {
         self.inner.lock().unwrap().records.clone()
     }
-
-    /// Highest assigned sequence so far (diagnostic use only).
-    pub fn last_seq(&self) -> u64 {
-        self.inner.lock().unwrap().next_seq - 1
-    }
 }
 
 impl Default for Ledger {

@@ -1,6 +1,6 @@
 --- a/src/h0.rs
 +++ b/src/h0.rs
-@@ -235,11 +235,15 @@
+@@ -242,11 +242,15 @@
              // Admit: record, enqueue, take the obligation — all under the
              // same cancel-order critical section.
              self.sink.admit(id, group, 0);
