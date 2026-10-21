@@ -1,0 +1,11 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -158,6 +158,8 @@
+                 admitted_total: 0,
+                 results: Vec::new(),
+                 panic_defect: None,
++                m5_parked: None,
++                m5_release: false,
+             }),
+             work_cv: Condvar::new(),
+             slot_cv: Condvar::new(),

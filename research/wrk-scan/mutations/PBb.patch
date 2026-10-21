@@ -1,0 +1,10 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -496,7 +496,6 @@
+                     }
+                     drop(st);
+                     shared.settle_cv.notify_all();
+-                    shared.slot_cv.notify_all();
+                 }
+             }
+         }

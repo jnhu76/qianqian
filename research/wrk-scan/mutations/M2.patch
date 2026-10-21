@@ -1,0 +1,13 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -535,6 +535,10 @@
+     let contribution = workload::contribution(&content, &meta, peak);
+     sink.transform_done(item_id, fold_meta(&meta), worker);
+     sink.result_published(item_id, contribution, worker);
++    if item_id == 10 {
++        // MUTANT M2: the result publication is duplicated.
++        sink.result_published(item_id, contribution, worker);
++    }
+     let term = match s.fault {
+         Some(code) => TerminalKind::CompletedErr(code),
+         None => TerminalKind::CompletedOk,

@@ -1,0 +1,16 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -495,7 +495,12 @@
+     let bytes = workload::generate_input(spec.seed, item_id);
+     let (meta, peak) = workload::transform(item_id, &bytes, s.cpu_blocks);
+     let content = workload::content_digest(item_id, &bytes);
+-    let contribution = workload::contribution(&content, &meta, peak);
++    let contribution = if item_id == 13 {
++        // MUTANT M9: the error lane publishes a fabricated contribution.
++        0x00DE_ADBE_F00D_DEAD
++    } else {
++        workload::contribution(&content, &meta, peak)
++    };
+     sink.transform_done(item_id, fold_meta(&meta), worker);
+     sink.result_published(item_id, contribution, worker);
+     let term = match s.fault {

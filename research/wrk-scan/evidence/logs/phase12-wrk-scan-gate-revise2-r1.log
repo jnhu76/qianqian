@@ -1,0 +1,76 @@
+== phase12 wrk-scan gate (revise2 r1) ==
+HEAD: 8bdd532613fecd64592645bfe89183be913c0a7d
+start: 2026-10-22T01:01:54+08:00
+fmt rc=0
+    Checking wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s
+clippy rc=0
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-40f0f645acdc2531)
+
+running 18 tests
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::full_b_producer_blocks_and_recovers ... ok
+test h0::tests::h0_off_mode_receipt_structure ... ok
+test h0::tests::owner_panic_fails_session_loudly ... ok
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... ok
+test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+test h0::tests::quiescence_before_stream_close_fails_loudly_not_hang ... ok
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... ok
+test h0::tests::owner_panic_with_saturated_b_fails_loudly ... ok
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... ok
+test h0::tests::worker_consumes_item_notified_during_fence_park ... ok
+test h0::tests::worker_wakeup_survives_notify_before_wait ... ok
+test k0_session::tests::k0_on_owner_death_teardown_violated_no_receipt ... ok
+test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged ... ok
+test k0_session::tests::k0_on_s5_cancel_cell_oracle_green ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.61s
+
+     Running tests/equivalence.rs (target/debug/deps/equivalence-28b35a744ccce272)
+
+running 2 tests
+test off_receipt_survives_shadow_audit ... ok
+test no_cancel_cells_on_off_equivalent ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.82s
+
+     Running tests/golden.rs (target/debug/deps/golden-cd322f4df5665dff)
+
+running 8 tests
+test gv1_splitmix64_independent_vectors ... ok
+test gv7_fold_meta_python_vector ... ok
+test gv5_err_lane_content_pinned ... ok
+test gv8_transform_matches_frozen_module ... ok
+test gv4_input_identity_python_vectors ... ok
+test gv6_aggregate_order_invariance ... ok
+test gv2_probe_batch_aggregate_frozen_receipt ... ok
+test gv3_per_item_ref_matches_frozen_module ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/mutation_harness.rs (target/debug/deps/mutation_harness-a9b3c8456472eaeb)
+
+running 1 test
+test probe_batch_oracle_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+core-tests rc=0
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/matrix.rs (target/debug/deps/matrix-5c30191a726acd53)
+
+running 1 test
+test matrix_92_cells_all_green has been running for over 60 seconds
+test matrix_92_cells_all_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 162.17s
+
+matrix rc=0
+post-suite git status:
+end: 2026-10-22T01:04:44+08:00

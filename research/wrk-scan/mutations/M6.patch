@@ -1,0 +1,13 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -493,7 +493,9 @@
+         sink.wait_done(item_id, s.wait_us, worker);
+     }
+     let bytes = workload::generate_input(spec.seed, item_id);
+-    let (meta, peak) = workload::transform(item_id, &bytes, s.cpu_blocks);
++    let cpu_blocks = if item_id == 26 { s.cpu_blocks - 1 } else { s.cpu_blocks };
++    // MUTANT M6: one block of CPU work quietly removed for item 26.
++    let (meta, peak) = workload::transform(item_id, &bytes, cpu_blocks);
+     let content = workload::content_digest(item_id, &bytes);
+     let contribution = workload::contribution(&content, &meta, peak);
+     sink.transform_done(item_id, fold_meta(&meta), worker);

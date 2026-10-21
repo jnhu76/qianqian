@@ -1,0 +1,5 @@
+== env ==
+SHA=b14693560dce40e273e949949b656a6bf36789d8
+2026-10-21T23:06:57+08:00
+== cmd ==
+cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test (in research/wrk-scan)

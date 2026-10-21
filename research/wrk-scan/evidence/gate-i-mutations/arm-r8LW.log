@@ -1,0 +1,56 @@
+   Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/LW/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/lib.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/wrk_scan-2389d639b3ec85e1)
+
+running 18 tests
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... ok
+
+thread 'h0-worker-1' (287236) panicked at src/h0.rs:539:13:
+h0 test-injected owner panic for item 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test h0::tests::owner_panic_fails_session_loudly ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+test h0::tests::h0_off_mode_receipt_structure ... ok
+
+thread 'h0-worker-1' (287249) panicked at src/h0.rs:539:13:
+h0 test-injected owner panic for item 0
+test h0::tests::owner_panic_with_saturated_b_fails_loudly ... ok
+test h0::tests::full_b_producer_blocks_and_recovers ... ok
+
+thread 'h0::tests::producer_done_with_queue_nonempty_still_drains' (287217) panicked at src/h0.rs:753:25:
+watchdog: control did not settle within 6s
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... FAILED
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... ok
+test h0::tests::quiescence_before_stream_close_fails_loudly_not_hang ... ok
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... ok
+
+thread '<unnamed>' (287267) panicked at src/h0.rs:995:13:
+worker never consumed the item notified during its fence park — the post-fence predicate re-check is missing or broken
+
+thread 'h0::tests::worker_consumes_item_notified_during_fence_park' (287224) panicked at src/h0.rs:757:21:
+watchdog: control thread panicked
+test h0::tests::worker_consumes_item_notified_during_fence_park ... FAILED
+
+thread 'h0-worker-2' (287271) panicked at src/h0.rs:539:13:
+h0 test-injected owner panic for item 3
+test k0_session::tests::k0_on_owner_death_teardown_violated_no_receipt ... ok
+
+thread 'h0::tests::worker_wakeup_survives_notify_before_wait' (287225) panicked at src/h0.rs:753:25:
+watchdog: control did not settle within 30s
+test h0::tests::worker_wakeup_survives_notify_before_wait ... FAILED
+test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged ... ok
+test k0_session::tests::k0_on_s5_cancel_cell_oracle_green ... ok
+
+failures:
+
+failures:
+    h0::tests::producer_done_with_queue_nonempty_still_drains
+    h0::tests::worker_consumes_item_notified_during_fence_park
+    h0::tests::worker_wakeup_survives_notify_before_wait
+
+test result: FAILED. 15 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.67s
+
+error: test failed, to rerun pass `--lib`

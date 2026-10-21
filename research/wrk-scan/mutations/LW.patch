@@ -1,0 +1,17 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -437,14 +437,6 @@
+         let mut st = shared.state.lock().unwrap();
+         while st.queue.is_empty() && !st.producer_done && !st.shutdown_requested {
+             h0_fence_park!("worker_pre_wait", st, &shared.state);
+-            // Re-evaluate the predicate AFTER the fence: the fence may
+-            // have released the state lock, so a notify may have landed
+-            // while this thread was parked — entering condvar.wait now
+-            // would lose it. This re-check is the structural lost-wakeup
+-            // defense the fence-based negative controls exercise.
+-            if !(st.queue.is_empty() && !st.producer_done && !st.shutdown_requested) {
+-                break;
+-            }
+             st = shared.work_cv.wait(st).unwrap();
+         }
+         if st.shutdown_requested || (st.queue.is_empty() && st.producer_done) {

@@ -1,0 +1,40 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 1 test
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... [tr] test: waiting worker arrivals
+[tr] park worker_pre_wait: registered, acquiring open lock
+[tr] park worker_pre_wait: holding open lock, dropping state
+[tr] S: admit_all begin
+[tr] park worker_pre_wait: registered, acquiring open lock
+[tr] park worker_pre_wait: holding open lock, dropping state
+[tr] test: workers parked; waiting admit arrival
+[tr] park admit_pre_cut: registered, acquiring open lock
+[tr] park admit_pre_cut: holding open lock, dropping state
+[tr] test: admit parked; opening gates
+[tr] park worker_pre_wait: OPEN observed
+[tr] park worker_pre_wait: re-locking state
+[tr] park worker_pre_wait: OPEN observed
+[tr] park worker_pre_wait: re-locking state
+[tr] park admit_pre_cut: OPEN observed
+[tr] park admit_pre_cut: re-locking state
+[tr] park admit_pre_cut: already open, pass through
+[tr] W1 popped 0
+[tr] park admit_pre_cut: already open, pass through
+[tr] park admit_pre_cut: already open, pass through
+[tr] S: admit_all done; finish
+[tr] W2 popped 1
+[tr] S: done flipped; settlement
+[tr] W1 acked 0
+[tr] W1 popped 2
+[tr] W2 acked 1
+[tr] W2 popped 3
+[tr] W1 acked 2
+[tr] W2 acked 3
+[tr] S: settled; quiescence
+[tr] S: quiesced
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
+

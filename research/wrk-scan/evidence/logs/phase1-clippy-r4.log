@@ -1,0 +1,26 @@
+    Checking wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error: unknown lint: `clippy::sort_by_key`
+  --> tests/golden.rs:23:14
+   |
+23 |     #![allow(clippy::sort_by_key, clippy::unnecessary_cast)]
+   |              ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unknown-lints` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unknown_lints)]`
+
+error: consider using `sort_by_key`
+   --> tests/fixtures/frozen_workload.rs:219:5
+    |
+219 |     sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_sort_by
+    = note: `-D clippy::unnecessary-sort-by` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_sort_by)]`
+help: try
+    |
+219 -     sorted.sort_by(|a, b| a.0.cmp(&b.0));
+219 +     sorted.sort_by_key(|a| a.0);
+    |
+
+error: could not compile `wrk-scan` (test "golden") due to 2 previous errors

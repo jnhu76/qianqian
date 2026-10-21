@@ -1,0 +1,107 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+  --> tests/matrix.rs:80:46
+   |
+80 |         input_digest: format!("sha256:{:x}", Sha256::digest(input_hasher.finalize())),
+   |                                       ----   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+   |                                       |
+   |                                       required by this formatting parameter
+   |
+   = help: the following other types implement trait `LowerHex`:
+             &T
+             &mut T
+             Saturating<T>
+             Wrapping<T>
+             compiler_builtins::math::libm_math::support::big::i256
+             compiler_builtins::math::libm_math::support::big::u256
+             compiler_builtins::math::libm_math::support::hex_float::hex_fmt::Hex<T>
+             i128
+           and 12 others
+   = note: the full name for the type has been written to '/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/target/debug/deps/matrix-5c30191a726acd53.long-type-2228542333026901567.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+  --> tests/matrix.rs:94:28
+   |
+94 |     format!("sha256:{:x}", h.finalize())
+   |                     ----   ^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+   |                     |
+   |                     required by this formatting parameter
+   |
+   = help: the following other types implement trait `LowerHex`:
+             &T
+             &mut T
+             Saturating<T>
+             Wrapping<T>
+             compiler_builtins::math::libm_math::support::big::i256
+             compiler_builtins::math::libm_math::support::big::u256
+             compiler_builtins::math::libm_math::support::hex_float::hex_fmt::Hex<T>
+             i128
+           and 12 others
+   = note: the full name for the type has been written to '/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan/target/debug/deps/matrix-5c30191a726acd53.long-type-2228542333026901567.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Scenario: std::cmp::Ord` is not satisfied
+    --> tests/matrix.rs:357:14
+     |
+ 357 |         refs.insert(s, build_ref(&spec));
+     |              ^^^^^^ the trait `std::cmp::Ord` is not implemented for `Scenario`
+     |
+note: required by a bound in `BTreeMap::<K, V, A>::insert`
+    --> /home/hoo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/collections/btree/map.rs:1047:12
+     |
+1045 |     pub fn insert(&mut self, key: K, value: V) -> Option<V>
+     |            ------ required by a bound in this associated function
+1046 |     where
+1047 |         K: Ord,
+     |            ^^^ required by this bound in `BTreeMap::<K, V, A>::insert`
+
+error[E0277]: the trait bound `Scenario: std::cmp::Ord` is not satisfied
+   --> tests/matrix.rs:364:18
+    |
+364 |         let r = &refs[&cell.scenario];
+    |                  ^^^^ the trait `std::cmp::Ord` is not implemented for `Scenario`
+    |
+    = note: required for `BTreeMap<Scenario, ScenarioRef>` to implement `Index<&Scenario>`
+
+error[E0308]: mismatched types
+   --> tests/matrix.rs:374:43
+    |
+374 |                 let (f, s, d, o) = run_on(cell, &spec);
+    |                                    ------ ^^^^ expected `Cell`, found `&Cell`
+    |                                    |
+    |                                    arguments to this function are incorrect
+    |
+note: function defined here
+   --> tests/matrix.rs:305:4
+    |
+305 | fn run_on(
+    |    ^^^^^^
+306 |     cell: Cell,
+    |     ----------
+help: consider dereferencing the borrow
+    |
+374 |                 let (f, s, d, o) = run_on(*cell, &spec);
+    |                                           +
+
+error[E0308]: mismatched types
+   --> tests/matrix.rs:383:38
+    |
+383 |                 let (f, s) = run_off(cell, &spec);
+    |                              ------- ^^^^ expected `Cell`, found `&Cell`
+    |                              |
+    |                              arguments to this function are incorrect
+    |
+note: function defined here
+   --> tests/matrix.rs:327:4
+    |
+327 | fn run_off(cell: Cell, spec: &BatchSpec) -> (RunFace, SessionStats) {
+    |    ^^^^^^^ ----------
+help: consider dereferencing the borrow
+    |
+383 |                 let (f, s) = run_off(*cell, &spec);
+    |                                      +
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `wrk-scan` (test "matrix") due to 6 previous errors

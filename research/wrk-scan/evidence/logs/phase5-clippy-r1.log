@@ -1,0 +1,37 @@
+    Checking qianqian-composition v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition)
+    Checking wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error: doc list item overindented
+ --> tests/matrix.rs:7:5
+  |
+7 | //!            ([`K0ScanSession`]); `DisposeVerdict::Discharged` is
+  |     ^^^^^^^^^^^ help: try using `  ` (2 spaces)
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#doc_overindented_list_items
+  = note: `-D clippy::doc-overindented-list-items` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(clippy::doc_overindented_list_items)]`
+
+error: doc list item overindented
+ --> tests/matrix.rs:8:5
+  |
+8 | //!            required.
+  |     ^^^^^^^^^^^ help: try using `  ` (2 spaces)
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#doc_overindented_list_items
+
+error: field assignment outside of initializer for an instance created with Default::default()
+   --> tests/matrix.rs:179:5
+    |
+179 |     f.admitted = receipt.items.len();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `RunFace { admitted: receipt.items.len(), ..Default::default() }` and removing relevant reassignments
+   --> tests/matrix.rs:178:5
+    |
+178 |     let mut f = RunFace::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#field_reassign_with_default
+    = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `wrk-scan` (test "matrix") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,10 @@
+== env ==
+SHA=b14693560dce40e273e949949b656a6bf36789d8
+date=2026-10-21T22:59:00+08:00
+cargo 1.97.1 (c980f4866 2026-06-30)
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+== cmd ==
+for s in r4- r5- r6-: ROUND=$s bash mutations/run-mutation-arms.sh
+cycle r4- rc=0
+cycle r5- rc=0
+cycle r6- rc=0

@@ -1,0 +1,51 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 12 tests
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... ok
+test h0::tests::h0_off_mode_receipt_structure ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::owner_panic_fails_session_loudly ... ok
+test h0::tests::full_b_producer_blocks_and_recovers ... ok
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... FAILED
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... FAILED
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... FAILED
+test h0::tests::worker_wakeup_survives_notify_before_wait ... FAILED
+
+failures:
+
+---- h0::tests::producer_done_with_queue_nonempty_still_drains stdout ----
+
+thread 'h0::tests::producer_done_with_queue_nonempty_still_drains' (148315) panicked at src/h0.rs:649:25:
+watchdog: control did not settle within 30s
+
+---- h0::tests::s5_scenario_cell_cancel_oracle_green stdout ----
+
+thread 'h0::tests::s5_scenario_cell_cancel_oracle_green' (148316) panicked at src/h0.rs:725:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::settlement_survives_done_flip_while_waiter_parked stdout ----
+
+thread 'h0::tests::settlement_survives_done_flip_while_waiter_parked' (148317) panicked at src/h0.rs:843:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- h0::tests::worker_wakeup_survives_notify_before_wait stdout ----
+
+thread 'h0::tests::worker_wakeup_survives_notify_before_wait' (148318) panicked at src/h0.rs:810:43:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+
+failures:
+    h0::tests::producer_done_with_queue_nonempty_still_drains
+    h0::tests::s5_scenario_cell_cancel_oracle_green
+    h0::tests::settlement_survives_done_flip_while_waiter_parked
+    h0::tests::worker_wakeup_survives_notify_before_wait
+
+test result: FAILED. 8 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.84s
+
+error: test failed, to rerun pass `--lib`
+rc=101

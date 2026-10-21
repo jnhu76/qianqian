@@ -1,0 +1,18 @@
+[package]
+name = "wrk-scan"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# R2 Gate I research crate (issue #306, WRK-SCAN-v0/R2-0-v3). Standalone by
+# its own empty [workspace] table (transport-dogfood precedent): cargo never
+# walks up into the production workspace and the production workspace never
+# walks down into this crate. No qianqian-* crate may depend on this package.
+# This is correctness-evidence infrastructure for issue #306 Gate I only:
+# never shipped, never benchmarked (Gate III is a separate authorization).
+
+[workspace]
+
+[dependencies]
+sha2 = "0.11.0"
+qianqian-composition = { path = "../../crates/qianqian-composition" }

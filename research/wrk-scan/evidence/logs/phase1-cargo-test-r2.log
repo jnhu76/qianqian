@@ -1,0 +1,25 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 2 tests
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... FAILED
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+
+failures:
+
+---- scenario::tests::frozen_46_cell_expansion_at_p_phys_10 stdout ----
+
+thread 'scenario::tests::frozen_46_cell_expansion_at_p_phys_10' (143242) panicked at src/scenario.rs:235:9:
+assertion `left == right` failed
+  left: 52
+ right: 46
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    scenario::tests::frozen_46_cell_expansion_at_p_phys_10
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`

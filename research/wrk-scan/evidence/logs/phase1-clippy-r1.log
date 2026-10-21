@@ -1,0 +1,70 @@
+    Checking typenum v1.20.1
+    Checking const-oid v0.10.2
+    Checking cfg-if v1.0.5
+    Checking cpufeatures v0.3.1
+    Checking hybrid-array v0.4.15
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking digest v0.11.3
+    Checking sha2 v0.11.1
+    Checking wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error: you should consider adding a `Default` implementation for `Ledger`
+  --> src/ledger.rs:87:5
+   |
+87 | /     pub fn new() -> Self {
+88 | |         Ledger {
+89 | |             inner: Mutex::new(LedgerState { next_seq: 1, records: Vec::new() }),
+90 | |         }
+91 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#new_without_default
+   = note: `-D clippy::new-without-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::new_without_default)]`
+help: try adding this
+   |
+86 + impl Default for Ledger {
+87 +     fn default() -> Self {
+88 +         Self::new()
+89 +     }
+90 + }
+   |
+
+error: manual implementation of `.is_multiple_of()`
+   --> src/scenario.rs:174:20
+    |
+174 |                 if item_id % 10 == 0 {
+    |                    ^^^^^^^^^^^^^^^^^ help: replace with: `item_id.is_multiple_of(10)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: consider using `sort_by_key`
+   --> src/workload.rs:256:5
+    |
+256 |     sorted.sort_by(|a, b| a.0.cmp(&b.0));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_sort_by
+    = note: `-D clippy::unnecessary-sort-by` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_sort_by)]`
+help: try
+    |
+256 -     sorted.sort_by(|a, b| a.0.cmp(&b.0));
+256 +     sorted.sort_by_key(|a| a.0);
+    |
+
+error: casting to the same type is unnecessary (`u32` -> `u32`)
+   --> src/workload.rs:261:26
+    |
+261 |             .rotate_left((item_id % 64) as u32);
+    |                          ^^^^^^^^^^^^^^^^^^^^^ help: try: `((item_id % 64))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_cast
+    = note: `-D clippy::unnecessary-cast` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_cast)]`
+
+error: could not compile `wrk-scan` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `wrk-scan` (lib test) due to 4 previous errors

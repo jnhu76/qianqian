@@ -1,0 +1,13 @@
+--- a/src/h0.rs
++++ b/src/h0.rs
+@@ -465,7 +465,9 @@
+         drop(st);
+ 
+         sink.item_start(item);
+-        if cancelled {
++        if cancelled || item == 22 {
++            // MUTANT M4: item 22 (group 1) is abandoned although no
++            // cancel was ever requested for its group.
+             // The owner observed the cancel while actually holding the
+             // item (dequeue observation): legal Abandon (SPEC §5.1).
+             finish_terminal(&sink, &shared, item, TerminalKind::Abandoned, worker, None);

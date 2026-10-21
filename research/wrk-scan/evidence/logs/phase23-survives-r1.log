@@ -1,0 +1,45 @@
+warning: unused variable: `spec`
+   --> src/h0.rs:482:5
+    |
+482 |     spec: &BatchSpec,
+    |     ^^^^ help: if this is intentional, prefix it with an underscore: `_spec`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `batch_id` is never read
+  --> src/observer.rs:80:11
+   |
+80 |     Off { batch_id: u64, receipt: Mutex<OffReceipt> },
+   |     ---   ^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `wrk-scan` (lib test) generated 2 warnings (run `cargo fix --lib -p wrk-scan --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-db33fe35f2383b5a)
+
+running 2 tests
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... 
+thread '<unnamed>' (147057) panicked at src/h0.rs:567:28:
+gate installed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'h0::tests::settlement_survives_done_flip_while_waiter_parked' (147056) panicked at src/h0.rs:651:21:
+watchdog: control thread panicked
+FAILED
+test h0::tests::worker_wakeup_survives_notify_before_wait ... 
+thread 'h0::tests::worker_wakeup_survives_notify_before_wait' (147061) panicked at src/h0.rs:795:37:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+FAILED
+
+failures:
+
+failures:
+    h0::tests::settlement_survives_done_flip_while_waiter_parked
+    h0::tests::worker_wakeup_survives_notify_before_wait
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`
