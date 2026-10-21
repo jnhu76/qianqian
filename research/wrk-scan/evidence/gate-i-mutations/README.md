@@ -37,9 +37,13 @@ creates a unique untracked run directory under `$TMPDIR` (pid+nanos,
 echoed on stdout) and writes the per-arm logs, the cycle summary and the
 worktree witness THERE — a replay cannot truncate or overwrite any
 committed receipt (same receipt-isolation rule as `tests/matrix.rs`'s
-`GATE_I_RECEIPT_OUT`). The archived `evidence/logs/phase12-*` files
-record the verification replay (cycle r8, default temp output) proving
-the worktree stays clean of tracked modifications end to end.
+`GATE_I_RECEIPT_OUT`). Both paths are proven end to end by the archived
+`evidence/logs/phase12-*` files: the r8 verification replay ran the FULL
+13-arm cycle with the default temp output (`git status --porcelain`
+empty before and after; `cycle-summaryr8.txt`: 13/13 MET, 0 violations,
+witness 0), and the override smoke ran another full cycle with
+`GATE_I_MUTATION_OUT=/tmp/wrk-scan-ovr-smoke` — every artifact landed in
+that directory and the repo stayed untouched.
 
 ## Results — final cycles `cycle-summaryr4-.txt`, `cycle-summaryr5-.txt`, `cycle-summaryr6-.txt`
 
@@ -79,6 +83,13 @@ recording was wrong. The driver gained the `panic:` signature class
 (commit b146935) and the r4–r6 cycles above are the corrected record.
 The r3 summary's `worktree … 1 entries` line is the honest witness that
 the dedicated-control h0.rs was in flight (uncommitted) at run time.
+`cycle-summaryr8.txt` is the receipt-isolation verification replay
+(PR #307 review round 2): first cycle executed by the driver AFTER its
+default output moved to the unique untracked run dir — same 13/13 MET,
+0 violations on the guarded source, and the pre/post `git status`
+snapshots (`evidence/logs/phase12-prestate.txt`,
+`phase12-poststate.txt`) show the repository completely untouched by
+the plain replay.
 
 ## Negative controls (Gate 授权) — mapping to executed evidence
 

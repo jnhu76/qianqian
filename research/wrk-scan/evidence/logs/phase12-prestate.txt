@@ -1,0 +1,7 @@
+== phase12 pre-state ==
+start: 2026-10-22T00:57:39+08:00
+HEAD: c4f12b3a7761a40d76c606b431ad073d98d28a6d
+git status --porcelain (pre):
+ROUND=<unset>
+GATE_I_MUTATION_OUT=<unset>
+TMPDIR=<unset>
