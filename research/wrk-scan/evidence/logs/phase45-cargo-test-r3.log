@@ -1,0 +1,92 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error[E0507]: cannot move out of `spec_for_activation`, a captured variable in an `Fn` closure
+   --> src/k0_session.rs:78:55
+    |
+ 73 |         let spec_for_activation = spec;
+    |             -------------------   ---- move occurs because `spec_for_activation` has type `BatchSpec`, which does not implement the `Copy` trait
+    |             |
+    |             captured outer variable
+...
+ 77 |             .on_activate(move |ctx| {
+    |                          ---------- captured by this `Fn` closure
+ 78 |                 let executor = H0Executor::start(cfg, spec_for_activation, sink);
+    |                                                       ^^^^^^^^^^^^^^^^^^^ `spec_for_activation` is moved here
+    |
+help: `Fn` and `FnMut` closures require captured values to be able to be consumed multiple times, but `FnOnce` closures may consume them only once
+   --> /home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition/src/component.rs:128:17
+    |
+128 |         f: impl Fn(&mut ActivationCtx<'_>) -> Result<(), ActivationError> + 'static,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0507]: cannot move out of `sink`, a captured variable in an `Fn` closure
+   --> src/k0_session.rs:78:76
+    |
+ 65 |     pub fn compose(cfg: H0Config, spec: BatchSpec, sink: ObserverSink) -> Result<Self, String> {
+    |                                                    ----  ------------ move occurs because `sink` has type `ObserverSink`, which does not implement the `Copy` trait
+    |                                                    |
+    |                                                    captured outer variable
+...
+ 77 |             .on_activate(move |ctx| {
+    |                          ---------- captured by this `Fn` closure
+ 78 |                 let executor = H0Executor::start(cfg, spec_for_activation, sink);
+    |                                                                            ^^^^ `sink` is moved here
+    |
+help: `Fn` and `FnMut` closures require captured values to be able to be consumed multiple times, but `FnOnce` closures may consume them only once
+   --> /home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition/src/component.rs:128:17
+    |
+128 |         f: impl Fn(&mut ActivationCtx<'_>) -> Result<(), ActivationError> + 'static,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `cell_for_teardown`
+  --> src/k0_session.rs:72:13
+   |
+72 |         let cell_for_teardown = Rc::clone(&cell);
+   |             ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cell_for_teardown`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0507`.
+warning: `wrk-scan` (lib) generated 1 warning
+error: could not compile `wrk-scan` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0507]: cannot move out of `spec_for_activation`, a captured variable in an `Fn` closure
+   --> src/k0_session.rs:78:55
+    |
+ 73 |         let spec_for_activation = spec;
+    |             -------------------   ---- move occurs because `spec_for_activation` has type `workload::BatchSpec`, which does not implement the `Copy` trait
+    |             |
+    |             captured outer variable
+...
+ 77 |             .on_activate(move |ctx| {
+    |                          ---------- captured by this `Fn` closure
+ 78 |                 let executor = H0Executor::start(cfg, spec_for_activation, sink);
+    |                                                       ^^^^^^^^^^^^^^^^^^^ `spec_for_activation` is moved here
+    |
+help: `Fn` and `FnMut` closures require captured values to be able to be consumed multiple times, but `FnOnce` closures may consume them only once
+   --> /home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition/src/component.rs:128:17
+    |
+128 |         f: impl Fn(&mut ActivationCtx<'_>) -> Result<(), ActivationError> + 'static,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0507]: cannot move out of `sink`, a captured variable in an `Fn` closure
+   --> src/k0_session.rs:78:76
+    |
+ 65 |     pub fn compose(cfg: H0Config, spec: BatchSpec, sink: ObserverSink) -> Result<Self, String> {
+    |                                                    ----  ------------ move occurs because `sink` has type `observer::ObserverSink`, which does not implement the `Copy` trait
+    |                                                    |
+    |                                                    captured outer variable
+...
+ 77 |             .on_activate(move |ctx| {
+    |                          ---------- captured by this `Fn` closure
+ 78 |                 let executor = H0Executor::start(cfg, spec_for_activation, sink);
+    |                                                                            ^^^^ `sink` is moved here
+    |
+help: `Fn` and `FnMut` closures require captured values to be able to be consumed multiple times, but `FnOnce` closures may consume them only once
+   --> /home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition/src/component.rs:128:17
+    |
+128 |         f: impl Fn(&mut ActivationCtx<'_>) -> Result<(), ActivationError> + 'static,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `wrk-scan` (lib test) generated 1 warning (1 duplicate)
+error: could not compile `wrk-scan` (lib test) due to 2 previous errors; 1 warning emitted
+rc=101

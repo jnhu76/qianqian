@@ -1,0 +1,42 @@
+     Locking 1 package to latest compatible version
+      Adding qianqian-composition v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition)
+   Compiling qianqian-composition v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition)
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-gate1/research/wrk-scan)
+error[E0599]: `ResolveError` doesn't implement `std::fmt::Display`
+  --> src/k0_session.rs:81:79
+   |
+81 |                     .map_err(|e| qianqian_composition::ActivationError::new(e.to_string()))
+   |                                                                               ^^^^^^^^^ method cannot be called on `ResolveError` due to unsatisfied trait bounds
+   |
+  ::: /home/hoo/Source/qianqian-r2-gate1/crates/qianqian-composition/src/context.rs:24:1
+   |
+24 | pub enum ResolveError {
+   | --------------------- doesn't satisfy `ResolveError: ToString` or `ResolveError: std::fmt::Display`
+   |
+   = note: the following trait bounds were not satisfied:
+           `ResolveError: std::fmt::Display`
+           which is required by `ResolveError: ToString`
+
+error[E0308]: mismatched types
+   --> src/k0_session.rs:136:13
+    |
+136 |           let (result, watch) = {
+    |  _____________^^^^^^^^^^^^^^^___-
+    | |             |
+    | |             expected `Result<(), SessionError>`, found `(_, _)`
+137 | |             let mut controls = self.cell.borrow_mut();
+138 | |             let executor = controls
+139 | |                 .executor
+...   |
+147 | |             result
+148 | |         };
+    | |_________- this expression has type `Result<(), SessionError>`
+    |
+    = note: expected enum `Result<(), SessionError>`
+              found tuple `(_, _)`
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `wrk-scan` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+rc=101

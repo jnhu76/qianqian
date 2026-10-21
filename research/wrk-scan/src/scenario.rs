@@ -217,7 +217,7 @@ impl Cell {
     /// the identity only has to exist and be stable for future gates.
     pub fn arm_id(self, k0_on: bool) -> String {
         format!(
-            "H0-{}-S{}-P{}-B{}",
+            "H0-{}-{}-P{}-B{}",
             if k0_on { "ON" } else { "OFF" },
             self.scenario_label(),
             self.p,

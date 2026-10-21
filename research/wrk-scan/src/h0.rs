@@ -534,6 +534,15 @@ fn finish_terminal(
 #[cfg(test)]
 static TEST_PANIC_ITEM: AtomicU32 = AtomicU32::new(u32::MAX);
 
+/// Serializes every session test (h0 + k0_session): the fence gates and
+/// TEST_PANIC_ITEM are process-global, so concurrent sessions would
+/// observe each other's injections.
+#[cfg(test)]
+pub(crate) fn session_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 #[cfg(test)]
 fn test_panic_item() -> u32 {
     TEST_PANIC_ITEM.load(Ordering::Relaxed)
@@ -653,7 +662,7 @@ pub(crate) mod fences {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     //! H0 lifecycle obligations and executable negative controls. The
     //! fence-based controls serialize on one mutex (fence gates are
     //! process-global); every control runs under a watchdog whose ONLY
@@ -664,14 +673,12 @@ mod tests {
     use std::sync::mpsc;
     use std::time::Instant;
 
-    /// Serializes every session test: the fence gates and
-    /// TEST_PANIC_ITEM are process-global, so concurrent sessions would
-    /// observe each other's injections.
-    static SESSION_TEST_LOCK: Mutex<()> = Mutex::new(());
+    pub(crate) const SEED: u64 = 0x00C0_FFEE_0304_0001;
 
-    const SEED: u64 = 0x00C0_FFEE_0304_0001;
-
-    fn with_watchdog<T: Send + 'static>(secs: u64, f: impl FnOnce() -> T + Send + 'static) -> T {
+    pub(crate) fn with_watchdog<T: Send + 'static>(
+        secs: u64,
+        f: impl FnOnce() -> T + Send + 'static,
+    ) -> T {
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             let v = f();
@@ -693,7 +700,7 @@ mod tests {
         }
     }
 
-    fn probe_cfg(p: usize, b: usize, cancel: Option<(u32, u32)>) -> H0Config {
+    pub(crate) fn probe_cfg(p: usize, b: usize, cancel: Option<(u32, u32)>) -> H0Config {
         H0Config {
             p,
             b,
@@ -705,7 +712,7 @@ mod tests {
 
     #[test]
     fn h0_on_mode_no_cancel_full_oracle_green() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         let spec = BatchSpec::probe_batch();
         let sink = ObserverSink::on(spec.batch_id);
         let stats = run_session(probe_cfg(4, 8, None), spec.clone(), &sink).expect("session");
@@ -724,7 +731,7 @@ mod tests {
 
     #[test]
     fn h0_on_mode_cancel_milestone_full_oracle_green() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         // cancel after the 24th admission (group 7), the probe milestone.
         let spec = BatchSpec::probe_batch();
         let sink = ObserverSink::on(spec.batch_id);
@@ -742,7 +749,7 @@ mod tests {
 
     #[test]
     fn h0_off_mode_receipt_structure() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         let spec = BatchSpec::probe_batch();
         let sink = ObserverSink::off(spec.batch_id);
         let stats = run_session(probe_cfg(4, 8, None), spec.clone(), &sink).expect("session");
@@ -770,7 +777,7 @@ mod tests {
 
     #[test]
     fn s5_scenario_cell_cancel_oracle_green() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         // Real frozen cell: S5, P=4, B=8 (2P), cancel after the 164th
         // admission, group 7. Non-timed correctness run.
         let cell = crate::scenario::Scenario::S5;
@@ -793,7 +800,7 @@ mod tests {
 
     #[test]
     fn full_b_producer_blocks_and_recovers() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         // B=2, P=2, 48 items: the producer MUST hit the B wall and only
         // progress after terminal ACKs release permits. b_high_water == B
         // exactly, never above; active execution never above P.
@@ -817,7 +824,7 @@ mod tests {
 
     #[test]
     fn owner_panic_fails_session_loudly() {
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         with_watchdog(30, move || {
             let _injection = PanicInjectGuard(u32::MAX);
             H0Executor::inject_owner_panic_at(3);
@@ -855,7 +862,7 @@ mod tests {
         // i.e. strictly before the condvar wait. The loop re-check after
         // the fence must observe the item; a single-check (`if`) shape
         // would sleep forever here.
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         with_watchdog(30, move || {
             fences::reset();
             fences::install("worker_pre_wait");
@@ -895,7 +902,7 @@ mod tests {
         // happen. The settle_cv notify in finish_admission is the ONLY
         // wakeup source for the parked waiter — remove it and this
         // control hangs (watchdog RED).
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         with_watchdog(30, move || {
             fences::reset();
             fences::install("producer_pre_done");
@@ -946,7 +953,7 @@ mod tests {
         // critical section (before the cut check, lock released). The
         // re-check must cut the group-7 item: never admitted, no permit
         // consumed, O7 stays green.
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         with_watchdog(30, move || {
             fences::reset();
             fences::install("admit_pre_cut");
@@ -991,7 +998,7 @@ mod tests {
         // four items and closes the offer stream while they are parked.
         // Workers must still drain the whole queue and exit cleanly —
         // producer_done never means "queue is empty".
-        let _g = SESSION_TEST_LOCK.lock().unwrap();
+        let _g = super::session_test_lock();
         with_watchdog(6, move || {
             fences::reset();
             fences::install("worker_pre_wait");
