@@ -926,6 +926,13 @@ pub(crate) fn decode_worker<P: ProcessingRuntime>(
     // could route a hold nobody ever releases and wedge the episode's
     // final drain.
     completion.worker_exited(edge.terminal());
+    // Test-only observation point INSIDE the funnel (inert in every
+    // non-test build and whenever unarmed): parks the real worker
+    // between the publication above and the cleanup below, so the W-3
+    // order oracle witnesses the production program order itself. Holds
+    // no lock at the park.
+    #[cfg(all(test, not(loom)))]
+    crate::completion::test_sync::pause_after_worker_exit_publication(&completion);
     completion.abort_stranded_seek();
     // Observation teardown: one stop path, one join path, one owner
     // (this worker), at its single exit funnel — normal and panic paths
@@ -1275,6 +1282,196 @@ mod seek_record_tests {
             assert_eq!(
                 completion.observe_snapshot().terminal_outcome,
                 Some(crate::EpisodeTerminalOutcome::Completed)
+            );
+        });
+    }
+
+    /// RAII owner of the fenced REAL decode worker (the FencedRequest
+    /// drop contract applied to the exit-funnel fixture): arming
+    /// precedes the spawn, so the worker cannot pass the funnel window
+    /// unobserved, and the explicit flow is `wait_parked` → (sample) →
+    /// `release` → `join`. Whatever has not happened when the owner
+    /// drops — an assertion panic anywhere in between included —
+    /// happens here in that order: the fence drop first (its release
+    /// sender disconnecting ends the worker's park), then the join.
+    /// Neither step panics, so the original failure is the one that
+    /// propagates while the parked funnel still resumes to completion.
+    /// Drop covers panic/unwind hygiene; it is not an unconditional
+    /// bounded join — the fenced funnel is non-blocking by construction
+    /// (the park holds no lock, the slot is empty, the edge is EOF, the
+    /// analyst runs one bounded iteration), so the join always ends.
+    struct FencedFunnelWorker {
+        fence: Option<crate::completion::test_sync::Fence>,
+        worker: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl FencedFunnelWorker {
+        fn spawn(
+            completion: &SessionCompletion,
+            edge: Arc<PcmEdge>,
+            seeks: Arc<AtomicUsize>,
+            invalidations: Arc<AtomicUsize>,
+        ) -> FencedFunnelWorker {
+            let fence = crate::completion::test_sync::arm_exit_funnel(completion);
+            let worker_completion = completion.clone();
+            let worker = std::thread::spawn(move || {
+                decode_worker(
+                    Box::new(Provider {
+                        seeks,
+                        ending: false,
+                    }),
+                    edge,
+                    worker_completion,
+                    STAGING_FRAMES,
+                    Processing(invalidations),
+                    ObservationTap::new(crate::test_common::TEST_FORMAT, STAGING_FRAMES),
+                );
+            });
+            FencedFunnelWorker {
+                fence: Some(fence),
+                worker: Some(worker),
+            }
+        }
+
+        fn wait_parked(&self) {
+            self.fence
+                .as_ref()
+                .expect("the fenced worker was already released")
+                .wait_parked();
+        }
+
+        fn release(&mut self) {
+            if let Some(fence) = self.fence.take() {
+                fence.release();
+            }
+        }
+
+        fn join(&mut self) {
+            if let Some(worker) = self.worker.take() {
+                worker.join().expect("the fenced decode worker returned");
+            }
+        }
+    }
+
+    impl Drop for FencedFunnelWorker {
+        fn drop(&mut self) {
+            if let Some(fence) = self.fence.take() {
+                drop(fence);
+            }
+            if let Some(worker) = self.worker.take() {
+                let _ = worker.join();
+            }
+        }
+    }
+
+    /// W-3 — the Family W exit-funnel order oracle (#300 comment
+    /// 6308094792; owner admission #300 comment 6308167569). PROPERTY:
+    /// the real decode worker's exit funnel publishes `worker_gone` and
+    /// the terminal evidence BEFORE `abort_stranded_seek` runs — the
+    /// production program order `worker_exited` → `abort_stranded_seek`
+    /// (ADR-PBK-002 §20 D14.5 corrective-1: no plant may exist whose
+    /// only resolver is gone).
+    ///
+    /// PRECONDITION: the fence is armed before the real `decode_worker`
+    /// is spawned; the park rendezvous (mpsc, both directions) is the
+    /// S1 edge, and the 5 s deadline is only a failure watchdog. The
+    /// worker parks holding no lock (the window sits between two funnel
+    /// statements), so the controller's lock-backed sample cannot
+    /// collide with a lock-holding park.
+    ///
+    /// EXECUTION: the two funnel calls are NEVER driven by the test —
+    /// the real worker reaches the fence inside its own immediate-EOF
+    /// exit funnel. `worker_gone` has exactly one writer in the crate
+    /// (the production `worker_exited` publication; this fixture sets
+    /// no booleans), and it is sampled through the production
+    /// completion lock, so the witness cannot be a test-planted value.
+    ///
+    /// LEGAL OUTCOMES: the fixture deliberately fixes the single branch
+    /// (worker parks between publication and cleanup); this premise is
+    /// stronger than the general product guarantee and is never
+    /// promoted back into one.
+    ///
+    /// OBSERVATION: the order witness is `worker_gone == true` AT the
+    /// between-calls fence, sampled under the real completion lock —
+    /// publication strictly before the fence is publication strictly
+    /// before the cleanup that follows it. Post-join asserts verify the
+    /// correct funnel also completes its cleanup (slot clear, nothing
+    /// routed). The D11 terminal Fact is NOT settled here (no drain
+    /// owner exists in this fixture); settlement is owned by the
+    /// existing settlement/leg oracles.
+    ///
+    /// FALSIFIER (EXECUTED_MUTATION; #242 discipline — RED actually
+    /// observed, see PR evidence): swapping ONLY the two production
+    /// calls in `decode_worker`, fence untouched, makes the mutated
+    /// funnel run the cleanup first (nothing stranded, so it can never
+    /// run again) and park with `worker_gone` still false; this test
+    /// then REDs at exactly the order witness. Scope note (owner gate
+    /// item 4): at funnel entry the edge is already terminal (EOF), so
+    /// a concurrent `request_seek` would be refused by its Open sample
+    /// regardless of `worker_gone` — rejection is deliberately NOT part
+    /// of this oracle; the worker_gone order witness is the sole
+    /// discriminator.
+    #[test]
+    fn the_real_exit_funnel_publishes_worker_gone_before_its_cleanup() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(2, 8));
+            let seeks = Arc::new(AtomicUsize::new(0));
+            let invalidations = Arc::new(AtomicUsize::new(0));
+
+            let mut worker = FencedFunnelWorker::spawn(
+                &completion,
+                edge.clone(),
+                seeks.clone(),
+                invalidations.clone(),
+            );
+            worker.wait_parked();
+
+            // The real worker is parked INSIDE its own exit funnel,
+            // between `worker_exited` and `abort_stranded_seek`. The
+            // W-3 order witness: the publication already happened.
+            let state = crate::completion::test_sync::second_hold_state(&completion);
+            assert!(
+                state.worker_gone,
+                "at the exit-funnel fence (between the two production calls), \
+                 worker_gone must already be published: the funnel's cleanup \
+                 may only run after the worker's liveness evidence exists"
+            );
+            assert_eq!(
+                state.worker_terminal,
+                Some(crate::edge::EdgeTerminal::Eof),
+                "the same publication also carries the worker's terminal evidence"
+            );
+
+            worker.release();
+            worker.join();
+
+            // The correct funnel completes its cleanup after the fence:
+            // the stranded-seek sweep finds an empty slot (this fixture
+            // never plants one) and the protocol stays clean.
+            assert!(
+                !completion.seek_in_flight(),
+                "the post-fence cleanup must leave no seek in flight"
+            );
+            assert_eq!(completion.take_seek_command(), None);
+            assert!(
+                !completion.seek_release_pending(),
+                "an empty-slot cleanup routes no seek release"
+            );
+            assert_eq!(completion.seek_protocol_state(), (false, false, None));
+            // The publication is persistent: the same lock-backed
+            // read-out still reports the worker gone after the funnel
+            // completed.
+            let settled = crate::completion::test_sync::second_hold_state(&completion);
+            assert!(settled.worker_gone);
+            assert_eq!(
+                settled.worker_terminal,
+                Some(crate::edge::EdgeTerminal::Eof)
+            );
+            assert_eq!(
+                seeks.load(Ordering::SeqCst),
+                0,
+                "the immediate-EOF worker executed no provider seek"
             );
         });
     }

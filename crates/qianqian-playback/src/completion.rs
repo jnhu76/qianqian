@@ -1450,6 +1450,14 @@ pub(crate) mod test_sync {
         /// `request_stop`: after intent recording, before this request's
         /// own data-plane stop.
         StopWindow,
+        /// The decode worker's exit funnel: after `worker_exited`
+        /// published `worker_terminal`/`worker_gone`, before
+        /// `abort_stranded_seek`. Held by the REAL worker inside
+        /// `decode_worker` (never fixture-driven), holding no lock at
+        /// the park, so the funnel's publication-before-cleanup program
+        /// order is directly witnessable between the two production
+        /// calls.
+        ExitFunnelAfterPublication,
     }
 
     struct Armed {
@@ -1622,6 +1630,14 @@ pub(crate) mod test_sync {
         arm_at(completion, Site::SeekRoute)
     }
 
+    /// Arm the fence for exactly this completion's real decode worker
+    /// reaching its exit-funnel window (after `worker_exited`, before
+    /// `abort_stranded_seek`). Other sites and other completions pass
+    /// through.
+    pub(crate) fn arm_exit_funnel(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::ExitFunnelAfterPublication)
+    }
+
     fn arm_at(completion: &SessionCompletion, site: Site) -> Fence {
         let (parked_tx, parked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -1670,6 +1686,15 @@ pub(crate) mod test_sync {
     /// `request_stop` window (see [`Site::StopWindow`]).
     pub(super) fn pause_between_intent_and_own_edge_stop(completion: &SessionCompletion) {
         pause_at(completion, Site::StopWindow);
+    }
+
+    /// [`pause_between_open_sample_and_second_hold`] for the REAL decode
+    /// worker's exit funnel (see [`Site::ExitFunnelAfterPublication`]).
+    /// The worker parks holding no lock: the window sits between two
+    /// statements of the funnel, and the preceding call's lock hold ended
+    /// inside it.
+    pub(crate) fn pause_after_worker_exit_publication(completion: &SessionCompletion) {
+        pause_at(completion, Site::ExitFunnelAfterPublication);
     }
 
     fn pause_at(completion: &SessionCompletion, site: Site) {
