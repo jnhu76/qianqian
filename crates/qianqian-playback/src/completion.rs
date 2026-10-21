@@ -1450,6 +1450,14 @@ pub(crate) mod test_sync {
         /// `request_stop`: after intent recording, before this request's
         /// own data-plane stop.
         StopWindow,
+        /// The decode worker's exit funnel: after `worker_exited`
+        /// published `worker_terminal`/`worker_gone`, before
+        /// `abort_stranded_seek`. Held by the REAL worker inside
+        /// `decode_worker` (never fixture-driven), holding no lock at
+        /// the park, so the funnel's publication-before-cleanup program
+        /// order is directly witnessable between the two production
+        /// calls.
+        ExitFunnelAfterPublication,
     }
 
     struct Armed {
@@ -1512,13 +1520,17 @@ pub(crate) mod test_sync {
         }
     }
 
-    /// The RAII owner of one fenced request: the fence AND the request
-    /// thread. The explicit flow is `wait_parked` → (drive the window) →
-    /// `release` → `join`; whatever has not happened when the owner drops
-    /// — an assertion panic anywhere in between included — happens here,
-    /// in that order: the fence drop first (its release sender
-    /// disconnecting ends the parked receive), then the join. Neither
-    /// step panics, so the ORIGINAL failure is the one that propagates.
+    /// The RAII owner of one fenced thread body: the fence AND the body's
+    /// thread. The body is usually one of the request paths ([`FencedRequest::spawn`],
+    /// [`FencedRequest::spawn_at_seek_route`], [`FencedRequest::spawn_stop`]);
+    /// [`FencedRequest::spawn_with`] owns an arbitrary body — e.g. the real
+    /// decode worker — under the same contract. The explicit flow is
+    /// `wait_parked` → (drive the window) → `release` → `join`; whatever has
+    /// not happened when the owner drops — an assertion panic anywhere in
+    /// between included — happens here, in that order: the fence drop first
+    /// (its release sender disconnecting ends the parked receive), then the
+    /// join. Neither step panics, so the ORIGINAL failure is the one that
+    /// propagates.
     ///
     /// Drop covers panic/unwind hygiene. It is not an unconditional
     /// bounded join: nothing in a test can force-terminate a genuinely
@@ -1564,6 +1576,22 @@ pub(crate) mod test_sync {
             let fence = arm_stop(completion);
             let completion = completion.clone();
             let requester = std::thread::spawn(move || completion.request_stop());
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
+        /// [`FencedRequest::spawn`] for an arbitrary fenced body: the
+        /// caller arms the site first (`spawn_with` spawns only after
+        /// taking the fence, so the arm-before-spawn ordering holds), and
+        /// the body — e.g. the real decode worker — parks inside it under
+        /// the same owner contract.
+        pub(crate) fn spawn_with(
+            fence: Fence,
+            body: impl FnOnce() + Send + 'static,
+        ) -> FencedRequest {
+            let requester = std::thread::spawn(body);
             FencedRequest {
                 fence: Some(fence),
                 requester: Some(requester),
@@ -1622,6 +1650,14 @@ pub(crate) mod test_sync {
         arm_at(completion, Site::SeekRoute)
     }
 
+    /// Arm the fence for exactly this completion's real decode worker
+    /// reaching its exit-funnel window (after `worker_exited`, before
+    /// `abort_stranded_seek`). Other sites and other completions pass
+    /// through.
+    pub(crate) fn arm_exit_funnel(completion: &SessionCompletion) -> Fence {
+        arm_at(completion, Site::ExitFunnelAfterPublication)
+    }
+
     fn arm_at(completion: &SessionCompletion, site: Site) -> Fence {
         let (parked_tx, parked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -1670,6 +1706,15 @@ pub(crate) mod test_sync {
     /// `request_stop` window (see [`Site::StopWindow`]).
     pub(super) fn pause_between_intent_and_own_edge_stop(completion: &SessionCompletion) {
         pause_at(completion, Site::StopWindow);
+    }
+
+    /// [`pause_between_open_sample_and_second_hold`] for the REAL decode
+    /// worker's exit funnel (see [`Site::ExitFunnelAfterPublication`]).
+    /// The worker parks holding no lock: the window sits between two
+    /// statements of the funnel, and the preceding call's lock hold ended
+    /// inside it.
+    pub(crate) fn pause_after_worker_exit_publication(completion: &SessionCompletion) {
+        pause_at(completion, Site::ExitFunnelAfterPublication);
     }
 
     fn pause_at(completion: &SessionCompletion, site: Site) {
