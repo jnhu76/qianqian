@@ -1,5 +1,5 @@
    Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/clean-c/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
      Running tests/mutation_harness.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/mutation_harness-b183021465fd519b)
 
 running 1 test
@@ -17,5 +17,5 @@ ADMITTED=40 JOINED=4
 VERDICT = GREEN
 test probe_batch_oracle_green ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
 

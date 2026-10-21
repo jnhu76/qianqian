@@ -46,7 +46,7 @@ modifications 0.
 | M7 | post-cancel admission — group-7 item 27 after the cut | O7 | `O7_no_admission_after_cancel` |
 | M8 | wait + IoWaitDone both omitted — item 25 | O2 (wait dimension) | `O2_exactly_once_effects` |
 | M9 | error-lane contribution forgery — fault item 13 | O3 (Err branch) | `O3_content_vs_ref` |
-| LW | post-fence predicate re-check deleted (supplementary — kills the lost-wakeup defense's non-vacuity) | control watchdog | `watchdog:` (fence control times out) |
+| LW | post-fence predicate re-check deleted (supplementary — kills the lost-wakeup defense's non-vacuity) | `worker_consumes_item_notified_during_fence_park` (dedicated: no alternative wakeup source in its schedule) | `worker never consumed` (deterministic; see `gate-i-finding-lost-wakeup.md` §RED-side status for the masked-sibling history) |
 | PB | defect-path B-permit wedge reintroduced (supplementary — reverts the panic-path fix) | control watchdog | `watchdog:` (`owner_panic_with_saturated_b_fails_loudly` times out) |
 
 Signatures match the frozen probe receipt (APP-C §C.6) exactly, except

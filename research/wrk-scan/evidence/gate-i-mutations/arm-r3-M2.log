@@ -1,5 +1,5 @@
    Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/M2/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
      Running tests/mutation_harness.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/mutation_harness-bbb0f6b22cd7d09d)
 
 running 1 test
@@ -16,7 +16,7 @@ ADMITTED=40 JOINED=4
   O10_no_effect_after_quiescence             PASS
 VERDICT = RED
 
-thread 'probe_batch_oracle_green' (210992) panicked at tests/mutation_harness.rs:42:5:
+thread 'probe_batch_oracle_green' (239134) panicked at tests/mutation_harness.rs:42:5:
 ORACLE RED: [CheckResult { check: "O2_exactly_once_effects", pass: false, detail: "item 10: 2 ResultPublished effects (expect 1)" }, CheckResult { check: "O3_content_vs_ref", pass: false, detail: "aggregate digest 10315313916799861499 != expected 5861790606641471796" }]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test probe_batch_oracle_green ... FAILED

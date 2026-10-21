@@ -60,3 +60,31 @@ while pred {
   的实现载体；M-class 单检查变体（`if` 替代 `while`/删除复检）将由
   mutation 臂给出 RED 证据。
 - 全部过程日志归档于 `evidence/logs/phase23-*`（含每轮失败现场）。
+
+## RED-side status (Gate I closure)
+
+The original text above claims the mutation arm would give the RED
+evidence. Gate I executed this in three stages, all logs retained:
+
+1. First construction (delete the `worker_main` post-fence re-check, run
+   the whole lib suite): killed 2/3 cycles — but via the SIBLING control
+   `producer_done_with_queue_nonempty_still_drains`'s 6 s watchdog, whose
+   premise depends on a lock re-acquire race between fence-returning
+   threads and the producer's notify burst. Cycle r2 escaped entirely:
+   the dedicated controls are masked in some arrival orders because
+   `finish_admission`'s `notify_all` (and multi-worker drain) provides
+   alternative wakeup sources — the deleted `notify_one` is not the only
+   path to settlement. Premise-by-timing (the repository's known
+   recurring class, cf. R0-B #246); evidence retained as
+   `gate-i-mutations/arm-{,r2-,r3-}LW.log` from the first cycles.
+2. Fix: a DEDICATED control with no alternative wakeup source —
+   `worker_consumes_item_notified_during_fence_park` (P=1, B=1, one item,
+   no `finish_admission`, no cancel): the enqueue + `notify_one` land
+   while the worker is parked at the fence, and the post-fence re-check
+   is the ONLY way the item is ever observed; a 3 s observation window
+   panics "worker never consumed…" otherwise. Clean tree GREEN; the LW
+   mutant went RED 3/3 consecutive runs (pre-fix, arm runs against the
+   pre-control sibling tests are retained for the record).
+3. The LW arm's designated detection is now that panic message. The
+   claim in this file is thereby closed with deterministic executed
+   evidence: the re-check is load-bearing, and deleting it is caught.

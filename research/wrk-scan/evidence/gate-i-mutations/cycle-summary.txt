@@ -8,9 +8,9 @@ M6 rc=101 MET (RED; failed: O3_content_vs_ref )
 M7 rc=101 MET (RED; failed: O7_no_admission_after_cancel )
 M8 rc=101 MET (RED; failed: O2_exactly_once_effects )
 M9 rc=101 MET (RED; failed: O3_content_vs_ref )
-LW rc=101 MET (RED; failed: watchdog/control detection)
+LW rc=101 VIOLATION (RED but designated 'worker never consumed' not in log; failed: )
 PB rc=101 MET (RED; failed: watchdog/control detection)
 C-green rc=0 MET (VERDICT = GREEN)
 rc_legend: MET = green arm green / mutant arm RED with designated check
-total violations: 0
-worktree src/tests modifications: 6 entries (0 = untouched)
+total violations: 1
+worktree src/tests modifications: 1 entries (0 = untouched)

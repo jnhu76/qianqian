@@ -16,7 +16,7 @@ ADMITTED=40 JOINED=4
   O10_no_effect_after_quiescence             FAIL
 VERDICT = RED
 
-thread 'probe_batch_oracle_green' (211737) panicked at tests/mutation_harness.rs:42:5:
+thread 'probe_batch_oracle_green' (239875) panicked at tests/mutation_harness.rs:42:5:
 ORACLE RED: [CheckResult { check: "O6_executors_joined_before_quiescence", pass: false, detail: "executor 4 exited at 194 AFTER receipt 193; receipt at 193 is not the last record (last: ExecutorExited at 194)" }, CheckResult { check: "O10_no_effect_after_quiescence", pass: false, detail: "records after receipt: ExecutorExited@194" }]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test probe_batch_oracle_green ... FAILED

@@ -72,10 +72,15 @@ observables) using the implementation's formal record names.
   `ORACLE=GREEN`.
 - S5 rows: admitted exactly 225 of N=256 (deterministic — the cut bites
   at the frozen 164th admission and every later group-7 offer is cut);
-  Abandons 1 / 2 / 3 at P=4 / 5 / 10 respectively (the in-flight window
-  grows with P); every admitted item reached a terminal.
+  every admitted item reached a terminal. WHICH in-flight group-7 items
+  Abandon vs complete is legal schedule-dependent nondeterminism (SPEC
+  §6.3): the abandoned count grows with the in-flight window (1–4 across
+  P=4/5/10 in the committed run), and the ON/OFF arms of a cell may
+  legally diverge here — each row is independently GREEN via the oracle
+  (ON) and the per-item legal-set audit (both).
 - `MAX_B_IN_FLIGHT ≤ B` and `MAX_ACTIVE_EXECUTION ≤ P` on every row.
 - No-cancel rows: identical `RESULT_DIGEST` and `AGGREGATE_DIGEST` across
-  K0 modes, P, B, and across the two independent runs — the deterministic
-  correctness baseline (one distinct digest per scenario; S5 has three,
-  one per legal abandoned-count outcome, identical across K0 modes).
+  K0 modes, P, B, and across independent runs — the deterministic
+  correctness baseline (one distinct digest per scenario; S5 has one
+  digest per legal abandoned-set outcome, so its count can differ between
+  runs and between a cell's ON/OFF arms).

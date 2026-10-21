@@ -129,6 +129,9 @@ struct Shared {
 
 /// The H0 executor. `start` spawns the worker pool; the session owner
 /// (control thread) then drives admission, settlement and quiescence.
+///
+/// Dropping without `abort()` / `await_quiescence()` leaks the parked
+/// worker pool — every caller must take the session to a terminal action.
 pub struct H0Executor {
     cfg: H0Config,
     spec: BatchSpec,
@@ -577,7 +580,13 @@ static TEST_PANIC_ITEM: AtomicU32 = AtomicU32::new(u32::MAX);
 #[cfg(test)]
 pub(crate) fn session_test_lock() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Fixture hygiene: a control that hung inside its watchdog thread
+    // (mutation arms) never drops its PanicInjectGuard, so the
+    // process-global injection would cascade-fail every later session
+    // test. Acquiring the fixture lock resets it.
+    TEST_PANIC_ITEM.store(u32::MAX, Ordering::Relaxed);
+    guard
 }
 
 #[cfg(test)]
@@ -927,6 +936,56 @@ pub(crate) mod tests {
     }
 
     // ---- executable interleaving controls (fence-based) ----
+
+    /// The post-fence re-check's dedicated kill target: the item's
+    /// enqueue + `notify_one` land while the worker is parked inside its
+    /// predicate loop, and NO other wakeup source exists (no done-flip,
+    /// no further admission, no cancel). With the re-check the parked
+    /// worker observes the queue on wake and consumes the item promptly;
+    /// with the re-check deleted the worker sleeps forever and the 3 s
+    /// observation window panics — the LW mutation arm's designated RED.
+    #[test]
+    fn worker_consumes_item_notified_during_fence_park() {
+        let _g = super::session_test_lock();
+        with_watchdog(30, move || {
+            fences::reset();
+            fences::install("worker_pre_wait");
+            let spec = BatchSpec::new(1, SEED, 1);
+            let sink = ObserverSink::on(spec.batch_id);
+            let mut ex = H0Executor::start(probe_cfg(1, 1, None), spec.clone(), sink.clone());
+            fences::wait_arrivals("worker_pre_wait", 1);
+            // The admission's enqueue + notify_one land while the worker
+            // is parked at the fence (park releases the state lock but
+            // blocks on the gate, never on work_cv). Run on this thread —
+            // B=1 admits the single item without blocking.
+            ex.admit_all();
+            fences::open("worker_pre_wait");
+            // The re-check is the only path to the item now. A missing
+            // consumption is the lost wakeup, deterministically.
+            let deadline = std::time::Instant::now() + Duration::from_secs(3);
+            let consumed = loop {
+                if std::time::Instant::now() > deadline {
+                    break false;
+                }
+                let done = sink
+                    .ledger()
+                    .unwrap()
+                    .snapshot()
+                    .iter()
+                    .any(|r| r.item_id == Some(0) && r.terminal.is_some());
+                if done {
+                    break true;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            };
+            assert!(
+                consumed,
+                "worker never consumed the item notified during its fence park — \
+                 the post-fence predicate re-check is missing or broken"
+            );
+            ex.abort(); // cleanup join; the parked worker exits via the funnel
+        });
+    }
 
     #[test]
     fn worker_wakeup_survives_notify_before_wait() {

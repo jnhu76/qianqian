@@ -1,74 +1,44 @@
    Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms/PB/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
      Running unittests src/lib.rs (/tmp/wrk-scan-mutation-arms/shared-target/debug/deps/wrk_scan-2987aeb701679842)
 
-running 16 tests
+running 17 tests
 test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
 test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
 test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+
+thread 'h0-worker-1' (238513) panicked at src/h0.rs:517:13:
+h0 test-injected owner panic for item 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'h0::tests::owner_panic_with_saturated_b_fails_loudly' (238494) panicked at src/h0.rs:731:25:
+watchdog: control did not settle within 30s
+test h0::tests::owner_panic_with_saturated_b_fails_loudly ... FAILED
 test h0::tests::full_b_producer_blocks_and_recovers ... ok
 test h0::tests::h0_off_mode_receipt_structure ... ok
 test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... ok
-test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
-test h0::tests::producer_done_with_queue_nonempty_still_drains ... ok
 
-thread 'h0-worker-4' (209873) panicked at src/h0.rs:514:13:
+thread 'h0-worker-2' (238541) panicked at src/h0.rs:517:13:
 h0 test-injected owner panic for item 3
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test h0::tests::owner_panic_fails_session_loudly ... ok
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... ok
+test h0::tests::worker_wakeup_survives_notify_before_wait ... ok
+test h0::tests::worker_consumes_item_notified_during_fence_park ... ok
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... ok
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... ok
 
-thread 'h0-worker-1' (209875) panicked at src/h0.rs:514:13:
-h0 test-injected owner panic for item 0
-
-thread 'h0::tests::owner_panic_with_saturated_b_fails_loudly' (209838) panicked at src/h0.rs:722:25:
-watchdog: control did not settle within 30s
-test h0::tests::owner_panic_with_saturated_b_fails_loudly ... FAILED
-
-thread 'h0-worker-3' (210024) panicked at src/h0.rs:514:13:
-h0 test-injected owner panic for item 0
-
-thread 'h0::tests::s5_scenario_cell_cancel_oracle_green' (209842) panicked at src/h0.rs:820:10:
-session: SessionError { worker: 3, item: 0, message: "h0 test-injected owner panic for item 0" }
-test h0::tests::s5_scenario_cell_cancel_oracle_green ... FAILED
-
-thread 'h0-worker-1' (210027) panicked at src/h0.rs:514:13:
-h0 test-injected owner panic for item 0
-
-thread '<unnamed>' (210028) panicked at src/h0.rs:942:39:
-settlement: SessionError { worker: 1, item: 0, message: "h0 test-injected owner panic for item 0" }
-
-thread '<unnamed>' (210026) panicked at src/h0.rs:956:44:
-session completes: RecvError
-
-thread 'h0::tests::worker_wakeup_survives_notify_before_wait' (209845) panicked at src/h0.rs:726:21:
-watchdog: control thread panicked
-test h0::tests::worker_wakeup_survives_notify_before_wait ... FAILED
-
-thread 'h0-worker-1' (210030) panicked at src/h0.rs:514:13:
-h0 test-injected owner panic for item 0
-test h0::tests::settlement_survives_done_flip_while_waiter_parked has been running for over 60 seconds
-test k0_session::tests::k0_on_owner_death_teardown_violated_no_receipt has been running for over 60 seconds
-test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged has been running for over 60 seconds
-test k0_session::tests::k0_on_s5_cancel_cell_oracle_green has been running for over 60 seconds
-
-thread 'h0::tests::settlement_survives_done_flip_while_waiter_parked' (209844) panicked at src/h0.rs:722:25:
-watchdog: control did not settle within 30s
-test h0::tests::settlement_survives_done_flip_while_waiter_parked ... FAILED
-
-thread 'h0-worker-3' (210403) panicked at src/h0.rs:514:13:
+thread 'h0-worker-4' (238565) panicked at src/h0.rs:517:13:
 h0 test-injected owner panic for item 3
 test k0_session::tests::k0_on_owner_death_teardown_violated_no_receipt ... ok
-test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged ... ok
 test k0_session::tests::k0_on_s5_cancel_cell_oracle_green ... ok
+test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged ... ok
 
 failures:
 
 failures:
     h0::tests::owner_panic_with_saturated_b_fails_loudly
-    h0::tests::s5_scenario_cell_cancel_oracle_green
-    h0::tests::settlement_survives_done_flip_while_waiter_parked
-    h0::tests::worker_wakeup_survives_notify_before_wait
 
-test result: FAILED. 12 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 62.40s
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.03s
 
 error: test failed, to rerun pass `--lib`

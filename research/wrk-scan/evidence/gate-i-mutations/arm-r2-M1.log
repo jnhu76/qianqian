@@ -16,7 +16,7 @@ ADMITTED=39 JOINED=4
   O10_no_effect_after_quiescence             PASS
 VERDICT = RED
 
-thread 'probe_batch_oracle_green' (205679) panicked at tests/mutation_harness.rs:42:5:
+thread 'probe_batch_oracle_green' (235919) panicked at tests/mutation_harness.rs:42:5:
 ORACLE RED: [CheckResult { check: "O1_terminal_coverage", pass: false, detail: "admitted-but-no-terminal: [20]" }, CheckResult { check: "O9_fanin_after_all_terminals", pass: false, detail: "aggregate at 189 before item 20 terminal" }]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test probe_batch_oracle_green ... FAILED
