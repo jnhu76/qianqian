@@ -160,9 +160,11 @@ echo "total violations: $VIOLATIONS" >> "$SUMMARY"
 
 # ---- main-worktree byte-identity witness (the driver never edits it) ----
 # Only tracked-file MODIFICATIONS count; untracked new files are the
-# campaign's own deliverables.
-git -C "$CRATE" status --porcelain -- src tests | grep -v '^??' > "$EV/worktree-untouched.txt" || true
-echo "worktree src/tests modifications: $(wc -l < "$EV/worktree-untouched.txt") entries (0 = untouched)" >> "$SUMMARY"
+# campaign's own deliverables. mutations/ is covered too: a patch file
+# edited in-flight would otherwise make the archived cycle unreproducible
+# from HEAD (delta review P2/P3, PR #307).
+git -C "$CRATE" status --porcelain -- src tests mutations | grep -v '^??' > "$EV/worktree-untouched.txt" || true
+echo "worktree src/tests/mutations modifications: $(wc -l < "$EV/worktree-untouched.txt") entries (0 = untouched)" >> "$SUMMARY"
 
 cat "$SUMMARY"
 exit $([ "$VIOLATIONS" -eq 0 ] && echo 0 || echo 1)
