@@ -30,9 +30,12 @@ campaign's H0 executor (`src/h0.rs`).
 
 ### Run-artifact isolation (PR #307 review round 2)
 
-Every file in this directory is an intentional archive, produced by an
-explicit `GATE_I_MUTATION_OUT=<this-dir>` run. It is never a default
-write target: a plain replay (`bash mutations/run-mutation-arms.sh`)
+The files in this directory are intentional archives. Up to cycle r7
+they were produced directly — this directory was then the driver's
+default output target; since the receipt-isolation fix (c4f12b3) an
+archive here can only be produced by an explicit
+`GATE_I_MUTATION_OUT=<this-dir>` run. The driver never writes here by
+default anymore: a plain replay (`bash mutations/run-mutation-arms.sh`)
 creates a unique untracked run directory under `$TMPDIR` (pid+nanos,
 echoed on stdout) and writes the per-arm logs, the cycle summary and the
 worktree witness THERE — a replay cannot truncate or overwrite any
@@ -83,13 +86,22 @@ recording was wrong. The driver gained the `panic:` signature class
 (commit b146935) and the r4–r6 cycles above are the corrected record.
 The r3 summary's `worktree … 1 entries` line is the honest witness that
 the dedicated-control h0.rs was in flight (uncommitted) at run time.
+`cycle-summaryr7-.txt` is the re-admission cycle on the guarded source
+(quiescence precondition guard, commit 9ad5e0a): same 13/13 MET,
+0 violations, with M5 dying on `O6`+`O10` through the regenerated
+`M5d.patch` (f3f2e81).
 `cycle-summaryr8.txt` is the receipt-isolation verification replay
 (PR #307 review round 2): first cycle executed by the driver AFTER its
 default output moved to the unique untracked run dir — same 13/13 MET,
 0 violations on the guarded source, and the pre/post `git status`
 snapshots (`evidence/logs/phase12-prestate.txt`,
 `phase12-poststate.txt`) show the repository completely untouched by
-the plain replay.
+the plain replay. It was invoked as
+`ROUND=r8 bash mutations/run-mutation-arms.sh` (the prestate file
+records the ambient, unset environment); `ROUND` only stamps artifact
+names INSIDE the run dir — hence `arm-r8M1.log`/`cycle-summaryr8.txt`
+vs the `r7-` style of earlier rounds — so the isolation claim rests on
+the echoed default run dir, not on the ROUND prefix.
 
 ## Negative controls (Gate 授权) — mapping to executed evidence
 
