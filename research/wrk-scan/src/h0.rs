@@ -292,6 +292,24 @@ impl H0Executor {
     /// record. A caller that skipped settlement — or a worker that died
     /// outside `catch_unwind` — is a loud `Err`, never a forged receipt.
     pub fn await_quiescence(&mut self) -> Result<SessionStats, SessionError> {
+        // Precondition guard (Owner review P2, PR #307): a worker can only
+        // exit via the drain funnel (`producer_done` + empty queue) or an
+        // abort. With the offer stream still open, workers are parked (or
+        // will park) forever, so `join` has no termination guarantee —
+        // reject BEFORE joining instead of hanging. With `producer_done`
+        // set, every admitted item completes in bounded time and the join
+        // terminates; settlement itself is still enforced after the join.
+        // The parked pool is recovered with [`Self::abort`].
+        if !self.shared.state.lock().unwrap().producer_done {
+            return Err(SessionError {
+                worker: 0,
+                item: u32::MAX,
+                message: "await_quiescence before the offer stream is closed \
+                          (finish_admission): workers can never drain-exit — \
+                          recover an un-settled executor with abort()"
+                    .into(),
+            });
+        }
         let stats = self.join_workers()?;
         let mut sorted = {
             let st = self.shared.state.lock().unwrap();
@@ -1158,6 +1176,39 @@ pub(crate) mod tests {
             assert_eq!(stats.admitted_count, 4);
             assert_eq!(stats.workers_joined, 2);
             assert!(green);
+        });
+    }
+
+    #[test]
+    fn quiescence_before_stream_close_fails_loudly_not_hang() {
+        // Owner review P2 (PR #307): await_quiescence() on an executor
+        // whose offer stream is still open would join workers parked on
+        // their condvar — an unbounded hang (drain-exit requires
+        // producer_done). The precondition guard must reject BEFORE the
+        // join; the watchdog is the oracle (without the guard the join
+        // never returns and this test times out RED). The parked pool is
+        // then recovered with abort().
+        let _g = super::session_test_lock();
+        with_watchdog(6, move || {
+            let spec = BatchSpec::new(1, SEED, 4);
+            let sink = ObserverSink::off(spec.batch_id);
+            let mut ex = H0Executor::start(probe_cfg(2, 4, None), spec, sink.clone());
+            // NO admit_all / finish_admission: the workers park on an
+            // empty queue and producer_done stays false.
+            let err = ex
+                .await_quiescence()
+                .expect_err("guard must reject an un-settled executor");
+            assert!(
+                err.message.contains("offer stream"),
+                "unexpected error: {err:?}"
+            );
+            let stats = ex.abort();
+            assert_eq!(stats.workers_spawned, 2);
+            assert_eq!(stats.workers_joined, 2);
+            assert!(
+                !sink.off_snapshot().unwrap().quiescence_recorded,
+                "a rejected quiescence must not publish a receipt"
+            );
         });
     }
 }
