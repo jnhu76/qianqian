@@ -930,7 +930,10 @@ pub(crate) fn decode_worker<P: ProcessingRuntime>(
     // non-test build and whenever unarmed): parks the real worker
     // between the publication above and the cleanup below, so the W-3
     // order oracle witnesses the production program order itself. Holds
-    // no lock at the park.
+    // no lock at the park. It must remain between these two calls:
+    // relocating it outside the window would leave the oracle's
+    // between-calls witness green even if the calls were reordered
+    // around it.
     #[cfg(all(test, not(loom)))]
     crate::completion::test_sync::pause_after_worker_exit_publication(&completion);
     completion.abort_stranded_seek();
@@ -1286,84 +1289,6 @@ mod seek_record_tests {
         });
     }
 
-    /// RAII owner of the fenced REAL decode worker (the FencedRequest
-    /// drop contract applied to the exit-funnel fixture): arming
-    /// precedes the spawn, so the worker cannot pass the funnel window
-    /// unobserved, and the explicit flow is `wait_parked` → (sample) →
-    /// `release` → `join`. Whatever has not happened when the owner
-    /// drops — an assertion panic anywhere in between included —
-    /// happens here in that order: the fence drop first (its release
-    /// sender disconnecting ends the worker's park), then the join.
-    /// Neither step panics, so the original failure is the one that
-    /// propagates while the parked funnel still resumes to completion.
-    /// Drop covers panic/unwind hygiene; it is not an unconditional
-    /// bounded join — the fenced funnel is non-blocking by construction
-    /// (the park holds no lock, the slot is empty, the edge is EOF, the
-    /// analyst runs one bounded iteration), so the join always ends.
-    struct FencedFunnelWorker {
-        fence: Option<crate::completion::test_sync::Fence>,
-        worker: Option<std::thread::JoinHandle<()>>,
-    }
-
-    impl FencedFunnelWorker {
-        fn spawn(
-            completion: &SessionCompletion,
-            edge: Arc<PcmEdge>,
-            seeks: Arc<AtomicUsize>,
-            invalidations: Arc<AtomicUsize>,
-        ) -> FencedFunnelWorker {
-            let fence = crate::completion::test_sync::arm_exit_funnel(completion);
-            let worker_completion = completion.clone();
-            let worker = std::thread::spawn(move || {
-                decode_worker(
-                    Box::new(Provider {
-                        seeks,
-                        ending: false,
-                    }),
-                    edge,
-                    worker_completion,
-                    STAGING_FRAMES,
-                    Processing(invalidations),
-                    ObservationTap::new(crate::test_common::TEST_FORMAT, STAGING_FRAMES),
-                );
-            });
-            FencedFunnelWorker {
-                fence: Some(fence),
-                worker: Some(worker),
-            }
-        }
-
-        fn wait_parked(&self) {
-            self.fence
-                .as_ref()
-                .expect("the fenced worker was already released")
-                .wait_parked();
-        }
-
-        fn release(&mut self) {
-            if let Some(fence) = self.fence.take() {
-                fence.release();
-            }
-        }
-
-        fn join(&mut self) {
-            if let Some(worker) = self.worker.take() {
-                worker.join().expect("the fenced decode worker returned");
-            }
-        }
-    }
-
-    impl Drop for FencedFunnelWorker {
-        fn drop(&mut self) {
-            if let Some(fence) = self.fence.take() {
-                drop(fence);
-            }
-            if let Some(worker) = self.worker.take() {
-                let _ = worker.join();
-            }
-        }
-    }
-
     /// W-3 — the Family W exit-funnel order oracle (#300 comment
     /// 6308094792; owner admission #300 comment 6308167569). PROPERTY:
     /// the real decode worker's exit funnel publishes `worker_gone` and
@@ -1419,12 +1344,26 @@ mod seek_record_tests {
             let seeks = Arc::new(AtomicUsize::new(0));
             let invalidations = Arc::new(AtomicUsize::new(0));
 
-            let mut worker = FencedFunnelWorker::spawn(
-                &completion,
-                edge.clone(),
-                seeks.clone(),
-                invalidations.clone(),
-            );
+            // Arming precedes the spawn (spawn_with starts the thread only
+            // after taking the armed fence), so the real worker cannot pass
+            // the funnel window unobserved.
+            let fence = crate::completion::test_sync::arm_exit_funnel(&completion);
+            let worker_completion = completion.clone();
+            let worker_seeks = seeks.clone();
+            let mut worker =
+                crate::completion::test_sync::FencedRequest::spawn_with(fence, move || {
+                    decode_worker(
+                        Box::new(Provider {
+                            seeks: worker_seeks,
+                            ending: false,
+                        }),
+                        edge,
+                        worker_completion,
+                        STAGING_FRAMES,
+                        Processing(invalidations),
+                        ObservationTap::new(crate::test_common::TEST_FORMAT, STAGING_FRAMES),
+                    );
+                });
             worker.wait_parked();
 
             // The real worker is parked INSIDE its own exit funnel,

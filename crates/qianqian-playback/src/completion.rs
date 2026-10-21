@@ -1520,13 +1520,17 @@ pub(crate) mod test_sync {
         }
     }
 
-    /// The RAII owner of one fenced request: the fence AND the request
-    /// thread. The explicit flow is `wait_parked` → (drive the window) →
-    /// `release` → `join`; whatever has not happened when the owner drops
-    /// — an assertion panic anywhere in between included — happens here,
-    /// in that order: the fence drop first (its release sender
-    /// disconnecting ends the parked receive), then the join. Neither
-    /// step panics, so the ORIGINAL failure is the one that propagates.
+    /// The RAII owner of one fenced thread body: the fence AND the body's
+    /// thread. The body is usually one of the request paths ([`FencedRequest::spawn`],
+    /// [`FencedRequest::spawn_at_seek_route`], [`FencedRequest::spawn_stop`]);
+    /// [`FencedRequest::spawn_with`] owns an arbitrary body — e.g. the real
+    /// decode worker — under the same contract. The explicit flow is
+    /// `wait_parked` → (drive the window) → `release` → `join`; whatever has
+    /// not happened when the owner drops — an assertion panic anywhere in
+    /// between included — happens here, in that order: the fence drop first
+    /// (its release sender disconnecting ends the parked receive), then the
+    /// join. Neither step panics, so the ORIGINAL failure is the one that
+    /// propagates.
     ///
     /// Drop covers panic/unwind hygiene. It is not an unconditional
     /// bounded join: nothing in a test can force-terminate a genuinely
@@ -1572,6 +1576,22 @@ pub(crate) mod test_sync {
             let fence = arm_stop(completion);
             let completion = completion.clone();
             let requester = std::thread::spawn(move || completion.request_stop());
+            FencedRequest {
+                fence: Some(fence),
+                requester: Some(requester),
+            }
+        }
+
+        /// [`FencedRequest::spawn`] for an arbitrary fenced body: the
+        /// caller arms the site first (`spawn_with` spawns only after
+        /// taking the fence, so the arm-before-spawn ordering holds), and
+        /// the body — e.g. the real decode worker — parks inside it under
+        /// the same owner contract.
+        pub(crate) fn spawn_with(
+            fence: Fence,
+            body: impl FnOnce() + Send + 'static,
+        ) -> FencedRequest {
+            let requester = std::thread::spawn(body);
             FencedRequest {
                 fence: Some(fence),
                 requester: Some(requester),
