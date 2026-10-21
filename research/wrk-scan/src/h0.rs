@@ -79,8 +79,12 @@ pub struct H0Config {
     pub cancel_milestone: Option<(u32, u32)>,
 }
 
-/// Why a session failed. Published only by real owner-death handling —
-/// never by the harness.
+/// Why a session failed. Published by real owner-death handling
+/// (`worker`/`item` name the dead owner) or — under the
+/// `worker: 0 / item: u32::MAX` sentinel — by an executor-level
+/// precondition/cleanliness failure (unjoined worker, outstanding
+/// settlement obligations, offer stream still open). Never by forging a
+/// terminal or a receipt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionError {
     pub worker: u64,

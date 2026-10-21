@@ -1,18 +1,27 @@
 --- a/src/h0.rs
 +++ b/src/h0.rs
-@@ -289,25 +289,28 @@
+@@ -292,6 +292,16 @@
      /// record. A caller that skipped settlement — or a worker that died
      /// outside `catch_unwind` — is a loud `Err`, never a forged receipt.
      pub fn await_quiescence(&mut self) -> Result<SessionStats, SessionError> {
--        let stats = self.join_workers()?;
 +        // MUTANT M5: publish quiescence while worker 4 is still parked —
-+        // the receipt precedes the join.
++        // the receipt precedes the join. (producer_done is true by the
++        // time worker 4 parks at the drain, so the stream-open guard
++        // passes; the mutation is the receipt/join ORDER.)
 +        {
 +            let mut st = self.shared.state.lock().unwrap();
 +            while st.m5_parked.is_none() {
 +                st = self.shared.settle_cv.wait(st).unwrap();
 +            }
 +        }
+         // Precondition guard (Owner review P2, PR #307): a worker can only
+         // exit via the drain funnel (`producer_done` + empty queue) or an
+         // abort. With the offer stream still open, workers are parked (or
+@@ -310,25 +320,20 @@
+                     .into(),
+             });
+         }
+-        let stats = self.join_workers()?;
          let mut sorted = {
              let st = self.shared.state.lock().unwrap();
 -            if !st.pending.is_empty() {
