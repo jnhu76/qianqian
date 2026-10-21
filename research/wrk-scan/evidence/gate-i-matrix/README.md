@@ -8,6 +8,17 @@ receipt of the latest full-suite run (phase6/9/10 logs). Whole-binary wall
 clock (~3 min debug) is harness overhead, not mechanism timing — Gate I
 is non-timed and no duration is evidence.
 
+Receipt provenance (Owner review P2, PR #307): this file is a TRACKED
+historical artifact and the test suite never rewrites it. A matrix run
+writes its receipt to a fresh temp directory by default; an explicit
+
+    GATE_I_RECEIPT_OUT=evidence/gate-i-matrix/cells.jsonl \
+        cargo test --test matrix
+
+is the only way this file changes (that invocation, not the suite, owns
+the destination). A plain `cargo test` therefore cannot dirty the
+checkout, and archived receipts stay distinguishable from later reruns.
+
 ## What each arm runs
 
 - `K0_MODE=ON` — the session is composed on the real

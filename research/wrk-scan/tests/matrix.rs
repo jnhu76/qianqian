@@ -7,7 +7,10 @@
 //!   ([`K0ScanSession`]); `DisposeVerdict::Discharged` is required.
 //! - K0 OFF : the same executor driven directly ([`run_session`]).
 //!
-//! Verdict per arm (recorded in `evidence/gate-i-matrix/cells.jsonl`):
+//! Verdict per arm (recorded in the run's receipt JSONL — a fresh temp
+//! path by default; the tracked `evidence/gate-i-matrix/cells.jsonl` is
+//! only rewritten by an explicit
+//! `GATE_I_RECEIPT_OUT=<path> cargo test --test matrix`):
 //! - no-cancel cells: exact equality with the independently computed REF —
 //!   every item Completed{Ok,Err} with its REF contribution, the fan-in
 //!   aggregate equal to `workload::aggregate(REF contributions)`, and the
@@ -353,12 +356,37 @@ fn run_off(cell: Cell, spec: &BatchSpec) -> (RunFace, SessionStats) {
 
 #[test]
 fn matrix_92_cells_all_green() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("evidence/gate-i-matrix");
-    fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("cells.jsonl");
-    // Each run rewrites the receipt: one file = one complete matrix run.
+    // Evidence integrity (Owner review P2, PR #307): the committed receipt
+    // is a TRACKED historical artifact — a plain `cargo test` must never
+    // rewrite it. A run's receipt lands in a fresh temp directory by
+    // default; set GATE_I_RECEIPT_OUT to an explicit path to intentionally
+    // regenerate a receipt (that invocation, not the test suite, owns the
+    // destination).
+    let path = match std::env::var_os("GATE_I_RECEIPT_OUT") {
+        Some(p) => {
+            let path = PathBuf::from(p);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            path
+        }
+        None => {
+            let dir = std::env::temp_dir().join(format!(
+                "wrk-scan-matrix-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            dir.join("cells.jsonl")
+        }
+    };
+    // Each run rewrites its receipt: one file = one complete matrix run.
     fs::write(&path, b"").unwrap();
     let mut out = OpenOptions::new().append(true).open(&path).unwrap();
+    println!("matrix receipt (this run): {}", path.display());
 
     let cells = Scenario::expand_cells(P_PHYS);
     assert_eq!(cells.len(), 46, "frozen cell expansion on this host");
