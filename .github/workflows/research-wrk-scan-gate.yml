@@ -1,0 +1,74 @@
+name: Research Wrk-Scan Gate
+
+# Lightweight gate for the standalone research crate research/wrk-scan
+# (R2 Gate I correctness baseline, issues #304/#306 — PR #307 Owner
+# review P2). The crate is its own cargo workspace (excluded from the
+# production workspace on purpose), so the Rust Regression workflow
+# never compiles it; this gate gives it the same fmt/clippy/test bar,
+# plus the frozen 92-cell correctness matrix.
+#
+# Per the Owner ruling on PR #307: correctness evidence only — NO
+# resident mutation gate. The M1–M9 mutation admission stays a
+# campaign-run artifact (research/wrk-scan/mutations/run-mutation-arms.sh
+# with archived receipts under evidence/gate-i-mutations/); it is
+# neither re-run nor enforced on every push.
+#
+# Evidence integrity (same Owner review): the matrix test writes its
+# receipt to a fresh temp path — never the tracked
+# evidence/gate-i-matrix/cells.jsonl — unless GATE_I_RECEIPT_OUT is
+# explicitly set, so a green CI run cannot dirty the checkout and no
+# cleanup step is needed.
+#
+# A green run states: the research crate is fmt-clean, clippy-clean at
+# -D warnings, and its full test suite (lib controls, ON/OFF
+# equivalence + shadow audit, golden evidence, mutation harness) plus
+# the 92-cell correctness matrix pass on linux-x86_64 stable. It makes
+# NO claim about Windows/macOS targets and no claim that the frozen
+# M1–M9 families remain killed (that is the archived campaign
+# evidence, not a per-push gate).
+
+on:
+  pull_request:
+    paths:
+      - "research/wrk-scan/**"
+      # path dependency of the K0-ON arm: a kernel change can break the
+      # research crate's build or its matrix
+      - "crates/qianqian-composition/**"
+      - ".github/workflows/research-wrk-scan-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/wrk-scan/**"
+      - "crates/qianqian-composition/**"
+      - ".github/workflows/research-wrk-scan-gate.yml"
+
+concurrency:
+  group: research-wrk-scan-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wrk-scan:
+    name: fmt + clippy + tests + 92-cell matrix (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: research/wrk-scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests (lib controls + equivalence + golden + mutation harness)
+        run: cargo test --lib --test equivalence --test golden --test mutation_harness
+
+      - name: 92-cell correctness matrix
+        run: cargo test --test matrix -- --nocapture
