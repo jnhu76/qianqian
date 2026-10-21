@@ -27,3 +27,6 @@ __pycache__/
 
 # Standalone Rust-aware public-contract verifier.
 /tools/audio-api-surface/target
+
+# research crate builds its own workspace target dir
+research/wrk-scan/target/
