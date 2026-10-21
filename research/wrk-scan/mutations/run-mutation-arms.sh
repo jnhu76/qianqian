@@ -45,7 +45,9 @@ designated() {
     # re-check (the lost-wakeup defense), PB reintroduces the defect-path
     # B-permit wedge. Both are detected by the fence/control tests'
     # watchdog, never by the oracle.
-    LW) echo "watchdog:" ;;
+    # "panic:" prefix = the designated signature is the control's panic
+    # message (plain substring), not a harness test-name FAIL line.
+    LW) echo "panic:worker never consumed" ;;
     PB) echo "watchdog:" ;;
     *) echo "" ;;
   esac
@@ -107,6 +109,10 @@ run_arm() { # $1 name, $2 dir, $3 expect(green|red)
     failed=$(grep '^  .* FAIL$' "$log" | awk '{print $1}' | tr '\n' ' ')
     if [ "$primary" = "watchdog:" ]; then
       hit=$(grep -c "watchdog:" "$log")
+    elif [ "${primary#panic:}" != "$primary" ]; then
+      # panic-message signature: a libtest panic line carries the message
+      # itself, never a "  <test>  FAIL" table row — match the substring.
+      hit=$(grep -cF "${primary#panic:}" "$log")
     else
       hit=$(grep -c "^  $primary  *FAIL$" "$log")
     fi
