@@ -28,6 +28,19 @@ campaign's H0 executor (`src/h0.rs`).
   defect-path B-permit wedge. Both are caught by the fence/panic control
   tests' watchdogs (`cargo test --lib`), not by the oracle.
 
+### Run-artifact isolation (PR #307 review round 2)
+
+Every file in this directory is an intentional archive, produced by an
+explicit `GATE_I_MUTATION_OUT=<this-dir>` run. It is never a default
+write target: a plain replay (`bash mutations/run-mutation-arms.sh`)
+creates a unique untracked run directory under `$TMPDIR` (pid+nanos,
+echoed on stdout) and writes the per-arm logs, the cycle summary and the
+worktree witness THERE — a replay cannot truncate or overwrite any
+committed receipt (same receipt-isolation rule as `tests/matrix.rs`'s
+`GATE_I_RECEIPT_OUT`). The archived `evidence/logs/phase12-*` files
+record the verification replay (cycle r8, default temp output) proving
+the worktree stays clean of tracked modifications end to end.
+
 ## Results — final cycles `cycle-summaryr4-.txt`, `cycle-summaryr5-.txt`, `cycle-summaryr6-.txt`
 
 Each final cycle: A GREEN, C GREEN, all nine frozen mutants RED with the

@@ -9,19 +9,30 @@
 #   C   fresh clean copy      → harness must PASS
 #
 # The main worktree is never modified: every arm runs in a copy under
-# $WORK, all mutations exist only as patch files in mutations/. Logs are
-# archived under evidence/gate-i-mutations/ (no /dev/null discards).
+# $WORK, all mutations exist only as patch files in mutations/. Run
+# artifacts (per-arm logs, cycle summary, worktree witness) go to the run
+# directory — a UNIQUE UNTRACKED temp dir by default; GATE_I_MUTATION_OUT
+# overrides it. Committed receipts under evidence/gate-i-mutations/ are
+# intentional archives, never a default write target. Nothing is
+# discarded (no /dev/null): every run's artifacts stay in its run dir.
 #
 # rc: 0 = all arms MET; 1 = at least one arm VIOLATED.
 set -u
 
 CRATE="$(cd "$(dirname "$0")/.." && pwd)"
-EV="$CRATE/evidence/gate-i-mutations"
+# Receipt isolation (Owner review P2, PR #307 round 2 — same rule as
+# tests/matrix.rs): the default run directory is unique and untracked, so
+# a plain replay can never truncate or overwrite committed evidence.
+# GATE_I_MUTATION_OUT=<dir> is the explicit opt-in that targets a chosen
+# directory (how the archives under evidence/gate-i-mutations/ were made).
+EV="${GATE_I_MUTATION_OUT:-${TMPDIR:-/tmp}/wrk-scan-mutations-$$-$(date +%s%N)}"
 WORK="${TMPDIR:-/tmp}/wrk-scan-mutation-arms"
 mkdir -p "$EV" "$WORK"
+echo "mutation run dir: $EV"
 export CARGO_TARGET_DIR="$WORK/shared-target"
-# ROUND (optional) stamps the archived logs so repeat cycles are all
-# retained (e.g. ROUND=r2-); every run's logs are kept, none discarded.
+# ROUND (optional) stamps this run's log/summary names so repeat cycles
+# stay distinguishable (e.g. ROUND=r8-); every run's artifacts are kept
+# in its run dir, none discarded.
 ROUND="${ROUND:-}"
 
 SUMMARY="$EV/cycle-summary$ROUND.txt"
