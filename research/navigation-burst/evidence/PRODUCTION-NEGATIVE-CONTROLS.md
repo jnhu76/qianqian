@@ -64,9 +64,16 @@ RED            cargo test -p qianqian-headless --lib
                REV-P2-RED-pre-fix.log (+ .meta.txt: cmd/env/sha)
 GREEN          same filter with the navigate() cancel line
                rc=0  REV-P2-GREEN-fixed.log
-mutation RED   the cancel line removed from the FINAL bytes, same run
-               rc=101, same signature
-               REV-P2-RED-mutation-final-bytes.log
+mutation RED   the whole navigate cancel hunk (4 comment lines +
+               the cancel call) removed from the FINAL bytes, same
+               run; mutated-tree sha256 b175f1f2fc2380703ec436e681f
+               d3ba2058dee0ccf0ed82a871cb4d17d5e3313; rc=101, same
+               signature
+               first pass  REV-P2-RED-mutation-final-bytes.log
+               rerun with full meta (cmd/shas/rc)
+               REV-P2-RED-mutation-final-bytes-RERUN1.log +
+               .meta.txt (reruns are new files per the failure-
+               evidence contract; first pass had no meta sidecar)
 restored GREEN bytes identical to the final tree, rc=0
                player.rs sha256 7ce3ee545c8b8acd3840a9be75c4a58ecb0…
                0b47f374e114d7c3235ace2e4683c

@@ -104,5 +104,11 @@ regression `direct_manual_steps_supersede_the_pending_burst` is RED
 without the fix (pre-fix run and mutation-at-final-bytes run, both
 rc=101) and GREEN with it; provenance and full logs at
 `evidence/PRODUCTION-NEGATIVE-CONTROLS.md` § Owner-review regression.
+A fresh-context delta review swept every App entry that opens an
+episode or rebuilds traversal state: no second hole of this class
+(DELTA_VERDICT FIXED_CLEAN). One informational note it added:
+`establish_playlist` still relies on caller discipline (it rides an
+Open commit in every production path), so a future shell adapter must
+keep that order — not a reachable hole today.
 Windows native acceptance remains NOT_RUN — an owner-side pre-merge
 platform gate, separate from this review round.
