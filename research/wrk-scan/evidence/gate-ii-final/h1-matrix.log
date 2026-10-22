@@ -1,0 +1,10 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-g2/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running tests/matrix_h1.rs (target/debug/deps/matrix_h1-a9cd1cfc323c07aa)
+
+running 1 test
+test matrix_h1_92_cells_all_green has been running for over 60 seconds
+test matrix_h1_92_cells_all_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 162.99s
+
