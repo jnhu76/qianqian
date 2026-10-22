@@ -248,6 +248,9 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
     let c = rec.cell;
     let f = &rec.face;
     let arm = c.arm_id(rec.k0_on).replacen("H0-", "H1-", 1);
+    // Hoisted out of the writeln! args: clippy::format_in_format_args
+    // fires on the CI's newer clippy.
+    let cancel_groups = format!("{:?}", f.cancel_groups);
     let verdict = if rec.failures.is_empty() {
         "GREEN".to_string()
     } else {
@@ -279,7 +282,7 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
         f.completed_ok,
         f.completed_err,
         f.abandoned(),
-        format!("{:?}", f.cancel_groups),
+        cancel_groups,
         result_digest(&f.results),
         f.aggregate.map(agg_hex).unwrap_or_else(|| "ABSENT".into()),
         rec.stats.stats.b_high_water,
