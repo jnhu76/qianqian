@@ -702,9 +702,12 @@ fn handle_item(
         // outstanding (admitted-not-terminal; the residue is visible in
         // `pending` and in the ledger's ACK gap — never executed, never
         // forged). Stats carry the unreceived-queue face
-        // (`channel_resident_final`).
+        // (`channel_resident_final`). No exit record here: this is NOT
+        // a thread exit — handle_item only returns to worker_main,
+        // whose next top-of-loop check observes the monotone flag and
+        // publishes the single ExecutorExited at the true exit boundary
+        // (owner merge-review P2, PR #310).
         drop(st);
-        sink.worker_exit(worker);
         return;
     }
     let cancelled = st.cancelled_groups.contains(&item_group);
@@ -1341,6 +1344,70 @@ pub(crate) mod tests {
                     || r.kind == EffectKind::TransformDone
                     || r.kind == EffectKind::IoWaitDone),
                 "no item work may run after the abort flag is authoritative"
+            );
+            expect_receipt_absent(&sink);
+        });
+    }
+
+    #[test]
+    fn abort_post_recv_exit_event_is_unique() {
+        // Owner merge-review P2 (PR #310): under a specific abort
+        // interleave a worker published TWO ExecutorExited records —
+        // handle_item observed the shutdown flag at its post-recv
+        // re-check and recorded an exit, but only returned to
+        // worker_main's loop, whose very next top-of-loop check recorded
+        // the exit again before the thread actually returned. The exit
+        // event must have exactly one publisher per thread: the true
+        // worker-exit boundaries in worker_main.
+        //
+        // Deterministic seam: the worker is parked at the post-recv fence
+        // holding item 0 (admitted, never executed) when abort flips the
+        // flag; the fence opener is driven by abort's own control-plane
+        // signal, so the post-recv re-check provably observes shutdown.
+        // The oracle is the exit-event count on the same ledger face the
+        // 92-cell matrix reads: exactly one per joined worker.
+        let _g = H1Executor::session_test_lock();
+        with_watchdog(30, move || {
+            fences::reset();
+            fences::install("h1_worker_post_recv");
+            let spec = BatchSpec::new(1, SEED, 2);
+            let sink = ObserverSink::on(spec.batch_id);
+            let mut ex = H1Executor::start(h1_cfg(1, 2, None), spec.clone(), sink.clone());
+            let ctl_rx = ex.leak_ctl_receiver_clone();
+            std::thread::spawn(move || {
+                let _ = ctl_rx.recv();
+                fences::open("h1_worker_post_recv");
+            });
+            ex.admit_all();
+            fences::wait_arrivals("h1_worker_post_recv", 1);
+            let stats = ex.abort();
+            assert_eq!(stats.stats.workers_spawned, 1);
+            assert_eq!(stats.stats.workers_joined, 1, "bounded join");
+            let ledger = sink.ledger().unwrap().snapshot();
+            let exits: Vec<u64> = ledger
+                .iter()
+                .filter(|r| r.kind == EffectKind::ExecutorExited)
+                .map(|r| r.owner)
+                .collect();
+            assert_eq!(
+                exits,
+                vec![1],
+                "exactly one ExecutorExited per worker thread, published \
+                 at the true exit boundary"
+            );
+            // The received item 0 stays honestly outstanding: never
+            // executed, never forged; item 1 stays channel-resident.
+            assert_eq!(stats.channel_resident_final, 1);
+            assert!(
+                !ledger.iter().any(|r| r.terminal.is_some()),
+                "no terminal may be forged under abort"
+            );
+            assert!(
+                !ledger.iter().any(
+                    |r| r.kind == EffectKind::IoWaitDone || r.kind == EffectKind::TransformDone
+                ),
+                "the held item must not execute after the abort flag is \
+                 authoritative"
             );
             expect_receipt_absent(&sink);
         });

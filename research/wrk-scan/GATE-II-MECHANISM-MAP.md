@@ -100,3 +100,40 @@ release logic, so it cannot become a generic scheduler. Both executors call
 the SAME business function on their own real dispatch paths, which is what
 keeps the H0/H1 comparison about the execution+communication mechanism
 rather than two business algorithms (Owner GO letter §2.4).
+
+## 5. Owner merge-review revision (PR #310 REVISE round, P2-01)
+
+The Owner's merge review found one P2: under an abort interleave a worker
+could publish TWO `ExecutorExited` records — `handle_item`'s post-recv
+shutdown branch recorded an exit, but it only returns to `worker_main`,
+whose next top-of-loop check recorded the exit again at the real thread
+exit. Fix: that branch no longer records; the only publishers are the two
+true exit boundaries in `worker_main` (the top-of-loop shutdown break and
+the disconnect funnel), both followed immediately by the thread return.
+H0 is unaffected (its single `worker_exit` site is already inside
+`worker_main`, immediately before `return`). `shutdown_requested` is
+monotone (only `abort` sets it, never cleared), so the loop-top publisher
+is deterministically reached after the branch returns.
+
+Deterministic regression: `abort_post_recv_exit_event_is_unique` parks the
+worker at the `h1_worker_post_recv` fence holding an admitted-but-unexecuted
+item, drives the opener from abort's own control-plane signal, and asserts
+exactly one `ExecutorExited` for the joined worker on the same ledger face
+the 92-cell matrix reads. Dual-arm evidence at the FINAL source bytes
+(sha256 bound in each `run-context.txt`): RED `[1, 1]` vs `[1]`, rc=101
+(`evidence/gate-ii-rev2/test-red/`, defect state `efca14bd…` = HEAD body +
+final test), GREEN rc=0 (`evidence/gate-ii-rev2/test-green/`, fixed state
+`3d8a8e17…`). Earlier draft-test runs are archived unmodified under
+`evidence/gate-ii-rev2/superseded/` (the first RED used a draft assertion
+expecting worker id 0; H1 worker ids are 1-based — reruns are new files,
+the drafts are not silently replaced).
+
+Delta review (two independent fresh-context reviewers, concurrency +
+oracle focus): concurrency FIXES_VERIFIED (P1=0, P2=0); oracle initially
+FIXES_INSUFFICIENT solely on evidence provenance (archived RED came from
+the superseded draft; GREEN context lacked HEAD/sha binding) — remediated
+by the regeneration above at the reviewer-reconstructed defect hash
+(`efca14bd…` matched independently). All twelve mutation patches still
+apply to the fixed tree (independently dry-run verified by both reviewers;
+M5a–d mutate `await_quiescence`/the disconnect funnel, not the removed
+line); no re-anchoring, no campaign re-run.

@@ -1,0 +1,116 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-g2/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.82s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-28638ba512f484bd)
+
+running 41 tests
+test h0::tests::full_b_producer_blocks_and_recovers ... ok
+test h0::tests::cancel_racing_admission_linearization ... ok
+test h0::tests::h0_off_mode_receipt_structure ... ok
+test h0::tests::h0_on_mode_cancel_milestone_full_oracle_green ... ok
+test h0::tests::h0_on_mode_no_cancel_full_oracle_green ... ok
+test h0::tests::owner_panic_fails_session_loudly ... ok
+test h0::tests::owner_panic_with_saturated_b_fails_loudly ... ok
+test h0::tests::producer_done_with_queue_nonempty_still_drains ... ok
+test h0::tests::quiescence_before_stream_close_fails_loudly_not_hang ... ok
+test h1::tests::quiescence_before_stream_close_fails_loudly_not_hang ... ok
+test h0::tests::settlement_survives_done_flip_while_waiter_parked ... ok
+test h0::tests::worker_consumes_item_notified_during_fence_park ... ok
+test h0::tests::worker_wakeup_survives_notify_before_wait ... ok
+test h1::tests::abort_mid_flight_bounded_all_outcomes_legal ... ok
+test h1::tests::abort_post_recv_exit_event_is_unique ... ok
+test h1::tests::abort_wakes_parked_workers_bounded ... ok
+test h1::tests::abort_with_saturated_queue_leaves_obligation_residue ... ok
+test h1::tests::cancel_racing_admission_linearization ... ok
+test h1::tests::channel_send_failure_fails_closed ... ok
+test h1::tests::cancel_between_admission_and_close_interleave_green ... ok
+test scenario::tests::frozen_46_cell_expansion_at_p_phys_10 ... ok
+test scenario::tests::scenario_shapes_match_frozen_overrides ... ok
+test h1::tests::full_b_producer_blocks_and_recovers ... ok
+test h1::tests::h1_off_mode_receipt_structure ... ok
+test h1::tests::h1_on_mode_cancel_milestone_full_oracle_green ... ok
+test h1::tests::h1_on_mode_no_cancel_full_oracle_green ... ok
+test h1::tests::owner_panic_fails_session_loudly ... ok
+test h1::tests::owner_panic_with_saturated_b_fails_loudly ... ok
+test h1::tests::q_equals_b_is_a_real_queue_not_a_counter_alias ... ok
+test h1::tests::queue_empty_and_disconnect_are_not_settlement ... ok
+test h0::tests::s5_scenario_cell_cancel_oracle_green ... ok
+test h1::tests::s5_scenario_cell_cancel_oracle_green ... ok
+test h1::tests::sender_leak_stalls_drain_and_abort_recovers ... ok
+test h1::tests::settlement_survives_done_flip_while_waiter_parked ... ok
+test h1::tests::workers_drain_queue_after_close_while_parked ... ok
+test k0_session::tests::k0_on_h1_owner_death_teardown_violated_no_receipt ... ok
+test k0_session::tests::k0_on_h1_probe_batch_full_oracle_green_discharged ... ok
+test k0_session::tests::k0_on_h1_s5_cancel_cell_oracle_green ... ok
+test k0_session::tests::k0_on_owner_death_teardown_violated_no_receipt ... ok
+test k0_session::tests::k0_on_probe_batch_full_oracle_green_discharged ... ok
+test k0_session::tests::k0_on_s5_cancel_cell_oracle_green ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.92s
+
+     Running tests/equivalence.rs (target/debug/deps/equivalence-1a078cc28bc6afb8)
+
+running 2 tests
+test off_receipt_survives_shadow_audit ... ok
+test no_cancel_cells_on_off_equivalent ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.47s
+
+     Running tests/golden.rs (target/debug/deps/golden-25d8ba20cb65300a)
+
+running 8 tests
+test gv1_splitmix64_independent_vectors ... ok
+test gv7_fold_meta_python_vector ... ok
+test gv5_err_lane_content_pinned ... ok
+test gv8_transform_matches_frozen_module ... ok
+test gv4_input_identity_python_vectors ... ok
+test gv6_aggregate_order_invariance ... ok
+test gv2_probe_batch_aggregate_frozen_receipt ... ok
+test gv3_per_item_ref_matches_frozen_module ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/matrix.rs (target/debug/deps/matrix-949303994ad02a5e)
+
+running 1 test
+test matrix_92_cells_all_green has been running for over 60 seconds
+test matrix_92_cells_all_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 187.58s
+
+     Running tests/matrix_h1.rs (target/debug/deps/matrix_h1-a9cd1cfc323c07aa)
+
+running 1 test
+test matrix_h1_92_cells_all_green has been running for over 60 seconds
+test matrix_h1_92_cells_all_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 189.86s
+
+     Running tests/mutation_harness.rs (target/debug/deps/mutation_harness-e52e7f8699185cba)
+
+running 1 test
+test probe_batch_oracle_green ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/mutation_harness_h1.rs (target/debug/deps/mutation_harness_h1-85202a0d71b36709)
+
+running 1 test
+test probe_batch_oracle_green_h1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/orthogonality.rs (target/debug/deps/orthogonality-754e477b9187b3c5)
+
+running 3 tests
+test settlement_watch_face_is_the_shared_surface ... ok
+test k0_observer_2x2_h0 ... ok
+test k0_observer_2x2_h1 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.30s
+
+   Doc-tests wrk_scan
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

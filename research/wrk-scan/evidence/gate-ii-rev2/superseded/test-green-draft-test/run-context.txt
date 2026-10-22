@@ -1,0 +1,3 @@
+cmd: cargo test --lib abort_post_recv_exit_event_is_unique -- --nocapture
+fix applied: handle_item post-recv shutdown branch no longer records worker_exit
+date: 2026-10-22T16:47:29+08:00
