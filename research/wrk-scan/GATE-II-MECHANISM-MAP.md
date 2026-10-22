@@ -60,6 +60,15 @@ Quiescence: aggregate + receipt as LAST record        [shared shape]
 `execute_item` never calls `ref_result` (SPEC §2.5(b)); only oracle-side
 code (`oracle.rs`, test faces) computes REF.
 
+Lock/channel discipline, stated precisely (review A F4): NO blocking
+channel op, NO `recv`/`select`/`join` and NO condvar wait happens while
+holding the state lock; the ONE channel op inside the admission critical
+section is the non-blocking `try_send` — that is the frozen mechanism
+admission action of ADMISSION_RECIPE step C (SPEC §4.2), placed there so
+a full channel can never make the producer wait under the lock. The
+last-sender drop (`finish_admission`) happens AFTER the state lock is
+released; the abort wake signals are sent outside the lock.
+
 ## 3. Patch re-anchoring map (code motion consequence, prompt §5)
 
 The H0 mutation patches are context-anchored to `src/h0.rs`. Moving

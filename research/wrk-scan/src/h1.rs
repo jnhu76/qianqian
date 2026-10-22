@@ -330,14 +330,18 @@ impl H1Executor {
                 .work_tx
                 .as_ref()
                 .expect("the producer sender is held until finish_admission");
-            let send_result = tx.try_send(id);
+            // The cfg(test) injection REPLACES THE SEND (decided before any
+            // real send), so a "failed" admission never leaves a phantom
+            // message in the channel — the rollback drill stays exact: no
+            // message, no obligation, no ledger record, no permit.
             #[cfg(test)]
-            // The ONLY way the structurally-unreachable Full arm can run
-            // without violating the frozen budgets (Gate II §15 control).
-            let send_result = if test_send_full_item() == id {
+            let injected_full = test_send_full_item() == id;
+            #[cfg(not(test))]
+            let injected_full = false;
+            let send_result = if injected_full {
                 Err(crossbeam_channel::TrySendError::Full(id))
             } else {
-                send_result
+                tx.try_send(id)
             };
             if let Err(e) = send_result {
                 st.pending.remove(&id);
@@ -451,9 +455,14 @@ impl H1Executor {
 
     /// Owner-death abort: request worker shutdown, join everything, and
     /// return the stats WITHOUT publishing any aggregate or receipt.
-    /// The obligations left behind by the dead owner (un-ACKed admitted
-    /// items, unreceived queue messages) are reported in the stats and
-    /// the ledger — never silently discharged by the harness.
+    /// The obligations left behind by the dead owner are reported, never
+    /// silently discharged by the harness: unreceived queue messages via
+    /// [`H1SessionStats::channel_resident_final`], and received-but-not-
+    /// executed items via the ledger/pending ACK gap (no stats field —
+    /// both faces are honest residue, neither is forged). Abort also
+    /// invalidates the settlement face: an `await_settlement` on an
+    /// aborted executor with an open stream may block forever — the
+    /// owner's result is abort's return value, exactly as in H0.
     ///
     /// Linearization: the flag flip under the state lock. Workers observe
     /// it at (a) their top-of-loop check, (b) the post-recv state step —
@@ -679,6 +688,10 @@ fn handle_item(
     shared: &Arc<H1Shared>,
     item: u32,
 ) {
+    // Pure lookup, no protocol state: hoisted out of the lock section so
+    // a structurally-impossible index panic could never fire under the
+    // lock (review A F5).
+    let item_group = spec.items[item as usize].cancellation_group;
     let mut st = shared.state.lock().unwrap();
     st.channel_resident -= 1;
     h1_fence_park!("h1_worker_post_recv", st, &shared.state);
@@ -686,15 +699,15 @@ fn handle_item(
     // authoritative state may have moved — abort, cancel, defect.
     if st.shutdown_requested {
         // Abort after recv, before execution: the obligation stays
-        // outstanding (admitted-not-terminal, reported as residue by the
-        // abort path and the ledger) — never executed, never forged.
+        // outstanding (admitted-not-terminal; the residue is visible in
+        // `pending` and in the ledger's ACK gap — never executed, never
+        // forged). Stats carry the unreceived-queue face
+        // (`channel_resident_final`).
         drop(st);
         sink.worker_exit(worker);
         return;
     }
-    let cancelled = st
-        .cancelled_groups
-        .contains(&spec.items[item as usize].cancellation_group);
+    let cancelled = st.cancelled_groups.contains(&item_group);
     st.active_execution += 1;
     st.active_high_water = st.active_high_water.max(st.active_execution);
     drop(st);
@@ -1366,13 +1379,32 @@ pub(crate) mod tests {
             sorted.dedup();
             assert_eq!(sorted, acked, "at most one terminal per item");
             assert!(
-                acked.iter().all(|id| spec.items[*id as usize].item_id < 4),
+                acked.iter().all(|id| (*id as usize) < 4),
                 "every ACK belongs to an admitted item"
             );
+            // The FULL partition of the four admitted items across the
+            // three legal abort outcomes (review A F1):
+            //   ACKed (owner completed honestly)
+            // + resident (never received: honestly queued)
+            // + received-but-not-executed (dropped at the post-recv
+            //   shutdown re-check: neither ACKed nor resident — identified
+            //   as an admitted item with no ACK and no execution effect).
+            let execution_effects = |id: u32| {
+                ledger.iter().any(|r| {
+                    r.item_id == Some(id)
+                        && (r.kind == EffectKind::IoWaitDone
+                            || r.kind == EffectKind::TransformDone
+                            || (r.kind == EffectKind::ResultPublished
+                                && r.log == crate::ledger::LogKind::Effect))
+                })
+            };
+            let dropped: Vec<u32> = (0u32..4)
+                .filter(|id| !acked.contains(id) && execution_effects(*id))
+                .collect();
             assert_eq!(
-                acked.len() + stats.channel_resident_final,
+                acked.len() + stats.channel_resident_final + dropped.len(),
                 4,
-                "admitted == ACKed + honestly-resident"
+                "admitted == ACKed + honestly-resident + received-but-dropped"
             );
             expect_receipt_absent(&sink);
         });

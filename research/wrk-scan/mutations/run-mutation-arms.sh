@@ -81,7 +81,11 @@ designated() {
     # "panic:" prefix = the designated signature is the control's panic
     # message (plain substring), not a harness test-name FAIL line.
     LW) echo "panic:worker never consumed" ;;
-    PB) echo "watchdog:" ;;
+    # Match the timeout-protective watchdog's settle-failure line, not the
+    # generic "watchdog:" prefix (which would also match the watchdog's
+    # panicked-relay line and let an unrelated arm failure score MET —
+    # review B P3).
+    PB) echo "watchdog: control did not settle within" ;;
     *) echo "" ;;
   esac
 }
@@ -145,8 +149,8 @@ run_arm() { # $1 name, $2 dir, $3 expect(green|red)
     local primary failed hit
     primary=$(designated "$name")
     failed=$(grep '^  .* FAIL$' "$log" | awk '{print $1}' | tr '\n' ' ')
-    if [ "$primary" = "watchdog:" ]; then
-      hit=$(grep -c "watchdog:" "$log")
+    if [ "$primary" = "watchdog: control did not settle within" ]; then
+      hit=$(grep -cF "$primary" "$log")
     elif [ "${primary#panic:}" != "$primary" ]; then
       # panic-message signature: a libtest panic line carries the message
       # itself, never a "  <test>  FAIL" table row — match the substring.

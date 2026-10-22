@@ -247,6 +247,7 @@ struct CellRecord {
 fn write_record(out: &mut impl Write, rec: &CellRecord) {
     let c = rec.cell;
     let f = &rec.face;
+    let arm = c.arm_id(rec.k0_on).replacen("H0-", "H1-", 1);
     let verdict = if rec.failures.is_empty() {
         "GREEN".to_string()
     } else {
@@ -258,14 +259,14 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
             r#"{{"ARM":"{}","ARM_ORDER_VALUE":"0x{:016x}","SCENARIO":"{}","P":{},"B":{},"Q":{},"K0_MODE":"{}","#,
             r#""SEED":"0x00c0ffee03040001","BATCH_ID":{},"INPUT_DIGEST":"{}","#,
             r#""ADMITTED_COUNT":{},"TERMINAL_COUNT":{},"COMPLETED_OK":{},"#,
-            r#""COMPLETED_ERR":{},"ABANDONED":{},"RESULT_DIGEST":"{}","#,
+            r#""COMPLETED_ERR":{},"ABANDONED":{},"CANCEL_GROUPS":"{}","RESULT_DIGEST":"{}","#,
             r#""AGGREGATE_DIGEST":"{}","B_HIGH_WATER":{},"Q_HIGH_WATER":{},"#,
             r#""P_HIGH_WATER":{},"WORKER_EXITS":{},"WORKERS_JOINED":{},"#,
             r#""QUIESCENCE_RECEIPT":"{}","K0_DISPOSE_VERDICT":{},"ORACLE":{},"#,
             r#""ORACLE_VERDICT":"{}"}}"#
         ),
-        format!("H1-{}", c.arm_id(rec.k0_on)),
-        arm_order_value(&format!("H1-{}", c.arm_id(rec.k0_on)), SEED),
+        arm,
+        arm_order_value(&arm, SEED),
         c.scenario_label(),
         c.p,
         c.b,
@@ -278,6 +279,7 @@ fn write_record(out: &mut impl Write, rec: &CellRecord) {
         f.completed_ok,
         f.completed_err,
         f.abandoned(),
+        format!("{:?}", f.cancel_groups),
         result_digest(&f.results),
         f.aggregate.map(agg_hex).unwrap_or_else(|| "ABSENT".into()),
         rec.stats.stats.b_high_water,

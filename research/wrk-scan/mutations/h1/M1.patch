@@ -1,6 +1,6 @@
 --- a/src/h1.rs
 +++ b/src/h1.rs
-@@ -322,15 +322,24 @@
+@@ -322,10 +322,15 @@
              // structurally unreachable in a healthy session (see module
              // docs), so this arm only fires on a real invariant break or
              // an injected fault — and must fail closed.
@@ -20,13 +20,14 @@
              let tx = self
                  .work_tx
                  .as_ref()
-                 .expect("the producer sender is held until finish_admission");
--            let send_result = tx.try_send(id);
-+            let send_result = if id == 20 {
+@@ -338,7 +343,9 @@
+             let injected_full = test_send_full_item() == id;
+             #[cfg(not(test))]
+             let injected_full = false;
+-            let send_result = if injected_full {
++            let send_result = if id == 20 && !injected_full {
 +                Ok(())
-+            } else {
-+                tx.try_send(id)
-+            };
-             #[cfg(test)]
-             // The ONLY way the structurally-unreachable Full arm can run
-             // without violating the frozen budgets (Gate II §15 control).
++            } else if injected_full {
+                 Err(crossbeam_channel::TrySendError::Full(id))
+             } else {
+                 tx.try_send(id)
