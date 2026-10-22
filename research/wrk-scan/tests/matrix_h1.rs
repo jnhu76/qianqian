@@ -37,11 +37,7 @@ use sha2::{Digest, Sha256};
 
 use qianqian_composition::DisposeVerdict;
 
-use wrk_scan::h0::SessionStats as H0SessionStatsAlias;
-#[allow(unused_imports)]
-use wrk_scan::h1::H1Config;
-use wrk_scan::h1::H1Executor;
-use wrk_scan::h1::{self, H1SessionStats};
+use wrk_scan::h1::{self, H1Config, H1Executor, H1SessionStats};
 use wrk_scan::k0_session::K0ScanSession;
 use wrk_scan::ledger::{EffectKind, LedgerRecord, TerminalKind};
 use wrk_scan::observer::{ObserverSink, OffReceipt};
@@ -247,9 +243,6 @@ struct CellRecord {
     oracle: Option<oracle::OracleVerdict>,
     failures: Vec<String>,
 }
-
-#[allow(unused)]
-fn _stats_type_witness(_s: &H0SessionStatsAlias) {}
 
 fn write_record(out: &mut impl Write, rec: &CellRecord) {
     let c = rec.cell;
