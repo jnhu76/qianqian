@@ -3,7 +3,7 @@
 //! [`dispatch`], and the same action leads to the same product
 //! operation regardless of its input source.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
@@ -28,6 +28,27 @@ pub(super) fn eof_feedback<S: EpisodeStart>(
         OpenOutcome::Refused { diagnostic } => format!("auto-next refused: {diagnostic}"),
         OpenOutcome::ActivationFailedClean { diagnostic } => {
             format!("auto-next failed (clean): {diagnostic}")
+        }
+        OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
+    }
+}
+
+/// The operation feedback for one resolved navigation burst (a pending
+/// intent's quiet window expired with a net displacement). Direction-
+/// neutral on purpose: a merged burst has no single "next" or
+/// "previous" — only its one committed target.
+pub(super) fn pending_commit_feedback<S: EpisodeStart>(
+    outcome: &OpenOutcome,
+    player: &ReferencePlayerApp<S>,
+) -> String {
+    match outcome {
+        OpenOutcome::Opened => match player.active_source() {
+            Some(source) => format!("navigation: opened {}", source.display()),
+            None => "navigation: opened".to_owned(),
+        },
+        OpenOutcome::Refused { diagnostic } => format!("navigation refused: {diagnostic}"),
+        OpenOutcome::ActivationFailedClean { diagnostic } => {
+            format!("navigation failed (clean): {diagnostic}")
         }
         OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
     }
@@ -100,6 +121,11 @@ pub(super) fn dispatch<S: EpisodeStart>(
         //                                (`play_current`'s own rule)
         //   neither                   -> honest inert feedback
         TuiAction::PlayPause => {
+            // A current-episode command is not a navigation: it must not
+            // be rewritten into another episode's open, so an
+            // uncommitted relative burst is cancelled instead of
+            // surfacing as a surprise switch after the pause/resume.
+            player.cancel_pending_navigation();
             match player.active_handle() {
                 Some(handle) => {
                     // The choice comes from ONE fresh authoritative
@@ -123,12 +149,18 @@ pub(super) fn dispatch<S: EpisodeStart>(
             Step::Continue
         }
         TuiAction::Stop => {
+            // Stop cancels the uncommitted burst: nothing pressed before
+            // the stop may open a new episode after it.
+            player.cancel_pending_navigation();
             if let Some(handle) = player.active_handle() {
                 handle.request_stop();
             }
             Step::Continue
         }
         TuiAction::SeekRelative(seconds) => {
+            // A seek names THIS episode's timeline; a pending burst must
+            // not surface as a different episode opening moments later.
+            player.cancel_pending_navigation();
             if let Some(handle) = player.active_handle() {
                 // The SAME frozen seek command as before: the target is
                 // derived from one fresh coherent observation, and an
@@ -150,6 +182,7 @@ pub(super) fn dispatch<S: EpisodeStart>(
         // no command, and the bar published no region to click in the
         // first place.
         TuiAction::SeekPerMille(per_mille) => {
+            player.cancel_pending_navigation();
             if let Some(handle) = player.active_handle()
                 && let Some(target) = seek_fraction_target(&handle.observe(), per_mille)
             {
@@ -470,41 +503,45 @@ impl Navigation {
 /// stream factor. One product decision, one constant.
 const VOLUME_STEP: i16 = 5;
 
-/// Perform one MANUAL navigation through the player (Issue #166
-/// §34/§35): the SAME Open replacement, with the committed cursor moving
-/// only on commit. The inert ends (no wrap outside Repeat All) report
-/// honestly; every other outcome is the Open outcome under the
-/// operation's name.
+/// Perform one MANUAL navigation request (Issue #166 §34/§35, amended
+/// by the navigation-burst fix): the key registers ONE App-owned
+/// relative-navigation intent; the burst coalesces inside the player
+/// and commits at most one Open when [`crate::player::
+/// NAVIGATION_QUIET_WINDOW`] expires with a net displacement. The
+/// registration itself opens, probes and drains NOTHING — keys kept
+/// arriving inside the window must merge, not be dropped as a busy
+/// interval. The loop's `settle_timers` resolves the deadline and
+/// reports under [`pending_commit_feedback`].
 fn perform_navigation<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
     navigation: Navigation,
 ) {
     let name = navigation.name();
-    let outcome = if navigation.forward() {
-        player.next_track()
+    let now = Instant::now();
+    // Only on the exact deadline boundary does registration have to
+    // resolve an expired burst first; the outcome, if any, is the
+    // synchronous Open that just ran and owns the status line.
+    let resolved = if navigation.forward() {
+        player.request_next_intent(now)
     } else {
-        player.previous_track()
+        player.request_previous_intent(now)
     };
-    if matches!(outcome, Some(OpenOutcome::Opened)) {
-        model.note_episode_replacement();
+    if let Some(outcome) = &resolved {
+        if matches!(outcome, OpenOutcome::Opened) {
+            model.note_episode_replacement();
+        }
+        model.set_status(Some(pending_commit_feedback(outcome, player)));
+        drain_busy_interval_input();
+        return;
     }
-    let feedback = match outcome {
+    model.set_status(Some(match player.pending_navigation_deadline() {
+        // The burst is armed; the loop reports the commit when it lands.
+        Some(_) => format!("{name}: navigation queued"),
+        // An inert key at a traversal boundary with no burst open —
+        // the honest "nothing there" the direct navigation always said.
         None => format!("no {name} track"),
-        Some(outcome) => match outcome {
-            OpenOutcome::Opened => match player.active_source() {
-                Some(source) => format!("{name}: opened {}", source.display()),
-                None => format!("{name}: opened"),
-            },
-            OpenOutcome::Refused { diagnostic } => format!("{name} refused: {diagnostic}"),
-            OpenOutcome::ActivationFailedClean { diagnostic } => {
-                format!("{name} failed (clean): {diagnostic}")
-            }
-            OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
-        },
-    };
-    model.set_status(Some(feedback));
-    drain_busy_interval_input();
+    }));
 }
 /// Play the SELECTED playlist row through the same Open replacement
 /// (Issue #166 §19). The selection is presentation state the user
@@ -580,13 +617,14 @@ mod tests {
     //! Tests for this submodule.
 
     use std::path::PathBuf;
+    use std::time::Instant;
 
     use crossterm::event::{
         KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
     };
 
-    use super::super::refresh;
     use super::super::testutil::*;
+    use super::super::{refresh, settle_timers};
     use super::dispatch;
     use crate::player::ReferencePlayerApp;
     use crate::player::tests::FakeEpisodeSource;
@@ -720,9 +758,10 @@ mod tests {
         );
     }
 
-    /// The N/P actions are the App's manual navigation, not episode
-    /// commands: the shell reports the outcome, the episode is only
-    /// ever touched by the frozen replacement.
+    /// The N/P actions are the App's relative-navigation intents, not
+    /// episode commands: registration opens nothing, and the loop's
+    /// settle step commits the ONE burst Open at the deadline. The
+    /// episode is only ever touched by the frozen replacement.
     #[test]
     fn n_and_p_route_the_manual_navigation() {
         let tree = TempTree::new("navigation");
@@ -733,15 +772,33 @@ mod tests {
         assert_eq!(player.open(&a), crate::player::OpenOutcome::Opened);
         player.establish_playlist(vec![a.clone(), b.clone()]);
         refresh(&mut model, &player);
+        let t0 = Instant::now();
 
         assert_eq!(
             dispatch(TuiAction::Next, &mut model, &mut player),
             Step::Continue
         );
         refresh(&mut model, &player);
+        assert_eq!(
+            model.source(),
+            Some(a.to_string_lossy().as_ref()),
+            "registration opens nothing"
+        );
+        assert_eq!(model.status().unwrap(), "next: navigation queued");
+
+        // The registration's deadline rides the REAL dispatch instant
+        // (a hair after t0); the injected settle times sit two window
+        // widths past it, so the premises have ~100 ms of scheduler
+        // slack and the oracle stays deterministic.
+        settle_timers(
+            &mut model,
+            &mut player,
+            t0 + 2 * crate::player::NAVIGATION_QUIET_WINDOW,
+        );
+        refresh(&mut model, &player);
         assert_eq!(model.source(), Some(b.to_string_lossy().as_ref()));
         assert!(
-            model.status().unwrap().starts_with("next: opened "),
+            model.status().unwrap().starts_with("navigation: opened "),
             "{:?}",
             model.status()
         );
@@ -749,6 +806,11 @@ mod tests {
         assert_eq!(
             dispatch(TuiAction::Previous, &mut model, &mut player),
             Step::Continue
+        );
+        settle_timers(
+            &mut model,
+            &mut player,
+            t0 + 3 * crate::player::NAVIGATION_QUIET_WINDOW,
         );
         refresh(&mut model, &player);
         assert_eq!(model.source(), Some(a.to_string_lossy().as_ref()));
