@@ -799,8 +799,12 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 
     /// The `R` key: toggle Sequential ↔ Shuffle. The committed entry is
     /// re-anchored, never restarted and never re-opened (Issue #166 §9).
-    /// Returns the new order.
+    /// A toggle is always a real reorder — the whole traversal is
+    /// rebuilt — so a pending burst (a position in the OLD geometry) is
+    /// cancelled exactly as in [`Self::set_order`]. Returns the new
+    /// order.
     pub fn toggle_order(&mut self) -> PlaybackOrder {
+        self.cancel_pending_navigation();
         self.playlist.toggle_order()
     }
 
@@ -4120,6 +4124,31 @@ pub(crate) mod tests {
         assert_eq!(
             player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
             None
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+
+        // The `R` key's toggle is ALWAYS a real reorder (no same-order
+        // early return): the R-key-during-pending hole — a stale
+        // virtual position committing against the fresh permutation —
+        // is pinned shut here.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.toggle_order();
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "the toggle cancelled the burst"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(0), "re-anchored");
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no stale-position Open against the new permutation"
         );
         assert_eq!(
             count_events(&log.lock().unwrap(), "probe "),

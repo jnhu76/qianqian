@@ -75,6 +75,11 @@ the strict boundary does not collapse).
 
 ## Negative controls (mutation-verified RED, restored GREEN)
 
+Recipes, run filters, results and full logs archived at
+`evidence/PRODUCTION-NEGATIVE-CONTROLS.md` +
+`evidence/NEG-A-direct-per-key.log` / `NEG-B1-early-commit.log` /
+`NEG-B2-commit-on-refused.log`:
+
 ```text
 A  shell re-wired to the direct per-key API
    → n_and_p_route_the_manual_navigation,
