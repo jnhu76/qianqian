@@ -331,8 +331,12 @@ fn run_on(
     spec: &BatchSpec,
 ) -> (RunFace, SessionStats, DisposeVerdict, oracle::OracleVerdict) {
     let sink = ObserverSink::on(spec.batch_id);
-    let mut session =
-        K0ScanSession::compose(cfg_of(cell), spec.clone(), sink.clone()).expect("K0 compose");
+    let mut session = K0ScanSession::<wrk_scan::h0::H0Executor>::compose(
+        cfg_of(cell),
+        spec.clone(),
+        sink.clone(),
+    )
+    .expect("K0 compose");
     session
         .run_admission_and_settlement()
         .expect("K0-ON settlement");

@@ -24,6 +24,7 @@
 #![forbid(unsafe_code)]
 
 pub mod h0;
+pub mod h1;
 pub mod k0_session;
 pub mod ledger;
 pub mod observer;
