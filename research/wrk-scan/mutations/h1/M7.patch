@@ -1,0 +1,14 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -310,8 +310,10 @@
+             // on a cut), so a cut releases it by not consuming it —
+             // N1(b) holds structurally and no permit can leak.
+             h1_fence_park!("h1_admit_pre_cut", st, &self.shared.state);
+-            if st.cancelled_groups.contains(&group) {
++            if st.cancelled_groups.contains(&group) && id != 27 {
+                 // Cut: the item stays Offered with no terminal obligation.
++                // (MUTANT M7: group-7 item 27 is admitted after the group
++                // cancel record.)
+                 drop(st);
+                 continue;
+             }

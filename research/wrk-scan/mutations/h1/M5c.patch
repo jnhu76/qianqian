@@ -1,0 +1,25 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -637,6 +637,22 @@
+             recv(ctl_rx) -> _ => continue,
+         };
+         let Ok(item) = received else {
++            if worker == 4 {
++                // MUTANT M5: worker 4 parks at the drain instead of
++                // exiting; its exit lands strictly after quiescence.
++                {
++                    let mut st = shared.state.lock().unwrap();
++                    st.m5_parked = true;
++                }
++                shared.settle_cv.notify_all();
++                let mut g = shared.state.lock().unwrap();
++                while !g.m5_release {
++                    g = shared.settle_cv.wait(g).unwrap();
++                }
++                drop(g);
++                sink.worker_exit(worker);
++                return;
++            }
+             // Disconnected = the last actual sender was dropped (only
+             // `finish_admission` does that) AND the queue drained. The
+             // single legal normal-exit funnel: record ExecutorExited at

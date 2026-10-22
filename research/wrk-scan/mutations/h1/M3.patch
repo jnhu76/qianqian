@@ -1,0 +1,14 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -713,6 +713,11 @@
+         match outcome {
+             Ok((term, contribution)) => {
+                 finish_terminal(sink, shared, item, term, worker, Some(contribution));
++                if item == 16 {
++                    // MUTANT M3: an effect published after the item's own
++                    // terminal ACK.
++                    sink.transform_done(item, 0, worker);
++                }
+             }
+             Err(payload) => {
+                 let message = payload

@@ -1,0 +1,32 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -322,15 +322,24 @@
+             // structurally unreachable in a healthy session (see module
+             // docs), so this arm only fires on a real invariant break or
+             // an injected fault — and must fail closed.
+-            st.pending.insert(id);
+-            st.admitted_not_terminal += 1;
+-            st.admitted_total += 1;
+-            st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            if id != 20 {
++                st.pending.insert(id);
++                st.admitted_not_terminal += 1;
++                st.admitted_total += 1;
++                st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            } else {
++                // MUTANT M1: item 20's admitted obligation is silently
++                // lost — never registered, never sent, never terminal.
++            }
+             let tx = self
+                 .work_tx
+                 .as_ref()
+                 .expect("the producer sender is held until finish_admission");
+-            let send_result = tx.try_send(id);
++            let send_result = if id == 20 {
++                Ok(())
++            } else {
++                tx.try_send(id)
++            };
+             #[cfg(test)]
+             // The ONLY way the structurally-unreachable Full arm can run
+             // without violating the frozen budgets (Gate II §15 control).

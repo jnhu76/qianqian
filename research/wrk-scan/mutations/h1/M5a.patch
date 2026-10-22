@@ -1,0 +1,12 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -170,6 +170,9 @@
+     admitted_total: usize,
+     results: Vec<(u32, u64)>,
+     panic_defect: Option<SessionError>,
++    /// MUTANT M5 machinery: parked-worker hold at the drain.
++    m5_parked: bool,
++    m5_release: bool,
+ }
+ 
+ struct H1Shared {

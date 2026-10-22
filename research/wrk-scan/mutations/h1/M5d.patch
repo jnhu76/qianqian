@@ -1,0 +1,51 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -427,25 +427,30 @@
+                     .into(),
+             });
+         }
++        // MUTANT M5: wait for worker 4 to park at the drain, publish the
++        // aggregate + receipt BEFORE joining, then release it — the
++        // receipt precedes the exits.
++        {
++            let mut st = self.shared.state.lock().unwrap();
++            while !st.m5_parked {
++                st = self.shared.settle_cv.wait(st).unwrap();
++            }
++        }
++        {
++            let mut sorted = {
++                let st = self.shared.state.lock().unwrap();
++                st.results.clone()
++            };
++            sorted.sort_by_key(|(id, _)| *id);
++            let agg = crate::workload::aggregate(&sorted);
++            self.sink.aggregate(agg);
++            self.sink.quiescence_receipt();
++            let mut st = self.shared.state.lock().unwrap();
++            st.m5_release = true;
++            drop(st);
++            self.shared.settle_cv.notify_all();
++        }
+         let stats = self.join_workers()?;
+-        let mut sorted = {
+-            let st = self.shared.state.lock().unwrap();
+-            if !st.pending.is_empty() {
+-                return Err(SessionError {
+-                    worker: 0,
+-                    item: u32::MAX,
+-                    message: "quiescence requires settlement (pending obligations remain)".into(),
+-                });
+-            }
+-            if let Some(defect) = st.panic_defect.clone() {
+-                return Err(defect);
+-            }
+-            st.results.clone()
+-        };
+-        sorted.sort_by_key(|(id, _)| *id);
+-        let agg = crate::workload::aggregate(&sorted);
+-        self.sink.aggregate(agg);
+-        self.sink.quiescence_receipt();
+         Ok(stats)
+     }
+ 
