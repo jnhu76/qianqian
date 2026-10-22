@@ -472,9 +472,9 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // boundary-0): eight long tracks, so only a sequence that
         // deliberately walks to an end reaches the inert boundary and
         // every burst lands on a committed, steadily playing episode.
-        "B-single-N" | "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms"
-        | "B-nnnnn-250ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms" | "B-np-10ms"
-        | "B-npnpnp-10ms" => &VTEST8,
+        "B-single-N" | "B-nnnnn-10ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms"
+        | "B-np-10ms" | "B-npnpnp-10ms" => &VTEST8,
+        "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => &VTEST8,
         // The manual-vs-natural pair: a SHORT first track so natural EOF
         // arrives quickly, and one long follower so the auto-next target
         // is unique. synth5.mp3 is staged by the burst runner (ffmpeg
@@ -2076,24 +2076,39 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             v.extend(quit_clean());
             v
         }
-        "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => {
-            let gap = match name {
-                "B-nnnnn-10ms" => 10,
-                "B-nnnnn-50ms" => 50,
-                "B-nnnnn-150ms" => 150,
-                _ => 250,
-            };
+        "B-nnnnn-10ms" => {
             let mut v = vec![
                 expect_format(),
                 expect("Track: 1/8"),
                 Step::SleepMs(1_500),
                 Step::Mark,
-                // Five raw keys from Track 1: every key opens (no
-                // boundary in reach); the committed final target is
-                // entry 6.
-                Step::KeysEach("n", 5, gap),
+                // Five raw keys at a cadence entirely inside ONE quiet
+                // window: ONE committed Open; the committed final
+                // target is entry 6 (old per-key behavior: 5 opens).
+                Step::KeysEach("n", 5, 10),
                 expect_after_mark_async("Track: 6/8".to_owned(), OPEN_WAIT),
             ];
+            v.extend(quit_clean());
+            v
+        }
+        // Deliberate single-stepping at a spaced cadence (production-
+        // acceptance redesign): each key is synchronized on the shell's
+        // own committed-Track witness, never on a blind wall-clock
+        // cadence — under the coalescing shell a key landing while a
+        // replacement is mid-flight is busy-interval input (drained),
+        // so the old blind scripts were timing-dependent instruments.
+        // Five witnessed steps: five ONE-key commits.
+        "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+            ];
+            for track in 2..=6 {
+                v.push(keys("n"));
+                v.push(expect_after_mark_async(format!("Track: {track}/8"), OPEN_WAIT));
+            }
             v.extend(quit_clean());
             v
         }
@@ -2101,16 +2116,23 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             let mut v = vec![
                 expect_format(),
                 expect("Track: 1/8"),
-                // Walk forward first so the burst has room backward.
-                Step::KeysEach("n", 4, 150),
-                expect_within("Track: 5/8".to_owned(), OPEN_WAIT),
-                Step::SleepMs(1_500),
                 Step::Mark,
-                // From Track 5: p opens 4,3,2,1; the FOURTH p at Track 1
-                // is inert (Repeat Off, no wrap). Final target: entry 1.
-                Step::KeysEach("p", 4, 10),
-                expect_after_mark_async("Track: 1/8".to_owned(), OPEN_WAIT),
             ];
+            // Synchronized forward walk: four witnessed steps to
+            // Track 5/8 (see the stepped-nnnnn note — never a blind
+            // cadence under the coalescing shell).
+            for track in 2..=5 {
+                v.push(keys("n"));
+                v.push(expect_after_mark_async(format!("Track: {track}/8"), OPEN_WAIT));
+            }
+            v.push(Step::SleepMs(1_500));
+            v.push(Step::Mark);
+            // From Track 5: p,p,p,p at burst cadence is ONE quiet
+            // window with net displacement 4 → ONE committed Open back
+            // to Track 1 (old per-key behavior: 4 opens; the fourth p
+            // at Track 1 is inert either way). Final target: entry 1.
+            v.push(Step::KeysEach("p", 4, 10));
+            v.push(expect_after_mark_async("Track: 1/8".to_owned(), OPEN_WAIT));
             v.extend(quit_clean());
             v
         }
