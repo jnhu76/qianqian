@@ -617,7 +617,6 @@ mod tests {
     //! Tests for this submodule.
 
     use std::path::PathBuf;
-    use std::time::Instant;
 
     use crossterm::event::{
         KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -772,7 +771,6 @@ mod tests {
         assert_eq!(player.open(&a), crate::player::OpenOutcome::Opened);
         player.establish_playlist(vec![a.clone(), b.clone()]);
         refresh(&mut model, &player);
-        let t0 = Instant::now();
 
         assert_eq!(
             dispatch(TuiAction::Next, &mut model, &mut player),
@@ -786,14 +784,19 @@ mod tests {
         );
         assert_eq!(model.status().unwrap(), "next: navigation queued");
 
-        // The registration's deadline rides the REAL dispatch instant
-        // (a hair after t0); the injected settle times sit two window
-        // widths past it, so the premises have ~100 ms of scheduler
-        // slack and the oracle stays deterministic.
+        // The registration's deadline rides the REAL dispatch instant,
+        // which the test cannot sample — so OBSERVE the armed window
+        // and settle one full window past it. A state-check premise,
+        // never a wall-clock offset: the CI Windows runner once delayed
+        // dispatch more than one window past a fixed t0, and the fixed
+        // t0 + 2·window settle then read the window as still open.
+        let deadline = player
+            .pending_navigation_deadline()
+            .expect("the Next registration armed a burst window");
         settle_timers(
             &mut model,
             &mut player,
-            t0 + 2 * crate::player::NAVIGATION_QUIET_WINDOW,
+            deadline + crate::player::NAVIGATION_QUIET_WINDOW,
         );
         refresh(&mut model, &player);
         assert_eq!(model.source(), Some(b.to_string_lossy().as_ref()));
@@ -807,10 +810,13 @@ mod tests {
             dispatch(TuiAction::Previous, &mut model, &mut player),
             Step::Continue
         );
+        let deadline = player
+            .pending_navigation_deadline()
+            .expect("the Previous registration armed a burst window");
         settle_timers(
             &mut model,
             &mut player,
-            t0 + 3 * crate::player::NAVIGATION_QUIET_WINDOW,
+            deadline + crate::player::NAVIGATION_QUIET_WINDOW,
         );
         refresh(&mut model, &player);
         assert_eq!(model.source(), Some(a.to_string_lossy().as_ref()));
