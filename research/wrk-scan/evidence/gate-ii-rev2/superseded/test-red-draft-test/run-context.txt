@@ -1,0 +1,4 @@
+cmd: cargo test --lib abort_post_recv_exit_event_is_unique -- --nocapture
+HEAD: e9e8cf21b462bc9471c4e55999f23fb445a81e59
+h1.rs sha256: 1f5f3fb26ff3df195ba4b0f3ca73ef337d7c5874aa1feb769f08bdf452e212b8  src/h1.rs
+date: 2026-10-22T16:46:30+08:00

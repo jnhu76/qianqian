@@ -19,13 +19,25 @@ name: Research Wrk-Scan Gate
 # explicitly set, so a green CI run cannot dirty the checkout and no
 # cleanup step is needed.
 #
+# Gate II extension (issue #308): the H1 bounded-channel mechanism
+# (crossbeam-channel 0.5, research-only) joins the same bar — its
+# lifecycle controls live in the lib tests, the K0×Observer 2×2
+# orthogonality smoke runs for BOTH mechanisms, and the frozen 92-cell
+# correctness matrix runs for BOTH mechanisms (matrix = H0, matrix_h1 =
+# H1, each writing its receipt to a fresh temp path). The H0 AND H1
+# M1–M9 mutation admissions remain archived campaign evidence
+# (mutations/run-mutation-arms.sh and mutations/run-mutation-arms-h1.sh
+# with receipts under evidence/), never a per-push gate.
+#
 # A green run states: the research crate is fmt-clean, clippy-clean at
-# -D warnings, and its full test suite (lib controls, ON/OFF
-# equivalence + shadow audit, golden evidence, mutation harness) plus
-# the 92-cell correctness matrix pass on linux-x86_64 stable. It makes
-# NO claim about Windows/macOS targets and no claim that the frozen
-# M1–M9 families remain killed (that is the archived campaign
-# evidence, not a per-push gate).
+# -D warnings, and its full test suite (lib controls for H0+H1, ON/OFF
+# equivalence + shadow audit, golden evidence, both mutation harness
+# greens, K0×Observer orthogonality) plus both 92-cell correctness
+# matrices pass on linux-x86_64 stable. It makes NO claim about
+# Windows/macOS targets, no performance ranking (non-timed
+# correctness), and no claim that the frozen M1–M9 families remain
+# killed (that is the archived campaign evidence, not a per-push
+# gate).
 
 on:
   pull_request:
@@ -48,9 +60,9 @@ concurrency:
 
 jobs:
   wrk-scan:
-    name: fmt + clippy + tests + 92-cell matrix (Linux)
+    name: fmt + clippy + tests + 92-cell matrices H0+H1 (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: research/wrk-scan
@@ -67,8 +79,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Tests (lib controls + equivalence + golden + mutation harness)
-        run: cargo test --lib --test equivalence --test golden --test mutation_harness
+      - name: Tests (lib controls + equivalence + golden + mutation harness greens + orthogonality)
+        run: cargo test --lib --test equivalence --test golden --test mutation_harness --test mutation_harness_h1 --test orthogonality
 
-      - name: 92-cell correctness matrix
-        run: cargo test --test matrix -- --nocapture
+      - name: 92-cell correctness matrices (H0 + H1)
+        run: cargo test --test matrix --test matrix_h1 -- --nocapture

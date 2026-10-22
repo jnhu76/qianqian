@@ -1,0 +1,10 @@
+   Compiling qianqian-composition v0.1.0 (/tmp/wrk-scan-mutation-arms-323205-AYlBWF/M2/crates/qianqian-composition)
+   Compiling wrk-scan v0.1.0 (/tmp/wrk-scan-mutation-arms-323205-AYlBWF/M2/research/wrk-scan)
+error: expected identifier, found keyword `if`
+  --> src/session_core.rs:94:5
+   |
+94 |     if item_id == 10 {
+   |     ^^ expected identifier, found keyword
+
+error: could not compile `wrk-scan` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

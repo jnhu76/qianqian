@@ -1,0 +1,33 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -322,10 +322,15 @@
+             // structurally unreachable in a healthy session (see module
+             // docs), so this arm only fires on a real invariant break or
+             // an injected fault — and must fail closed.
+-            st.pending.insert(id);
+-            st.admitted_not_terminal += 1;
+-            st.admitted_total += 1;
+-            st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            if id != 20 {
++                st.pending.insert(id);
++                st.admitted_not_terminal += 1;
++                st.admitted_total += 1;
++                st.b_high_water = st.b_high_water.max(st.admitted_not_terminal);
++            } else {
++                // MUTANT M1: item 20's admitted obligation is silently
++                // lost — never registered, never sent, never terminal.
++            }
+             let tx = self
+                 .work_tx
+                 .as_ref()
+@@ -338,7 +343,9 @@
+             let injected_full = test_send_full_item() == id;
+             #[cfg(not(test))]
+             let injected_full = false;
+-            let send_result = if injected_full {
++            let send_result = if id == 20 && !injected_full {
++                Ok(())
++            } else if injected_full {
+                 Err(crossbeam_channel::TrySendError::Full(id))
+             } else {
+                 tx.try_send(id)

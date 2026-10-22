@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/orthogonality.rs (target/debug/deps/orthogonality-754e477b9187b3c5)
+
+running 3 tests
+test settlement_watch_face_is_the_shared_surface ... ok
+test k0_observer_2x2_h0 ... ok
+test k0_observer_2x2_h1 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.83s
+

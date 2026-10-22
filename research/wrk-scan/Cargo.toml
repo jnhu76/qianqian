@@ -16,3 +16,8 @@ publish = false
 [dependencies]
 sha2 = "0.11.0"
 qianqian-composition = { path = "../../crates/qianqian-composition" }
+# H1 mechanism dependency (Gate II, issue #308, Owner GO:
+# CHANNEL_LIBRARY = crossbeam-channel 0.5, RESEARCH_ONLY). The bounded
+# MPMC channel + its parker IS the H1 mechanism under test; it appears in
+# no product crate and in no other research arm.
+crossbeam-channel = "0.5.15"

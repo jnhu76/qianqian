@@ -100,7 +100,7 @@ fn on_face(
     use wrk_scan::ledger::LogKind;
 
     let sink = ObserverSink::on(spec.batch_id);
-    let mut session = K0ScanSession::compose(
+    let mut session = K0ScanSession::<wrk_scan::h0::H0Executor>::compose(
         H0Config {
             p: cell.0,
             b: cell.1,

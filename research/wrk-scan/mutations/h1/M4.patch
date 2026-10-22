@@ -1,0 +1,15 @@
+--- a/src/h1.rs
++++ b/src/h1.rs
+@@ -700,9 +700,11 @@
+     drop(st);
+ 
+     sink.item_start(item);
+-    if cancelled {
++    if cancelled || item == 22 {
+         // The owner observed the cancel while actually holding the item
+         // (post-recv observation): legal Abandon (SPEC §5.1).
++        // (MUTANT M4: item 22 (group 1) is abandoned although no cancel
++        // was ever requested for its group.)
+         finish_terminal(sink, shared, item, TerminalKind::Abandoned, worker, None);
+     } else {
+         // PD premise: panic-contained so the owner survives; the frozen

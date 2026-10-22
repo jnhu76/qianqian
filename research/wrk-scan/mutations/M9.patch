@@ -1,6 +1,6 @@
---- a/src/h0.rs
-+++ b/src/h0.rs
-@@ -495,7 +495,12 @@
+--- a/src/session_core.rs
++++ b/src/session_core.rs
+@@ -87,7 +87,12 @@
      let bytes = workload::generate_input(spec.seed, item_id);
      let (meta, peak) = workload::transform(item_id, &bytes, s.cpu_blocks);
      let content = workload::content_digest(item_id, &bytes);

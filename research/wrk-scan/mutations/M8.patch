@@ -1,6 +1,6 @@
---- a/src/h0.rs
-+++ b/src/h0.rs
-@@ -486,7 +486,9 @@
+--- a/src/session_core.rs
++++ b/src/session_core.rs
+@@ -78,7 +78,9 @@
          }
      }
      let s = &spec.items[item_id as usize];

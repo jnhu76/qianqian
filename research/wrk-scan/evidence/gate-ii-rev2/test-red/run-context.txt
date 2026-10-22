@@ -1,0 +1,6 @@
+cmd: cargo test --lib abort_post_recv_exit_event_is_unique -- --nocapture
+HEAD: e9e8cf21b462bc9471c4e55999f23fb445a81e59 (unchanged; defect temporarily restored in working tree, final test text)
+h1.rs sha256: efca14bdf5a5b1a672cf052efcc3c2e11d06a3ac351275e72a96f979437a0d73  src/h1.rs
+env: cargo 1.97.1 (c980f4866 2026-06-30); RUSTFLAGS=unset
+expected: RED — duplicate ExecutorExited [1, 1] vs [1]
+rc=101

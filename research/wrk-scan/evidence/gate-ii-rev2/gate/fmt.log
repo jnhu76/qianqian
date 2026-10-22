@@ -1,0 +1,14 @@
+Diff in /home/hoo/Source/qianqian-r2-g2/research/wrk-scan/src/h1.rs:1403:
+                 "no terminal may be forged under abort"
+             );
+             assert!(
+-                !ledger
+-                    .iter()
+-                    .any(|r| r.kind == EffectKind::IoWaitDone
+-                        || r.kind == EffectKind::TransformDone),
++                !ledger.iter().any(
++                    |r| r.kind == EffectKind::IoWaitDone || r.kind == EffectKind::TransformDone
++                ),
+                 "the held item must not execute after the abort flag is \
+                  authoritative"
+             );

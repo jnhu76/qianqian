@@ -16,6 +16,18 @@
 # intentional archives, never a default write target. Nothing is
 # discarded (no /dev/null): every run's artifacts stay in its run dir.
 #
+# Gate II (#308, GII-G) — evidence hermeticity hardened:
+#   - $WORK is now a UNIQUE mktemp dir per run (it used to be one fixed
+#     shared path, so two concurrently started campaigns would rm -rf
+#     each other's arm copies and share one cargo target dir — a real
+#     concurrent-campaign collision). Per-run scratch never collides;
+#     scratch is removed on success and KEPT (path recorded in the
+#     summary) on failure for forensics.
+#   - a non-blocking flock fails the run closed if another invocation of
+#     THIS driver is already mid-run (defense in depth; the unique $WORK
+#     already removes the correctness hazard, the lock removes the
+#     accidental-double-invocation surprise).
+#
 # rc: 0 = all arms MET; 1 = at least one arm VIOLATED.
 set -u
 
@@ -26,14 +38,24 @@ CRATE="$(cd "$(dirname "$0")/.." && pwd)"
 # GATE_I_MUTATION_OUT=<dir> is the explicit opt-in that targets a chosen
 # directory (how the archives under evidence/gate-i-mutations/ were made).
 EV="${GATE_I_MUTATION_OUT:-${TMPDIR:-/tmp}/wrk-scan-mutations-$$-$(date +%s%N)}"
-WORK="${TMPDIR:-/tmp}/wrk-scan-mutation-arms"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/wrk-scan-mutation-arms-$$-XXXXXX")"
 mkdir -p "$EV" "$WORK"
 echo "mutation run dir: $EV"
+echo "scratch dir: $WORK"
 export CARGO_TARGET_DIR="$WORK/shared-target"
 # ROUND (optional) stamps this run's log/summary names so repeat cycles
 # stay distinguishable (e.g. ROUND=r8-); every run's artifacts are kept
 # in its run dir, none discarded.
 ROUND="${ROUND:-}"
+
+# Fail closed on a concurrent campaign of the same driver (GII-G). The
+# lock lives outside the repo (never dirties the worktree witness).
+LOCKFILE="${TMPDIR:-/tmp}/wrk-scan-h0-mutation-campaign.lock"
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+  echo "FLOCK-HELD: another H0 mutation campaign is already running ($LOCKFILE) — refusing to start (fail-closed)" | tee -a "$EV/cycle-summary$ROUND.txt"
+  exit 1
+fi
 
 SUMMARY="$EV/cycle-summary$ROUND.txt"
 : > "$SUMMARY"
@@ -59,7 +81,11 @@ designated() {
     # "panic:" prefix = the designated signature is the control's panic
     # message (plain substring), not a harness test-name FAIL line.
     LW) echo "panic:worker never consumed" ;;
-    PB) echo "watchdog:" ;;
+    # Match the timeout-protective watchdog's settle-failure line, not the
+    # generic "watchdog:" prefix (which would also match the watchdog's
+    # panicked-relay line and let an unrelated arm failure score MET —
+    # review B P3).
+    PB) echo "watchdog: control did not settle within" ;;
     *) echo "" ;;
   esac
 }
@@ -103,6 +129,11 @@ TOML
 
 run_arm() { # $1 name, $2 dir, $3 expect(green|red)
   local name=$1 dir=$2 expect=$3 log="$EV/arm-$ROUND$1.log"
+  # Source identity witness (Gate II §14): sha256 of every patched source
+  # file + the manifests, per arm — a killed arm must name the exact bytes
+  # it mutated, a clean arm the exact bytes that stayed green.
+  (cd "$dir/research/wrk-scan" && sha256sum Cargo.toml Cargo.lock src/*.rs tests/*.rs \
+      > "$EV/arm-$ROUND$1.source-sha.txt")
   (cd "$dir/research/wrk-scan" && timeout 300 cargo test $(arm_filter "$name") -- --nocapture) > "$log" 2>&1
   local rc=$?
   local verdict
@@ -118,8 +149,8 @@ run_arm() { # $1 name, $2 dir, $3 expect(green|red)
     local primary failed hit
     primary=$(designated "$name")
     failed=$(grep '^  .* FAIL$' "$log" | awk '{print $1}' | tr '\n' ' ')
-    if [ "$primary" = "watchdog:" ]; then
-      hit=$(grep -c "watchdog:" "$log")
+    if [ "$primary" = "watchdog: control did not settle within" ]; then
+      hit=$(grep -cF "$primary" "$log")
     elif [ "${primary#panic:}" != "$primary" ]; then
       # panic-message signature: a libtest panic line carries the message
       # itself, never a "  <test>  FAIL" table row — match the substring.
@@ -178,4 +209,12 @@ git -C "$CRATE" status --porcelain -- src tests mutations | grep -v '^??' > "$EV
 echo "worktree src/tests/mutations modifications: $(wc -l < "$EV/worktree-untouched.txt") entries (0 = untouched)" >> "$SUMMARY"
 
 cat "$SUMMARY"
-exit $([ "$VIOLATIONS" -eq 0 ] && echo 0 || echo 1)
+if [ "$VIOLATIONS" -eq 0 ]; then
+  # Success: per-run scratch (arm copies + cargo target) is disposable —
+  # every receipt lives in the run dir. On failure the scratch is KEPT
+  # for forensics and its path is recorded above.
+  rm -rf "$WORK"
+  exit 0
+fi
+echo "scratch kept for forensics: $WORK" >> "$SUMMARY"
+exit 1

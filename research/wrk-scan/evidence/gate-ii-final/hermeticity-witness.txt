@@ -1,0 +1,2 @@
+GIT STATUS IDENTICAL ACROSS PLAIN TEST RUNS (orthogonality + both mutation harnesses)
+Note: the first witness attempt (wrapped around the two 92-cell matrix runs) reported one diff line: research/wrk-scan/FREEZE-AUTHORITY-MAP.md — the Gate II §8 doc addendum edited by the agent DURING the run, not test-induced dirt; the matrix runs themselves wrote only to the external run dir. Witness retaken above around plain test runs on the otherwise-stable tree.

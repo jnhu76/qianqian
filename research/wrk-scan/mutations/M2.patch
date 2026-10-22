@@ -1,6 +1,6 @@
---- a/src/h0.rs
-+++ b/src/h0.rs
-@@ -535,6 +535,10 @@
+--- a/src/session_core.rs
++++ b/src/session_core.rs
+@@ -90,6 +90,10 @@
      let contribution = workload::contribution(&content, &meta, peak);
      sink.transform_done(item_id, fold_meta(&meta), worker);
      sink.result_published(item_id, contribution, worker);

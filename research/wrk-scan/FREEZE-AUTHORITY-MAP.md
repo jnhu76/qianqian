@@ -168,3 +168,47 @@ cancel 仅 S5（第 164 次受理后，group 7）。
 
 除此之外任何与冻结文本的冲突 => `PROTOCOL_AMENDMENT_REQUIRED`，停止并上报，
 不静默改规范。
+
+## 8. Gate II 追加记录（#308，2026-10-22，EXECUTED）
+
+本轮（R2 Gate II H1）不改动任何冻结语义；以下为 H1 机制轮的权威路由与身份记录。
+
+### 8.1 冻结身份复算（Gate II 执行基线核验）
+
+```text
+执行基线   = main@1375d4853ef595ffb57180b43d65f655ed8cf5f5（PR #307 merge = Gate I 收口）
+Owner GO   = GATE_II_H1_GO（#308 comment 6330781617）：
+             CHANNEL_LIBRARY = crossbeam-channel 0.5（research-only）
+             QUEUE_Q = B；SHARED_CODE = A_NARROW
+SPEC/APP-A/APP-B/APP-C 四正文 canonical SHA256 与 GitHub live body 逐项复算：
+             全部 MATCH；SUITE_SHA256 = 6a00d0a8…9281 MATCH（2026-10-22 复算）
+```
+
+### 8.2 H1 对冻结文本的扩展（全部为机制实现，不触语义）
+
+```text
+新依赖     crossbeam-channel 0.5（Cargo.lock pin 0.5.17；仅本 research crate；
+           SPEC §1 G0 的"生产无 crossbeam"指生产 crate，研究 crate 依 Owner GO 引入）
+H1 机制    = SPEC §4.4 表 H1 列（bounded channel 容量 C = Q = B，Owner GO §1.B 的
+           C>=B 分支）；Q 与 B 分开计量（b_high_water / q_high_water / 
+           channel_resident 三 witness，绝不同一计数器）
+受理配方   = §4.2 ADMISSION_RECIPE 原样实现：B permit（condvar）→ 取消序临界区
+           （义务登记 → 非阻塞 try_send → ItemAdmitted 入账）；
+           ADMISSION_LINEARIZATION = 临界区内 ItemAdmitted 追加时刻
+共享业务   = session_core::execute_item（A_NARROW；原 h0.rs 函数逐字迁移，
+           唯一例外：cfg(test) 注入 panic 消息字面量改为机制中立措辞；
+           patch 迁移映射见 GATE-II-MECHANISM-MAP.md §3）
+REF 边界   不变：执行路径禁止 ref_result（§2.5(b)），oracle 独立
+```
+
+### 8.3 Gate II 证据归档路由
+
+```text
+evidence/gate-ii-motion/     A_NARROW 搬移后 H0 回归（92-cell receipt、
+                             M1–M9+LW/PB round-2 收据 + round-1 的 M2
+                             PATCH 编译失败诚实存档、逐 arm source-sha）
+evidence/gate-ii-final/      最终 HEAD 的 H0/H1 双 92-cell receipt + hermeticity witness
+evidence/gate-ii-mutations-h1/  H1 M1–M9 campaign 收据（逐 arm log + source-sha）
+evidence/gate-ii-orthogonality/ K0×Observer 2×2 smoke 收据
+H0 历史证据    evidence/gate-i-*/（原样保留，绝不覆盖）
+```

@@ -1,0 +1,9 @@
+   Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-g2/research/wrk-scan)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.91s
+     Running unittests src/lib.rs (target/debug/deps/wrk_scan-28638ba512f484bd)
+
+running 1 test
+test h1::tests::abort_post_recv_exit_event_is_unique ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
