@@ -1,0 +1,18 @@
+run: BURST-RUNP2
+campaign: research/navigation-burst-boundary-0
+date_utc: 2026-10-22T19:58:33Z
+branch: fix/nav-burst-coalesce
+head_sha: 0884b5587aa65df4c908ba1fa550b9b1261b6900
+origin_main: 9f4b9540d92277a927c8b1a1a67400e76e2fdd3f
+worktree_status: 39 dirty entries
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+features: playback profile: release
+product_binary: qianqian-headless.exe
+product_binary_sha256: c0a82108c9e1b3f1a6d6c6496bc7bafa5f3eee365406fddd5499c882ee13f9a3
+tuidriver_sha256: 55e2ccf75ac17a9649409d68b00648fe4732d920919467d2becca8af166bd1c2
+driver_env: QIANQIAN_AUDIO_LOG=1 (inherited by the child; the off-by-default per-episode mechanism lines)
+synth5_sha256: ca028a20b5c72cb7230680982897c3f8f4c28cdba81dcb5473a2ad732992b24e
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+windows_caption: Microsoft Windows 11 专业版
+audio_device: 适用于蓝牙? 音频的英特尔? 智音技术

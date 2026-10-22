@@ -1,0 +1,7 @@
+[+0.201] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=121086 opened: 44100 Hz, 2 channels, mask
+[+1.979] KEY "n"
+[+1.980] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=121086 opened: 44100 Hz, 2 channels, mask3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+2.060] KEY "p"
+[+3.222] KEY "q"
+[+3.250] [qianqian-wasapi] error ts_us=3191834 render aborted: data plane stopped
+[+3.303] [qianqian-wasapi] error ts_us=3191834 render aborted: data plane stopped[K

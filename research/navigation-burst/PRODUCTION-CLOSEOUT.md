@@ -110,5 +110,8 @@ episode or rebuilds traversal state: no second hole of this class
 `establish_playlist` still relies on caller discipline (it rides an
 Open commit in every production path), so a future shell adapter must
 keep that order — not a reachable hole today.
-Windows native acceptance remains NOT_RUN — an owner-side pre-merge
-platform gate, separate from this review round.
+Windows native acceptance was then EXECUTED on the Owner's real
+Windows host (ConPTY burst matrix 9/9 GREEN + MSVC native test suite
+432/0) — see
+`evidence/PRODUCTION-WINDOWS-ACCEPTANCE.md`; the human listening
+witness remains the owner-side NOT_RUN item.

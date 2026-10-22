@@ -1,0 +1,26 @@
+[+0.460] KEY "n"
+[+0.614] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=527416 render aborted: data plane stopped
+[+0.658] [120C[4;49H2[6;12H--[1C--[8;9H2[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest02.mp3[qianqian-wasapi] info ts_us=604036 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+1.057] T[mavigation: ope[38;5;8mr[med C:\Users\Public\qianqian-dogfood\vtest02.mp3[qianqian-wasapi] info ts_us=604036 opened: 44100 Hz, 2 hannels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+1.157] KEY "n"
+[+1.315] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=1227651 render aborted: data plane stoppe
+[+1.367] [120C[4;49H3[6;12H--[1C--[8;9H3[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest03.mp3[qianqian-wasapi] info ts_us=1304586 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+1.753] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=1227651 render aborted: data plane stoppdavigation: ope ed C:\Users\Public\qianqian-dogfood\vtest03.mp3[qianqian-wasapi] info ts_us=1304586 opened: 44100 Hz, 2channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+1.855] KEY "n"
+[+1.977] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=1931576 render aborted: data plane stoppe
+[+2.088] [120C[4;49H4[6;12H--[1C--[8;9H4[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest04.mp3[qianqian-wasapi] info ts_us=2002653 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+2.452] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=1931576 render aborted: data plane stoppdavigation: ope ed C:\Users\Public\qianqian-dogfood\vtest04.mp3[qianqian-wasapi] info ts_us=2002653 opened: 44100 Hz, 2channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+2.552] KEY "n"
+[+2.688] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=2631347 render aborted: data plane stoppe
+[+2.798] [120C[4;49H5[6;12H--[1C--[8;9H5[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest05.mp3[qianqian-wasapi] info ts_us=2700028 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+3.136] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=2631347 render aborted: data plane stoppdavigation: ope ed C:\Users\Public\qianqian-dogfood\vtest05.mp3[qianqian-wasapi] info ts_us=2700028 opened: 44100 Hz, 2channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+4.738] KEY "p" #1 of 4
+[+4.748] KEY "p" #2 of 4
+[+4.758] KEY "p" #3 of 4
+[+4.768] KEY "p" #4 of 4
+[+4.914] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=4837749 render aborted: data plane stoppe
+[+5.024] [120C[4;49H1[6;12H--[1C--[8;9H1[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;1Hnavigation: opened C:\Users\Public\qianqian-dogfood\vtest01.mp3[qianqian-wasapi] info ts_us=4922254 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+5.365] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=4837749 render aborted: data plane stoppnavigation: opened C:\Users\Public\qianqian-dogfood\vtest01.mp3[qianqian-wasapi] info ts_us=4922254 opened: 44100 Hz, 2channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+5.467] KEY "q"
+[+5.530] [qianqian-wasapi] error ts_us=5445267 render aborted: data plane stopped
+[+5.548] [qianqian-wasapi] error ts_us=5445267 render aborted: data plane stopped[K

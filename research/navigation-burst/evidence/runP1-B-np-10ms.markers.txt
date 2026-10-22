@@ -1,0 +1,5 @@
+[+1.996] KEY "n"
+[+2.077] KEY "p"
+[+3.239] KEY "q"
+[+3.287] [qianqian-wasapi] error ts_us=3217960 render aborted: data plane stopped
+[+3.320] [qianqian-wasapi] error ts_us=3217960 render aborted: data plane stopped[K
