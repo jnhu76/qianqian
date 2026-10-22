@@ -11,4 +11,4 @@ M9 rc=101 MET (RED; failed: O3_content_vs_ref )
 C-green rc=0 MET (VERDICT = GREEN)
 rc_legend: MET = green arm green / mutant arm RED with designated check
 total violations: 0
-worktree src/tests/mutations modifications: 1 entries (0 = untouched)
+worktree src/tests/mutations modifications: 0 entries (0 = untouched)

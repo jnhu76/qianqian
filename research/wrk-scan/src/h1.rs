@@ -1350,13 +1350,15 @@ pub(crate) mod tests {
     fn abort_mid_flight_bounded_all_outcomes_legal() {
         // Abort at an arbitrary mid-flight moment (the worker is usually
         // inside item 0's 2ms wait when the flag flips; the race is
-        // benign because EVERY legal outcome is asserted): the executing
-        // owner completes its item honestly; an item only received in
-        // the post-recv shutdown re-check window leaves its obligation
-        // honestly outstanding; unreceived items stay honestly resident
-        // in the channel. Whatever the interleaving: the join is bounded
-        // (watchdog), every ACK belongs to an admitted item and is the
-        // only one, admitted == ACKed + resident, and no receipt exists.
+        // benign because every legal outcome is asserted): the executing
+        // owner completes its item honestly; an item received into the
+        // post-recv shutdown re-check window leaves its obligation
+        // honestly outstanding (no per-item record); unreceived items
+        // stay honestly resident in the channel. Whatever the
+        // interleaving: the join is bounded (watchdog), every ACK belongs
+        // to an admitted item and is the only one, the admitted set
+        // partitions exactly into ACKed and effect-less (the resident
+        // witness is bounded aggregate-side), and no receipt exists.
         let _g = H1Executor::session_test_lock();
         with_watchdog(30, move || {
             let spec = BatchSpec::new(1, SEED, 4);

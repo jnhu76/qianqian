@@ -1,10 +1,12 @@
    Compiling wrk-scan v0.1.0 (/home/hoo/Source/qianqian-r2-g2/research/wrk-scan)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
      Running tests/matrix.rs (target/debug/deps/matrix-949303994ad02a5e)
 
 running 1 test
+matrix receipt (this run): /home/hoo/Source/qianqian-r2-g2-runs/2026-10-22-gii-exec/final-runs/matrices/h0-matrix-cells-final.jsonl
 test matrix_92_cells_all_green has been running for over 60 seconds
 test matrix_92_cells_all_green ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 162.49s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 162.78s
 
+RC=0
