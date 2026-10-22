@@ -1382,13 +1382,16 @@ pub(crate) mod tests {
                 acked.iter().all(|id| (*id as usize) < 4),
                 "every ACK belongs to an admitted item"
             );
-            // The FULL partition of the four admitted items across the
-            // three legal abort outcomes (review A F1):
-            //   ACKed (owner completed honestly)
-            // + resident (never received: honestly queued)
-            // + received-but-not-executed (dropped at the post-recv
-            //   shutdown re-check: neither ACKed nor resident — identified
-            //   as an admitted item with no ACK and no execution effect).
+            // Per-item partition of the four admitted items (review A F1,
+            // delta-reviewed formulation): every admitted item is either
+            // ACKed or effect-less at stats-read time — abort() joins all
+            // workers before the stats are read, and an executed item
+            // always reaches its ACK, so "effects without ACK" is illegal
+            // and "not ACKed" (unreceived OR received-but-dropped at the
+            // post-recv recheck, which leaves no per-item record) is
+            // exactly the effect-less class. The ledger cannot express the
+            // resident-vs-dropped split per item, so the resident witness
+            // is bounded aggregate-side instead of being double-counted.
             let execution_effects = |id: u32| {
                 ledger.iter().any(|r| {
                     r.item_id == Some(id)
@@ -1398,13 +1401,21 @@ pub(crate) mod tests {
                                 && r.log == crate::ledger::LogKind::Effect))
                 })
             };
-            let dropped: Vec<u32> = (0u32..4)
-                .filter(|id| !acked.contains(id) && execution_effects(*id))
-                .collect();
+            let not_acked: Vec<u32> = (0u32..4).filter(|id| !acked.contains(id)).collect();
+            assert!(
+                not_acked.iter().all(|id| !execution_effects(*id)),
+                "execution effects without a terminal ACK are illegal under abort"
+            );
             assert_eq!(
-                acked.len() + stats.channel_resident_final + dropped.len(),
+                acked.len() + not_acked.len(),
                 4,
-                "admitted == ACKed + honestly-resident + received-but-dropped"
+                "admitted partitions exactly into ACKed and effect-less"
+            );
+            assert!(
+                stats.channel_resident_final <= not_acked.len(),
+                "resident witness {} exceeds the not-ACKed class {}",
+                stats.channel_resident_final,
+                not_acked.len()
             );
             expect_receipt_absent(&sink);
         });
