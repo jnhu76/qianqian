@@ -1,6 +1,6 @@
---- a/src/h0.rs
-+++ b/src/h0.rs
-@@ -493,7 +493,9 @@
+--- a/src/session_core.rs
++++ b/src/session_core.rs
+@@ -85,7 +85,9 @@
          sink.wait_done(item_id, s.wait_us, worker);
      }
      let bytes = workload::generate_input(spec.seed, item_id);

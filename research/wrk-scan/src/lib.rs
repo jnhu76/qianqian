@@ -29,4 +29,5 @@ pub mod ledger;
 pub mod observer;
 pub mod oracle;
 pub mod scenario;
+pub mod session_core;
 pub mod workload;

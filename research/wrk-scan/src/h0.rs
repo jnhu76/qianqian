@@ -33,12 +33,16 @@
 //! logic (its 50ms `wait_timeout` diagnostic polling, its mutant fields)
 //! is deliberately NOT inherited (SPEC §4.5). The `ref_result` shortcut
 //! is never called on the execution path — workers run the real content
-//! primitives (SPEC §2.5(b)).
+//! primitives (SPEC §2.5(b)) via the shared mechanism-neutral core
+//! ([`crate::session_core::execute_item`], the A_NARROW extraction of
+//! Gate II): H0's dispatch/synchronization below and H1's channel
+//! dispatch both call that one business function.
 //!
 //! `cfg(test)`-only facilities (compiled out of every non-test build):
 //! `fences` — named gates that force documented interleavings for the
-//! negative controls, never sleep-based; `TEST_PANIC_ITEM` — owner-panic
-//! injection for the owner-death control.
+//! negative controls, never sleep-based (the gate machinery itself lives
+//! in `session_core`); the owner-panic injection point (also
+//! `session_core`, read inside the shared `execute_item`).
 
 // Fence macros must precede their first use. In non-test builds every
 // call site compiles to nothing.
@@ -52,22 +56,21 @@ macro_rules! h0_fence_park {
 #[cfg(test)]
 macro_rules! h0_fence_park {
     ($name:literal, $guard:expr, $lock:expr) => {
-        $guard = $crate::h0::fences::park($name, $guard, $lock);
+        $guard = $crate::session_core::fences::park($name, $guard, $lock);
     };
 }
 
 use std::collections::{HashSet, VecDeque};
 use std::panic::{self, AssertUnwindSafe};
-#[cfg(test)]
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
 
 use crate::ledger::TerminalKind;
 use crate::observer::ObserverSink;
-use crate::oracle::fold_meta;
+use crate::session_core::execute_item;
 use crate::workload::{self, BatchSpec};
+
+pub use crate::session_core::{SessionError, SessionStats};
 
 /// Session configuration: P execution parallelism, B admitted-not-terminal
 /// budget, and the optional frozen cancel milestone (k-th admission, group).
@@ -77,29 +80,6 @@ pub struct H0Config {
     pub b: usize,
     /// `(k, group)`: request_cancel(group) fires after the k-th admission.
     pub cancel_milestone: Option<(u32, u32)>,
-}
-
-/// Why a session failed. Published by real owner-death handling
-/// (`worker`/`item` name the dead owner) or — under the
-/// `worker: 0 / item: u32::MAX` sentinel — by an executor-level
-/// precondition/cleanliness failure (unjoined worker, outstanding
-/// settlement obligations, offer stream still open). Never by forging a
-/// terminal or a receipt.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SessionError {
-    pub worker: u64,
-    pub item: u32,
-    pub message: String,
-}
-
-/// Mode-independent lifecycle statistics (same values in ON and OFF).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SessionStats {
-    pub admitted_count: usize,
-    pub b_high_water: usize,
-    pub active_execution_high_water: usize,
-    pub workers_spawned: usize,
-    pub workers_joined: usize,
 }
 
 struct H0State {
@@ -532,41 +512,6 @@ fn worker_main(worker: u64, spec: BatchSpec, sink: ObserverSink, shared: Arc<Sha
     }
 }
 
-/// The REAL item work: wait + input generation + CPU transform + content
-/// digest + contribution. Never `ref_result` (SPEC §2.5(b)); the fault
-/// lane performs all common work and then publishes CompletedErr(0x31).
-fn execute_item(
-    worker: u64,
-    spec: &BatchSpec,
-    sink: &ObserverSink,
-    item_id: u32,
-) -> (TerminalKind, u64) {
-    #[cfg(test)]
-    {
-        if test_panic_item() == item_id {
-            panic!("h0 test-injected owner panic for item {item_id}");
-        }
-    }
-    let s = &spec.items[item_id as usize];
-    if s.wait_us > 0 {
-        // Synthetic logical I/O wait — a workload parameter (simulated
-        // pacing), never a synchronization premise (SPEC §3.2).
-        std::thread::sleep(Duration::from_micros(s.wait_us));
-        sink.wait_done(item_id, s.wait_us, worker);
-    }
-    let bytes = workload::generate_input(spec.seed, item_id);
-    let (meta, peak) = workload::transform(item_id, &bytes, s.cpu_blocks);
-    let content = workload::content_digest(item_id, &bytes);
-    let contribution = workload::contribution(&content, &meta, peak);
-    sink.transform_done(item_id, fold_meta(&meta), worker);
-    sink.result_published(item_id, contribution, worker);
-    let term = match s.fault {
-        Some(code) => TerminalKind::CompletedErr(code),
-        None => TerminalKind::CompletedOk,
-    };
-    (term, contribution)
-}
-
 /// Terminal ACK by the real owner (the completing/abandoning worker),
 /// then B-permit release + obligation discharge + fan-in sink update,
 /// then wake the backpressure and settlement waiters.
@@ -592,140 +537,19 @@ fn finish_terminal(
 }
 
 // ---- cfg(test)-only facilities ----
+// The process-global facilities (fence gates, owner-panic injection,
+// session test lock) live in `session_core` so H0 and H1 controls share
+// them identically; h0 keeps its named gate call sites and re-exports the
+// lock under its historical path for the existing tests.
 
 #[cfg(test)]
-static TEST_PANIC_ITEM: AtomicU32 = AtomicU32::new(u32::MAX);
-
-/// Serializes every session test (h0 + k0_session): the fence gates and
-/// TEST_PANIC_ITEM are process-global, so concurrent sessions would
-/// observe each other's injections.
-#[cfg(test)]
-pub(crate) fn session_test_lock() -> std::sync::MutexGuard<'static, ()> {
-    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    // Fixture hygiene: a control that hung inside its watchdog thread
-    // (mutation arms) never drops its PanicInjectGuard, so the
-    // process-global injection would cascade-fail every later session
-    // test. Acquiring the fixture lock resets it.
-    TEST_PANIC_ITEM.store(u32::MAX, Ordering::Relaxed);
-    guard
-}
-
-#[cfg(test)]
-fn test_panic_item() -> u32 {
-    TEST_PANIC_ITEM.load(Ordering::Relaxed)
-}
+pub(crate) use crate::session_core::session_test_lock;
 
 #[cfg(test)]
 impl H0Executor {
     /// Test-only owner-panic injection for the negative control.
     pub(crate) fn inject_owner_panic_at(item: u32) {
-        TEST_PANIC_ITEM.store(item, Ordering::Relaxed);
-    }
-}
-
-/// Named fence gates, `cfg(test)` only. A test installs a gate; an
-/// executor thread reaching the matching `h0_fence_park!` point
-/// registers its arrival and blocks — TEMPORARILY RELEASING the state
-/// lock it holds — until the test opens the gate. This forces the
-/// documented interleavings deterministically, never with sleeps, and
-/// leaves the fenced critical region observable to the other threads
-/// exactly as a legal interleaving would.
-#[cfg(test)]
-pub(crate) mod fences {
-    use std::collections::HashMap;
-    use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
-
-    struct Gate {
-        arrivals: Mutex<usize>,
-        arrived_cv: Condvar,
-        open: Mutex<bool>,
-        open_cv: Condvar,
-    }
-
-    fn gates() -> &'static Mutex<HashMap<&'static str, Arc<Gate>>> {
-        static GATES: OnceLock<Mutex<HashMap<&'static str, Arc<Gate>>>> = OnceLock::new();
-        GATES.get_or_init(|| Mutex::new(HashMap::new()))
-    }
-
-    fn gate(name: &str) -> Option<Arc<Gate>> {
-        gates().lock().unwrap().get(name).cloned()
-    }
-
-    /// Drop every gate. Called at test start: gates persist across
-    /// tests (process-global), and stale gates would trip install's
-    /// double-install guard and leak open/closed state.
-    pub fn reset() {
-        gates().lock().unwrap().clear();
-    }
-
-    /// Install a closed gate. Panics if already installed (test bug).
-    pub fn install(name: &'static str) {
-        let g = Arc::new(Gate {
-            arrivals: Mutex::new(0),
-            arrived_cv: Condvar::new(),
-            open: Mutex::new(false),
-            open_cv: Condvar::new(),
-        });
-        assert!(
-            gates().lock().unwrap().insert(name, g).is_none(),
-            "fence gate {name} installed twice"
-        );
-    }
-
-    /// Block (test side) until `expected` threads reached the gate.
-    /// The arrivals guard is released before parking on the condvar, so a
-    /// parked executor thread can never block the test's view of arrivals.
-    pub fn wait_arrivals(name: &str, expected: usize) {
-        let g = gate(name).expect("gate installed");
-        let mut n = g.arrivals.lock().unwrap();
-        while *n < expected {
-            n = g.arrived_cv.wait(n).unwrap();
-        }
-    }
-
-    /// Open the gate, releasing every parked thread.
-    pub fn open(name: &str) {
-        let g = gate(name).expect("gate installed");
-        *g.open.lock().unwrap() = true;
-        g.open_cv.notify_all();
-    }
-
-    /// Executor-side fence point: if the named gate is installed and
-    /// closed, register arrival, release the lock while parked, then
-    /// re-acquire and return. The caller's loop/critical-section
-    /// re-check after the fence is exactly what the controls exercise.
-    pub fn park<'a, T>(
-        name: &str,
-        guard: MutexGuard<'a, T>,
-        lock: &'a Mutex<T>,
-    ) -> MutexGuard<'a, T> {
-        let g = match gate(name) {
-            Some(g) => g,
-            None => {
-                return guard;
-            }
-        };
-        if *g.open.lock().unwrap() {
-            return guard;
-        }
-        {
-            // Register the arrival and release the arrivals mutex BEFORE
-            // parking: holding it across the park would deadlock any test
-            // that waits to observe the arrival before opening the gate.
-            {
-                let mut a = g.arrivals.lock().unwrap();
-                *a += 1;
-                g.arrived_cv.notify_all();
-            }
-            let mut o = g.open.lock().unwrap();
-            drop(guard);
-            while !*o {
-                o = g.open_cv.wait(o).unwrap();
-            }
-        }
-        let g2 = lock.lock().unwrap();
-        g2
+        crate::session_core::set_test_panic_item(item);
     }
 }
 
@@ -738,8 +562,9 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::oracle;
+    use crate::session_core::fences;
     use std::sync::mpsc;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     pub(crate) const SEED: u64 = 0x00C0_FFEE_0304_0001;
 
