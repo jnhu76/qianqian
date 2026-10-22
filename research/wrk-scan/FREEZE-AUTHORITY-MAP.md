@@ -195,7 +195,8 @@ H1 机制    = SPEC §4.4 表 H1 列（bounded channel 容量 C = Q = B，Owner 
 受理配方   = §4.2 ADMISSION_RECIPE 原样实现：B permit（condvar）→ 取消序临界区
            （义务登记 → 非阻塞 try_send → ItemAdmitted 入账）；
            ADMISSION_LINEARIZATION = 临界区内 ItemAdmitted 追加时刻
-共享业务   = session_core::execute_item（A_NARROW；原 h0.rs 函数逐字迁移；
+共享业务   = session_core::execute_item（A_NARROW；原 h0.rs 函数逐字迁移，
+           唯一例外：cfg(test) 注入 panic 消息字面量改为机制中立措辞；
            patch 迁移映射见 GATE-II-MECHANISM-MAP.md §3）
 REF 边界   不变：执行路径禁止 ref_result（§2.5(b)），oracle 独立
 ```
