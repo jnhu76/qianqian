@@ -399,6 +399,14 @@ fn prev_opened(media: &str, file: &str) -> String {
     format!("previous: opened {media}\\{file}")
 }
 
+/// The coalesced navigation-commit feedback line: the shell renders the
+/// ONE committed Open direction-neutrally (`navigation: opened <src>`);
+/// the per-key `next:`/`previous:` wordings are gone with the burst
+/// fix (PR #311, production-acceptance retarget of the B needles).
+fn nav_opened(media: &str, file: &str) -> String {
+    format!("navigation: opened {media}\\{file}")
+}
+
 /// The corpus. flac4/mp3cbr/alac4/alac6 are the repository's committed
 /// fixtures (renamed only); synth45/synth30 are locally generated
 /// synthetic media (ffmpeg sine), recorded by SHA256 in the run
@@ -465,7 +473,8 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // deliberately walks to an end reaches the inert boundary and
         // every burst lands on a committed, steadily playing episode.
         "B-single-N" | "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms"
-        | "B-nnnnn-250ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms" => &VTEST8,
+        | "B-nnnnn-250ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms" | "B-np-10ms"
+        | "B-npnpnp-10ms" => &VTEST8,
         // The manual-vs-natural pair: a SHORT first track so natural EOF
         // arrives quickly, and one long follower so the auto-next target
         // is unique. synth5.mp3 is staged by the burst runner (ffmpeg
@@ -2061,7 +2070,7 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::SleepMs(1_500),
                 Step::Mark,
                 keys("n"),
-                expect_after_mark_async(next_opened(media, "vtest02.mp3"), OPEN_WAIT),
+                expect_after_mark_async(nav_opened(media, "vtest02.mp3"), OPEN_WAIT),
                 expect_after_mark_async("Track: 2/8".to_owned(), SHORT_WAIT),
             ];
             v.extend(quit_clean());
@@ -2112,12 +2121,51 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::SleepMs(1_500),
                 Step::Mark,
                 // 1 → n,n,n → 4 → p,p → 2 → n,n → 4 → p → 3. All eight
-                // keys non-inert; the committed final target is entry 3.
+                // keys inside ONE quiet window: ONE committed Open, the
+                // final target is entry 3 (old per-key behavior: 8).
                 Step::KeysEach("n", 3, 10),
                 Step::KeysEach("p", 2, 10),
                 Step::KeysEach("n", 2, 10),
                 keys("p"),
                 expect_after_mark_async("Track: 3/8".to_owned(), OPEN_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        // Net-zero collapse pair (PR #311 production acceptance): a
+        // burst that nets no displacement commits ZERO Opens — no
+        // `navigation: opened` feedback may exist in the post-mark
+        // window at all, and the Track line never moves. The repaint
+        // keeps the absence window non-vacuous while the 100 ms quiet
+        // window expires.
+        "B-np-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                keys("n"),
+                keys("p"),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 1/8".to_owned(), SHORT_WAIT),
+                Step::AbsentAfterMark("navigation: opened".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-npnpnp-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                Step::KeysEach("n", 3, 10),
+                Step::KeysEach("p", 3, 10),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 1/8".to_owned(), SHORT_WAIT),
+                Step::AbsentAfterMark("navigation: opened".to_owned()),
             ];
             v.extend(quit_clean());
             v
@@ -2147,7 +2195,7 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 // manual-vs-natural comparison baseline.
                 keys("n"),
                 expect_after_mark_async("Track: 2/2".to_owned(), OPEN_WAIT),
-                expect_after_mark_async("next: opened".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("navigation: opened".to_owned(), SHORT_WAIT),
             ];
             v.extend(quit_clean());
             v
