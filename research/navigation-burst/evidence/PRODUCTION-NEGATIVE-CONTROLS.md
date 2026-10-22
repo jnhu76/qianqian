@@ -43,3 +43,36 @@ NEGATIVE B2  cursor committed on a REFUSED Open
             (0 passed, 1 failed)
   restored  GREEN (the shipped tree's own full gate re-ran GREEN)
 ```
+
+## Owner-review regression (PR #311 REVISE round, 2026-10-22)
+
+Review P2: the direct `next_track()`/`previous_track()` API bypassed
+the pending-burst cancellation, so after `request_next_intent()` armed
+a burst, a direct `previous_track()` committed its own episode and the
+STALE virtual target still opened a second episode at the deadline.
+The regression `direct_manual_steps_supersede_the_pending_burst` pins
+both directions (a committed direct step and an inert one at the
+Repeat-Off boundary each end the window). RED/GREEN provenance:
+
+```text
+pre-fix bytes  player.rs sha256 61ea8067f190f99a09678ada706c5157…
+               35c8e2a8dad71533baa0c63b4dc2fc5b
+RED            cargo test -p qianqian-headless --lib
+               direct_manual_steps_supersede_the_pending_burst
+               rc=101 "the direct step cancelled the burst
+                       left: Some(Instant…) right: None"
+               REV-P2-RED-pre-fix.log (+ .meta.txt: cmd/env/sha)
+GREEN          same filter with the navigate() cancel line
+               rc=0  REV-P2-GREEN-fixed.log
+mutation RED   the cancel line removed from the FINAL bytes, same run
+               rc=101, same signature
+               REV-P2-RED-mutation-final-bytes.log
+restored GREEN bytes identical to the final tree, rc=0
+               player.rs sha256 7ce3ee545c8b8acd3840a9be75c4a58ecb0…
+               0b47f374e114d7c3235ace2e4683c
+               REV-P2-GREEN-restored.log
+full suite     429 lib + 31 shell/integration tests, 0 failed; the
+               historical direct-API burst matrix untouched and green
+               (log retained outside the repo:
+               ../qianqian-navburst-logs/review-round-2/)
+```

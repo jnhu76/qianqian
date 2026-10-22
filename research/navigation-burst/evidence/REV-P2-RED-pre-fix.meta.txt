@@ -1,0 +1,9 @@
+=== cmd ===
+cargo test -p qianqian-headless --lib direct_manual_steps_supersede_the_pending_burst -- --nocapture
+=== env ===
+Linux WuJie 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+=== player.rs sha256 (pre-fix bytes) ===
+61ea8067f190f99a09678ada706c515735c8e2a8dad71533baa0c63b4dc2fc5b  apps/headless/src/player.rs
+=== rc ===
+rc=101

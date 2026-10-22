@@ -587,6 +587,11 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// through the frozen replacement, and commit the cursor only on
     /// commit evidence.
     fn navigate(&mut self, forward: bool) -> Option<OpenOutcome> {
+        // A direct step is an explicit immediate navigation: it
+        // supersedes an uncommitted relative burst exactly like a
+        // direct Open — committed or inert, the window ends here so no
+        // stale virtual position can open a second episode later.
+        self.cancel_pending_navigation();
         let position = self.playlist.manual_step(forward)?;
         let candidate = self.playlist.path_at(position)?.to_owned();
         let outcome = self.replace_episode(&candidate);
@@ -671,8 +676,10 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// later against geometry that no longer exists.
     ///
     /// Cancels (called inside the App seams themselves): a direct Open,
-    /// `play_selected`, `play_current` (an explicit target supersedes
-    /// the burst); `remove_selected`, `clear_playlist` and a traversal
+    /// `play_selected`, `play_current`, and a direct
+    /// `next_track`/`previous_track` step (an explicit target or
+    /// immediate navigation supersedes the burst, committed or inert);
+    /// `remove_selected`, `clear_playlist` and a traversal
     /// `set_order` (entry positions shift or are rebuilt). Deliberately
     /// KEPT across: `cycle_repeat` and `append_admitted` (no traversal
     /// position moves), browsing (`select_*`: presentation never plays),
@@ -4031,6 +4038,82 @@ pub(crate) mod tests {
         );
         assert_eq!(player.active_source(), Some(Path::new(files[2])));
         assert_eq!(count_events(&log.lock().unwrap(), "probe "), 2);
+    }
+
+    /// A direct manual step — the historical `next_track`/`previous_track`
+    /// API a shell may still call — is an explicit immediate navigation:
+    /// it supersedes the pending burst exactly like an explicit Open
+    /// (Owner review of PR #311: the direct entries used to bypass the
+    /// cancellation, so a stale virtual position could open a second
+    /// episode one quiet window after the direct step).
+    #[test]
+    fn direct_manual_steps_supersede_the_pending_burst() {
+        let files = [
+            "/media/dm-finite-0.flac",
+            "/media/dm-finite-1.flac",
+            "/media/dm-finite-2.flac",
+        ];
+        let mk = || {
+            let source = FakeEpisodeSource::new();
+            let log = source.log.clone();
+            let mut player = ReferencePlayerApp::new(source);
+            assert!(opened(&player.open(Path::new(files[0]))));
+            player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+            (player, log)
+        };
+
+        // The review's own sequence: a Next burst is pending when a
+        // direct Previous commits first. The stale target (row 2) must
+        // never open at the deadline; the committed row stays row 0.
+        let (mut player, log) = mk();
+        assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "the direct step cancelled the burst"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no late Open from the stale virtual target"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[0])));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            3,
+            "setup + walk + the direct step only"
+        );
+
+        // Mirror, and the inert end: a direct Next at the Repeat-Off
+        // boundary opens nothing yet still ends the window — every
+        // direct-API invocation supersedes the burst, committed or not.
+        let (mut player, log) = mk();
+        for _ in 0..2 {
+            assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        }
+        let t0 = Instant::now();
+        player.request_previous_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        assert_eq!(player.next_track(), None, "Repeat Off end is inert");
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "even an inert direct step ends the window"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[2])));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            3,
+            "setup + walk only; the inert step opens nothing"
+        );
     }
 
     /// Stop cancels the uncommitted burst: nothing pressed before the

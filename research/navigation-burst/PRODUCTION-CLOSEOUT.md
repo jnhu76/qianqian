@@ -31,8 +31,9 @@ apps/headless/src/player.rs
     classes untouched); expiry at the committed row collapses to zero
     opens. A pending burst defers poll_eof_policy (manual wins over
     auto-next, R3 §6); explicit targets (open / play_selected /
-    play_current), traversal-geometry edits (remove / clear /
-    set_order) and Stop cancel it; Quit drops it.
+    play_current), direct next_track()/previous_track() steps,
+    traversal-geometry edits (remove / clear / set_order) and Stop
+    cancel it; Quit drops it.
 
 apps/headless/src/tui/runtime/{mod,dispatch,picker}.rs
     The shell translates N/P keys and transport buttons into intent
@@ -90,3 +91,18 @@ B1 virtual cursor committed at registration
 B2 cursor committed on a refused Open
    → the_pending_open_rides_the_frozen_failure_classes RED
 ```
+
+## Owner review round (PR #311 REVISE, 2026-10-22)
+
+Review P2: the direct `next_track()`/`previous_track()` API bypassed
+the cancellation — after a pending burst was armed, a direct step
+committed its own episode and the STALE virtual target still opened a
+second episode at the deadline. Fixed in `navigate()` itself (the two
+public direct entries are its only callers): a direct step supersedes
+the burst exactly like a direct Open, committed or inert. The
+regression `direct_manual_steps_supersede_the_pending_burst` is RED
+without the fix (pre-fix run and mutation-at-final-bytes run, both
+rc=101) and GREEN with it; provenance and full logs at
+`evidence/PRODUCTION-NEGATIVE-CONTROLS.md` § Owner-review regression.
+Windows native acceptance remains NOT_RUN — an owner-side pre-merge
+platform gate, separate from this review round.
