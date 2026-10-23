@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
-use super::dispatch::{perform_clear_playlist, perform_remove_selected};
+use super::dispatch::{perform_clear_playlist, perform_remove_selected, record_open_outcome};
 use super::drain_busy_interval_input;
 use crate::tui::model::{
     ConfirmKind, Modal, ModalConfirm, ModalInput, ModalKind, PickerSubject, PlaylistCursor,
@@ -38,9 +38,16 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
         ModalInput::Char(c) => model.modal_push(c),
         ModalInput::Backspace => model.modal_backspace(),
         ModalInput::Cancel => model.close_modal(),
-        // The help overlay's content scroll (G5): presentation inside
-        // the modal, nothing behind it.
-        ModalInput::HelpScroll(scroll) => model.help_scroll(scroll),
+        // The help overlay's content scroll (G5), and the error
+        // details overlay's own (Issue #23 B2): presentation inside
+        // whichever overlay is open, nothing behind it.
+        ModalInput::HelpScroll(scroll) => {
+            if matches!(model.modal(), Some(Modal::ErrorDetails { .. })) {
+                model.error_details_scroll(scroll);
+            } else {
+                model.help_scroll(scroll);
+            }
+        }
         // The [Use this folder] button (T0 picker freeze): the
         // displayed directory becomes the subject — pure presentation,
         // nothing is committed until an explicit commit button.
@@ -153,21 +160,35 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
             }
             _ => match model.confirm_modal() {
                 ModalConfirm::Nothing | ModalConfirm::Confirm(_) => {}
-                ModalConfirm::Seek(target) => match player.active_handle() {
-                    Some(handle) => {
-                        // The SAME frozen seek command the arrows use
-                        // (Issue #166 §27): the episode's own
-                        // clamp/refusal contract decides the landing.
-                        handle.request_seek(target);
+                ModalConfirm::Seek(target) => {
+                    // The fail-stop gate covers seeks (Issue #23 B2
+                    // §6.2): the GoTo overlay itself stays open (its
+                    // keys are harmless), but its SEEK COMMIT may not
+                    // even attempt an episode command while the latch
+                    // stands.
+                    if model.fail_stopped() {
                         model.set_status(Some(format!(
-                            "seek requested: {}",
-                            crate::status::format_clock(target)
+                            "fail-stop: {}",
+                            crate::error_presentation::fail_stop_presentation().explanation()
                         )));
+                        return;
                     }
-                    // Nothing to seek: the parsed target is dropped
-                    // rather than sent into a nonexistent episode.
-                    None => model.set_status(Some("seek: no episode".to_owned())),
-                },
+                    match player.active_handle() {
+                        Some(handle) => {
+                            // The SAME frozen seek command the arrows use
+                            // (Issue #166 §27): the episode's own
+                            // clamp/refusal contract decides the landing.
+                            handle.request_seek(target);
+                            model.set_status(Some(format!(
+                                "seek requested: {}",
+                                crate::status::format_clock(target)
+                            )));
+                        }
+                        // Nothing to seek: the parsed target is dropped
+                        // rather than sent into a nonexistent episode.
+                        None => model.set_status(Some("seek: no episode".to_owned())),
+                    }
+                }
                 ModalConfirm::Unreadable(diagnostic) => {
                     model.set_status(Some(diagnostic.to_owned()))
                 }
@@ -436,16 +457,27 @@ fn perform_open<S: EpisodeStart>(
 ) -> Option<OpenOutcome> {
     let mut expansion = crate::input::expand_inputs([candidate]);
     let outcome = crate::input::open_expanded(player, &mut expansion);
-    let feedback = match &outcome {
-        None => format!("open refused: {}", expansion.refusal()),
-        Some(OpenOutcome::Opened) => expansion.opened_status(),
-        Some(OpenOutcome::Refused { diagnostic }) => format!("open refused: {diagnostic}"),
-        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
-            format!("open failed (clean): {diagnostic}")
+    match &outcome {
+        // The expansion produced no playable candidate: the open
+        // operation was refused before any OpenOutcome existed. The
+        // same B1 recording applies — an operation refusal is exactly
+        // what the OpenRefused presentation projects (Issue #23 B2).
+        None => {
+            let diagnostic = expansion.refusal();
+            let presentation =
+                crate::error_presentation::presentation_for_open(&OpenOutcome::Refused {
+                    diagnostic,
+                });
+            if let Some(presentation) = &presentation {
+                model.set_status(Some(crate::error_presentation::operation_error_feedback(
+                    "open",
+                    presentation,
+                )));
+            }
+            model.set_operation_error(presentation);
         }
-        Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
-    };
-    model.set_status(Some(feedback));
+        Some(outcome) => record_open_outcome(model, outcome, "open", expansion.opened_status()),
+    }
     outcome
 }
 
