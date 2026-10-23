@@ -10,6 +10,7 @@ use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::theme;
 use super::{SELECTED_MARKER, viewport_offset};
+use crate::error_presentation::ErrorPresentation;
 use crate::tui::model::{ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, TuiModel};
 use qianqian_playback::EqPreset;
 
@@ -189,9 +190,12 @@ fn picker_layout(
     let width = area.width.min(64).saturating_sub(4).max(16);
     let inner_width = width.saturating_sub(2);
     // The bounded note rows (#235): an error diagnostic or the
-    // [Use this folder] target wraps inside at most two rows.
+    // [Use this folder] target wraps inside at most two rows. The
+    // diagnostic is filesystem-derived text, so it crosses the display
+    // firewall in its escaped form (Issue #23 B2): the model keeps the
+    // raw bytes, the render never acts on a control character.
     let note_text = if let Some(error) = &picker.error {
-        Some(error.clone())
+        Some(crate::error_presentation::diagnostic_for_display(error))
     } else if picker.folder_target
         && let Some(dir) = &picker.dir
     {
@@ -544,7 +548,15 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             // rows, then clipping truthfully (#235).
             if let Some(slot) = layout.note {
                 if let Some(error) = &picker.error {
-                    let wrapped = wrapped_note(error, slot.width);
+                    // Same mapping the layout measured with: the painted
+                    // text is the DISPLAY-ESCAPED diagnostic, so a control
+                    // or invisible character can neither act on the
+                    // terminal nor wrap to a different row count than the
+                    // layout reserved (Issue #23 B2 §4.3).
+                    let wrapped = wrapped_note(
+                        &crate::error_presentation::diagnostic_for_display(error),
+                        slot.width,
+                    );
                     frame.render_widget(Paragraph::new(wrapped), slot);
                 } else if picker.folder_target
                     && let Some(dir) = &picker.dir
@@ -797,6 +809,58 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             };
             frame.render_widget(Paragraph::new(hint).centered(), hint_area);
         }
+        Modal::ErrorDetails {
+            presentation,
+            scroll,
+        } => {
+            // The error details overlay (Issue #23 B2): the SNAPSHOT's
+            // own copy, wrapped the help overlay's way, scrolled the
+            // help overlay's way. The technical detail reaches the
+            // terminal only through the B1 display mapping
+            // (`technical_detail_for_display`) — never the raw string.
+            let popup_width = area.width.min(70).saturating_sub(4).max(12);
+            let inner_width = popup_width.saturating_sub(2);
+            let lines: Vec<Line<'static>> = error_detail_lines(presentation)
+                .into_iter()
+                .flat_map(|text| {
+                    wrap_text(&text, inner_width)
+                        .into_iter()
+                        .map(Line::from)
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let height = (lines.len() as u16 + 3).min(area.height);
+            let popup = centered_area(area, height);
+            frame.render_widget(Clear, popup);
+            frame.render_widget(
+                Paragraph::new("").block(
+                    Block::bordered()
+                        .title(theme::title(" Error details "))
+                        .border_style(theme::border()),
+                ),
+                popup,
+            );
+            let inner = Rect::new(
+                popup.x + 1,
+                popup.y + 1,
+                popup.width.saturating_sub(2),
+                popup.height.saturating_sub(2),
+            );
+            let [content, hint_area] =
+                Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+            let visible = content.height as usize;
+            let max_offset = lines.len().saturating_sub(visible);
+            let offset = (*scroll as usize).min(max_offset);
+            frame.render_widget(Paragraph::new(lines).scroll((offset as u16, 0)), content);
+            let hint = if max_offset == 0 {
+                "Esc close"
+            } else if offset >= max_offset {
+                "↑↓ scroll · end · Esc close"
+            } else {
+                "↑↓ scroll · Esc close"
+            };
+            frame.render_widget(Paragraph::new(hint).centered(), hint_area);
+        }
     }
 }
 
@@ -825,6 +889,29 @@ fn centered_area(area: Rect, height: u16) -> Rect {
         height,
     )
 }
+/// The error details overlay's content lines (Issue #23 B2 §4.1): the
+/// B1 presentation's own user copy, the stable kind name, and the
+/// technical detail — only ever in its DISPLAY-escaped form, never the
+/// raw diagnostic. Nothing here asserts a fault fact B1 did not
+/// establish: no cause is guessed, no code invented; a diagnostic that
+/// does not exist says so.
+fn error_detail_lines(presentation: &ErrorPresentation) -> Vec<String> {
+    let mut lines = vec![
+        presentation.title().to_owned(),
+        presentation.explanation().to_owned(),
+        String::new(),
+        format!("错误类型：{:?}", presentation.kind()),
+    ];
+    match presentation.technical_detail_for_display() {
+        Some(detail) => {
+            lines.push("技术信息：".to_owned());
+            lines.push(detail);
+        }
+        None => lines.push("没有额外技术信息。".to_owned()),
+    }
+    lines
+}
+
 /// The help modal's content (the `?` key): the shipped keys and input
 /// methods, ordered by the T0 user workflows — open and play, steer
 /// the playlist, shape the sound, watch — instead of a flat key dump,
@@ -882,6 +969,7 @@ fn help_lines() -> Vec<Line<'static>> {
         Line::from("   Tab / Shift+Tab   move keyboard focus"),
         Line::from("   Enter             activate the focused control"),
         Line::from("   Mouse             click any control: tabs, buttons, rows"),
+        Line::from("   E                 error details (when an error is showing)"),
         Line::from("   ?                 close this help"),
         Line::from("   Esc               cancel edits · close this help"),
         Line::from("   Q / Ctrl+C        quit (Ctrl+C works everywhere)"),
@@ -896,6 +984,53 @@ mod tests {
 
     use super::*;
     use crate::tui::model::*;
+
+    /// The error details overlay renders its read-only SNAPSHOT — the
+    /// B1 user copy, the kind, and the DISPLAY-ESCAPED technical
+    /// detail — and publishes no hit regions of its own, exactly like
+    /// the Help overlay it shares its keyboard shape with (Issue #23
+    /// B2 §4).
+    #[test]
+    fn the_error_details_overlay_renders_the_safe_snapshot() {
+        let mut model = plain_model();
+        model.update(qianqian_playback::PlaybackSessionObservation {
+            terminal_outcome: Some(qianqian_playback::EpisodeTerminalOutcome::Failed),
+            failure_diagnostic: Some("decode: a\u{200b}b broken.flac".to_owned()),
+            ..pending()
+        });
+        // The pre-modal frame's published regions are the baseline: the
+        // overlay must add none of its own.
+        let _ = rendered(&mut model, 80, 30);
+        let base_regions = model.regions().len();
+        model.open_modal(ModalKind::ErrorDetails);
+
+        let text = rendered(&mut model, 80, 30);
+        // The TestBackend stores a double-width CJK glyph's continuation
+        // cell as a space, so CJK needles compare against the collapsed
+        // form.
+        let collapsed = text.replace(' ', "");
+        assert!(text.contains(" Error details "), "{text}");
+        assert!(collapsed.contains("这首歌曲播放失败"), "{text}");
+        assert!(
+            collapsed.contains("播放已失败，暂时无法确定具体原因。"),
+            "{text}"
+        );
+        assert!(collapsed.contains("错误类型：EpisodeFailed"), "{text}");
+        assert!(collapsed.contains("技术信息："), "{text}");
+        // The invisible character is VISIBLE as its escape; the raw
+        // control never renders.
+        assert!(!text.contains('\u{200b}'), "{text}");
+        assert!(text.contains("\\u{200b}"), "{text}");
+        assert!(text.contains("Esc close"), "{text}");
+
+        // No modal-owned hit regions: the modal frame publishes the
+        // same set the base frame did.
+        assert_eq!(
+            model.regions().len(),
+            base_regions,
+            "the details overlay is keyboard-owned like Help"
+        );
+    }
 
     /// The Open/GoTo/Help modals render as popups over the shell; the
     /// input lines are visible even on a short terminal (the field
@@ -972,6 +1107,7 @@ mod tests {
             ("+ / -", "+ / -"),
             ("S", "S                 stop"),
             ("O", "O                 open"),
+            ("E", "E                 error details"),
             ("[Open]", "[Open]            the transport"),
             ("?", "?                 close"),
             ("Esc", "Esc"),

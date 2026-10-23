@@ -11,6 +11,7 @@ use super::hit::{ArmedClick, HitRegion};
 use super::modal::Modal;
 use super::projection::{BAR_WIDTH, PlaylistRow, status_shape};
 use super::responsive::{ShellFit, shell_fit};
+use crate::error_presentation::{ErrorPresentation, presentation_for_observation};
 use crate::playlist::{PlaybackOrder, RepeatMode};
 use qianqian_playback::{
     AudioProcessingConfig, EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation,
@@ -79,6 +80,21 @@ pub struct TuiModel {
     /// copy re-read every refresh. `None` = no telemetry available.
     pub(super) snapshot: Option<qianqian_playback::ObservationSnapshot>,
 
+    /// The most recent OPERATION error's B1 presentation (Issue #23
+    /// B2): one bounded slot, `Some` only while that operation's
+    /// failure is the newest operation result and no committed
+    /// replacement has superseded it. This is the Open/activation
+    /// operation's own error — it belongs to the OPERATION, never to
+    /// the (possibly still playing) episode, and an episode failure is
+    /// NEVER copied here: that one derives from the observation.
+    last_operation_error: Option<ErrorPresentation>,
+    /// The App's fail-stop latch, projected by every refresh. A
+    /// presentation mirror of [`crate::player::ReferencePlayerApp::
+    /// is_fail_stopped`] — never authority: the App's own seams remain
+    /// the ones that refuse, and the shell's gate in front of them is
+    /// only the UI's honest "not available" layer.
+    fail_stopped: bool,
+
     /// The active route (§5). Presentation-only: default Now Playing.
     pub(super) route: TuiRoute,
     /// The one active focus target, if any (§10).
@@ -133,6 +149,8 @@ impl TuiModel {
             eq_draft: None,
             visualizer_mode: super::visualizer::VisualizerMode::Spectrum,
             snapshot: None,
+            last_operation_error: None,
+            fail_stopped: false,
             route: TuiRoute::NowPlaying,
             focus: None,
             focus_before_modal: None,
@@ -355,8 +373,73 @@ impl TuiModel {
     /// seam owner reports the event and the arm dies with the context
     /// it was armed in (§17, G1 F06; the model holds no episode
     /// identity of its own).
+    ///
+    /// A committed replacement is also the error-revocation witness
+    /// (Issue #23 B2): the old episode's failure — derived from the
+    /// observation the refresh is about to replace — and any retained
+    /// OPERATION error (the same-file replay whose source string is
+    /// unchanged included) stop being viewable, and an open Error
+    /// Details modal closes rather than mislabeling the new episode
+    /// with the old error. The episode-side failure needs no slot at
+    /// all: the next refresh's fresh observation is what it derives
+    /// from.
     pub fn note_episode_replacement(&mut self) {
+        if let Some(Modal::ErrorDetails { .. }) = self.modal {
+            self.close_modal();
+        }
+        self.last_operation_error = None;
         self.invalidate_frame();
+    }
+
+    /// Record the most recent operation's B1 error projection, or
+    /// clear the slot when the operation succeeded (its own B1
+    /// projection is `None`). Every new operation result REPLACES the
+    /// slot — a previous operation's error never outlives the result
+    /// that followed it — and a committed replacement clears it via
+    /// [`Self::note_episode_replacement`].
+    pub fn set_operation_error(&mut self, error: Option<ErrorPresentation>) {
+        let shape = error.as_ref().map(ErrorPresentation::kind);
+        if shape
+            != self
+                .last_operation_error
+                .as_ref()
+                .map(ErrorPresentation::kind)
+        {
+            self.invalidate_frame();
+        }
+        self.last_operation_error = error;
+    }
+
+    /// The EPISODE failure's B1 presentation, derived fresh from the
+    /// current observation on every call — never a stored copy. Only
+    /// the committed D11 `Failed` fact produces one; `Completed`,
+    /// `Stopped` and the not-yet-committed state produce none, and a
+    /// new episode's fresh observation cannot inherit the old one.
+    pub fn episode_error(&self) -> Option<ErrorPresentation> {
+        presentation_for_observation(&self.observation)
+    }
+
+    /// The error the E key and the details affordances show: the live
+    /// episode's failure when one stands (the failure on the panel in
+    /// front of the user), else the most recent operation error.
+    /// `None` = nothing is viewable; E opens no empty panel.
+    pub fn viewable_error(&self) -> Option<ErrorPresentation> {
+        self.episode_error()
+            .or_else(|| self.last_operation_error.clone())
+    }
+
+    /// The App's fail-stop latch, projected by the refresh.
+    pub fn set_fail_stopped(&mut self, fail_stopped: bool) {
+        if self.fail_stopped != fail_stopped {
+            self.invalidate_frame();
+        }
+        self.fail_stopped = fail_stopped;
+    }
+
+    /// Whether the App's fail-stop latch stands (a presentation
+    /// mirror; the App remains the authority that refuses).
+    pub fn fail_stopped(&self) -> bool {
+        self.fail_stopped
     }
 
     /// Record one operation's feedback line (composition feedback,
@@ -524,14 +607,20 @@ impl TuiModel {
 
     /// Diagnostics worth showing, in stable order. Both are
     /// presentation text supplied by the seam; their presence or
-    /// wording is never part of the semantic outcome.
+    /// wording is never part of the semantic outcome. The DISPLAY
+    /// mapping is the B1 escape (Issue #23 §4.2/§4.3): raw control or
+    /// invisible characters can never ride a diagnostic into the
+    /// panel, the status bar or the details modal — the raw text stays
+    /// inspectable through [`ErrorPresentation::technical_detail`] in
+    /// the details path, which applies the same mapping.
     pub fn diagnostics(&self) -> Vec<String> {
+        use crate::error_presentation::diagnostic_for_display;
         let mut lines = Vec::new();
         if let Some(error) = &self.observation.activation_error {
-            lines.push(format!("activation: {error}"));
+            lines.push(format!("activation: {}", diagnostic_for_display(error)));
         }
         if let Some(failure) = &self.observation.failure_diagnostic {
-            lines.push(format!("failure: {failure}"));
+            lines.push(format!("failure: {}", diagnostic_for_display(failure)));
         }
         lines
     }
@@ -632,6 +721,128 @@ mod tests {
         assert!(
             model.diagnostics().is_empty(),
             "no episode, no episode diagnostics"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Issue #23 B2: the error lifetime rules (episode error DERIVED
+    // from the observation; at most one bounded operation-error slot).
+    // ------------------------------------------------------------------
+
+    use crate::error_presentation::{ErrorPresentationKind, presentation_for_open};
+    use crate::player::OpenOutcome;
+
+    fn failed_observation(diagnostic: Option<&str>) -> PlaybackSessionObservation {
+        PlaybackSessionObservation {
+            failure_diagnostic: diagnostic.map(str::to_owned),
+            terminal_outcome: Some(qianqian_playback::EpisodeTerminalOutcome::Failed),
+            ..pending()
+        }
+    }
+
+    /// Only the committed D11 `Failed` fact derives an error:
+    /// pending, `Completed` and `Stopped` derive none.
+    #[test]
+    fn completed_stopped_and_pending_derive_no_error() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.episode_error(), None, "pending derives nothing");
+        model.update(pending());
+        assert_eq!(model.episode_error(), None);
+        model.update(PlaybackSessionObservation {
+            terminal_outcome: Some(qianqian_playback::EpisodeTerminalOutcome::Completed),
+            ..pending()
+        });
+        assert_eq!(model.episode_error(), None, "Completed is not an error");
+        model.update(PlaybackSessionObservation {
+            terminal_outcome: Some(qianqian_playback::EpisodeTerminalOutcome::Stopped),
+            ..pending()
+        });
+        assert_eq!(model.episode_error(), None, "Stopped is not an error");
+    }
+
+    /// A Failed fact with NO diagnostic still presents — with the
+    /// stable copy and NO invented technical detail.
+    #[test]
+    fn a_failed_fact_without_a_diagnostic_forges_no_detail() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(failed_observation(None));
+        let error = model.episode_error().expect("Failed presents");
+        assert_eq!(error.kind(), ErrorPresentationKind::EpisodeFailed);
+        assert_eq!(error.technical_detail(), None, "nothing is invented");
+    }
+
+    /// The EPISODE failure outranks the stored operation error while
+    /// it stands; once a fresh observation replaces it, the operation
+    /// error is viewable again — until the next replacement revokes
+    /// the slot entirely.
+    #[test]
+    fn the_episode_failure_outranks_the_operation_error() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_operation_error(presentation_for_open(&OpenOutcome::Refused {
+            diagnostic: "op refusal".to_owned(),
+        }));
+        model.update(failed_observation(Some("decode: broken")));
+        assert_eq!(
+            model.viewable_error().map(|e| e.kind()),
+            Some(ErrorPresentationKind::EpisodeFailed),
+            "the failure on the panel in front of the user wins"
+        );
+        // A new episode's fresh observation: the episode error is gone,
+        // the operation error (a fact about the last OPERATION) is
+        // viewable again.
+        model.update(pending());
+        assert_eq!(
+            model.viewable_error().map(|e| e.kind()),
+            Some(ErrorPresentationKind::OpenRefused)
+        );
+        // The committed replacement revokes the slot entirely.
+        model.note_episode_replacement();
+        assert_eq!(model.viewable_error(), None);
+    }
+
+    /// A successful Open's outcome (its B1 projection is `None`)
+    /// CLEARS the operation-error slot: the newest result owns the
+    /// slot, success included.
+    #[test]
+    fn a_successful_open_clears_the_operation_error_slot() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_operation_error(presentation_for_open(&OpenOutcome::Refused {
+            diagnostic: "op refusal".to_owned(),
+        }));
+        model.set_operation_error(presentation_for_open(&OpenOutcome::Opened));
+        assert_eq!(
+            model.viewable_error(),
+            None,
+            "the success owns the slot now"
+        );
+    }
+
+    /// An ordinary status line never erases the episode failure: the
+    /// failure derives from the FACT, not from what was last said.
+    #[test]
+    fn an_ordinary_status_line_does_not_erase_the_episode_failure() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(failed_observation(Some("decode: broken")));
+        model.set_status(Some("navigation: opened /media/next.flac".to_owned()));
+        assert!(
+            model.episode_error().is_some(),
+            "the Failed fact still stands under new feedback"
+        );
+    }
+
+    /// A committed replacement closes an OPEN details overlay (the
+    /// panel showed the retired episode's error) — the model-level
+    /// half of the runtime's case D.
+    #[test]
+    fn a_committed_replacement_closes_the_details_overlay() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(failed_observation(Some("decode: broken")));
+        model.open_modal(ModalKind::ErrorDetails);
+        assert!(matches!(model.modal(), Some(Modal::ErrorDetails { .. })));
+        model.note_episode_replacement();
+        assert!(
+            model.modal().is_none(),
+            "stale details must not mislabel the new episode"
         );
     }
 }

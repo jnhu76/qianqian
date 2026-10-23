@@ -133,6 +133,7 @@ Enter.
 | `+ / -`             | Volume up / down (steps of 5, range 0–100)        |
 | `S`                 | Stop                                              |
 | `O`                 | Open a file or folder                             |
+| `E`                 | Error details, when an error is showing (a failed track, a refused open) |
 | `[Open]`            | The transport-row button on Now Playing: open a file or folder (the same action as `O`) |
 | `?`                 | Help overlay                                      |
 | `Esc`               | Cancel input / drop open edits / close the help   |

@@ -187,6 +187,10 @@ impl TuiModel {
                 // control: nothing is focused while it is open (its
                 // keys are modal-scoped and never consult focus).
                 Modal::Help { .. } => Vec::new(),
+                // The error details overlay (Issue #23 B2) is
+                // keyboard-owned the same way: no controls, no focus
+                // stops, its own scroll keys.
+                Modal::ErrorDetails { .. } => Vec::new(),
                 Modal::GoTo { .. } => vec![FocusId::ModalField],
             };
         }
@@ -515,7 +519,8 @@ impl TuiModel {
     /// Open modal starts as a fresh picker draft; the runtime supplies
     /// its first listing right after (the model performs no I/O).
     pub fn open_modal(&mut self, kind: ModalKind) {
-        self.focus_before_modal = self.focus;
+        let prior_focus = self.focus;
+        self.focus_before_modal = prior_focus;
         self.modal = Some(match kind {
             ModalKind::Open | ModalKind::AddFile | ModalKind::AddFolder => {
                 // One picker, three modes (T0 Add File/Folder policies):
@@ -550,6 +555,27 @@ impl TuiModel {
                 self.focus = None;
                 Modal::Help { scroll: 0 }
             }
+            // The error details overlay (Issue #23 B2): opens ONLY when
+            // an error is actually viewable — no key press can conjure
+            // an empty panel or a fabricated error. The content is the
+            // viewable error SNAPSHOT taken at open time; the keyboard
+            // is owned the help-overlay way.
+            ModalKind::ErrorDetails => match self.viewable_error() {
+                Some(presentation) => {
+                    self.focus = None;
+                    Modal::ErrorDetails {
+                        presentation,
+                        scroll: 0,
+                    }
+                }
+                None => {
+                    // Nothing viewable: the open is fully inert — the
+                    // pre-modal bookkeeping is undone, no panel, no
+                    // fabricated error.
+                    self.focus_before_modal = prior_focus;
+                    return;
+                }
+            },
             // The preset menu (G3) starts its cursor on the preset the
             // DESIRED configuration currently matches — the menu answers
             // "which preset am I on" as honestly as "pick one". (The
@@ -615,8 +641,12 @@ impl TuiModel {
                 &mut picker.input
             }
             Modal::GoTo { input } => input,
-            // Help and the confirm modal have no text field to edit.
-            Modal::Help { .. } | Modal::Confirm { .. } | Modal::Presets { .. } => return,
+            // Help, the confirm modal and the error details overlay
+            // have no text field to edit.
+            Modal::Help { .. }
+            | Modal::Confirm { .. }
+            | Modal::Presets { .. }
+            | Modal::ErrorDetails { .. } => return,
         };
         match input {
             ModalInput::Char(c) => text.push(c),
@@ -857,7 +887,10 @@ impl TuiModel {
                 self.close_modal();
                 ModalConfirm::Confirm(kind)
             }
-            Some(Modal::Open(_)) | Some(Modal::Presets { .. }) | None => ModalConfirm::Nothing,
+            Some(Modal::Open(_))
+            | Some(Modal::Presets { .. })
+            | Some(Modal::ErrorDetails { .. })
+            | None => ModalConfirm::Nothing,
         }
     }
 
@@ -883,6 +916,22 @@ impl TuiModel {
     /// the top — the tour begins at the beginning.
     pub fn help_scroll(&mut self, scroll: HelpScroll) {
         let Some(Modal::Help { scroll: offset }) = self.modal.as_mut() else {
+            return;
+        };
+        match scroll {
+            HelpScroll::Up => *offset = offset.saturating_sub(1),
+            HelpScroll::Down => *offset = offset.saturating_add(1),
+            HelpScroll::PageUp => *offset = offset.saturating_sub(HELP_PAGE_LINES),
+            HelpScroll::PageDown => *offset = offset.saturating_add(HELP_PAGE_LINES),
+        }
+    }
+
+    /// Scroll the error details overlay (Issue #23 B2), the help
+    /// overlay's own rule: one line per step, one page per page step,
+    /// saturating at the top, clamped by the view to what the popup
+    /// shows. Reopening starts at the top.
+    pub fn error_details_scroll(&mut self, scroll: HelpScroll) {
+        let Some(Modal::ErrorDetails { scroll: offset, .. }) = self.modal.as_mut() else {
             return;
         };
         match scroll {

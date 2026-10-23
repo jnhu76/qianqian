@@ -81,6 +81,13 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
             Some(TuiAction::OpenModal(ModalKind::GoTo))
         }
         KeyCode::Char('?') if plain(key) => Some(TuiAction::OpenModal(ModalKind::Help)),
+        // E (Issue #23 B2): the error details overlay — INERT while no
+        // error is viewable (the model's open refuses to conjure an
+        // empty panel), and available while the shell fail-stopped:
+        // reading the safe details is exactly what that state allows.
+        KeyCode::Char('e') | KeyCode::Char('E') if plain(key) => {
+            Some(TuiAction::OpenModal(ModalKind::ErrorDetails))
+        }
         KeyCode::Char('n') | KeyCode::Char('N') if plain(key) => Some(TuiAction::Next),
         KeyCode::Char('p') | KeyCode::Char('P') if plain(key) => Some(TuiAction::Previous),
         KeyCode::Char('r') | KeyCode::Char('R') if plain(key) => Some(TuiAction::ToggleOrder),
@@ -137,6 +144,27 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
             KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
             // The content scroll (G5): one line per arrow, one page per
             // Page key. Nothing else leaks through to the background.
+            KeyCode::Up if plain(key) => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Up,
+            ))),
+            KeyCode::Down if plain(key) => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Down,
+            ))),
+            KeyCode::PageUp => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageUp,
+            ))),
+            KeyCode::PageDown => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageDown,
+            ))),
+            _ => None,
+        },
+        // The error details overlay (Issue #23 B2) owns the keyboard
+        // the same way: Esc closes, the arrows/Page keys scroll, `q`
+        // keeps its conventional quit, and NO other key — N, P, Space,
+        // O included — can act on the background behind it.
+        ModalKind::ErrorDetails => match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
             KeyCode::Up if plain(key) => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
                 HelpScroll::Up,
             ))),

@@ -28,6 +28,7 @@ const KEY_ROWS: &[(&str, &str)] = &[
     ("S", "S            stop"),
     ("O", "O            open"),
     ("[Open]", "[Open]       the transport button"),
+    ("E", "E            error details"),
     ("?", "?            keyboard help"),
     ("Esc", "Esc          cancel"),
     ("Q", "Q or Ctrl+C"),

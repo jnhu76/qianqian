@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use super::actions::PlaylistCursor;
+use crate::error_presentation::ErrorPresentation;
 
 /// The modal kind to open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,11 @@ pub enum ModalKind {
     /// The EQ preset picker (G3): a menu over the eight factory
     /// presets; activating one fills the Audio route's DRAFT EQ stage.
     Presets,
+    /// The error details overlay (Issue #23 B2): a read-only snapshot
+    /// of one viewable B1 error presentation. Opens only while an
+    /// error is actually viewable; keyboard-owned like the help
+    /// overlay, with its own scroll.
+    ErrorDetails,
 }
 
 /// Which final subject the shared picker accepts. Navigation is
@@ -192,6 +198,18 @@ pub enum Modal {
     Presets {
         cursor: Option<usize>,
     },
+    /// The error details overlay (Issue #23 B2): a READ-ONLY snapshot
+    /// of the presentation this modal was opened for, plus the scroll
+    /// offset. The snapshot is deliberate: the content can never mutate
+    /// under the reader's eyes (a new operation result replaces the
+    /// model's slot, not the open modal), and a committed replacement
+    /// CLOSES the modal outright instead of letting a stale snapshot
+    /// mislabel the new episode. The technical detail inside is only
+    /// ever rendered through the B1 display mapping.
+    ErrorDetails {
+        presentation: ErrorPresentation,
+        scroll: u16,
+    },
 }
 
 impl Modal {
@@ -206,6 +224,7 @@ impl Modal {
                 ConfirmKind::Clear => ModalKind::ConfirmClear,
             },
             Modal::Presets { .. } => ModalKind::Presets,
+            Modal::ErrorDetails { .. } => ModalKind::ErrorDetails,
         }
     }
 
@@ -215,7 +234,10 @@ impl Modal {
         match self {
             Modal::Open(picker) => Some(picker.input.as_str()),
             Modal::GoTo { input } => Some(input),
-            Modal::Help { .. } | Modal::Confirm { .. } | Modal::Presets { .. } => None,
+            Modal::Help { .. }
+            | Modal::Confirm { .. }
+            | Modal::Presets { .. }
+            | Modal::ErrorDetails { .. } => None,
         }
     }
 }
