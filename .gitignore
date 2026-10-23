@@ -30,3 +30,6 @@ __pycache__/
 
 # research crate builds its own workspace target dir
 research/wrk-scan/target/
+
+# Mimosa local workspace data
+.mimosa/
