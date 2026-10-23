@@ -1,0 +1,19 @@
+[+0.089] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=53555 opened: 44100 Hz, 1 channels, mask 4
+[+12.447] KEY "n" #1 of 5
+[+12.458] KEY "n" #2 of 5
+[+12.468] KEY "n" #3 of 5
+[+12.478] KEY "n" #4 of 5
+[+12.488] KEY "n" #5 of 5
+[+12.499] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=53555 opened: 44100 Hz, 1 channels, mask next: navigation queued[K
+[+12.608] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=12578773 render aborted: data plane stopp
+[+12.686] [120C[4;55H3[6;12H--[1C--[7C6[8;9H3[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\listening\L03.mp3[qianqian-wasapi] info ts_us=12610803 opened: 44100 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)
+[+13.092] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=12578773 render aborted: data plane stopeavigation: ope ed C:\Users\Public\qianqian-dogfood\listening\L03.mp3[qianqian-wasapi] info ts_us=12610803 opened: 4410 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+25.193] KEY "p"
+[+25.273] KEY "n"
+[+34.436] KEY "p"
+[+34.602] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=34528117 render aborted: data plane stopp
+[+34.679] [120C[39;70H[qianqian-wasapi] info ts_us=34577310 opened: 44100 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)
+[+35.031] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=34528117 render aborted: data plane stopnavigation: opened C:\Users\Public\qianqian-dogfood\listening\L02.mp3[qianqian-wasapi] info ts_us=34577310 opened: 4410 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+45.133] KEY "q"
+[+45.187] [K[3;1H[?25h[qianqian-wasapi] error ts_us=45118312 render aborted: data plane stopped
+[+45.213] [qianqian-wasapi] error ts_us=45118312 render aborted: data plane stopped[K

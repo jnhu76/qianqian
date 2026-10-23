@@ -139,7 +139,30 @@ cargo test -p qianqian-headless
 (The per-platform lib totals differ from Linux's 429 — cfg-partitioned
 tests — and both platforms are 0-failed.)
 
+## Human listening witness — PASS (Owner-confirmed, 2026-10-23)
+
+Corpus: the Owner's own media — three NCE2 spoken-word lessons staged
+from their Downloads/D: corpus as `listening\L01-L03.mp3` (distinct
+content, so every committed switch is unmistakable). Scenario
+`L1-listening` drives the audible timeline through the same ConPTY
+harness: 12 s alone on lesson 1; an NNNNN burst (ONE switch to lesson
+3 — the three-entry net target); P+N collapse (no switch, lesson 3
+keeps playing 8 s); one P to lesson 2; clean quit.
+
+Rounds L1–L3 calibrated the instrument (removed Position label;
+three-entry net target; the burst's own status line makes text-
+absence unwinnable — the no-reopen oracle moved to the device-open
+ceiling). **L4 and L5 both passed end to end**, each with exactly
+THREE distinct device opens (startup L01, burst commit L03, closing
+P commit L02; zero re-open at the collapse) and frame Track
+sequence 1/3 → 3/3 → 2/3 with no other transition.
+
+The Owner listened to the live sessions on the host's speakers and
+confirmed: **正常。时间线确认。** ("Normal. Timeline confirmed.") —
+one switch at the burst, no switch at the collapse, clean switches.
+This closes the last NOT_RUN item of the acceptance.
+
 ## Still NOT_RUN
 
-Human listening witness (audibility on real speakers/headphones) — an
-owner-side item by nature; nothing in this round claims it.
+Nothing. (The #301 capability-umbrella scope remains separate; this
+PR declares only the navigation-burst fix.)

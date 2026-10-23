@@ -1,0 +1,23 @@
+L1-listening: GREEN (46078ms, exit Some(0))
+    expect "Track: 1/3" OK
+    expect "Format: 44100 Hz" OK
+    sleep 12000ms
+    mark
+    keys "n" x5
+    expect-after-mark(async) "Track: 3/3" OK
+    sleep 12000ms
+    mark
+    keys "p"
+    keys "n"
+    sleep 1000ms
+    repaint
+    expect-after-mark(async) "Track: 3/3" OK
+    sleep 8000ms
+    keys "p"
+    expect-after-mark(async) "Track: 2/3" OK
+    sleep 10000ms
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
