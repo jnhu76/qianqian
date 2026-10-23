@@ -1,0 +1,1 @@
+[+0.243] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask

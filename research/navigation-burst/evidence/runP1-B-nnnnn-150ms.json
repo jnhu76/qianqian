@@ -1,0 +1,13 @@
+{"scenario":"B-nnnnn-150ms","verdict":"RED","exit_code":null,
+ "failure":"timeout waiting for \"Track: 6/8\" after offset 32339 (async transition, repainting)",
+ "child_status_at_failure":"alive=true threads=Some(9)",
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"Track: 1/8\" OK",
+    "sleep 1500ms",
+    "mark",
+    "keys \"n\" x5"
+],
+ "resources":[
+    {"label":"baseline","threads":8,"handles":187,"working_set_bytes":13967360}
+]}

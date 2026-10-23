@@ -1,0 +1,738 @@
+[+0.043s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.060s]
+scanning C:\Users\Public\qianqian-dogfood\listening\L01.mp3 ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.198s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.213s]
+Now Playing               Playlist                 Audio                     Visualizer               [?] Help [Q] Quit
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/3                                                                                                            │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐
+│         Open         ││        ◀ Prev        ││         Pause        ││        ■ Stop        ││        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit
+[+0.243s]
+Now Playing               Playlist                 Audio                     Visualizer               [?] Help [Q] Quit
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/3                                                                                                            │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐
+│         Open         ││        ◀ Prev        ││         Pause        ││        ■ Stop        ││        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+[+0.243s]
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/3                                                                                                            │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐
+│         Open         ││        ◀ Prev        ││         Pause        ││        ■ Stop        ││        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+[+0.259s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/3                                                                                                            │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐
+│         Open         ││        ◀ Prev        ││         Pause        ││        ■ Stop        ││        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+0.274s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 00                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:00┐╸───────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+1.255s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 01                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:01┐╸───────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+2.249s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 02                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:02┐╸───────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+3.251s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 03                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:03┐╸───────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+4.255s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 04                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:04┐━╸──────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+5.244s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 05                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:05┐━╸──────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+6.235s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 06                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:06┐━╸──────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+7.239s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 07                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:07┐━━╸─────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+8.233s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 08                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:08┐━━╸─────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+9.227s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 09                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:09┐━━╸─────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+
+[+10.227s]
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\listening\L01.mp3                                                            │
+│Format: 44100 Hz, 1 channels, mask 0x4                                                                                │
+│Position: --:-- / 01:18                                                                                               │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/300 10                                                                                                       │
+│DSP (desired): off (bypass)                                                                                           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────┐┌─────────────────00:10┐━━━╸────────────────────┌01:18─────────────────┐┌──────────────────────┐
+│         Open         ││[ Back 5s ]rev        ││         Pause        ││        ■ [tForward 5s│]        Next ▶        │
+└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘
+┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐
+│-│                  │+││Order: Sequential││Repeat: Off│
+└─┘                  └─┘└─────────────────┘└───────────┘
+opened C:\Users\Public\qianqian-dogfood\listening\L01.mp3 (3 candidates)
+Tab=focus  Enter=activate  O=open  ?=help  Q=quit[qianqian-wasapi] info ts_us=136743 opened: 44100 Hz, 1 channels, mask
+4, buffer 1036 frames (shared, event-driven, engine SRC)
+

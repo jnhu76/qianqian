@@ -454,6 +454,7 @@ mod tests {
     //! Tests for this submodule.
 
     use std::fs;
+    use std::time::Instant;
 
     use crossterm::event::KeyCode;
 
@@ -511,10 +512,22 @@ mod tests {
             "the accepted folder candidates are the navigation state"
         );
 
-        // N walks the SEEDED list through the same replacement.
+        // N registers the intent against the SEEDED list; the loop's
+        // settle step commits the ONE open at the burst deadline.
         assert_eq!(
             handle_key(key(KeyCode::Char('N')), &mut model, &mut player),
             Step::Continue
+        );
+        refresh(&mut model, &player);
+        assert_eq!(
+            model.source(),
+            Some(a.to_string_lossy().as_ref()),
+            "registration opens nothing"
+        );
+        super::super::settle_timers(
+            &mut model,
+            &mut player,
+            Instant::now() + 2 * crate::player::NAVIGATION_QUIET_WINDOW,
         );
         refresh(&mut model, &player);
         assert_eq!(model.source(), Some(b.to_string_lossy().as_ref()));

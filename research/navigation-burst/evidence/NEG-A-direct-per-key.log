@@ -1,0 +1,173 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling libc v0.2.189
+   Compiling unicode-segmentation v1.13.3
+   Compiling autocfg v1.5.1
+   Compiling rustversion v1.0.23
+   Compiling foldhash v0.2.0
+   Compiling allocator-api2 v0.2.21
+   Compiling cfg-if v1.0.4
+   Compiling equivalent v1.0.2
+   Compiling thiserror v2.0.20
+   Compiling ident_case v1.0.1
+   Compiling bitflags v2.13.2
+   Compiling strsim v0.11.1
+   Compiling either v1.18.0
+   Compiling heck v0.5.0
+   Compiling signal-hook v0.3.18
+   Compiling ryu v1.0.23
+   Compiling itoa v1.0.18
+   Compiling static_assertions v1.1.0
+   Compiling unicode-width v0.2.2
+   Compiling instability v0.3.13
+   Compiling parking_lot_core v0.9.12
+   Compiling rustix v1.1.4
+   Compiling log v0.4.34
+   Compiling indoc v2.0.7
+   Compiling scopeguard v1.2.0
+   Compiling smallvec v1.16.1
+   Compiling critical-section v1.2.0
+   Compiling num-conv v0.2.2
+   Compiling lock_api v0.4.14
+   Compiling num_threads v0.1.7
+   Compiling time-core v0.1.9
+   Compiling deranged v0.5.8
+   Compiling linux-raw-sys v0.12.1
+   Compiling itertools v0.14.0
+   Compiling powerfmt v0.2.0
+   Compiling strength_reduce v0.2.4
+   Compiling litrs v1.0.0
+   Compiling line-clipping v0.3.8
+   Compiling qianqian-composition v0.1.0 (/tmp/qq-negworktree/crates/qianqian-composition)
+   Compiling qianqian-diagnostics v0.1.0 (/tmp/qq-negworktree/crates/qianqian-diagnostics)
+   Compiling num-traits v0.2.19
+   Compiling convert_case v0.10.0
+   Compiling hashbrown v0.17.1
+   Compiling hashbrown v0.16.1
+   Compiling castaway v0.2.4
+   Compiling compact_str v0.9.1
+   Compiling document-features v0.2.12
+   Compiling qianqian-audio-api v0.1.0 (/tmp/qq-negworktree/crates/qianqian-audio-api)
+   Compiling qianqian-app v0.1.0 (/tmp/qq-negworktree/crates/qianqian-app)
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+   Compiling lru v0.18.4
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling errno v0.3.14
+   Compiling mio v1.2.3
+   Compiling primal-check v0.3.4
+   Compiling transpose v0.2.3
+   Compiling time v0.3.55
+   Compiling signal-hook-registry v1.4.8
+   Compiling parking_lot v0.12.5
+   Compiling rustfft v6.4.1
+   Compiling signal-hook-mio v0.2.5
+   Compiling unicode-truncate v2.0.1
+   Compiling strum_macros v0.28.0
+   Compiling derive_more-impl v2.1.1
+   Compiling derive_more v2.1.1
+   Compiling crossterm v0.29.0
+   Compiling strum v0.28.0
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.20
+   Compiling kasuari v0.4.12
+   Compiling ratatui-core v0.1.2
+   Compiling realfft v3.5.0
+   Compiling qianqian-playback v0.1.0 (/tmp/qq-negworktree/crates/qianqian-playback)
+   Compiling darling_macro v0.24.1
+   Compiling darling v0.24.1
+   Compiling ratatui-widgets v0.3.2
+   Compiling ratatui-crossterm v0.1.2
+   Compiling ratatui-macros v0.7.2
+   Compiling ratatui v0.30.2
+   Compiling qianqian-headless v0.1.0 (/tmp/qq-negworktree/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.85s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 58 tests
+test tui::runtime::dispatch::tests::a_seek_per_mille_without_evidence_sends_nothing ... ok
+test tui::runtime::dispatch::tests::a_picker_commit_takes_a_tab_row_focus_along ... ok
+test tui::runtime::dispatch::tests::activating_the_already_active_route_brings_the_tab_row_focus_home ... ok
+test tui::runtime::dispatch::tests::add_folder_mode_refuses_a_file_subject ... ok
+test tui::runtime::dispatch::tests::esc_cancels_the_open_audio_drafts_and_sends_nothing ... ok
+test tui::runtime::dispatch::tests::one_modal_enter_performs_at_most_one_product_operation ... ok
+test tui::runtime::dispatch::tests::enter_on_the_live_row_refuses_in_scan_clean_vocabulary ... ok
+test tui::runtime::dispatch::tests::clearing_with_a_live_episode_asks_and_cancel_keeps_everything ... ok
+test tui::runtime::dispatch::tests::home_play_follows_the_frozen_truth_table ... ok
+test tui::runtime::dispatch::tests::policy_and_volume_route_to_the_player ... ok
+test tui::runtime::dispatch::tests::the_audio_route_cancels_discard_only_their_own_draft ... ok
+test tui::runtime::dispatch::tests::the_audio_route_commits_each_operation_through_its_own_seam ... ok
+test tui::runtime::dispatch::tests::q_from_the_idle_state_exits_and_touches_nothing ... ok
+test tui::runtime::dispatch::tests::the_stop_action_routes_through_the_request_stop_seam_only ... ok
+test tui::runtime::dispatch::tests::removing_the_live_row_asks_first_then_retires_it ... ok
+test tui::runtime::picker::tests::a_bad_folder_open_from_idle_preserves_the_idle_state ... ok
+test tui::runtime::dispatch::tests::the_audio_route_applies_a_preset_with_a_live_episode ... ok
+test tui::runtime::dispatch::tests::the_toolbar_add_file_appends_without_starting_playback ... ok
+test tui::runtime::picker::tests::a_failed_field_confirm_keeps_the_picker_context_for_retry ... ok
+test tui::runtime::picker::tests::an_add_reports_added_skipped_and_warnings ... ok
+test tui::runtime::picker::tests::a_bad_folder_open_while_playing_leaves_playback_untouched ... ok
+test tui::runtime::dispatch::tests::n_and_p_route_the_manual_navigation ... FAILED
+test tui::runtime::dispatch::tests::the_seek_action_changes_nothing_when_the_position_is_unknown ... ok
+test tui::runtime::picker::tests::enter_on_the_parent_row_ascends ... ok
+test tui::runtime::dispatch::tests::removing_a_non_live_row_removes_directly ... ok
+test tui::runtime::dispatch::tests::the_pause_resume_action_routes_through_the_seam_both_ways ... ok
+test tui::runtime::picker::tests::esc_cancels_the_open_modal_without_touching_the_player ... ok
+test tui::runtime::picker::tests::picker_success_routes_follow_the_frozen_dispositions ... ok
+test tui::runtime::picker::tests::o_from_no_episode_opens_a_real_file ... ok
+test tui::runtime::dispatch::tests::activating_a_route_takes_a_tab_row_focus_along ... ok
+test tui::runtime::dispatch::tests::a_modal_click_never_leaks_and_a_close_consumes_its_event ... ok
+test tui::runtime::tests::mouse_capture_is_disabled_on_the_same_lifecycle_that_enables_it ... ok
+test tui::runtime::picker::tests::an_o_open_over_a_partially_unreadable_folder_reports_the_warnings ... ok
+test tui::runtime::dispatch::tests::a_resize_invalidates_geometry_and_preserves_a_valid_focus ... ok
+test tui::runtime::dispatch::tests::a_toolbar_click_activates_the_clicked_button_not_the_focused_one ... ok
+test tui::runtime::tests::the_guard_unwinds_entered_modes_when_a_later_step_fails ... ok
+test tui::runtime::tests::the_poll_timeout_is_the_tick_shortened_to_the_burst_deadline ... ok
+test tui::runtime::dispatch::tests::route_switching_is_presentation_only_and_parity_holds ... ok
+test tui::runtime::tests::the_refresh_tick_is_the_20fps_band ... ok
+test tui::runtime::picker::tests::o_folder_seeds_the_list_and_navigates ... FAILED
+test tui::runtime::dispatch::tests::a_background_click_while_the_picker_is_open_dispatches_nothing ... ok
+test tui::runtime::picker::tests::use_this_folder_commits_the_displayed_directory_without_entering_it ... ok
+test tui::runtime::dispatch::tests::the_playlist_route_selects_and_plays ... ok
+test tui::runtime::dispatch::tests::a_same_file_replay_disarms_a_press_at_the_same_cell ... ok
+test tui::runtime::dispatch::tests::tab_moves_focus_through_the_real_cycle ... ok
+test tui::runtime::dispatch::tests::transport_activation_parity_holds ... ok
+test tui::runtime::dispatch::tests::the_nav_bar_help_and_quit_answer_the_mouse ... ok
+test tui::runtime::dispatch::tests::preference_row_clicks_converge_on_the_same_actions_as_their_keys ... ok
+test tui::runtime::tests::a_resize_event_through_the_loop_clears_the_frame ... ok
+test tui::runtime::picker::tests::a_relative_typed_line_resolves_against_the_displayed_directory ... ok
+test tui::runtime::picker::tests::the_picker_navigates_by_mouse_alone ... ok
+test tui::runtime::picker::tests::clicking_the_open_button_opens_the_picker_over_the_running_directory ... ok
+test tui::runtime::picker::tests::the_picker_add_button_appends_without_touching_the_episode ... ok
+test tui::runtime::tests::the_shell_classes_are_the_ones_the_draw_publishes ... ok
+test tui::runtime::picker::tests::the_picker_rows_navigate_and_a_file_row_only_selects ... ok
+test tui::runtime::tests::settle_hands_a_collapsed_burst_to_the_normal_eof_policy ... ok
+test tui::runtime::tests::settle_without_a_burst_is_the_ordinary_eof_policy ... ok
+test tui::runtime::tests::settle_resolves_a_due_burst_instead_of_the_completed_auto_next ... ok
+
+failures:
+
+---- tui::runtime::dispatch::tests::n_and_p_route_the_manual_navigation stdout ----
+
+thread 'tui::runtime::dispatch::tests::n_and_p_route_the_manual_navigation' (447375) panicked at apps/headless/src/tui/runtime/dispatch.rs:783:9:
+assertion `left == right` failed: registration opens nothing
+  left: Some("/tmp/qianqian-tui-test-navigation-447342/live-b.flac")
+ right: Some("/tmp/qianqian-tui-test-navigation-447342/live-a.flac")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tui::runtime::picker::tests::o_folder_seeds_the_list_and_navigates stdout ----
+
+thread 'tui::runtime::picker::tests::o_folder_seeds_the_list_and_navigates' (447457) panicked at apps/headless/src/tui/runtime/picker.rs:522:9:
+assertion `left == right` failed: registration opens nothing
+  left: Some("/tmp/qianqian-tui-test-o-folder-447342/album live-b.flac")
+ right: Some("/tmp/qianqian-tui-test-o-folder-447342/album live-a.flac")
+
+
+failures:
+    tui::runtime::dispatch::tests::n_and_p_route_the_manual_navigation
+    tui::runtime::picker::tests::o_folder_seeds_the_list_and_navigates
+
+test result: FAILED. 56 passed; 2 failed; 0 ignored; 0 measured; 370 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p qianqian-headless --lib`

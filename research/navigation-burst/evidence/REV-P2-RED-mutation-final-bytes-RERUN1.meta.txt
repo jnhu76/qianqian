@@ -1,0 +1,9 @@
+=== cmd ===
+cargo test -p qianqian-headless --lib direct_manual_steps_supersede_the_pending_burst
+=== mutation ===
+=== player.rs sha256 at mutation ===
+b175f1f2fc2380703ec436e681fd3ba2058dee0ccf0ed82a871cb4d17d5e3313  apps/headless/src/player.rs
+=== restored-tree sha256 (must equal fdf3385 bytes) ===
+7ce3ee545c8b8acd3840a9be75c4a58ecb00b47f374e114d7c3235ace2e4683c  apps/headless/src/player.rs
+=== rc ===
+101

@@ -1,0 +1,24 @@
+   Compiling qianqian-headless v0.1.0 (/tmp/qq-negworktree/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.79s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+test player::tests::the_pending_open_rides_the_frozen_failure_classes ... FAILED
+
+failures:
+
+---- player::tests::the_pending_open_rides_the_frozen_failure_classes stdout ----
+
+thread 'player::tests::the_pending_open_rides_the_frozen_failure_classes' (448198) panicked at apps/headless/src/player.rs:4129:9:
+assertion `left == right` failed: a refusal moves nothing
+  left: Some(1)
+ right: Some(0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    player::tests::the_pending_open_rides_the_frozen_failure_classes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 427 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p qianqian-headless --lib`

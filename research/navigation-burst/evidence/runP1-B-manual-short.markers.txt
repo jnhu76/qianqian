@@ -1,0 +1,9 @@
+[+1.289] KEY "n"
+[+1.290] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[32;98H[qianqian-wasapi] info ts_us=122167 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[6;16H1[31;47H1[1C━━━━╸[8;40;119t[38;5;6m[1m[HNow Playing[m               Playlist                 Audio                     Visualizer               [?] Help [Q] Quit[38;5;8m
+[+1.290]                          [ Back 5s ]                                               [ Forward 5s ][qianqian-wasapi] infots_us=122167 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)───────────────
+[+1.418] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=1358765 render aborted: data plane stoppe
+[+1.530] [120C[4;48H45.mp3[6;12H--[1C--[6C4[8;9H2[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\synth45.mp3[qianqian-wasapi] info ts_us=1434829 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+1.884] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=1358765 render aborted: data plane stoppdavigation: ope ed C:\Users\Public\qianqian-dogfood\synth45.mp3[qianqian-wasapi] info ts_us=1434829 opened: 44100 Hz, 2channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)[K
+[+1.985] KEY "q"
+[+2.027] [qianqian-wasapi] error ts_us=1954011 render aborted: data plane stopped
+[+2.066] [qianqian-wasapi] error ts_us=1954011 render aborted: data plane stopped[K

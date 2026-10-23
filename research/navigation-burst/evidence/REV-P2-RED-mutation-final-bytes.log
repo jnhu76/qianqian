@@ -1,0 +1,24 @@
+   Compiling qianqian-headless v0.1.0 (/home/hoo/Source/qianqian-navburst/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.66s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+test player::tests::direct_manual_steps_supersede_the_pending_burst ... FAILED
+
+failures:
+
+---- player::tests::direct_manual_steps_supersede_the_pending_burst stdout ----
+
+thread 'player::tests::direct_manual_steps_supersede_the_pending_burst' (520102) panicked at apps/headless/src/player.rs:4069:9:
+assertion `left == right` failed: the direct step cancelled the burst
+  left: Some(Instant { tv_sec: 105189, tv_nsec: 778294541 })
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    player::tests::direct_manual_steps_supersede_the_pending_burst
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 428 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p qianqian-headless --lib`

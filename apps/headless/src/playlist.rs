@@ -494,25 +494,42 @@ impl TemporaryPlaylist {
     /// never traps manual navigation. `None` = inert (no side effect, no
     /// probe, no command).
     pub fn manual_step(&self, forward: bool) -> Option<usize> {
-        let playing = self.playing?;
+        self.preview_step(self.playing?, forward)
+    }
+
+    /// The SAME manual-step policy applied from `from_position` instead
+    /// of the committed cursor (research/navigation-burst R3 §1): the
+    /// one traversal primitive a coalescing burst chains through, so
+    /// the pending target can never drift from the policy that governs
+    /// the real navigation. Pure query over the CURRENT order, repeat
+    /// mode and permutation: it mutates nothing — not `playing`, not
+    /// `selected`, not the revision, not the shuffle mechanism — and
+    /// answers `None` wherever [`Self::manual_step`] would (no
+    /// committed position is not its concern; an out-of-range
+    /// `from_position` is simply inert). It never opens, probes or
+    /// consumes anything; the caller decides what the answer is worth.
+    pub fn preview_step(&self, from_position: usize, forward: bool) -> Option<usize> {
         let last = self.play_order.len().checked_sub(1)?;
+        if from_position > last {
+            return None;
+        }
         let wrap = self.repeat == RepeatMode::All;
         let target = if forward {
-            if playing < last {
-                playing + 1
+            if from_position < last {
+                from_position + 1
             } else if wrap {
                 0
             } else {
                 return None;
             }
-        } else if playing > 0 {
-            playing - 1
+        } else if from_position > 0 {
+            from_position - 1
         } else if wrap {
             last
         } else {
             return None;
         };
-        (target != playing).then_some(target)
+        (target != from_position).then_some(target)
     }
 
     /// The entry the manual navigation target opens.
@@ -1592,5 +1609,153 @@ mod tests {
             Some(Path::new("/m/01.flac")),
             "the committed entry is the anchored head of the fresh cycle"
         );
+    }
+
+    // --- Pure preview (navigation-burst coalescing) ------------------
+
+    /// The preview from the committed position IS the manual step, for
+    /// every order × repeat × size combination: one policy, two entry
+    /// points, no drift.
+    #[test]
+    fn preview_from_the_committed_position_agrees_with_the_manual_step() {
+        for n in [0usize, 1, 2, 5] {
+            for order in [PlaybackOrder::Sequential, PlaybackOrder::Shuffle] {
+                for repeat in [RepeatMode::Off, RepeatMode::All, RepeatMode::One] {
+                    let p = playlist(n, 0, order, repeat);
+                    for forward in [true, false] {
+                        assert_eq!(
+                            p.preview_step(p.playing_position().unwrap_or(0), forward),
+                            p.manual_step(forward),
+                            "n={n} {order:?}/{repeat:?} forward={forward}"
+                        );
+                    }
+                    // And the preview moved nothing.
+                    assert!(p.invariants_hold());
+                }
+            }
+        }
+    }
+
+    /// Chaining previews from the committed position walks EXACTLY the
+    /// traversal the pane shows (Sequential: canonical; Shuffle: the
+    /// current permutation, both directions), and a pure query leaves
+    /// every observable — cursors, revision, and the shuffle
+    /// mechanism's seed — untouched.
+    #[test]
+    fn chained_previews_walk_the_traversal_without_touching_anything() {
+        for order in [PlaybackOrder::Sequential, PlaybackOrder::Shuffle] {
+            for forward in [true, false] {
+                let p = playlist(6, 0, order, RepeatMode::Off);
+                let playing_before = p.playing_position();
+                let selected_before = p.selected_position();
+                let revision_before = p.revision();
+                // The oracle is the pane's row order read BEFORE the
+                // chain — an independent derivation, not the function
+                // under test.
+                let mut walk: Vec<Option<usize>> = Vec::new();
+                let mut from = p.playing_position().expect("committed");
+                for _ in 0..5 {
+                    let step = if forward {
+                        from.checked_add(1).filter(|&f| f < 6)
+                    } else {
+                        from.checked_sub(1)
+                    };
+                    walk.push(step);
+                    match step {
+                        Some(next) => from = next,
+                        None => break,
+                    }
+                }
+                let mut chained: Vec<Option<usize>> = Vec::new();
+                let mut last = p.manual_step(forward);
+                for _ in 0..5 {
+                    chained.push(last);
+                    let Some(from) = last else { break };
+                    last = p.preview_step(from, forward);
+                }
+                assert_eq!(chained, walk, "{order:?} forward={forward}");
+                assert_eq!(p.playing_position(), playing_before);
+                assert_eq!(p.selected_position(), selected_before);
+                assert_eq!(p.revision(), revision_before);
+                assert!(p.invariants_hold());
+            }
+        }
+
+        // The permuter was not advanced either: a fixture that previewed
+        // and a fixture that did not must still draw the IDENTICAL
+        // fresh Shuffle cycle (the only operation that reads the seed).
+        for seed in [7u64, 0xC0FF_EE00] {
+            let mut previewed = playlist(5, 4, PlaybackOrder::Shuffle, RepeatMode::All);
+            let mut untouched = playlist(5, 4, PlaybackOrder::Shuffle, RepeatMode::All);
+            for from in 0..5 {
+                let _ = previewed.preview_step(from, true);
+            }
+            assert_eq!(
+                previewed.eof_step().map(|step| step.candidate),
+                untouched.eof_step().map(|step| step.candidate),
+                "seed {seed}: previews draw nothing from the permuter"
+            );
+        }
+    }
+
+    /// The preview's boundary semantics are the manual policy's: inert
+    /// at the Repeat Off / Repeat One ends, wrapping ONLY under Repeat
+    /// All, inert for a single entry and an empty playlist, and inert
+    /// for a stale out-of-range position.
+    #[test]
+    fn preview_boundaries_are_the_manual_boundaries() {
+        let p = playlist(4, 3, PlaybackOrder::Sequential, RepeatMode::Off);
+        assert_eq!(p.preview_step(3, true), None, "Repeat Off: no forward wrap");
+        assert_eq!(p.preview_step(3, false), Some(2));
+        assert_eq!(p.preview_step(0, false), None, "no backward wrap");
+        assert_eq!(p.preview_step(0, true), Some(1));
+
+        let all = playlist(4, 0, PlaybackOrder::Sequential, RepeatMode::All);
+        assert_eq!(all.preview_step(0, false), Some(3), "Repeat All wraps back");
+        assert_eq!(
+            all.preview_step(3, true),
+            Some(0),
+            "Repeat All wraps forward"
+        );
+
+        let one = playlist(4, 0, PlaybackOrder::Sequential, RepeatMode::One);
+        assert_eq!(one.preview_step(0, false), None, "Repeat One never traps");
+        assert_eq!(one.preview_step(3, true), None, "Repeat One never traps");
+
+        let single = playlist(1, 0, PlaybackOrder::Sequential, RepeatMode::All);
+        assert_eq!(single.preview_step(0, true), None, "single-entry inertia");
+        assert_eq!(single.preview_step(0, false), None);
+
+        let empty = TemporaryPlaylist::new_seeded(7);
+        assert_eq!(empty.preview_step(0, true), None);
+
+        let stale = playlist(4, 0, PlaybackOrder::Sequential, RepeatMode::All);
+        assert_eq!(
+            stale.preview_step(4, true),
+            None,
+            "an out-of-range position is inert, never a wrap"
+        );
+        assert!(stale.invariants_hold());
+    }
+
+    /// The preview reads the CURRENT order: a reorder under the query
+    /// changes what the same from-position previews to, which is why a
+    /// pending burst target must be cancelled before a reorder (the
+    /// player owns that rule; this pins the mechanism it relies on).
+    #[test]
+    fn preview_follows_the_current_order_not_a_frozen_one() {
+        let mut p = playlist(5, 0, PlaybackOrder::Sequential, RepeatMode::Off);
+        assert_eq!(p.preview_step(0, true), Some(1));
+        let shuffled_next = {
+            p.set_order(PlaybackOrder::Shuffle);
+            p.preview_step(0, true)
+        };
+        assert_eq!(shuffled_next, Some(1), "position 1 is in-range either way");
+        assert_eq!(
+            p.path_at(0),
+            Some(Path::new("/m/01.flac")),
+            "but the ENTRY at the position follows the permutation"
+        );
+        assert!(p.invariants_hold());
     }
 }

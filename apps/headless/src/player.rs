@@ -66,6 +66,23 @@
 //! Open replacement; a probe refusal or a clean activation failure
 //! leaves the committed cursor exactly where it was.
 //!
+//! Relative-navigation INTENTS ([`ReferencePlayerApp::request_next_intent`]
+//! / [`ReferencePlayerApp::request_previous_intent`], the
+//! research/navigation-burst production fix): a burst of rapid Next /
+//! Previous keystrokes coalesces into at most ONE replacement — or
+//! zero, when the burst nets no displacement. The App holds ONE
+//! pending interaction state (a virtual traversal target plus a
+//! [`NAVIGATION_QUIET_WINDOW`] deadline); each intent steps the target
+//! through the playlist's own pure [`TemporaryPlaylist::preview_step`]
+//! policy — never a local index increment, so Shuffle permutations,
+//! wrap and boundary rules cannot drift — and every valid key restarts
+//! the window. An explicit target (direct Open, Enter-on-selected,
+//! Home Play) supersedes the burst; operations that move traversal
+//! positions (remove, clear, reorder) cancel it; Stop cancels it; Quit
+//! drops it. Until the single commit, `playing` and `selected` are
+//! exactly what they always were — the pending target is interaction
+//! intent, never navigation truth.
+//!
 //! What THIS module adds on top of the playlist's pure policy is the
 //! one thing the playlist cannot own — the D11 observation:
 //!
@@ -97,6 +114,7 @@
 //! or platform mechanisms.
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{CompositionSnapshot, DisposeVerdict};
@@ -106,6 +124,27 @@ use qianqian_playback::{
 };
 
 use crate::playlist::{PlaybackOrder, RepeatMode, Row, TemporaryPlaylist};
+
+/// The trailing quiet window a burst of relative-navigation intents
+/// waits for before ONE committed Open replaces the whole burst
+/// (research/navigation-burst R3 §8; the middle of the measured
+/// 75–125 ms collapse band). Every valid key restarts the window; the
+/// single Open — or the zero-Open collapse when the burst netted no
+/// displacement — happens only when it expires. App-owned interaction
+/// policy, not a playback semantic: no Fact, no Plugin, no timer
+/// resource — the shell's ordinary event loop drives the deadline.
+pub const NAVIGATION_QUIET_WINDOW: Duration = Duration::from_millis(100);
+
+/// One uncommitted relative-navigation burst: the virtual traversal
+/// target the burst has accumulated so far, and the instant its quiet
+/// window expires. Interaction intent ONLY — never a committed
+/// position, never an Episode Fact, never playback truth: `playing`
+/// moves solely on Open commit evidence, exactly as before.
+#[derive(Debug, Clone, Copy)]
+struct PendingNavigation {
+    virtual_position: usize,
+    deadline: Instant,
+}
 
 /// The ONE observation the App's EOF policy reacts to: a committed D11
 /// `Completed` Fact. `Stopped`, `Failed` and "no terminal Fact yet" are
@@ -248,6 +287,12 @@ pub struct ReferencePlayerApp<S: EpisodeStart> {
     desired_volume: u8,
     /// Complete process-level desired DSP data; never an applied readback.
     desired_processing: AudioProcessingConfig,
+    /// The uncommitted relative-navigation burst (see
+    /// [`PendingNavigation`]): the ONE coalescing state of the
+    /// navigation-burst fix. App-owned interaction intent, held apart
+    /// from the playlist's committed `playing` and browsing `selected`
+    /// cursors — neither ever sees it until an Open commits.
+    pending_navigation: Option<PendingNavigation>,
 }
 
 impl<S: EpisodeStart> ReferencePlayerApp<S> {
@@ -262,6 +307,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             playlist: TemporaryPlaylist::new(),
             desired_volume: 100,
             desired_processing: AudioProcessingConfig::BYPASS,
+            pending_navigation: None,
         }
     }
 
@@ -390,9 +436,13 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         self.playlist.select(position)
     }
 
-    /// Retire first iff this selected entry owns the actual episode.
+    /// Remove first iff this selected entry owns the actual episode.
     /// A disposal failure latches fail-stop and leaves the list untouched.
+    /// A pending burst is cancelled first: removing a row shifts every
+    /// later traversal position, so a stale virtual target must not
+    /// survive into the compacted geometry.
     pub fn remove_selected(&mut self) -> Result<bool, String> {
+        self.cancel_pending_navigation();
         self.require_list_editable()?;
         if self.active.is_some()
             && self.playlist.selected_position() == self.playlist.playing_position()
@@ -403,6 +453,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     }
 
     pub fn clear_playlist(&mut self) -> Result<(), String> {
+        self.cancel_pending_navigation();
         self.require_list_editable()?;
         self.retire_for_list_edit()?;
         self.playlist.clear();
@@ -501,6 +552,10 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// activation failure leave the navigation state exactly as it was.
     /// The ordering/repeat preferences survive (Issue #166 §23).
     pub fn open(&mut self, candidate: &Path) -> OpenOutcome {
+        // An explicit target supersedes an uncommitted relative burst:
+        // it commits immediately, and the burst must not open something
+        // else a window later.
+        self.cancel_pending_navigation();
         let outcome = self.replace_episode(candidate);
         if matches!(outcome, OpenOutcome::Opened) {
             self.playlist.establish(vec![candidate.to_owned()], 0);
@@ -532,6 +587,11 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// through the frozen replacement, and commit the cursor only on
     /// commit evidence.
     fn navigate(&mut self, forward: bool) -> Option<OpenOutcome> {
+        // A direct step is an explicit immediate navigation: it
+        // supersedes an uncommitted relative burst exactly like a
+        // direct Open — committed or inert, the window ends here so no
+        // stale virtual position can open a second episode later.
+        self.cancel_pending_navigation();
         let position = self.playlist.manual_step(forward)?;
         let candidate = self.playlist.path_at(position)?.to_owned();
         let outcome = self.replace_episode(&candidate);
@@ -541,11 +601,146 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         Some(outcome)
     }
 
+    // --- Relative-navigation intents (the burst coalescing entry) ----
+    //
+    // The UI-neutral seam of the navigation-burst fix
+    // (research/navigation-burst R3 §1/§4/§6): a shell adapter
+    // translates each raw Next/Previous into ONE
+    // [`Self::request_next_intent`] / [`Self::request_previous_intent`]
+    // call; the burst accumulates a virtual target through the
+    // playlist's own [`TemporaryPlaylist::preview_step`] policy and
+    // commits at most ONE Open — through the UNCHANGED frozen
+    // replacement — when [`NAVIGATION_QUIET_WINDOW`] expires with a
+    // net displacement. The App owns the pending state and the
+    // deadline; the shell only translates events and drives time, so
+    // any future adapter (GUI, media keys) gets the same policy
+    // without a second cursor of its own.
+
+    /// Register one Next intent at time `now`. Returns the outcome of a
+    /// pending burst this call had to resolve first — only on the exact
+    /// deadline boundary, where an expired burst commits BEFORE the new
+    /// intent is applied (deterministic, never scheduler-dependent);
+    /// `None` otherwise.
+    pub fn request_next_intent(&mut self, now: Instant) -> Option<OpenOutcome> {
+        self.request_navigation_intent(now, true)
+    }
+
+    /// Register one Previous intent at time `now`; the mirror of
+    /// [`Self::request_next_intent`].
+    pub fn request_previous_intent(&mut self, now: Instant) -> Option<OpenOutcome> {
+        self.request_navigation_intent(now, false)
+    }
+
+    /// When the pending burst's quiet window expires, if one is open.
+    /// The shell's event loop derives its poll timeout from this — no
+    /// timer resource exists anywhere.
+    pub fn pending_navigation_deadline(&self) -> Option<Instant> {
+        Some(self.pending_navigation.as_ref()?.deadline)
+    }
+
+    /// Resolve the pending burst if its window has expired at `now`.
+    ///
+    /// ```text
+    /// no pending, or window still open   -> None (nothing happened)
+    /// expired, net displacement == 0     -> None (the burst collapses:
+    ///                                       the committed row is simply
+    ///                                       kept — never a re-open)
+    /// expired, net displacement != 0     -> Some(outcome of the ONE
+    ///                                       Open through the frozen
+    ///                                       D14.6 replacement; the
+    ///                                       cursor commits on success
+    ///                                       only, exactly as a direct
+    ///                                       navigation always did)
+    /// ```
+    pub fn poll_pending_navigation(&mut self, now: Instant) -> Option<OpenOutcome> {
+        let pending = self.pending_navigation.take()?;
+        if now < pending.deadline {
+            self.pending_navigation = Some(pending);
+            return None;
+        }
+        if self.playlist.playing_position() == Some(pending.virtual_position) {
+            return None;
+        }
+        let candidate = self.playlist.path_at(pending.virtual_position)?.to_owned();
+        let outcome = self.replace_episode(&candidate);
+        if matches!(outcome, OpenOutcome::Opened) {
+            self.playlist.commit_navigation(pending.virtual_position);
+        }
+        Some(outcome)
+    }
+
+    /// Discard the uncommitted burst without opening anything. The
+    /// cancellation policy's single lever: explicit targets and every
+    /// operation that invalidates traversal positions cancel the
+    /// pending burst INSTEAD of letting a stale virtual position commit
+    /// later against geometry that no longer exists.
+    ///
+    /// Cancels (called inside the App seams themselves): a direct Open,
+    /// `play_selected`, `play_current`, and a direct
+    /// `next_track`/`previous_track` step (an explicit target or
+    /// immediate navigation supersedes the burst, committed or inert);
+    /// `remove_selected`, `clear_playlist` and a traversal
+    /// `set_order` (entry positions shift or are rebuilt). Deliberately
+    /// KEPT across: `cycle_repeat` and `append_admitted` (no traversal
+    /// position moves), browsing (`select_*`: presentation never plays),
+    /// volume and DSP configuration (no navigation or episode meaning),
+    /// and Stop/Quit (a stopped host must not resurrect into a late
+    /// Open — the shell cancels Stop's pending; Quit simply drops the
+    /// pending with the player).
+    pub fn cancel_pending_navigation(&mut self) {
+        self.pending_navigation = None;
+    }
+
+    /// The one registration body: an expired burst resolves first (the
+    /// deterministic deadline boundary), then the intent steps the
+    /// virtual target through the playlist's OWN preview policy. A key
+    /// that cannot move further is still user activity: an open window
+    /// restarts rather than committing early (R3 §4's prototype-earned
+    /// correction); with no window open an inert key registers nothing,
+    /// exactly as an inert direct navigation opens nothing.
+    fn request_navigation_intent(&mut self, now: Instant, forward: bool) -> Option<OpenOutcome> {
+        let resolved = self.poll_pending_navigation(now);
+        let from = match self
+            .pending_navigation
+            .as_ref()
+            .map(|pending| pending.virtual_position)
+            .or_else(|| self.playlist.playing_position())
+        {
+            Some(from) => from,
+            None => return resolved,
+        };
+        match self.playlist.preview_step(from, forward) {
+            Some(target) => {
+                let deadline = now + NAVIGATION_QUIET_WINDOW;
+                match &mut self.pending_navigation {
+                    Some(pending) => {
+                        pending.virtual_position = target;
+                        pending.deadline = deadline;
+                    }
+                    None => {
+                        self.pending_navigation = Some(PendingNavigation {
+                            virtual_position: target,
+                            deadline,
+                        });
+                    }
+                }
+            }
+            None => {
+                if let Some(pending) = &mut self.pending_navigation {
+                    pending.deadline = now + NAVIGATION_QUIET_WINDOW;
+                }
+            }
+        }
+        resolved
+    }
+
     /// `Enter`: play the SELECTED playlist entry through the SAME
     /// Open/replacement path (Issue #166 §19). `None` = nothing is
     /// selected, or selection is the unsettled current entry. Selection movement itself never
-    /// reaches here — browsing cannot play anything.
+    /// reaches here — browsing cannot play anything. An explicit
+    /// target supersedes a pending relative burst (cancelled first).
     pub fn play_selected(&mut self) -> Option<OpenOutcome> {
+        self.cancel_pending_navigation();
         if self.selected_is_live_episode() {
             return None;
         }
@@ -562,8 +757,10 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 
     /// Home Play replays the terminal current entry independently of browsing;
     /// with no episode it plays selection. An unsettled episode is inert here
-    /// (the client uses its existing pause/resume commands instead).
+    /// (the client uses its existing pause/resume commands instead). An
+    /// explicit target supersedes a pending relative burst (cancelled first).
     pub fn play_current(&mut self) -> Option<OpenOutcome> {
+        self.cancel_pending_navigation();
         let Some(episode) = self.active.as_ref() else {
             return self.play_selected();
         };
@@ -609,14 +806,23 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 
     /// The `R` key: toggle Sequential ↔ Shuffle. The committed entry is
     /// re-anchored, never restarted and never re-opened (Issue #166 §9).
-    /// Returns the new order.
+    /// A toggle is always a real reorder — the whole traversal is
+    /// rebuilt — so a pending burst (a position in the OLD geometry) is
+    /// cancelled exactly as in [`Self::set_order`]. Returns the new
+    /// order.
     pub fn toggle_order(&mut self) -> PlaybackOrder {
+        self.cancel_pending_navigation();
         self.playlist.toggle_order()
     }
 
     /// Set the traversal order (the `--shuffle` startup preference,
-    /// Issue #166 §24). Idempotent.
+    /// Issue #166 §24). Idempotent. A real reorder rebuilds the whole
+    /// traversal, so a pending burst — a position in the OLD geometry —
+    /// is cancelled before it can commit against the new permutation.
     pub fn set_order(&mut self, order: PlaybackOrder) {
+        if order != self.playlist.order() {
+            self.cancel_pending_navigation();
+        }
         self.playlist.set_order(order);
     }
 
@@ -637,11 +843,19 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// not retried (no skip cascade — the failure is reported and the
     /// traversal stays truthful).
     ///
+    /// A pending manual burst has precedence (research/navigation-burst
+    /// R3 §6): while one is uncommitted the policy does not fire at all
+    /// — the burst resolves first, and if it collapses to the committed
+    /// row the normal policy then applies to the live episode as if the
+    /// burst had never happened. Precedence is App decision order,
+    /// never evidence relabeling: D11 is untouched.
+    ///
     /// `None` = nothing was due (no episode, the policy already ran for
-    /// this episode, the terminal outcome is not Completed, or the
-    /// policy is inert at the end of the traversal).
+    /// this episode, the terminal outcome is not Completed, the policy
+    /// is inert at the end of the traversal, or a manual burst is still
+    /// uncommitted).
     pub fn poll_eof_policy(&mut self) -> Option<OpenOutcome> {
-        if self.fail_stop.is_some() {
+        if self.fail_stop.is_some() || self.pending_navigation.is_some() {
             return None;
         }
         let due = self.active.as_ref().is_some_and(|episode| {
@@ -865,6 +1079,10 @@ pub(crate) mod tests {
         path.to_string_lossy().contains("finite")
     }
 
+    fn is_corrupt(path: &Path) -> bool {
+        path.to_string_lossy().contains("corrupt")
+    }
+
     /// The fake render leg: mirrors the real mechanism's observable
     /// shape — ONE loop-top gate check before every read, the data
     /// plane decides after release, the drain verdict publishes once on
@@ -945,9 +1163,12 @@ pub(crate) mod tests {
     }
 
     /// The fake decode endpoint: silence, in bounded blocks. `finite`
-    /// paths serve 8 blocks then EOF; everything else is endless.
+    /// paths serve 8 blocks then EOF; everything else is endless. A
+    /// `corrupt` path opens cleanly and then fails mid-stream — the
+    /// steady-path decode failure whose D11 settlement is `Failed`.
     struct FakePcmStream {
         remaining_blocks: usize,
+        corrupt: bool,
         /// The fixture's event log. The stream records the seek requests
         /// that actually reach the decoder, so a test can witness that a
         /// shell command became a D14.5 provider request WITHOUT
@@ -964,6 +1185,11 @@ pub(crate) mod tests {
             None
         }
         fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+            if self.corrupt {
+                return Err(DecodeError {
+                    message: "synthetic mid-stream decode failure".to_owned(),
+                });
+            }
             if self.remaining_blocks == 0 {
                 return Ok(DecodeOutcome::Eof);
             }
@@ -995,6 +1221,7 @@ pub(crate) mod tests {
             }
             Ok(Box::new(FakePcmStream {
                 remaining_blocks: if is_finite(path) { 8 } else { usize::MAX },
+                corrupt: is_corrupt(path),
                 log: self.log.clone(),
             }))
         }
@@ -2941,5 +3168,1234 @@ pub(crate) mod tests {
         // NP shows the absence of any zero-Open collapse today: the net
         // target equals the committed track, yet BOTH keys ran a full
         // replacement (asserted above via R10's counts: 2 and 2).
+    }
+
+    // --- Relative-navigation intents: the coalescing matrix ---------
+    //
+    // The production fix's own oracle (research/navigation-burst R3 §4,
+    // prototype-validated): a burst of intent registrations coalesces
+    // into at most ONE Open through the UNCHANGED frozen replacement —
+    // or zero, when the burst nets no displacement. The oracle is the
+    // kernel-mediated event log (probe / activate / teardown lines)
+    // plus `expected_final_position` above — an independent plain-index
+    // simulation of the frozen U2 traversal rule, never the
+    // `preview_step` under test. Time is INJECTED per call, so nothing
+    // here sleeps and every deadline boundary is exact.
+    //
+    // Negative-control note: the shell-level twin of this oracle
+    // (`n_and_p_route_the_manual_navigation` and its runtime siblings)
+    // asserts ZERO opens before the deadline — re-wiring the shell to
+    // the direct per-key API below turns those asserts red, which is
+    // exactly the regression class this matrix exists to catch.
+
+    /// The committed start position of the intent matrix (same shape as
+    /// the direct-API matrix above: room in both directions, inert ends
+    /// reachable).
+    const INTENT_START: usize = 3;
+
+    /// A player on the burst playlist, committed cursor walked to
+    /// [`INTENT_START`] through the direct API (setup; excluded from
+    /// every count by the caller's baseline).
+    fn intent_player() -> (ReferencePlayerApp<FakeEpisodeSource>, Log) {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(BURST_TRACKS[0]))));
+        player.establish_playlist(BURST_TRACKS.iter().map(PathBuf::from).collect::<Vec<_>>());
+        for _ in 0..INTENT_START {
+            assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        }
+        (player, log)
+    }
+
+    /// Drive one burst: keys at a 10 ms cadence from `t0`, then the two
+    /// settle probes — 1 ms before the final deadline and exactly at it
+    /// (the boundary is strict: `now >= deadline` commits). The cadence
+    /// premise (no key crosses a deadline) is asserted, never assumed.
+    fn drive_burst(
+        player: &mut ReferencePlayerApp<FakeEpisodeSource>,
+        t0: Instant,
+        keys: &[bool],
+    ) -> (Option<OpenOutcome>, Option<OpenOutcome>) {
+        for (index, &forward) in keys.iter().enumerate() {
+            let now = t0 + Duration::from_millis(10 * index as u64);
+            let resolved = if forward {
+                player.request_next_intent(now)
+            } else {
+                player.request_previous_intent(now)
+            };
+            assert!(
+                resolved.is_none(),
+                "premise: a 10 ms cadence never crosses a deadline"
+            );
+        }
+        let deadline =
+            t0 + Duration::from_millis(10 * (keys.len() - 1) as u64) + NAVIGATION_QUIET_WINDOW;
+        let before = player.poll_pending_navigation(deadline - Duration::from_millis(1));
+        let at = player.poll_pending_navigation(deadline);
+        (before, at)
+    }
+
+    /// The coalescing count matrix (research/navigation-burst R1 §2 is
+    /// the OLD per-key behavior this replaces: NNNPPNNP cost 8 full
+    /// replacements there; it costs 1 here). Per row: the independent
+    /// final-position simulation decides BOTH the final row and the
+    /// Open count — a burst opens exactly once iff it netted a
+    /// displacement, and every probe/start/retire count equals the
+    /// Open count because each commit rides the whole frozen
+    /// replacement and nothing else runs.
+    #[test]
+    fn intent_burst_matrix_coalesces_to_at_most_one_replacement() {
+        let sequences: [(&str, Vec<bool>); 10] = [
+            ("I1 N", vec![true]),
+            ("I2 P", vec![false]),
+            ("I3 NN", vec![true, true]),
+            ("I4 NNNNN", vec![true; 5]),
+            ("I5 NP", vec![true, false]),
+            ("I6 PN", vec![false, true]),
+            ("I7 NNPP", vec![true, true, false, false]),
+            (
+                "I8 NNNPPNNP",
+                vec![true, true, true, false, false, true, true, false],
+            ),
+            ("I9 NPNPNP", vec![true, false, true, false, true, false]),
+            (
+                "I10 NNPPNNPP",
+                vec![true, true, false, false, true, true, false, false],
+            ),
+        ];
+
+        println!("NAVIGATION_INTENT_MATRIX (coalesced, 10 ms cadence, quiet 100 ms)");
+        println!("input       keys opened probes starts retires final_pos vburst_ms");
+        for (name, keys) in sequences {
+            let (mut player, log) = intent_player();
+            let baseline_probes = count_events(&log.lock().unwrap(), "probe ");
+            let baseline_starts = count_events(&log.lock().unwrap(), "activate ");
+            let baseline_retires = count_events(&log.lock().unwrap(), "teardown ");
+
+            // While the burst is pending NOTHING may masquerade as
+            // navigation truth: the committed cursors sit exactly where
+            // they were (negative-control B's first witness).
+            let t0 = Instant::now();
+            let (before, at) = drive_burst(&mut player, t0, &keys);
+            assert_eq!(before, None, "{name}: nothing commits before the deadline");
+
+            let expected = expected_final_position(INTENT_START, &keys);
+            let expected_opens = usize::from(expected != INTENT_START);
+            let opens = usize::from(at == Some(OpenOutcome::Opened));
+            assert_eq!(
+                opens, expected_opens,
+                "{name}: the independent policy target decides the Open count"
+            );
+
+            let events = log.lock().unwrap().clone();
+            let probes = count_events(&events, "probe ") - baseline_probes;
+            let starts = (count_events(&events, "activate ") - baseline_starts) / 2;
+            let retires = (count_events(&events, "teardown ") - baseline_retires) / 2;
+            assert_eq!(
+                probes, expected_opens,
+                "{name}: one attempt per committed Open, none otherwise\n{events:?}"
+            );
+            assert_eq!(
+                starts, expected_opens,
+                "{name}: each Open starts exactly one fresh episode\n{events:?}"
+            );
+            assert_eq!(
+                retires, expected_opens,
+                "{name}: each Open retires exactly one old episode\n{events:?}"
+            );
+
+            let (committed, selected) = (
+                player.playlist_playing_position(),
+                player.playlist_selected_position(),
+            );
+            assert_eq!(
+                committed,
+                Some(expected),
+                "{name}: playing is the policy target"
+            );
+            assert_eq!(
+                selected,
+                Some(expected),
+                "{name}: manual commit takes the selection along"
+            );
+            if expected_opens == 1 {
+                assert_eq!(
+                    player.active_source(),
+                    Some(Path::new(BURST_TRACKS[expected])),
+                    "{name}: the committed source is the final policy target"
+                );
+            } else {
+                assert_eq!(
+                    player.active_source(),
+                    Some(Path::new(BURST_TRACKS[INTENT_START])),
+                    "{name}: a zero-net burst re-opens nothing"
+                );
+            }
+            assert_eq!(
+                player.pending_navigation_deadline(),
+                None,
+                "{name}: the burst is settled"
+            );
+
+            println!(
+                "{name:<11} {:>4} {:>6} {:>6} {:>6} {:>7} {:>9} {:>9}",
+                keys.len(),
+                opens,
+                probes,
+                starts,
+                retires,
+                committed.map(|p| p + 1).unwrap_or_default(),
+                (keys.len() as u64 - 1) * 10 + NAVIGATION_QUIET_WINDOW.as_millis() as u64,
+            );
+        }
+    }
+
+    /// The window boundary is strict and deadline-deterministic: 1 ms
+    /// early nothing happens; exactly at the deadline the one Open
+    /// commits; and a key landing EXACTLY on a deadline sees the
+    /// expired burst resolved FIRST (App-side precedence — never
+    /// scheduler luck), then arms its own fresh burst.
+    #[test]
+    fn the_quiet_window_boundary_is_strict_and_deadline_first() {
+        let (mut player, _) = intent_player();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW - Duration::from_millis(1)),
+            None,
+            "1 ms early: nothing"
+        );
+        // Still pending: neither cursor has moved.
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START));
+        assert_eq!(player.playlist_selected_position(), Some(INTENT_START));
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened),
+            "now >= deadline commits"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START + 1));
+        assert_eq!(player.pending_navigation_deadline(), None);
+
+        // NP whose P lands exactly on the N window's deadline.
+        let (mut player, log) = intent_player();
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        let resolved = player.request_previous_intent(t0 + NAVIGATION_QUIET_WINDOW);
+        assert_eq!(
+            resolved,
+            Some(OpenOutcome::Opened),
+            "the expired N burst resolved before the P was applied"
+        );
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(INTENT_START + 1),
+            "the boundary commit landed first"
+        );
+        assert!(
+            player.pending_navigation_deadline().is_some(),
+            "the P armed its own fresh burst"
+        );
+        // The strict boundary did NOT collapse (R3 §4): the P burst is
+        // a real navigation back, resolved at its own deadline.
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 2 * NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened),
+            "the P navigates back from the boundary commit"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START));
+        let events = log.lock().unwrap().clone();
+        assert_eq!(
+            count_events(&events, "probe ") - baseline,
+            2,
+            "one Open per window, none merged\n{events:?}"
+        );
+    }
+
+    /// The product case: NP inside one window nets ZERO opens — the
+    /// burst collapses to the committed row instead of re-opening the
+    /// song already playing (the old per-key path cost 2 replacements).
+    #[test]
+    fn an_np_burst_inside_one_window_nets_zero_opens() {
+        let (mut player, log) = intent_player();
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.request_previous_intent(t0 + Duration::from_millis(99));
+        assert!(player.pending_navigation_deadline().is_some());
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(500)),
+            None,
+            "a zero-net burst never opens"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START));
+        assert_eq!(
+            player.active_source(),
+            Some(Path::new(BURST_TRACKS[INTENT_START]))
+        );
+        let events = log.lock().unwrap().clone();
+        assert_eq!(
+            count_events(&events, "probe ") - baseline,
+            0,
+            "no probe, no attempt, no replacement\n{events:?}"
+        );
+    }
+
+    /// An inert key at a boundary is still user activity: an open
+    /// window RESTARTS rather than committing early (R3 §4's
+    /// prototype-earned correction); with no window open an inert key
+    /// registers nothing at all.
+    #[test]
+    fn an_inert_boundary_key_restarts_the_window_and_never_commits_early() {
+        let (mut player, _) = intent_player();
+        let t0 = Instant::now();
+        // NNNN walks 3→7 (the last row; Repeat Off).
+        for step in 0..4u32 {
+            player.request_next_intent(t0 + Duration::from_millis(u64::from(step) * 10));
+        }
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(129)),
+            None,
+            "the 4th key's window is still open at 129 ms"
+        );
+        // The inert 5th N at 95 ms restarts the window to 195 ms.
+        player.request_next_intent(t0 + Duration::from_millis(95));
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(150)),
+            None,
+            "the restart pushed the commit out past the old deadline"
+        );
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(INTENT_START),
+            "still committed at what used to be the deadline"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(195)),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.playlist_playing_position(), Some(7));
+
+        // A FIRST key that is inert at a boundary registers nothing.
+        let (mut player, log) = intent_player();
+        for _ in 0..4 {
+            assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        }
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        player.request_next_intent(Instant::now());
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "inert at the end with no burst open: nothing armed"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(Instant::now() + Duration::from_secs(1)),
+            None
+        );
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 0);
+    }
+
+    /// Two bursts separated by a settled gap are two independent
+    /// windows: the first commits at its deadline, the second arms and
+    /// commits at its own.
+    #[test]
+    fn two_bursts_are_two_independent_windows() {
+        let (mut player, log) = intent_player();
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.request_next_intent(t0 + Duration::from_millis(10));
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(110)),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START + 2));
+        player.request_next_intent(t0 + Duration::from_millis(200));
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(299)),
+            None
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(300)),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.playlist_playing_position(), Some(INTENT_START + 3));
+        let events = log.lock().unwrap().clone();
+        assert_eq!(count_events(&events, "probe ") - baseline, 2);
+    }
+
+    /// Sustained input cannot starve a due burst: a cadence the window
+    /// keeps absorbing defers the commit (that IS the debounce), and
+    /// the moment a gap reaches the deadline the Open lands — with more
+    /// input still to come, which then arms the next window.
+    #[test]
+    fn sustained_input_defers_but_never_starves_a_due_burst() {
+        // Repeat All so every key is valid and the walk can run long.
+        let (mut player, _) = intent_player_with(|player| {
+            assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        });
+        let t0 = Instant::now();
+        // Ten keys at 10 ms: the window recedes with each one.
+        for step in 0..10u32 {
+            player.request_next_intent(t0 + Duration::from_millis(u64::from(step) * 10));
+        }
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(99)),
+            None,
+            "a key every 10 ms keeps deferring (that is the debounce)"
+        );
+        // The input pauses; the deadline arrives mid-stream and the ONE
+        // Open commits even though more keys follow it.
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(190)),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some((INTENT_START + 10) % BURST_TRACKS.len())
+        );
+        // The following keys arm a FRESH burst from the new commit.
+        player.request_next_intent(t0 + Duration::from_millis(200));
+        player.request_next_intent(t0 + Duration::from_millis(210));
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_millis(310)),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some((INTENT_START + 12) % BURST_TRACKS.len())
+        );
+    }
+
+    /// A player on the burst playlist with `customize` applied after
+    /// the standard walk to [`INTENT_START`].
+    fn intent_player_with(
+        customize: impl FnOnce(&mut ReferencePlayerApp<FakeEpisodeSource>),
+    ) -> (ReferencePlayerApp<FakeEpisodeSource>, Log) {
+        let (mut player, log) = intent_player();
+        customize(&mut player);
+        (player, log)
+    }
+
+    /// The burst follows EVERY repeat mode's manual policy: Repeat All
+    /// wraps the accumulated target through position 0; Repeat One
+    /// navigates like Off (never trapping the burst at the ends).
+    #[test]
+    fn intent_bursts_follow_the_repeat_policy() {
+        // Repeat All from 3: NNNNN walks 4,5,6,7 then wraps to 0.
+        let (mut player, log) = intent_player_with(|player| {
+            assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        });
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        let (before, at) = drive_burst(&mut player, t0, &[true; 5]);
+        assert_eq!(before, None);
+        assert_eq!(at, Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "the burst wrapped"
+        );
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+
+        // Repeat One: the walk navigates like Repeat Off and the ends
+        // are inert (never trapped into re-opens).
+        let (mut player, log) = intent_player_with(|player| {
+            assert_eq!(player.cycle_repeat(), RepeatMode::All);
+            assert_eq!(player.cycle_repeat(), RepeatMode::One);
+        });
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        let (before, at) = drive_burst(&mut player, t0, &[true; 5]);
+        assert_eq!(before, None);
+        assert_eq!(at, Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(7),
+            "Repeat One does not wrap the walk"
+        );
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+        // And a first key AT the end arms nothing under Repeat One.
+        player.request_next_intent(t0 + Duration::from_secs(1));
+        assert_eq!(player.pending_navigation_deadline(), None);
+    }
+
+    /// Single-entry and empty playlists arm no burst at all: manual
+    /// navigation is inert there under every mode, so the intent entry
+    /// is too.
+    #[test]
+    fn a_single_entry_or_empty_playlist_arms_nothing() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(BURST_TRACKS[0]))));
+        player.establish_playlist(vec![PathBuf::from(BURST_TRACKS[0])]);
+        let baseline = count_events(&events_handle.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        for repeat in 0..3 {
+            player.request_next_intent(t0 + Duration::from_millis(repeat * 10));
+            player.request_previous_intent(t0 + Duration::from_millis(repeat * 10 + 5));
+            assert_eq!(player.pending_navigation_deadline(), None);
+        }
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_secs(1)),
+            None
+        );
+        assert_eq!(
+            count_events(&events_handle.lock().unwrap(), "probe ") - baseline,
+            0
+        );
+
+        // No playlist at all.
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        player.request_next_intent(t0);
+        player.request_previous_intent(t0 + Duration::from_millis(10));
+        assert_eq!(player.pending_navigation_deadline(), None);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + Duration::from_secs(1)),
+            None
+        );
+    }
+
+    /// Under Shuffle the burst walks the CURRENT permutation in both
+    /// directions and round-trips to zero opens — the policy comes from
+    /// the playlist's preview, never a local index increment.
+    #[test]
+    fn intent_bursts_follow_the_shuffle_permutation_both_ways() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = ReferencePlayerApp::new_seeded(source, 0x5EED_B055);
+        assert!(opened(&player.open(Path::new(BURST_TRACKS[0]))));
+        player.establish_playlist(BURST_TRACKS.iter().map(PathBuf::from).collect::<Vec<_>>());
+        player.set_order(PlaybackOrder::Shuffle);
+        // The pane's row order read BEFORE the burst is the independent
+        // oracle for which ENTRY each position names.
+        let rows: Vec<PathBuf> = player
+            .playlist_rows()
+            .map(|row| row.path.to_path_buf())
+            .collect();
+        for _ in 0..INTENT_START {
+            assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        }
+        let baseline = count_events(&events_handle.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        // NNNNN forward: to the end of the permutation.
+        let (before, at) = drive_burst(&mut player, t0, &[true; 5]);
+        assert_eq!(before, None);
+        assert_eq!(at, Some(OpenOutcome::Opened));
+        assert_eq!(player.playlist_playing_position(), Some(7));
+        assert_eq!(player.active_source(), Some(rows[7].as_path()));
+        assert_eq!(
+            count_events(&events_handle.lock().unwrap(), "probe ") - baseline,
+            1
+        );
+
+        // PPPPP-style walk back to the permutation head, and a NNPP
+        // round-trip nets zero opens.
+        for _ in 0..7 {
+            assert!(matches!(player.previous_track(), Some(OpenOutcome::Opened)));
+        }
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        let t0 = Instant::now();
+        let (before, at) = drive_burst(&mut player, t0, &[true, true, false, false]);
+        assert_eq!(before, None);
+        assert_eq!(at, None, "a Shuffle round-trip nets zero opens");
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        assert_eq!(player.active_source(), Some(rows[0].as_path()));
+    }
+
+    // --- Pending burst vs the natural-EOF policy (R3 §6) -------------
+
+    /// A player whose committed episode has ALREADY settled `Completed`
+    /// (the natural-EOF precondition), plus the event log.
+    fn completed_player(
+        files: &[&str],
+    ) -> (
+        ReferencePlayerApp<FakeEpisodeSource>,
+        Log,
+        PlaybackSessionHandle,
+    ) {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Completed,
+            "premise: the fixture completed"
+        );
+        (player, log, handle)
+    }
+
+    /// `Completed` + a pending P: the pending burst WINS. The EOF
+    /// policy defers while the burst is uncommitted, the one Open is
+    /// the pending target (not the auto-next), and exactly one attempt
+    /// runs. The targets are chosen to differ (pending → row 0, EOF →
+    /// row 2) so the probe log names the winner.
+    #[test]
+    fn a_pending_burst_precedes_the_completed_fact_auto_next() {
+        let files = [
+            "/media/eofp-finite-0.flac",
+            "/media/eofp-finite-1.flac",
+            "/media/eofp-live-2.flac",
+        ];
+        let (mut player, log, _) = completed_player(&files);
+        // Walk to position 1: the pending P targets row 0, the EOF
+        // policy would target row 2 — disambiguated by name.
+        assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        // The baseline starts HERE: the setup and the walk are not part
+        // of the burst's count.
+        let baseline = event_count(&log);
+        let t0 = Instant::now();
+
+        player.request_previous_intent(t0);
+        assert_eq!(
+            player.poll_eof_policy(),
+            None,
+            "the policy defers while a burst is uncommitted"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW - Duration::from_millis(1)),
+            None
+        );
+        assert_eq!(
+            player.poll_eof_policy(),
+            None,
+            "still uncommitted: still deferred"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened),
+            "the pending target wins over the auto-next"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[0])));
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        let events = log.lock().unwrap().clone();
+        let delta = &events[baseline..];
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("probe ")).count(),
+            1,
+            "exactly one attempt ran\n{events:?}"
+        );
+        assert!(
+            delta.iter().any(|e| e.contains("eofp-finite-0")),
+            "the attempt was the pending target\n{events:?}"
+        );
+        assert!(
+            !delta.iter().any(|e| e.contains("eofp-live-2")),
+            "the auto-next never ran\n{events:?}"
+        );
+    }
+
+    /// `Completed` + a pending burst that COLLAPSES (N then P): zero
+    /// manual opens, and the normal Completed policy applies to the
+    /// live episode as if the burst had never happened.
+    #[test]
+    fn a_collapsed_burst_hands_back_to_the_normal_completed_policy() {
+        let files = ["/media/eofc-finite-0.flac", "/media/eofc-live-1.flac"];
+        let (mut player, log, _) = completed_player(&files);
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.request_previous_intent(t0 + Duration::from_millis(10));
+        // N at t0, P at t0+10 ms: the final deadline is t0+110 ms.
+        let deadline = t0 + Duration::from_millis(10) + NAVIGATION_QUIET_WINDOW;
+
+        // Deferred for as long as the burst is uncommitted...
+        assert_eq!(player.poll_eof_policy(), None);
+        assert_eq!(
+            player.poll_pending_navigation(deadline - Duration::from_millis(1)),
+            None
+        );
+        assert_eq!(player.poll_eof_policy(), None, "still pending at 109 ms");
+        // ...then the burst collapses (no Open), the pending state is
+        // gone, and the SAME settle hands over to the normal policy.
+        assert_eq!(
+            player.poll_pending_navigation(deadline),
+            None,
+            "the collapse commits nothing"
+        );
+        assert_eq!(
+            player.poll_eof_policy(),
+            Some(OpenOutcome::Opened),
+            "the normal Completed policy applies after the collapse"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[1])));
+        let events = log.lock().unwrap().clone();
+        let probes: Vec<_> = events[baseline..]
+            .iter()
+            .filter(|e| e.starts_with("probe "))
+            .collect();
+        assert_eq!(
+            probes.len(),
+            1,
+            "zero manual attempts, exactly the auto-next's one\n{events:?}"
+        );
+        assert!(probes[0].contains("eofc-live-1"), "\n{events:?}");
+    }
+
+    /// The same precedence under Repeat All (the pending wrap) and
+    /// under Shuffle (the pending permutation step).
+    #[test]
+    fn pending_precedence_holds_under_repeat_all_and_shuffle() {
+        // Repeat All: completed row 0, pending P wraps to the last row.
+        let files = ["/media/eofa-finite-0.flac", "/media/eofa-live-1.flac"];
+        let (mut player, log, _) = completed_player(&files);
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_previous_intent(t0);
+        assert_eq!(player.poll_eof_policy(), None, "deferred");
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(
+            player.active_source(),
+            Some(Path::new(files[1])),
+            "the wrap target won"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(1));
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+
+        // Shuffle: completed position 0, pending N opens position 1 of
+        // the permutation — and the auto-next (position 1 of the same
+        // permutation under Off... disambiguated by the ORDER: the
+        // deferred check proves precedence, the probe count proves
+        // exactly-once.
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new_seeded(source, 0x5EED_E0F3);
+        let files: Vec<PathBuf> = [
+            "/media/eofs-finite-0.flac",
+            "/media/eofs-live-1.flac",
+            "/media/eofs-live-2.flac",
+            "/media/eofs-live-3.flac",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect();
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files);
+        player.set_order(PlaybackOrder::Shuffle);
+        let second_row: PathBuf = player
+            .playlist_rows()
+            .nth(1)
+            .expect("row 1")
+            .path
+            .to_path_buf();
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(player.poll_eof_policy(), None, "deferred");
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.active_source(), Some(second_row.as_path()));
+        assert_eq!(player.playlist_playing_position(), Some(1));
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+    }
+
+    /// `Failed` never auto-advances, and a pending burst still resolves
+    /// on its own deadline. The fixture fails mid-stream through the
+    /// REAL session, so the D11 `Failed` settlement is a premise, not
+    /// an assumption.
+    #[test]
+    fn a_failed_episode_never_auto_advances_and_a_pending_burst_still_resolves() {
+        let files = ["/media/f-p-corrupt-0.flac", "/media/f-p-ok-1.flac"];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Failed,
+            "premise: a mid-stream decode failure settles Failed"
+        );
+        assert_eq!(player.poll_eof_policy(), None, "Failed never auto-advances");
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened),
+            "the burst resolves regardless of the old episode's terminal class"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[1])));
+        assert_eq!(player.playlist_playing_position(), Some(1));
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+        // The new episode is endless and unsettled: no further
+        // automatic transition.
+        assert_eq!(player.poll_eof_policy(), None);
+    }
+
+    /// `Stopped` never auto-advances, and a pending burst still
+    /// resolves (a manual navigation after a stop is exactly as legal
+    /// as it was before this fix).
+    #[test]
+    fn a_stopped_episode_never_auto_advances_and_a_pending_burst_still_resolves() {
+        let files = ["/media/s-p-live-0.flac", "/media/s-p-ok-1.flac"];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let handle = player.active_handle().expect("committed").clone();
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Stopped,
+            "premise: the episode settled Stopped"
+        );
+        assert_eq!(
+            player.poll_eof_policy(),
+            None,
+            "Stopped never auto-advances"
+        );
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[1])));
+        assert_eq!(count_events(&log.lock().unwrap(), "probe ") - baseline, 1);
+    }
+
+    // --- Explicit targets, transport and list edits vs the burst -----
+
+    /// A direct Open is an explicit target: it supersedes the burst,
+    /// commits immediately, and no late Open follows.
+    #[test]
+    fn an_explicit_open_supersedes_the_pending_burst() {
+        let files = ["/media/x-o-live-0.flac", "/media/x-o-live-1.flac"];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+
+        let outcome = player.open(Path::new("/media/x-o-explicit-9.flac"));
+        assert_eq!(outcome, OpenOutcome::Opened);
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "the explicit target cancelled the burst"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no late Open"
+        );
+        assert_eq!(
+            player.active_source(),
+            Some(Path::new("/media/x-o-explicit-9.flac"))
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            2,
+            "setup + explicit only"
+        );
+    }
+
+    /// Enter-on-selected (an explicit target) supersedes the burst the
+    /// same way.
+    #[test]
+    fn play_selected_supersedes_the_pending_burst() {
+        let files = [
+            "/media/x-s-live-0.flac",
+            "/media/x-s-live-1.flac",
+            "/media/x-s-live-2.flac",
+        ];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        assert!(player.select_track(2));
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(player.play_selected(), Some(OpenOutcome::Opened));
+        assert_eq!(player.pending_navigation_deadline(), None);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no late Open"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[2])));
+        assert_eq!(count_events(&log.lock().unwrap(), "probe "), 2);
+    }
+
+    /// A direct manual step — the historical `next_track`/`previous_track`
+    /// API a shell may still call — is an explicit immediate navigation:
+    /// it supersedes the pending burst exactly like an explicit Open
+    /// (Owner review of PR #311: the direct entries used to bypass the
+    /// cancellation, so a stale virtual position could open a second
+    /// episode one quiet window after the direct step).
+    #[test]
+    fn direct_manual_steps_supersede_the_pending_burst() {
+        let files = [
+            "/media/dm-finite-0.flac",
+            "/media/dm-finite-1.flac",
+            "/media/dm-finite-2.flac",
+        ];
+        let mk = || {
+            let source = FakeEpisodeSource::new();
+            let log = source.log.clone();
+            let mut player = ReferencePlayerApp::new(source);
+            assert!(opened(&player.open(Path::new(files[0]))));
+            player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+            (player, log)
+        };
+
+        // The review's own sequence: a Next burst is pending when a
+        // direct Previous commits first. The stale target (row 2) must
+        // never open at the deadline; the committed row stays row 0.
+        let (mut player, log) = mk();
+        assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "the direct step cancelled the burst"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no late Open from the stale virtual target"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[0])));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            3,
+            "setup + walk + the direct step only"
+        );
+
+        // Mirror, and the inert end: a direct Next at the Repeat-Off
+        // boundary opens nothing yet still ends the window — every
+        // direct-API invocation supersedes the burst, committed or not.
+        let (mut player, log) = mk();
+        for _ in 0..2 {
+            assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+        }
+        let t0 = Instant::now();
+        player.request_previous_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        assert_eq!(player.next_track(), None, "Repeat Off end is inert");
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "even an inert direct step ends the window"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[2])));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            3,
+            "setup + walk only; the inert step opens nothing"
+        );
+    }
+
+    /// Stop cancels the uncommitted burst: nothing pressed before the
+    /// stop may open a new episode after it.
+    #[test]
+    fn stop_cancels_the_pending_burst() {
+        let files = ["/media/stp-live-0.flac", "/media/stp-ok-1.flac"];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let handle = player.active_handle().expect("committed").clone();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        player.cancel_pending_navigation();
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Stopped,
+            "premise: the stop settled the episode"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no Open after the stop"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[0])));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+    }
+
+    /// Quit settles and reports exactly as before; the uncommitted
+    /// burst dies with the player and opens nothing.
+    #[test]
+    fn quit_drops_the_pending_burst_without_a_new_episode() {
+        let files = [
+            "/media/qt-finite-0.flac",
+            "/media/qt-live-1.flac",
+            "/media/qt-live-2.flac",
+        ];
+        let (mut player, log, _) = completed_player(&files);
+        let baseline = count_events(&log.lock().unwrap(), "probe ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(player.pending_navigation_deadline().is_some());
+        let report = player.quit();
+        assert_eq!(
+            report.terminal,
+            Some(EpisodeTerminalOutcome::Completed),
+            "the completed episode keeps its own terminal through quit"
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe ") - baseline,
+            0,
+            "the pending burst never opened anything"
+        );
+    }
+
+    /// Traversal-geometry edits cancel the burst INSTEAD of letting a
+    /// stale virtual position commit against the new geometry: a real
+    /// reorder, removing the committed row, and clearing the list.
+    /// `cycle_repeat` deliberately KEEPS the burst (no traversal
+    /// position moves), pinned here as the decision it is.
+    #[test]
+    fn traversal_edits_cancel_the_burst_and_cycle_repeat_keeps_it() {
+        let files = [
+            "/media/ed-live-0.flac",
+            "/media/ed-live-1.flac",
+            "/media/ed-live-2.flac",
+        ];
+        let mk = || {
+            let source = FakeEpisodeSource::new();
+            let log = source.log.clone();
+            let mut player = ReferencePlayerApp::new(source);
+            assert!(opened(&player.open(Path::new(files[0]))));
+            player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+            (player, log)
+        };
+
+        // A real reorder rebuilds the permutation: cancel.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.set_order(PlaybackOrder::Shuffle);
+        assert_eq!(player.pending_navigation_deadline(), None);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+
+        // The `R` key's toggle is ALWAYS a real reorder (no same-order
+        // early return): the R-key-during-pending hole — a stale
+        // virtual position committing against the fresh permutation —
+        // is pinned shut here.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.toggle_order();
+        assert_eq!(
+            player.pending_navigation_deadline(),
+            None,
+            "the toggle cancelled the burst"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(0), "re-anchored");
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "no stale-position Open against the new permutation"
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+
+        // Removing the committed row retires the episode and compacts
+        // the list: cancel.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(player.remove_selected(), Ok(true));
+        assert_eq!(player.pending_navigation_deadline(), None);
+        assert_eq!(
+            player.playlist_playing_position(),
+            None,
+            "the playing row was removed"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+
+        // Clearing the list: cancel.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.clear_playlist().expect("clear");
+        assert_eq!(player.pending_navigation_deadline(), None);
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 10 * NAVIGATION_QUIET_WINDOW),
+            None
+        );
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            1,
+            "setup only"
+        );
+
+        // Repeat cycling moves no traversal position: the burst stays.
+        let (mut player, log) = mk();
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        assert!(
+            player.pending_navigation_deadline().is_some(),
+            "cycle_repeat keeps the burst"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(player.playlist_playing_position(), Some(1));
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "probe "),
+            2,
+            "setup + the one commit"
+        );
+    }
+
+    /// The failure classes of the ONE committed Open are exactly the
+    /// frozen D14.6 classes: a refused candidate consumes the burst
+    /// without touching the old episode; a clean activation failure
+    /// consumes it leaving no runtime and an unmoved cursor; a §G.6
+    /// disposal violation latches fail-stop through the SAME path.
+    #[test]
+    fn the_pending_open_rides_the_frozen_failure_classes() {
+        // Probe refusal.
+        let files = [
+            "/media/fc-live-0.flac",
+            "/media/fc-invalid-1.flac",
+            "/media/fc-live-2.flac",
+        ];
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let old = player.active_handle().expect("committed").clone();
+        let baseline = count_events(&log.lock().unwrap(), "teardown ");
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        match player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW) {
+            Some(OpenOutcome::Refused { diagnostic }) => {
+                assert!(diagnostic.contains("fc-invalid-1"), "{diagnostic}");
+            }
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "a refusal moves nothing"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(files[0])));
+        assert_eq!(
+            old.observe().terminal_outcome,
+            None,
+            "the old episode was never touched"
+        );
+        assert!(!old.observe().stop_requested);
+        assert_eq!(
+            count_events(&log.lock().unwrap(), "teardown ") - baseline,
+            0,
+            "no retirement for a refusal"
+        );
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 2 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "the burst was consumed by the refusal"
+        );
+
+        // Clean activation failure.
+        let files = [
+            "/media/fc2-live-0.flac",
+            "/media/fc2-failstart-1.flac",
+            "/media/fc2-live-2.flac",
+        ];
+        let source = FakeEpisodeSource::new();
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(matches!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::ActivationFailedClean { .. })
+        ));
+        assert!(player.active_handle().is_none(), "no runtime remains");
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "the cursor names the last committed entry"
+        );
+        assert!(
+            matches!(player.open(Path::new(files[2])), OpenOutcome::Opened),
+            "a later Open stays legal"
+        );
+
+        // §G.6 fail-stop through the pending commit's own retirement.
+        let mut source = FakeEpisodeSource::new();
+        source.violating_cleanup = true;
+        let files = ["/media/fc3-finite-0.flac", "/media/fc3-ok-1.flac"];
+        let mut player = ReferencePlayerApp::new(source);
+        assert!(opened(&player.open(Path::new(files[0]))));
+        player.establish_playlist(files.iter().map(PathBuf::from).collect::<Vec<_>>());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        assert!(matches!(
+            player.poll_pending_navigation(t0 + NAVIGATION_QUIET_WINDOW),
+            Some(OpenOutcome::FailStop { .. })
+        ));
+        assert!(player.is_fail_stopped());
+        assert_eq!(
+            player.poll_pending_navigation(t0 + 2 * NAVIGATION_QUIET_WINDOW),
+            None,
+            "a latched player runs nothing further"
+        );
     }
 }

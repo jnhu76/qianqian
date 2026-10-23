@@ -1,0 +1,9 @@
+   Compiling qianqian-headless v0.1.0 (/home/hoo/Source/qianqian-navburst/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.57s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+test player::tests::direct_manual_steps_supersede_the_pending_burst ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 428 filtered out; finished in 0.01s
+

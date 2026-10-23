@@ -1,0 +1,11 @@
+[+0.137] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=89378 opened: 44100 Hz, 2 channels, mask 3
+[+1.978] KEY "n" #1 of 3
+[+1.988] KEY "n" #2 of 3
+[+1.999] KEY "n" #3 of 3
+[+2.010] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=89378 opened: 44100 Hz, 2 channels, mask next: navigation queued                            S  )[K
+[+2.090] KEY "p" #1 of 3
+[+2.100] KEY "p" #2 of 3
+[+2.111] KEY "p" #3 of 3
+[+3.283] KEY "q"
+[+3.339] [qianqian-wasapi] error ts_us=3271160 render aborted: data plane stopped
+[+3.365] [qianqian-wasapi] error ts_us=3271160 render aborted: data plane stopped[K

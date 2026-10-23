@@ -399,6 +399,14 @@ fn prev_opened(media: &str, file: &str) -> String {
     format!("previous: opened {media}\\{file}")
 }
 
+/// The coalesced navigation-commit feedback line: the shell renders the
+/// ONE committed Open direction-neutrally (`navigation: opened <src>`);
+/// the per-key `next:`/`previous:` wordings are gone with the burst
+/// fix (PR #311, production-acceptance retarget of the B needles).
+fn nav_opened(media: &str, file: &str) -> String {
+    format!("navigation: opened {media}\\{file}")
+}
+
 /// The corpus. flac4/mp3cbr/alac4/alac6 are the repository's committed
 /// fixtures (renamed only); synth45/synth30 are locally generated
 /// synthetic media (ffmpeg sine), recorded by SHA256 in the run
@@ -464,8 +472,20 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // boundary-0): eight long tracks, so only a sequence that
         // deliberately walks to an end reaches the inert boundary and
         // every burst lands on a committed, steadily playing episode.
-        "B-single-N" | "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms"
-        | "B-nnnnn-250ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms" => &VTEST8,
+        "B-single-N" | "B-nnnnn-10ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms"
+        | "B-np-10ms" | "B-npnpnp-10ms" => &VTEST8,
+        "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => &VTEST8,
+        // Human-listening witness (PR #311): three real user media
+        // files staged under listening\ (distinct spoken lessons, so
+        // every committed switch is unmistakable to the ear). The
+        // script's own oracles are only the shell's committed-Track
+        // witnesses and the net-zero absence; what the user HEARS is
+        // the witness they give.
+        "L1-listening" => &[
+            "listening\\L01.mp3",
+            "listening\\L02.mp3",
+            "listening\\L03.mp3",
+        ],
         // The manual-vs-natural pair: a SHORT first track so natural EOF
         // arrives quickly, and one long follower so the auto-next target
         // is unique. synth5.mp3 is staged by the burst runner (ffmpeg
@@ -504,6 +524,9 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
     let watchdog = if name == "U2-soak" {
         // 20 x 100 s of real playback plus transition overhead.
         Duration::from_secs(2_400)
+    } else if name == "L1-listening" {
+        // ~55 s of scripted listening plus overhead.
+        Duration::from_secs(180)
     } else if name == "A20" {
         Duration::from_secs(300)
     } else if name == "A19" {
@@ -2061,30 +2084,45 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::SleepMs(1_500),
                 Step::Mark,
                 keys("n"),
-                expect_after_mark_async(next_opened(media, "vtest02.mp3"), OPEN_WAIT),
+                expect_after_mark_async(nav_opened(media, "vtest02.mp3"), OPEN_WAIT),
                 expect_after_mark_async("Track: 2/8".to_owned(), SHORT_WAIT),
             ];
             v.extend(quit_clean());
             v
         }
-        "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => {
-            let gap = match name {
-                "B-nnnnn-10ms" => 10,
-                "B-nnnnn-50ms" => 50,
-                "B-nnnnn-150ms" => 150,
-                _ => 250,
-            };
+        "B-nnnnn-10ms" => {
             let mut v = vec![
                 expect_format(),
                 expect("Track: 1/8"),
                 Step::SleepMs(1_500),
                 Step::Mark,
-                // Five raw keys from Track 1: every key opens (no
-                // boundary in reach); the committed final target is
-                // entry 6.
-                Step::KeysEach("n", 5, gap),
+                // Five raw keys at a cadence entirely inside ONE quiet
+                // window: ONE committed Open; the committed final
+                // target is entry 6 (old per-key behavior: 5 opens).
+                Step::KeysEach("n", 5, 10),
                 expect_after_mark_async("Track: 6/8".to_owned(), OPEN_WAIT),
             ];
+            v.extend(quit_clean());
+            v
+        }
+        // Deliberate single-stepping at a spaced cadence (production-
+        // acceptance redesign): each key is synchronized on the shell's
+        // own committed-Track witness, never on a blind wall-clock
+        // cadence — under the coalescing shell a key landing while a
+        // replacement is mid-flight is busy-interval input (drained),
+        // so the old blind scripts were timing-dependent instruments.
+        // Five witnessed steps: five ONE-key commits.
+        "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+            ];
+            for track in 2..=6 {
+                v.push(keys("n"));
+                v.push(expect_after_mark_async(format!("Track: {track}/8"), OPEN_WAIT));
+            }
             v.extend(quit_clean());
             v
         }
@@ -2092,16 +2130,23 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             let mut v = vec![
                 expect_format(),
                 expect("Track: 1/8"),
-                // Walk forward first so the burst has room backward.
-                Step::KeysEach("n", 4, 150),
-                expect_within("Track: 5/8".to_owned(), OPEN_WAIT),
-                Step::SleepMs(1_500),
                 Step::Mark,
-                // From Track 5: p opens 4,3,2,1; the FOURTH p at Track 1
-                // is inert (Repeat Off, no wrap). Final target: entry 1.
-                Step::KeysEach("p", 4, 10),
-                expect_after_mark_async("Track: 1/8".to_owned(), OPEN_WAIT),
             ];
+            // Synchronized forward walk: four witnessed steps to
+            // Track 5/8 (see the stepped-nnnnn note — never a blind
+            // cadence under the coalescing shell).
+            for track in 2..=5 {
+                v.push(keys("n"));
+                v.push(expect_after_mark_async(format!("Track: {track}/8"), OPEN_WAIT));
+            }
+            v.push(Step::SleepMs(1_500));
+            v.push(Step::Mark);
+            // From Track 5: p,p,p,p at burst cadence is ONE quiet
+            // window with net displacement 4 → ONE committed Open back
+            // to Track 1 (old per-key behavior: 4 opens; the fourth p
+            // at Track 1 is inert either way). Final target: entry 1.
+            v.push(Step::KeysEach("p", 4, 10));
+            v.push(expect_after_mark_async("Track: 1/8".to_owned(), OPEN_WAIT));
             v.extend(quit_clean());
             v
         }
@@ -2112,12 +2157,51 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::SleepMs(1_500),
                 Step::Mark,
                 // 1 → n,n,n → 4 → p,p → 2 → n,n → 4 → p → 3. All eight
-                // keys non-inert; the committed final target is entry 3.
+                // keys inside ONE quiet window: ONE committed Open, the
+                // final target is entry 3 (old per-key behavior: 8).
                 Step::KeysEach("n", 3, 10),
                 Step::KeysEach("p", 2, 10),
                 Step::KeysEach("n", 2, 10),
                 keys("p"),
                 expect_after_mark_async("Track: 3/8".to_owned(), OPEN_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        // Net-zero collapse pair (PR #311 production acceptance): a
+        // burst that nets no displacement commits ZERO Opens — no
+        // `navigation: opened` feedback may exist in the post-mark
+        // window at all, and the Track line never moves. The repaint
+        // keeps the absence window non-vacuous while the 100 ms quiet
+        // window expires.
+        "B-np-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                keys("n"),
+                keys("p"),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 1/8".to_owned(), SHORT_WAIT),
+                Step::AbsentAfterMark("navigation: opened".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-npnpnp-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                Step::KeysEach("n", 3, 10),
+                Step::KeysEach("p", 3, 10),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 1/8".to_owned(), SHORT_WAIT),
+                Step::AbsentAfterMark("navigation: opened".to_owned()),
             ];
             v.extend(quit_clean());
             v
@@ -2147,7 +2231,48 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 // manual-vs-natural comparison baseline.
                 keys("n"),
                 expect_after_mark_async("Track: 2/2".to_owned(), OPEN_WAIT),
-                expect_after_mark_async("next: opened".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("navigation: opened".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        "L1-listening" => {
+            // Three entries, so the scripted beats are: the burst nets
+            // +2 (keys past the end are inert activity restarting the
+            // window) and lands on lesson 3; the collapse must be P
+            // THEN N (an inert N first, at the Repeat-Off end, arms
+            // nothing); the closing P returns to lesson 2.
+            let mut v = vec![
+                // The staged lessons are probed 44.1 kHz; the Format
+                // label is the proven playing-format witness on the
+                // current rendering (the old Position: MM:SS label no
+                // longer exists — position lives in the timeline bar).
+                expect("Track: 1/3"),
+                expect("Format: 44100 Hz"),
+                Step::SleepMs(12_000), // LISTEN: lesson 1 plays alone
+                Step::Mark,
+                // Five N at burst cadence: exactly ONE switch (net +2,
+                // lesson 3).
+                Step::KeysEach("n", 5, 10),
+                expect_after_mark_async("Track: 3/3".to_owned(), OPEN_WAIT),
+                Step::SleepMs(12_000), // LISTEN: lesson 3 plays alone
+                Step::Mark,
+                // P then N: the burst nets zero — NOTHING switches,
+                // lesson 3 keeps playing. No TEXT absence is claimed:
+                // the burst's own "navigation: opened" status line is
+                // still rendered (a same-row re-open would print the
+                // identical text), so the no-reopen oracle lives in the
+                // device-open ceiling, not in this transcript.
+                keys("p"),
+                keys("n"),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 3/3".to_owned(), SHORT_WAIT),
+                Step::SleepMs(8_000), // LISTEN: lesson 3 STILL playing
+                keys("p"),            // ONE switch back to lesson 2
+                expect_after_mark_async("Track: 2/3".to_owned(), OPEN_WAIT),
+                Step::SleepMs(10_000), // LISTEN: lesson 2
             ];
             v.extend(quit_clean());
             v

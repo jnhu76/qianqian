@@ -1,0 +1,37 @@
+   Compiling qianqian-headless v0.1.0 (/tmp/qq-negworktree/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.86s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 4 tests
+test player::tests::an_explicit_open_supersedes_the_pending_burst ... ok
+test player::tests::an_np_burst_inside_one_window_nets_zero_opens ... ok
+test player::tests::the_quiet_window_boundary_is_strict_and_deadline_first ... FAILED
+test player::tests::intent_burst_matrix_coalesces_to_at_most_one_replacement ... FAILED
+
+failures:
+
+---- player::tests::the_quiet_window_boundary_is_strict_and_deadline_first stdout ----
+
+thread 'player::tests::the_quiet_window_boundary_is_strict_and_deadline_first' (447853) panicked at apps/headless/src/player.rs:3340:9:
+assertion `left == right` failed
+  left: Some(4)
+ right: Some(3)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- player::tests::intent_burst_matrix_coalesces_to_at_most_one_replacement stdout ----
+NAVIGATION_INTENT_MATRIX (coalesced, 10 ms cadence, quiet 100 ms)
+input       keys opened probes starts retires final_pos vburst_ms
+
+thread 'player::tests::intent_burst_matrix_coalesces_to_at_most_one_replacement' (447852) panicked at apps/headless/src/player.rs:3276:13:
+assertion `left == right` failed: I1 N: the independent policy target decides the Open count
+  left: 0
+ right: 1
+
+
+failures:
+    player::tests::intent_burst_matrix_coalesces_to_at_most_one_replacement
+    player::tests::the_quiet_window_boundary_is_strict_and_deadline_first
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 424 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p qianqian-headless --lib`

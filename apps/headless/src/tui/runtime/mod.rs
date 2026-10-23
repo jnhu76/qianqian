@@ -22,7 +22,7 @@ mod picker;
 mod testutil;
 
 use std::io::{self, Write};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
@@ -37,7 +37,7 @@ use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 use crate::tui::view;
 
 use super::model::{Step, TuiModel, decode_key, decode_mouse};
-use dispatch::{dispatch, eof_feedback};
+use dispatch::{dispatch, eof_feedback, pending_commit_feedback};
 
 /// UI refresh cadence: 50 ms — 20 fps (Issue #233). The visualizer's
 /// per-frame deltas are whole terminal cells, and large-area cell
@@ -76,7 +76,13 @@ pub fn run<S: EpisodeStart>(
             .draw(|frame| view::draw(frame, &mut model))
             .map_err(|error| format!("terminal draw failed: {error}"))?;
 
-        if event::poll(TICK).map_err(|error| format!("terminal input failed: {error}"))?
+        // The pending navigation burst's deadline joins the ordinary
+        // event wait: the poll wakes on the first input event OR at the
+        // deadline, whichever comes first — no timer thread, no extra
+        // wakeups, and the 20 fps refresh cadence is unchanged (an
+        // expired burst never waits a whole extra tick).
+        let timeout = poll_timeout(player.pending_navigation_deadline(), Instant::now());
+        if event::poll(timeout).map_err(|error| format!("terminal input failed: {error}"))?
             && handle_event(
                 event::read().map_err(|error| format!("terminal input failed: {error}"))?,
                 &mut model,
@@ -86,29 +92,64 @@ pub fn run<S: EpisodeStart>(
             break;
         }
 
-        // The App's natural-EOF policy (Issue #166 §13): one D11
-        // `Completed` Fact may advance the temporary playlist through
-        // the SAME Open replacement. It runs AFTER input so a key press
-        // and an automatic transition never race for the same refresh,
-        // and it blocks exactly as the Open modal's Enter does (the
-        // documented synchronous-Open stall) — no async machinery is
-        // earned here either.
-        if let Some(outcome) = player.poll_eof_policy() {
-            if matches!(outcome, OpenOutcome::Opened) {
-                model.note_episode_replacement();
-            }
-            model.set_status(Some(eof_feedback(&outcome, player)));
-            // The advance stalled this loop like any Open replacement:
-            // input queued during the stall never reaches the new
-            // episode's geometry (T0 picker freeze).
-            drain_busy_interval_input();
-        }
+        settle_timers(&mut model, player, Instant::now());
 
         refresh(&mut model, player);
     }
 
     guard.restore();
     Ok(())
+}
+
+/// The event wait for one loop iteration: the ordinary refresh tick,
+/// shortened to a pending navigation burst's deadline when one expires
+/// sooner (`min(TICK, time-to-deadline)`); an already-expired deadline
+/// waits zero. Pure so the deadline arithmetic is testable without a
+/// terminal.
+fn poll_timeout(deadline: Option<Instant>, now: Instant) -> Duration {
+    deadline.map_or(TICK, |deadline| {
+        TICK.min(deadline.saturating_duration_since(now))
+    })
+}
+
+/// The loop's per-iteration automatic transitions, in precedence order:
+/// a pending navigation burst resolves FIRST (one Open at most, at its
+/// deadline), and the natural-EOF policy runs only when no burst
+/// attempt was made this iteration — the manual burst's outcome wins
+/// over the same Completed Fact's auto-next (research/navigation-burst
+/// R3 §6). Both run AFTER input so a key press and an automatic
+/// transition never race for the same refresh, and each blocks exactly
+/// as the Open modal's Enter does (the documented synchronous-Open
+/// stall) — no async machinery is earned here either.
+fn settle_timers<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+    now: Instant,
+) {
+    if let Some(outcome) = player.poll_pending_navigation(now) {
+        if matches!(outcome, OpenOutcome::Opened) {
+            model.note_episode_replacement();
+        }
+        model.set_status(Some(pending_commit_feedback(&outcome, player)));
+        // The burst's commit stalled this loop like any Open replacement:
+        // input queued during the stall never reaches the new episode's
+        // geometry (T0 picker freeze).
+        drain_busy_interval_input();
+        return;
+    }
+    // The App's natural-EOF policy (Issue #166 §13): one D11
+    // `Completed` Fact may advance the temporary playlist through
+    // the SAME Open replacement.
+    if let Some(outcome) = player.poll_eof_policy() {
+        if matches!(outcome, OpenOutcome::Opened) {
+            model.note_episode_replacement();
+        }
+        model.set_status(Some(eof_feedback(&outcome, player)));
+        // The advance stalled this loop like any Open replacement:
+        // input queued during the stall never reaches the new
+        // episode's geometry (T0 picker freeze).
+        drain_busy_interval_input();
+    }
 }
 
 /// The loop's per-event body, factored out so the wiring is itself
@@ -251,15 +292,26 @@ mod tests {
     //! Tests for this submodule.
 
     use std::io::{self, Write};
-    use std::time::Duration;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
 
     use crossterm::event::{Event, MouseButton, MouseEventKind};
 
     use super::testutil::*;
-    use super::{TICK, enter_terminal, handle_event, refresh, restore_terminal};
-    use crate::player::ReferencePlayerApp;
+    use super::{
+        TICK, enter_terminal, handle_event, poll_timeout, refresh, restore_terminal, settle_timers,
+    };
     use crate::player::tests::FakeEpisodeSource;
+    use crate::player::{NAVIGATION_QUIET_WINDOW, OpenOutcome, ReferencePlayerApp};
     use crate::tui::model::*;
+    use qianqian_playback::EpisodeTerminalOutcome;
+
+    /// The total kernel-mediated event count (the delta-slicing
+    /// baseline for the settle tests).
+    fn event_count(log: &Arc<Mutex<Vec<String>>>) -> usize {
+        log.lock().unwrap().len()
+    }
 
     /// The refresh tick is 50 ms — 20 fps, the smoothness band for
     /// whole-cell motion (#233). One ordinary tick serves input and
@@ -268,6 +320,171 @@ mod tests {
     #[test]
     fn the_refresh_tick_is_the_20fps_band() {
         assert_eq!(TICK, Duration::from_millis(50));
+    }
+
+    /// The event wait joins the pending burst's deadline without
+    /// changing the ordinary refresh cadence: no deadline means the
+    /// plain tick, an earlier deadline shortens the wait to exactly the
+    /// time remaining, an expired one waits zero, and a later one
+    /// never exceeds the tick.
+    #[test]
+    fn the_poll_timeout_is_the_tick_shortened_to_the_burst_deadline() {
+        let now = Instant::now();
+        assert_eq!(poll_timeout(None, now), TICK, "no burst: the plain tick");
+        assert_eq!(
+            poll_timeout(Some(now + 2 * TICK), now),
+            TICK,
+            "a later deadline never exceeds the tick"
+        );
+        assert_eq!(
+            poll_timeout(Some(now + Duration::from_millis(20)), now),
+            Duration::from_millis(20),
+            "an earlier deadline shortens the wait"
+        );
+        assert_eq!(
+            poll_timeout(Some(now - Duration::from_secs(1)), now),
+            Duration::ZERO,
+            "an expired deadline waits zero"
+        );
+        assert_eq!(
+            poll_timeout(Some(now), now),
+            Duration::ZERO,
+            "the exact boundary waits zero (now >= deadline commits)"
+        );
+    }
+
+    /// The settle step's precedence (research/navigation-burst R3 §6):
+    /// a due burst commits INSTEAD of the same Completed Fact's
+    /// auto-next — exactly one Open, the burst's target — and the EOF
+    /// policy then finds a fresh episode.
+    #[test]
+    fn settle_resolves_a_due_burst_instead_of_the_completed_auto_next() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let files = [
+            PathBuf::from("/media/settle-finite-0.flac"),
+            PathBuf::from("/media/settle-finite-1.flac"),
+            PathBuf::from("/media/settle-live-2.flac"),
+        ];
+        assert_eq!(player.open(&files[0]), OpenOutcome::Opened);
+        player.establish_playlist(files.to_vec());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        // Walk to position 1 (the pending P will target 0; the EOF
+        // auto-next would target 2).
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let baseline = event_count(&log);
+
+        let mut model = TuiModel::new(String::new());
+        let t0 = Instant::now();
+        player.request_previous_intent(t0);
+
+        settle_timers(&mut model, &mut player, t0 + NAVIGATION_QUIET_WINDOW);
+
+        assert_eq!(
+            player.active_source(),
+            Some(files[0].as_path()),
+            "the burst's target won"
+        );
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        let events = log.lock().unwrap().clone();
+        let delta = &events[baseline..];
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("probe ")).count(),
+            1,
+            "exactly one Open ran this settle\n{events:?}"
+        );
+        assert!(
+            delta.iter().any(|e| e.contains("settle-finite-0")),
+            "it was the burst target, never the auto-next\n{events:?}"
+        );
+    }
+
+    /// A burst that collapses hands the SAME settle to the normal
+    /// Completed policy — the auto-next fires exactly once, as if the
+    /// burst had never happened.
+    #[test]
+    fn settle_hands_a_collapsed_burst_to_the_normal_eof_policy() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let files = [
+            PathBuf::from("/media/collapse-finite-0.flac"),
+            PathBuf::from("/media/collapse-live-1.flac"),
+        ];
+        assert_eq!(player.open(&files[0]), OpenOutcome::Opened);
+        player.establish_playlist(files.to_vec());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let baseline = event_count(&log);
+
+        let mut model = TuiModel::new(String::new());
+        let t0 = Instant::now();
+        player.request_next_intent(t0);
+        player.request_previous_intent(t0 + Duration::from_millis(10));
+
+        settle_timers(
+            &mut model,
+            &mut player,
+            t0 + Duration::from_millis(10) + NAVIGATION_QUIET_WINDOW,
+        );
+
+        assert_eq!(
+            player.active_source(),
+            Some(files[1].as_path()),
+            "the collapse committed nothing and the auto-next advanced"
+        );
+        let events = log.lock().unwrap().clone();
+        let delta = &events[baseline..];
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("probe ")).count(),
+            1,
+            "zero manual attempts, exactly the auto-next\n{events:?}"
+        );
+        assert!(delta[0].contains("collapse-live-1"), "\n{events:?}");
+    }
+
+    /// With no burst pending the settle is exactly the ordinary EOF
+    /// policy it always was.
+    #[test]
+    fn settle_without_a_burst_is_the_ordinary_eof_policy() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let files = [
+            PathBuf::from("/media/plain-finite-0.flac"),
+            PathBuf::from("/media/plain-live-1.flac"),
+        ];
+        assert_eq!(player.open(&files[0]), OpenOutcome::Opened);
+        player.establish_playlist(files.to_vec());
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let baseline = event_count(&log);
+
+        let mut model = TuiModel::new(String::new());
+        settle_timers(&mut model, &mut player, Instant::now());
+
+        assert_eq!(player.active_source(), Some(files[1].as_path()));
+        let events = log.lock().unwrap().clone();
+        let delta = &events[baseline..];
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("probe ")).count(),
+            1,
+            "one auto-next attempt\n{events:?}"
+        );
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("teardown ")).count() / 2,
+            1,
+            "one old episode retired\n{events:?}"
+        );
+        assert_eq!(
+            delta.iter().filter(|e| e.starts_with("activate ")).count() / 2,
+            1,
+            "one fresh episode started\n{events:?}"
+        );
     }
 
     /// The oracle is ANSI byte order, valid only where the capture

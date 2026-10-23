@@ -1,0 +1,14 @@
+[+0.199] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=120235 opened: 44100 Hz, 2 channels, mask
+[+1.983] KEY "n" #1 of 5
+[+2.134] KEY "n" #2 of 5
+[+2.136] [120C[6;12H00[1C00[31;43H00:00[1C╸───────────────────────[1C00:45[32;26H[[1CBack[1C5s[1C][47C[[1CForward[1C5s[1C][6;16H1[31;47H1[39;1Hnext: navigation queued[28X[29C  [1C[11X[11C[qianqian-wasapi] error ts_us=2051416 render aborted: data plane stopped
+[+2.238] [120C[4;49H2[6;12H--[1C--[8;9H2[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest02.mp3[qianqian-wasapi] info ts_us=2134147 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+2.285] KEY "n" #3 of 5
+[+2.435] KEY "n" #4 of 5
+[+2.442] [6;12H00[1C00[31;43H00:00[1C╸───────────────────────[1C00:45[32;26H[[1CBack[1C5s[1C][47C[[1CForward[1C5s[1C][40;1H[120C[39;2Hext: navigatio[1C queued[40X[40C[qianqian-wasapi] error ts_us=2360408 render aborted: data plane stopped
+[+2.544] [120C[4;49H3[6;12H--[1C--[8;9H3[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\vtest03.mp3[qianqian-wasapi] info ts_us=2446738 opened: 44100 Hz, 2 channels, mask 3, buffer 1036 frames (shared, event-driven, engine SRC)
+[+2.586] KEY "n" #5 of 5
+[+2.737] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=120235 opened: 44100 Hz, 2 channels, masknext: navigation queued                               C           [qianqian-wasapi] error ts_us=2051416 render aborted:davigation: opeped C:\Users\Public\qianqian-dogfood\vtest02.mp3[qianqian-wasapi] info ts_us=2134147 opened: 44100 Hz, 2cext: navigatio3 queued                                        [qianqian-wasapi] error ts_us=2360408 render aborted: daaavigation: ope ed C:\Users\Public\qianqian-dogfood\vtest03.mp3[qianqian-wasapi] info ts_us=2446738 opened: 44100 Hz, 2cext: navigatio3 queued                                        ine SRC)[K
+[+2.745] [K[119C[39;64H[qianqian-wasapi] error ts_us=2659290 render aborted: data plane stopped
+[+2.791] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=2737248 opened: 44100 Hz, 2 channels, mas
+[+2.817] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=2737248 opened: 44100 Hz, 2 channels, mas k 3, buffer 1036 frames (shared, event-driven, engine SRC)[K

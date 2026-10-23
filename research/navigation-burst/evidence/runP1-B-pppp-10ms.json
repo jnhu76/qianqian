@@ -1,0 +1,11 @@
+{"scenario":"B-pppp-10ms","verdict":"RED","exit_code":null,
+ "failure":"timeout waiting for \"Track: 5/8\" after offset 0; history tail:\n ━━━━━━━━━━╸───────────── 00:45\n                         [ Back 5s ]                                               [ Forward 5s ]\n┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐┌──────────────────────┐\n│         Open         ││        ◀ Prev        ││         Pause        ││        ■ Stop        ││        Next ▶        │\n└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘└──────────────────────┘\n┌─┐ 100/100 (desired)┌─┐┌─────────────────┐┌───────────┐\n│-│                  │+││Order: Sequential││Repeat: Off│\n└─┘                  └─┘└─────────────────┘└───────────┘\nnavigation: opened C:\\Users\\Public\\qianqian-dogfood\\vtest03.mp3\nTab=focus  Enter=activate  O=open  ?=help  Q=quit\n",
+ "child_status_at_failure":"alive=true threads=Some(9)",
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"Track: 1/8\" OK",
+    "keys \"n\" x4"
+],
+ "resources":[
+    {"label":"baseline","threads":8,"handles":187,"working_set_bytes":13959168}
+]}
