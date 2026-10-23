@@ -241,11 +241,16 @@ fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
     }
     if let Some(status) = model.status() {
         for line in status.lines().take(MAX_STATUS_ROWS) {
-            // Every status row crosses the display firewall (Issue #23
-            // B2): feedback composes from filesystem-derived diagnostics
-            // and paths, so the render maps each line through the one
-            // display-escape entry point. Lines are already split here,
-            // so the newline byte itself is never part of the text.
+            // The status block's NEWLINES are the product's own line
+            // structure only: every untrusted fragment (paths,
+            // diagnostics) is display-escaped at its composition site,
+            // BEFORE the text can join the status string and become
+            // layout, wrapping or truncation input (Issue #23 B2 owner
+            // review P2-02 — a raw newline is legal in a Linux
+            // filename and must never arrive as an extra status row).
+            // The per-line mapping below is the idempotent final gate
+            // (the one display-escape entry point) behind that
+            // composition discipline.
             lines.push(Line::from(
                 crate::error_presentation::diagnostic_for_display(line),
             ));

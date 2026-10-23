@@ -733,3 +733,132 @@ fn nc1_diagnostic_prefixes_never_select_the_presentation() {
         assert_eq!(refused.title(), "无法打开所选音频");
     }
 }
+
+// ----------------------------------------------------------------------
+// Owner review of PR #316 (round 1), P2-01 and P2-02 counterfactuals.
+// ----------------------------------------------------------------------
+
+/// P2-01, the exact counterfactual through the REAL dispatch boundary:
+/// with A's Failed fact standing, a refused Open of B reports B's
+/// refusal on the status block AND `E` opens B's details — while A's
+/// failure block stays visible on the Now Playing panel. No error
+/// history queue: the rule is only which standing error the shell
+/// recorded last.
+#[test]
+fn a_refused_open_after_a_failed_episode_is_what_e_shows() {
+    let tree = TempTree::new("b2-recency");
+    let corrupt = tree.live_file("corrupt.flac");
+    let invalid = tree.live_file("invalid.flac");
+    let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+    let mut model = TuiModel::new(String::new());
+
+    // A commits and fails: the D11 Failed fact stands.
+    assert!(matches!(player.open(&corrupt), OpenOutcome::Opened));
+    let handle = player.active_handle().expect("committed").clone();
+    assert!(wait_for_terminal(&handle, EpisodeTerminalOutcome::Failed));
+    refresh(&mut model, &player);
+    assert_eq!(
+        model.episode_error().map(|e| e.kind()),
+        Some(ErrorPresentationKind::EpisodeFailed)
+    );
+
+    // Attempt to open B: refused; A's episode and its fact are untouched.
+    open_via_keys(&mut model, &mut player, &invalid);
+    assert!(model.modal().is_some(), "the picker stays for correction");
+    assert!(
+        player.active_handle().is_some(),
+        "a refusal replaces no episode"
+    );
+    assert_eq!(
+        model.viewable_error().map(|e| e.kind()),
+        Some(ErrorPresentationKind::OpenRefused),
+        "the refusal is the error the shell recorded LAST — E selects it"
+    );
+    assert_eq!(
+        model.episode_error().map(|e| e.kind()),
+        Some(ErrorPresentationKind::EpisodeFailed),
+        "A's Failed fact still stands for the panel"
+    );
+    let viewable = model.viewable_error().expect("viewable");
+    assert_eq!(
+        model.status(),
+        Some(crate::error_presentation::operation_error_feedback("open", &viewable).as_str()),
+        "the status block carries B's refusal copy"
+    );
+
+    // E opens B's details.
+    assert_eq!(
+        handle_key(key(KeyCode::Esc), &mut model, &mut player),
+        Step::Continue
+    );
+    assert_eq!(
+        handle_key(key(KeyCode::Char('E')), &mut model, &mut player),
+        Step::Continue
+    );
+    let Some(Modal::ErrorDetails { presentation, .. }) = model.modal() else {
+        panic!("E must open the newest error's details");
+    };
+    assert_eq!(presentation.kind(), ErrorPresentationKind::OpenRefused);
+    assert_eq!(
+        handle_key(key(KeyCode::Esc), &mut model, &mut player),
+        Step::Continue
+    );
+
+    // A's failure block is STILL on the Now Playing panel.
+    dispatch(
+        TuiAction::Navigate(TuiRoute::NowPlaying),
+        &mut model,
+        &mut player,
+    );
+    let text = frame_lines(&mut model, 100, 30);
+    assert!(
+        text.contains("这首歌曲播放失败"),
+        "A's Failed fact stays visible on the panel:\n{text}"
+    );
+}
+
+/// P2-02 through the REAL dispatch boundary, on the platform where the
+/// failure is legal (Linux filenames may contain newlines; Windows
+/// forbids them, so the file cannot even be created there — the
+/// composition rule itself is pinned cross-platform by the pure unit
+/// test in `input.rs`): a path fragment carrying a raw newline is
+/// display-escaped BEFORE it joins the status text, so it can never
+/// become an extra status row, and the replay's opened line still
+/// renders on exactly one row.
+#[cfg(unix)]
+#[test]
+fn a_newline_in_an_opened_path_cannot_become_a_status_row() {
+    let tree = TempTree::new("b2-newline-path");
+    let file = tree.live_file("new\nlinecorrupt.flac");
+    let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+    let mut model = TuiModel::new(String::new());
+
+    // The episode commits, then fails (the corrupt fake); the replay
+    // through the transport seam recomposes the opened line over the
+    // same newline-bearing path.
+    assert!(matches!(player.open(&file), OpenOutcome::Opened));
+    let handle = player.active_handle().expect("committed").clone();
+    assert!(wait_for_terminal(&handle, EpisodeTerminalOutcome::Failed));
+    refresh(&mut model, &player);
+    assert_eq!(
+        dispatch(TuiAction::PlayPause, &mut model, &mut player),
+        Step::Continue,
+        "the terminal episode routes to the App's play_current replay"
+    );
+
+    let status = model.status().expect("the replay's opened line");
+    assert!(status.starts_with("play: opened "), "{status:?}");
+    assert_eq!(
+        status.lines().count(),
+        1,
+        "the path's newline must not become a status row: {status:?}"
+    );
+    assert!(
+        status.contains("new\\nlinecorrupt.flac"),
+        "the newline is VISIBLE as its escape: {status:?}"
+    );
+
+    // And the drawn frame carries the escaped form in the status bar.
+    let text = frame_lines(&mut model, 160, 30);
+    assert!(text.contains("new\\nlinecorrupt.flac"), "{text}");
+}

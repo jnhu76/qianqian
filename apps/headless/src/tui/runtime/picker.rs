@@ -99,7 +99,13 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
                         )));
                     }
                     Err(refusal) => {
-                        model.set_status(Some(format!("preset refused: {refusal}")));
+                        // Display-escaped at composition (owner review
+                        // P2-02): seam text cannot ride a raw newline
+                        // into the status block's line layout.
+                        model.set_status(Some(format!(
+                            "preset refused: {}",
+                            crate::error_presentation::diagnostic_for_display(&refusal)
+                        )));
                     }
                 }
             }
@@ -190,7 +196,11 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
                     }
                 }
                 ModalConfirm::Unreadable(diagnostic) => {
-                    model.set_status(Some(diagnostic.to_owned()))
+                    // Display-escaped at composition (owner review
+                    // P2-02): the diagnostic quotes the typed line.
+                    model.set_status(Some(crate::error_presentation::diagnostic_for_display(
+                        diagnostic,
+                    )))
                 }
             },
         },
@@ -414,24 +424,34 @@ fn perform_add<S: EpisodeStart>(
         Ok(count) => {
             // Walkthrough C freezes "report added/skipped/warnings":
             // the bounded scan summary rides the added line, the
-            // warnings under it.
+            // warnings under it. The product's own `\n` joins stay the
+            // block's line structure; every untrusted fragment (the
+            // summary's diagnostics, each warning line) crosses the
+            // display firewall at composition, so none can carry a raw
+            // newline into the layout (owner review P2-02).
             let worth_summarizing = expansion.skipped > 0
                 || expansion.duplicates > 0
                 || expansion.rejected > 0
                 || !expansion.diagnostics.is_empty();
             let mut feedback = if worth_summarizing {
-                format!("added {count} to the playlist ({})", expansion.summary())
+                format!(
+                    "added {count} to the playlist ({})",
+                    crate::error_presentation::diagnostic_for_display(&expansion.summary())
+                )
             } else {
                 format!("added {count} to the playlist")
             };
             let warnings = expansion.scan_warnings();
             for line in warnings {
                 feedback.push('\n');
-                feedback.push_str(&line);
+                feedback.push_str(&crate::error_presentation::diagnostic_for_display(&line));
             }
             feedback
         }
-        Err(refusal) => format!("add refused: {refusal}"),
+        Err(refusal) => format!(
+            "add refused: {}",
+            crate::error_presentation::diagnostic_for_display(refusal)
+        ),
     };
     model.set_status(Some(feedback));
     result

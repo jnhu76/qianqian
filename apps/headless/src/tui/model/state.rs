@@ -17,6 +17,17 @@ use qianqian_playback::{
     AudioProcessingConfig, EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation,
 };
 
+/// Which of the two standing errors was recorded most recently (the E
+/// rule's tie-break): the shell records an operation result through
+/// [`TuiModel::set_operation_error`] and the episode's Failed fact
+/// arrives through [`TuiModel::update`]; whichever event happened last
+/// is the error `E` opens while both stand.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NewestError {
+    Operation,
+    EpisodeFailure,
+}
+
 /// One frame's worth of presentation state: the episode the player has
 /// committed (source path + latest coherent observation), the playlist
 /// rows, and the T1B interaction state (route, focus, modal, armed
@@ -88,6 +99,13 @@ pub struct TuiModel {
     /// the (possibly still playing) episode, and an episode failure is
     /// NEVER copied here: that one derives from the observation.
     last_operation_error: Option<ErrorPresentation>,
+    /// Which of the two standing errors the shell recorded most
+    /// recently (the E rule's tie-break, Issue #23 B2 owner review
+    /// P2-01): an operation result recorded after the episode's Failed
+    /// fact arrived, or the Failed fact arriving after the last
+    /// recorded operation result. Pure presentation bookkeeping — no
+    /// history, no authority; consulted only while BOTH errors stand.
+    newest_error: NewestError,
     /// The App's fail-stop latch, projected by every refresh. A
     /// presentation mirror of [`crate::player::ReferencePlayerApp::
     /// is_fail_stopped`] — never authority: the App's own seams remain
@@ -150,6 +168,7 @@ impl TuiModel {
             visualizer_mode: super::visualizer::VisualizerMode::Spectrum,
             snapshot: None,
             last_operation_error: None,
+            newest_error: NewestError::Operation,
             fail_stopped: false,
             route: TuiRoute::NowPlaying,
             focus: None,
@@ -163,7 +182,19 @@ impl TuiModel {
 
     /// Replace the projected truth with one fresh coherent read. Pure:
     /// the caller got the observation from the episode seam.
+    ///
+    /// The committed Failed fact ARRIVING on the current episode (a
+    /// fresh observation that first carries it — a standing failure
+    /// re-observed is not an arrival) is an error-recording event of
+    /// its own (the E rule, owner review P2-01): the panel's failure
+    /// becomes the error recorded LAST, newer than any operation
+    /// result recorded before it.
     pub fn update(&mut self, observation: PlaybackSessionObservation) {
+        if observation.terminal_outcome == Some(EpisodeTerminalOutcome::Failed)
+            && self.observation.terminal_outcome != Some(EpisodeTerminalOutcome::Failed)
+        {
+            self.newest_error = NewestError::EpisodeFailure;
+        }
         self.observation = observation;
     }
 
@@ -396,7 +427,10 @@ impl TuiModel {
     /// projection is `None`). Every new operation result REPLACES the
     /// slot — a previous operation's error never outlives the result
     /// that followed it — and a committed replacement clears it via
-    /// [`Self::note_episode_replacement`].
+    /// [`Self::note_episode_replacement`]. Recording an error is also
+    /// the E rule's operation-side event (owner review P2-01): this
+    /// result is now the error recorded LAST, newer than a Failed fact
+    /// that arrived before it.
     pub fn set_operation_error(&mut self, error: Option<ErrorPresentation>) {
         let shape = error.as_ref().map(ErrorPresentation::kind);
         if shape
@@ -406,6 +440,9 @@ impl TuiModel {
                 .map(ErrorPresentation::kind)
         {
             self.invalidate_frame();
+        }
+        if error.is_some() {
+            self.newest_error = NewestError::Operation;
         }
         self.last_operation_error = error;
     }
@@ -419,13 +456,25 @@ impl TuiModel {
         presentation_for_observation(&self.observation)
     }
 
-    /// The error the E key and the details affordances show: the live
-    /// episode's failure when one stands (the failure on the panel in
-    /// front of the user), else the most recent operation error.
-    /// `None` = nothing is viewable; E opens no empty panel.
+    /// The error the E key and the details affordances show. Two
+    /// errors can stand at once — the live episode's Failed fact
+    /// (presented on the Now Playing panel regardless of this rule)
+    /// and the most recent operation result's error (presented on the
+    /// status block) — and `E` opens the one the shell recorded LAST
+    /// (the E rule, Issue #23 B2 owner review P2-01): a refusal
+    /// recorded after a standing failure is what `E` shows while the
+    /// failure itself stays on the panel, and a failure arriving after
+    /// a standing refusal takes the details back. `None` = nothing is
+    /// viewable; E opens no empty panel.
     pub fn viewable_error(&self) -> Option<ErrorPresentation> {
-        self.episode_error()
-            .or_else(|| self.last_operation_error.clone())
+        match (&self.last_operation_error, self.episode_error()) {
+            (Some(operation), Some(episode_failure)) => match self.newest_error {
+                NewestError::Operation => Some(operation.clone()),
+                NewestError::EpisodeFailure => Some(episode_failure),
+            },
+            (Some(operation), None) => Some(operation.clone()),
+            (None, episode_failure) => episode_failure,
+        }
     }
 
     /// The App's fail-stop latch, projected by the refresh.
@@ -449,6 +498,15 @@ impl TuiModel {
     /// change invalidates the frame exactly like a resize (§22: "the
     /// same applies after content changes that move targets"). A
     /// same-shape feedback keeps the arm.
+    ///
+    /// Display firewall (Issue #23 B2 owner review P2-02): the `\n`
+    /// bytes in a recorded status are the product's OWN line
+    /// structure; every untrusted fragment must be display-escaped at
+    /// its composition site (via
+    /// [`crate::error_presentation::diagnostic_for_display`]) BEFORE
+    /// it joins this text, so no raw newline from a path or diagnostic
+    /// can arrive as an extra status row. The render keeps the same
+    /// mapping per line as the idempotent final gate.
     pub fn set_status(&mut self, status: Option<String>) {
         let shape = status_shape(status.as_deref());
         if shape != status_shape(self.status.as_deref()) {
@@ -771,12 +829,13 @@ mod tests {
         assert_eq!(error.technical_detail(), None, "nothing is invented");
     }
 
-    /// The EPISODE failure outranks the stored operation error while
-    /// it stands; once a fresh observation replaces it, the operation
-    /// error is viewable again — until the next replacement revokes
-    /// the slot entirely.
+    /// The E rule's episode side (owner review P2-01): a Failed fact
+    /// ARRIVING after a recorded operation error is the newer error —
+    /// it takes the details back — and once a fresh observation
+    /// replaces it, the operation error is viewable again until the
+    /// next replacement revokes the slot entirely.
     #[test]
-    fn the_episode_failure_outranks_the_operation_error() {
+    fn a_failure_arriving_after_an_operation_error_takes_the_details_back() {
         let mut model = TuiModel::new("song.flac");
         model.set_operation_error(presentation_for_open(&OpenOutcome::Refused {
             diagnostic: "op refusal".to_owned(),
@@ -785,7 +844,7 @@ mod tests {
         assert_eq!(
             model.viewable_error().map(|e| e.kind()),
             Some(ErrorPresentationKind::EpisodeFailed),
-            "the failure on the panel in front of the user wins"
+            "the failure arrived after the refusal: it is the newer error"
         );
         // A new episode's fresh observation: the episode error is gone,
         // the operation error (a fact about the last OPERATION) is
@@ -798,6 +857,38 @@ mod tests {
         // The committed replacement revokes the slot entirely.
         model.note_episode_replacement();
         assert_eq!(model.viewable_error(), None);
+    }
+
+    /// The E rule's operation side (owner review P2-01, the exact
+    /// counterfactual): with a standing episode failure, a refusal
+    /// recorded AFTER it is what `E` opens — while the failure itself
+    /// keeps standing for the Now Playing panel. No history queue: the
+    /// rule is only which of the two standing errors is newer.
+    #[test]
+    fn a_refusal_recorded_after_a_standing_failure_is_what_e_shows() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(failed_observation(Some("decode: broken")));
+        model.set_operation_error(presentation_for_open(&OpenOutcome::Refused {
+            diagnostic: "unsupported container".to_owned(),
+        }));
+        assert_eq!(
+            model.viewable_error().map(|e| e.kind()),
+            Some(ErrorPresentationKind::OpenRefused),
+            "the newest error — the refusal — is viewable"
+        );
+        assert_eq!(
+            model.episode_error().map(|e| e.kind()),
+            Some(ErrorPresentationKind::EpisodeFailed),
+            "the Failed fact still stands for the panel"
+        );
+        // And back: an episode failure re-arriving after a LATER
+        // refusal (a failed-again replay) takes the details back.
+        model.update(pending());
+        model.update(failed_observation(Some("decode: broken again")));
+        assert_eq!(
+            model.viewable_error().map(|e| e.kind()),
+            Some(ErrorPresentationKind::EpisodeFailed)
+        );
     }
 
     /// A successful Open's outcome (its B1 projection is `None`)

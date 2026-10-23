@@ -6,7 +6,7 @@
 use std::time::{Duration, Instant};
 
 use crate::error_presentation::{
-    fail_stop_presentation, operation_error_feedback, presentation_for_open,
+    diagnostic_for_display, fail_stop_presentation, operation_error_feedback, presentation_for_open,
 };
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
@@ -19,13 +19,21 @@ use crate::tui::model::{
 
 /// The operation feedback line for one OPENED outcome under its
 /// operation's own name — application composition feedback (D14.6),
-/// never a playback semantic, and never a claim about the sound.
+/// never a playback semantic, and never a claim about the sound. The
+/// path crosses the display firewall HERE, at composition (Issue #23
+/// B2 owner review P2-02): an untrusted fragment is display-escaped
+/// BEFORE it joins the status text, so it can never carry a raw
+/// newline (legal in a Linux filename) into the status block's line
+/// layout.
 pub(super) fn opened_status<S: EpisodeStart>(
     operation: &str,
     player: &ReferencePlayerApp<S>,
 ) -> String {
     match player.active_source() {
-        Some(source) => format!("{operation}: opened {}", source.display()),
+        Some(source) => format!(
+            "{operation}: opened {}",
+            diagnostic_for_display(&source.to_string_lossy())
+        ),
         None => format!("{operation}: opened"),
     }
 }
@@ -422,7 +430,10 @@ pub(super) fn perform_remove_selected<S: EpisodeStart>(
     match player.remove_selected() {
         Ok(true) => {
             model.set_status(Some(match label {
-                Some(label) => format!("removed {label}"),
+                // Display-escaped at composition (owner review P2-02):
+                // the row's path cannot ride a raw newline into the
+                // status block's line layout.
+                Some(label) => format!("removed {}", diagnostic_for_display(&label)),
                 None => "removed the selected row".to_owned(),
             }));
         }
@@ -454,7 +465,12 @@ fn record_list_edit_refusal<S: EpisodeStart>(
             model.set_status(Some(feedback));
         }
     } else {
-        model.set_status(Some(format!("{operation} refused: {refusal}")));
+        // Display-escaped at composition (owner review P2-02): the
+        // refusal is seam text that can quote paths or diagnostics.
+        model.set_status(Some(format!(
+            "{operation} refused: {}",
+            diagnostic_for_display(refusal)
+        )));
     }
 }
 
@@ -493,7 +509,10 @@ pub(super) fn perform_dsp_toggle_enabled<S: EpisodeStart>(
                 if next { "on" } else { "off (bypass)" }
             )));
         }
-        Err(refusal) => model.set_status(Some(format!("set processing refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "set processing refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
@@ -520,7 +539,10 @@ pub(super) fn perform_dsp_set_preamp<S: EpisodeStart>(
                 "preamp desired: {value:.3}x (applied state not reported)"
             )));
         }
-        Err(refusal) => model.set_status(Some(format!("set preamp refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "set preamp refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
@@ -548,7 +570,10 @@ pub(super) fn perform_dsp_apply_eq<S: EpisodeStart>(
                 "EQ desired updated (applied state not reported)".to_owned(),
             ));
         }
-        Err(refusal) => model.set_status(Some(format!("apply EQ refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "apply EQ refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
