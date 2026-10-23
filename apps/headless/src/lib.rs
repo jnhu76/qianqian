@@ -37,6 +37,7 @@
 mod assembly;
 pub mod cli;
 pub mod entry;
+pub mod error_presentation;
 pub mod input;
 pub mod machine;
 #[cfg(any(feature = "playback", test))]
