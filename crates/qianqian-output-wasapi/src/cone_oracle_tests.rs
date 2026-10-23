@@ -54,10 +54,10 @@
 //!   strictly before `complete()`.
 //! * B — the verdict becoming visible: the relay observer runs synchronously
 //!   inside `complete()`, before it returns, and snapshots A before forwarding
-//!   the verdict to the session's own signal.
-//! Assertion at the settlement boundary: on an aborted outcome, B's snapshot of
-//! A must be ≥ 1. Counter A is monotonic and shared with the legitimate
-//! `stop_and_join` caller, so later increments cannot weaken it.
+//!   the verdict to the session's own signal. Assertion at the settlement
+//!   boundary: on an aborted outcome, B's snapshot of A must be ≥ 1.
+//!   Counter A is monotonic and shared with the legitimate
+//!   `stop_and_join` caller, so later increments cannot weaken it.
 //!
 //! **Failure signatures.** Precondition never reached (k-th read entered /
 //! injection fired) → TOOLING-FAIL: report the precondition, never the property
@@ -75,8 +75,9 @@
 //!    `snapshot(A) == 0` while the necessity oracle stays green — deletion and
 //!    swapped order are independent controls, and neither substitutes for the
 //!    other.
-//! Run each mutation in a scratch checkout on a Windows host, then restore the
-//! bytes; a mutation that merely fails to compile is not a control result.
+//!    Run each mutation in a scratch checkout on a Windows host, then restore
+//!    the bytes; a mutation that merely fails to compile is not a control
+//!    result.
 //!
 //! **Cleanup/timeout evidence boundary.** The fixture releases the real device
 //! after the settle assertions (the render-thread join evidence). On a red run
