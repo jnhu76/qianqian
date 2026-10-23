@@ -475,6 +475,17 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "B-single-N" | "B-nnnnn-10ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms"
         | "B-np-10ms" | "B-npnpnp-10ms" => &VTEST8,
         "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => &VTEST8,
+        // Human-listening witness (PR #311): three real user media
+        // files staged under listening\ (distinct spoken lessons, so
+        // every committed switch is unmistakable to the ear). The
+        // script's own oracles are only the shell's committed-Track
+        // witnesses and the net-zero absence; what the user HEARS is
+        // the witness they give.
+        "L1-listening" => &[
+            "listening\\L01.mp3",
+            "listening\\L02.mp3",
+            "listening\\L03.mp3",
+        ],
         // The manual-vs-natural pair: a SHORT first track so natural EOF
         // arrives quickly, and one long follower so the auto-next target
         // is unique. synth5.mp3 is staged by the burst runner (ffmpeg
@@ -513,6 +524,9 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
     let watchdog = if name == "U2-soak" {
         // 20 x 100 s of real playback plus transition overhead.
         Duration::from_secs(2_400)
+    } else if name == "L1-listening" {
+        // ~55 s of scripted listening plus overhead.
+        Duration::from_secs(180)
     } else if name == "A20" {
         Duration::from_secs(300)
     } else if name == "A19" {
@@ -2218,6 +2232,47 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 keys("n"),
                 expect_after_mark_async("Track: 2/2".to_owned(), OPEN_WAIT),
                 expect_after_mark_async("navigation: opened".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        "L1-listening" => {
+            // Three entries, so the scripted beats are: the burst nets
+            // +2 (keys past the end are inert activity restarting the
+            // window) and lands on lesson 3; the collapse must be P
+            // THEN N (an inert N first, at the Repeat-Off end, arms
+            // nothing); the closing P returns to lesson 2.
+            let mut v = vec![
+                // The staged lessons are probed 44.1 kHz; the Format
+                // label is the proven playing-format witness on the
+                // current rendering (the old Position: MM:SS label no
+                // longer exists — position lives in the timeline bar).
+                expect("Track: 1/3"),
+                expect("Format: 44100 Hz"),
+                Step::SleepMs(12_000), // LISTEN: lesson 1 plays alone
+                Step::Mark,
+                // Five N at burst cadence: exactly ONE switch (net +2,
+                // lesson 3).
+                Step::KeysEach("n", 5, 10),
+                expect_after_mark_async("Track: 3/3".to_owned(), OPEN_WAIT),
+                Step::SleepMs(12_000), // LISTEN: lesson 3 plays alone
+                Step::Mark,
+                // P then N: the burst nets zero — NOTHING switches,
+                // lesson 3 keeps playing. No TEXT absence is claimed:
+                // the burst's own "navigation: opened" status line is
+                // still rendered (a same-row re-open would print the
+                // identical text), so the no-reopen oracle lives in the
+                // device-open ceiling, not in this transcript.
+                keys("p"),
+                keys("n"),
+                Step::SleepMs(1_000),
+                repaint(),
+                expect_after_mark_async("Track: 3/3".to_owned(), SHORT_WAIT),
+                Step::SleepMs(8_000), // LISTEN: lesson 3 STILL playing
+                keys("p"),            // ONE switch back to lesson 2
+                expect_after_mark_async("Track: 2/3".to_owned(), OPEN_WAIT),
+                Step::SleepMs(10_000), // LISTEN: lesson 2
             ];
             v.extend(quit_clean());
             v

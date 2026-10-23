@@ -1,0 +1,10 @@
+[+0.225] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=130638 opened: 44100 Hz, 1 channels, mask
+[+12.470] KEY "n" #1 of 5
+[+12.481] KEY "n" #2 of 5
+[+12.491] KEY "n" #3 of 5
+[+12.502] KEY "n" #4 of 5
+[+12.512] KEY "n" #5 of 5
+[+12.524] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] info ts_us=130638 opened: 44100 Hz, 1 channels, masknext: navigation queued[K
+[+12.699] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[K[71C[m[40;50H[qianqian-wasapi] error ts_us=12600000 render aborted: data plane stopp
+[+12.776] [120C[4;55H3[6;12H--[1C--[7C6[8;9H3[31;43H     [1C[24X[25C     [32;26H [1C    [1C  [1C [47C [1C       [1C  [1C [39;2Havigation: ope[1Ced C:\Users\Public\qianqian-dogfood\listening\L03.mp3[qianqian-wasapi] info ts_us=12686264 opened: 44100 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)
+[+13.121] Tab=focus  Enter=activate  O=open  ?=help  Q=quit[m[qianqian-wasapi] error ts_us=12600000 render aborted: data plane stopeavigation: ope ed C:\Users\Public\qianqian-dogfood\listening\L03.mp3[qianqian-wasapi] info ts_us=12686264 opened: 4410 Hz, 1 channels, mask 4, buffer 1036 frames (shared, event-driven, engine SRC)[K

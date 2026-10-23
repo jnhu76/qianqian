@@ -1,0 +1,4 @@
+L1-listening: RED (11309ms, exit None)
+    expect "Track: 1/3" OK
+    FAILURE: timeout waiting for a position sample different from None; post-mark samples: []
+    CHILD: alive=true threads=Some(8)

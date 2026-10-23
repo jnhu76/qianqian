@@ -1,0 +1,8 @@
+L1-listening: RED (33920ms, exit None)
+    expect "Track: 1/3" OK
+    expect "Format: 44100 Hz" OK
+    sleep 12000ms
+    mark
+    keys "n" x5
+    FAILURE: timeout waiting for "Track: 2/3" after offset 89397 (async transition, repainting)
+    CHILD: alive=true threads=Some(11)
