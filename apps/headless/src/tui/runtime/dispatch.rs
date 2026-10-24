@@ -5,53 +5,96 @@
 
 use std::time::{Duration, Instant};
 
+use crate::error_presentation::{
+    diagnostic_for_display, fail_stop_presentation, operation_error_feedback, presentation_for_open,
+};
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
 use super::drain_busy_interval_input;
 use super::picker::{handle_modal_input, navigate_picker_to};
 use crate::tui::model::{
-    ModalKind, PlaylistCursor, Step, TuiAction, TuiModel, seek_fraction_target, seek_target,
+    ModalInput, ModalKind, PlaylistCursor, Step, TuiAction, TuiModel, seek_fraction_target,
+    seek_target,
 };
 
-/// The operation feedback for one automatic EOF transition. Application
-/// composition feedback under the operation's own name — never a
-/// playback semantic, and never a claim about the sound.
-pub(super) fn eof_feedback<S: EpisodeStart>(
-    outcome: &OpenOutcome,
+/// The operation feedback line for one OPENED outcome under its
+/// operation's own name — application composition feedback (D14.6),
+/// never a playback semantic, and never a claim about the sound. The
+/// path crosses the display firewall HERE, at composition (Issue #23
+/// B2 owner review P2-02): an untrusted fragment is display-escaped
+/// BEFORE it joins the status text, so it can never carry a raw
+/// newline (legal in a Linux filename) into the status block's line
+/// layout.
+pub(super) fn opened_status<S: EpisodeStart>(
+    operation: &str,
     player: &ReferencePlayerApp<S>,
 ) -> String {
-    match outcome {
-        OpenOutcome::Opened => match player.active_source() {
-            Some(source) => format!("auto-next: opened {}", source.display()),
-            None => "auto-next: opened".to_owned(),
-        },
-        OpenOutcome::Refused { diagnostic } => format!("auto-next refused: {diagnostic}"),
-        OpenOutcome::ActivationFailedClean { diagnostic } => {
-            format!("auto-next failed (clean): {diagnostic}")
-        }
-        OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
+    match player.active_source() {
+        Some(source) => format!(
+            "{operation}: opened {}",
+            diagnostic_for_display(&source.to_string_lossy())
+        ),
+        None => format!("{operation}: opened"),
     }
 }
 
-/// The operation feedback for one resolved navigation burst (a pending
-/// intent's quiet window expired with a net displacement). Direction-
-/// neutral on purpose: a merged burst has no single "next" or
-/// "previous" — only its one committed target.
-pub(super) fn pending_commit_feedback<S: EpisodeStart>(
+/// Record one Open outcome as the shell's latest operation result
+/// (Issue #23 B2): its B1 error projection REPLACES the viewable
+/// operation-error slot (a success clears it — the newest result owns
+/// the slot), and the status block carries the feedback. Every
+/// `OpenOutcome` consumer in the shell records through here, so the
+/// four error kinds are presented identically wherever they arrive.
+/// `opened_feedback` is the caller's own success composition (the
+/// expansion's scan-warning block for an Open, the operation's opened
+/// line for transport actions) and is used only when the outcome
+/// opened.
+pub(super) fn record_open_outcome(
+    model: &mut TuiModel,
     outcome: &OpenOutcome,
-    player: &ReferencePlayerApp<S>,
-) -> String {
-    match outcome {
-        OpenOutcome::Opened => match player.active_source() {
-            Some(source) => format!("navigation: opened {}", source.display()),
-            None => "navigation: opened".to_owned(),
-        },
-        OpenOutcome::Refused { diagnostic } => format!("navigation refused: {diagnostic}"),
-        OpenOutcome::ActivationFailedClean { diagnostic } => {
-            format!("navigation failed (clean): {diagnostic}")
-        }
-        OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
-    }
+    operation: &str,
+    opened_feedback: String,
+) {
+    let presentation = presentation_for_open(outcome);
+    let feedback = match &presentation {
+        Some(presentation) => operation_error_feedback(operation, presentation),
+        None => opened_feedback,
+    };
+    model.set_operation_error(presentation);
+    model.set_status(Some(feedback));
+}
+
+/// Which actions the fail-stop UI gate refuses to send (Issue #23
+/// B2 §6.2): the ordinary playback/recovery operations — play, stop,
+/// navigation intents, seeks, the playlist edits that retire the live
+/// episode, and every Open/Add composition entry. When the §G.6 latch
+/// stands, the shell must not even ATTEMPT these against the App —
+/// the App's own refusals stay the authority, and this gate is the
+/// honest "unavailable" layer in front of them. Everything else
+/// (routes, focus, volume and desired-DSP preferences, Help, the
+/// error details overlay, Quit, the overlays' own close/scroll keys)
+/// stays live: reading the safe details and quitting is exactly what
+/// that state allows.
+fn fail_stop_refuses(action: &TuiAction) -> bool {
+    matches!(
+        action,
+        TuiAction::PlayPause
+            | TuiAction::Stop
+            | TuiAction::Next
+            | TuiAction::Previous
+            | TuiAction::SeekRelative(_)
+            | TuiAction::SeekPerMille(_)
+            | TuiAction::PlaylistPlaySelected
+            | TuiAction::PlaylistRemove
+            | TuiAction::PlaylistClear
+            | TuiAction::PlaylistAddFile
+            | TuiAction::PlaylistAddFolder
+            | TuiAction::OpenModal(ModalKind::Open)
+            | TuiAction::OpenModal(ModalKind::AddFile)
+            | TuiAction::OpenModal(ModalKind::AddFolder)
+            | TuiAction::ModalInput(ModalInput::CommitOpen)
+            | TuiAction::ModalInput(ModalInput::CommitAdd)
+            | TuiAction::ModalInput(ModalInput::CommitConfirm)
+    )
 }
 
 /// The ONE dispatch boundary (§8): every [`TuiAction`] — decoded from a
@@ -65,6 +108,19 @@ pub(super) fn dispatch<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
 ) -> Step {
+    // The fail-stop UI gate (Issue #23 B2 §6.2): with the §G.6 latch
+    // standing, the shell refuses to SEND the ordinary playback and
+    // Open operations — it does not rely on the App's own refusal to
+    // clean up afterwards. The refused press says why, once, as the
+    // latest operation feedback; the persistent banner (a view
+    // projection of the same latch) stays visible regardless.
+    if model.fail_stopped() && fail_stop_refuses(&action) {
+        model.set_status(Some(format!(
+            "fail-stop: {}",
+            fail_stop_presentation().explanation()
+        )));
+        return Step::Continue;
+    }
     match action {
         // Quit is loop control, never an episode command: it exits even
         // with no episode committed — the idle shell must stay
@@ -374,14 +430,48 @@ pub(super) fn perform_remove_selected<S: EpisodeStart>(
     match player.remove_selected() {
         Ok(true) => {
             model.set_status(Some(match label {
-                Some(label) => format!("removed {label}"),
+                // Display-escaped at composition (owner review P2-02):
+                // the row's path cannot ride a raw newline into the
+                // status block's line layout.
+                Some(label) => format!("removed {}", diagnostic_for_display(&label)),
                 None => "removed the selected row".to_owned(),
             }));
         }
         Ok(false) => model.set_status(Some("nothing selected".to_owned())),
-        Err(refusal) => model.set_status(Some(format!("remove refused: {refusal}"))),
+        Err(refusal) => record_list_edit_refusal(model, player, "remove", &refusal),
     }
     drain_busy_interval_input();
+}
+
+/// A list-edit refusal is an ordinary bounded refusal on the status
+/// line — unless the retirement latched §G.6 (Issue #23 B2 §6.2): the
+/// latch is then presented exactly like a latched Open (the FailStop
+/// copy from the App's own latch evidence in the error slot and on the
+/// status block), so the details stay one `E` away in EVERY path that
+/// can latch, not only the Open path.
+fn record_list_edit_refusal<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &ReferencePlayerApp<S>,
+    operation: &str,
+    refusal: &str,
+) {
+    if player.is_fail_stopped() {
+        let presentation = presentation_for_open(&OpenOutcome::FailStop {
+            diagnostic: player.fail_stop_reason().unwrap_or(refusal).to_owned(),
+        });
+        if let Some(presentation) = &presentation {
+            let feedback = operation_error_feedback(operation, presentation);
+            model.set_operation_error(Some(presentation.clone()));
+            model.set_status(Some(feedback));
+        }
+    } else {
+        // Display-escaped at composition (owner review P2-02): the
+        // refusal is seam text that can quote paths or diagnostics.
+        model.set_status(Some(format!(
+            "{operation} refused: {}",
+            diagnostic_for_display(refusal)
+        )));
+    }
 }
 
 /// The confirmed Clear through the App's own clear seam (G2): the App
@@ -394,7 +484,7 @@ pub(super) fn perform_clear_playlist<S: EpisodeStart>(
 ) {
     match player.clear_playlist() {
         Ok(()) => model.set_status(Some("playlist cleared".to_owned())),
-        Err(refusal) => model.set_status(Some(format!("clear refused: {refusal}"))),
+        Err(refusal) => record_list_edit_refusal(model, player, "clear", &refusal),
     }
     drain_busy_interval_input();
 }
@@ -419,7 +509,10 @@ pub(super) fn perform_dsp_toggle_enabled<S: EpisodeStart>(
                 if next { "on" } else { "off (bypass)" }
             )));
         }
-        Err(refusal) => model.set_status(Some(format!("set processing refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "set processing refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
@@ -446,7 +539,10 @@ pub(super) fn perform_dsp_set_preamp<S: EpisodeStart>(
                 "preamp desired: {value:.3}x (applied state not reported)"
             )));
         }
-        Err(refusal) => model.set_status(Some(format!("set preamp refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "set preamp refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
@@ -474,7 +570,10 @@ pub(super) fn perform_dsp_apply_eq<S: EpisodeStart>(
                 "EQ desired updated (applied state not reported)".to_owned(),
             ));
         }
-        Err(refusal) => model.set_status(Some(format!("apply EQ refused: {refusal}"))),
+        Err(refusal) => model.set_status(Some(format!(
+            "apply EQ refused: {}",
+            diagnostic_for_display(&refusal)
+        ))),
     }
     drain_busy_interval_input();
 }
@@ -511,7 +610,7 @@ const VOLUME_STEP: i16 = 5;
 /// registration itself opens, probes and drains NOTHING — keys kept
 /// arriving inside the window must merge, not be dropped as a busy
 /// interval. The loop's `settle_timers` resolves the deadline and
-/// reports under [`pending_commit_feedback`].
+/// records the commit through [`record_open_outcome`].
 fn perform_navigation<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
@@ -531,7 +630,14 @@ fn perform_navigation<S: EpisodeStart>(
         if matches!(outcome, OpenOutcome::Opened) {
             model.note_episode_replacement();
         }
-        model.set_status(Some(pending_commit_feedback(outcome, player)));
+        // Direction-neutral success copy; the B1 recording owns the
+        // error copy (Issue #23 B2).
+        record_open_outcome(
+            model,
+            outcome,
+            "navigation",
+            opened_status("navigation", player),
+        );
         drain_busy_interval_input();
         return;
     }
@@ -559,22 +665,15 @@ fn perform_play_selected<S: EpisodeStart>(
         model.set_status(Some("the selected track is the live episode".to_owned()));
         return;
     }
-    let feedback = match player.play_selected() {
-        None => "nothing selected".to_owned(),
-        Some(OpenOutcome::Opened) => {
-            model.note_episode_replacement();
-            match player.active_source() {
-                Some(source) => format!("play: opened {}", source.display()),
-                None => "play: opened".to_owned(),
+    match player.play_selected() {
+        None => model.set_status(Some("nothing selected".to_owned())),
+        Some(outcome) => {
+            if matches!(outcome, OpenOutcome::Opened) {
+                model.note_episode_replacement();
             }
+            record_open_outcome(model, &outcome, "play", opened_status("play", player));
         }
-        Some(OpenOutcome::Refused { diagnostic }) => format!("play refused: {diagnostic}"),
-        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
-            format!("play failed (clean): {diagnostic}")
-        }
-        Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
-    };
-    model.set_status(Some(feedback));
+    }
     drain_busy_interval_input();
 }
 /// The central transport control's Home-Play commands (T0 transport
@@ -584,31 +683,25 @@ fn perform_play_selected<S: EpisodeStart>(
 /// never a second start path. The feedback is the operation's own
 /// composition feedback, and the inert cases say why.
 fn perform_play_current<S: EpisodeStart>(model: &mut TuiModel, player: &mut ReferencePlayerApp<S>) {
-    let feedback = match player.play_current() {
+    match player.play_current() {
         // `play_current` is inert in exactly two ways: a terminal
         // episode with no replayable entry, or no episode and no
         // selection (the frozen "Play is disabled with its reason").
         None => {
-            if player.active_handle().is_some() {
+            let feedback = if player.active_handle().is_some() {
                 "play: the current episode has no replayable entry".to_owned()
             } else {
                 "No music loaded — open something with the Open button".to_owned()
+            };
+            model.set_status(Some(feedback));
+        }
+        Some(outcome) => {
+            if matches!(outcome, OpenOutcome::Opened) {
+                model.note_episode_replacement();
             }
+            record_open_outcome(model, &outcome, "play", opened_status("play", player));
         }
-        Some(OpenOutcome::Opened) => {
-            model.note_episode_replacement();
-            match player.active_source() {
-                Some(source) => format!("play: opened {}", source.display()),
-                None => "play: opened".to_owned(),
-            }
-        }
-        Some(OpenOutcome::Refused { diagnostic }) => format!("play refused: {diagnostic}"),
-        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
-            format!("play failed (clean): {diagnostic}")
-        }
-        Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
-    };
-    model.set_status(Some(feedback));
+    }
     drain_busy_interval_input();
 }
 

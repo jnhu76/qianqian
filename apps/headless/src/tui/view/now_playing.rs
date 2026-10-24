@@ -83,9 +83,29 @@ pub(super) fn draw_now_playing(
             if model.terminal_committed() {
                 lines.push(Line::from(COMMITTED_HINT));
             }
+            // The episode failure's non-blocking summary (Issue #23 B2
+            // §2): the B1 presentation's own user copy, stable in the
+            // panel while the D11 Failed fact stands — not a repeated
+            // status write, not a modal, not a replacement for the
+            // diagnostics below it. Reading the technical detail is the
+            // `E` overlay's job; the recovery hints name the EXISTING
+            // manual operations and are shown only while the shell has
+            // not fail-stopped (a latched shell permits no retry).
+            if let Some(error) = model.episode_error() {
+                lines.push(Line::from(error.title().to_owned()));
+                lines.push(Line::from(error.explanation().to_owned()));
+                lines.push(Line::from(if model.fail_stopped() {
+                    "E 查看技术详情".to_owned()
+                } else {
+                    "E 查看技术详情 · 可尝试：Space 重新播放 / N 手动下一首".to_owned()
+                }));
+            }
             // Diagnostics ride the same panel: an episode can carry BOTH
             // an activation diagnostic and a published failure
             // diagnostic, and neither may clip behind the other (C13).
+            // The display text is the B1 escape — raw control or
+            // invisible characters cannot ride a diagnostic into the
+            // panel (Issue #23 §4.2/§4.3).
             for diagnostic in model.diagnostics() {
                 lines.push(Line::from(diagnostic));
             }

@@ -250,10 +250,18 @@ impl ExpandedInputs {
     /// in parentheses whenever there is something to report (more
     /// candidates, skips, or scan warnings) and the bounded
     /// [`Self::scan_warnings`] detail lines after it. The block may be
-    /// multi-line; the shell renders each line on its own row.
+    /// multi-line; the shell renders each line on its own row. The
+    /// `\n` joins below are the product's own line structure — every
+    /// untrusted fragment (the candidate path, the summary's
+    /// diagnostics, each warning line) is display-escaped BEFORE it
+    /// joins, so none can carry a raw newline into the block's layout
+    /// (Issue #23 B2 owner review P2-02).
     pub fn opened_status(&self) -> String {
         let opened = match self.accepted.first() {
-            Some(first) => format!("opened {}", first.display()),
+            Some(first) => format!(
+                "opened {}",
+                crate::error_presentation::diagnostic_for_display(&first.to_string_lossy())
+            ),
             None => "opened".to_owned(),
         };
         let worth_summarizing = self.accepted.len() > 1
@@ -264,10 +272,13 @@ impl ExpandedInputs {
         if !worth_summarizing {
             return opened;
         }
-        let mut status = format!("{opened} ({})", self.summary());
+        let mut status = format!(
+            "{opened} ({})",
+            crate::error_presentation::diagnostic_for_display(&self.summary())
+        );
         for line in self.scan_warnings() {
             status.push('\n');
-            status.push_str(&line);
+            status.push_str(&crate::error_presentation::diagnostic_for_display(&line));
         }
         status
     }
@@ -496,13 +507,19 @@ fn startup_feedback(
     expansion: &ExpandedInputs,
     startup_open: Option<&OpenOutcome>,
 ) -> Option<String> {
+    // Every untrusted fragment (refusal and outcome diagnostics quote
+    // paths) is display-escaped BEFORE it joins the status text, so a
+    // raw newline cannot become a status row (Issue #23 B2 owner
+    // review P2-02). The raw diagnostics themselves stay raw wherever
+    // they feed a B1 presentation's technical detail.
+    let fragment = crate::error_presentation::diagnostic_for_display;
     match startup_open {
         None => {
             // No candidate anywhere in the argv paths: an honest
             // refusal, and the shell still runs so the user can open a
             // valid source. Same operation vocabulary as the in-shell
             // refusal.
-            Some(format!("open refused: {}", expansion.refusal()))
+            Some(format!("open refused: {}", fragment(&expansion.refusal())))
         }
         Some(OpenOutcome::Opened) => {
             // The old-world quiet start: exactly one accepted
@@ -521,9 +538,11 @@ fn startup_feedback(
                 Some(expansion.opened_status())
             }
         }
-        Some(OpenOutcome::Refused { diagnostic }) => Some(format!("open refused: {diagnostic}")),
+        Some(OpenOutcome::Refused { diagnostic }) => {
+            Some(format!("open refused: {}", fragment(diagnostic)))
+        }
         Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
-            Some(format!("open failed (clean): {diagnostic}"))
+            Some(format!("open failed (clean): {}", fragment(diagnostic)))
         }
         Some(OpenOutcome::FailStop { .. }) => {
             // The transport checks the returned outcome as soon as this
@@ -1219,6 +1238,44 @@ mod tests {
         assert!(
             status.contains("\nscan warning: cannot read "),
             "the diagnostic itself is not silently discarded: {status}"
+        );
+    }
+
+    /// Issue #23 B2 owner review P2-02: a newline inside a path
+    /// fragment (legal in a Linux filename) is display-escaped at
+    /// composition, BEFORE it joins the status text — it can never
+    /// become a status row of its own. The product's own multi-line
+    /// structure (the scan-warning line under the opened line) still
+    /// renders as separate lines.
+    #[test]
+    fn a_newline_in_a_path_fragment_escapes_before_the_status_layout() {
+        let fragment = ExpandedInputs {
+            accepted: vec![PathBuf::from("/media/new\nline.flac")],
+            ..ExpandedInputs::default()
+        };
+        let status = fragment.opened_status();
+        assert_eq!(status.lines().count(), 1, "{status:?}");
+        assert_eq!(status, "opened /media/new\\nline.flac", "{status:?}");
+
+        // The same fragment inside a summarized, multi-line block: the
+        // product's `\n` joins stay, the fragment stays escaped.
+        let with_warning = ExpandedInputs {
+            accepted: vec![PathBuf::from("/media/new\nline.flac")],
+            diagnostics: vec!["cannot read /media/x: boom".to_owned()],
+            ..ExpandedInputs::default()
+        };
+        let status = with_warning.opened_status();
+        assert_eq!(status.lines().count(), 2, "{status:?}");
+        let opened = status.lines().next().expect("the opened line");
+        assert!(
+            opened.ends_with("(1 candidate; 1 scan warning)"),
+            "the opened line keeps its shape: {opened:?}"
+        );
+        assert!(opened.contains("/media/new\\nline.flac"), "{opened:?}");
+        assert_eq!(
+            status.lines().nth(1),
+            Some("scan warning: cannot read /media/x: boom"),
+            "the product's own multi-line structure is preserved"
         );
     }
 

@@ -381,8 +381,35 @@ fn reference_player_transport(
     let expansion = preparation.expansion;
     let startup_open = preparation.startup_open;
     let initial_status = preparation.initial_status;
+    // The startup Open's B1 projection (Issue #23 B2): a refused or
+    // clean-failed startup enters the shell's operation-error slot, so
+    // `E` shows its details exactly like an in-shell refusal. A
+    // startup whose expansion produced no candidate at all refused the
+    // same operation — its own refusal text is the diagnostic. (A
+    // startup FailStop never reaches the shell: the transport returns
+    // before this point.)
+    let initial_error = match &startup_open {
+        Some(outcome) => crate::error_presentation::presentation_for_open(outcome),
+        None if !interactive_startup => {
+            crate::error_presentation::presentation_for_open(&OpenOutcome::Refused {
+                diagnostic: expansion.refusal(),
+            })
+        }
+        None => None,
+    };
+    // A startup that carries an error presentation reports it in the
+    // shell's own B1 status vocabulary (Issue #23 B2), exactly like the
+    // same refusal would read after an in-shell Open; the headless
+    // transport's startup copy is untouched.
+    let initial_status = match &initial_error {
+        Some(presentation) => Some(crate::error_presentation::operation_error_feedback(
+            "open",
+            presentation,
+        )),
+        None => initial_status,
+    };
 
-    let shell = crate::tui::run(&mut player, initial_status);
+    let shell = crate::tui::run(&mut player, initial_status, initial_error);
     if let Err(error) = &shell {
         eprintln!("reference-player shell failed: {error}");
     }

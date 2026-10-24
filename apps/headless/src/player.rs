@@ -1083,6 +1083,15 @@ pub(crate) mod tests {
         path.to_string_lossy().contains("corrupt")
     }
 
+    /// A corrupt stream that serves a bounded stretch of good (paced)
+    /// blocks before its first error. The pacing seam is the
+    /// synchronization argument: the failure cannot publish before
+    /// that many 1 ms-paced render reads, so an assertion taken
+    /// synchronously after the open commit observes a pending episode.
+    fn is_late_corrupt(path: &Path) -> bool {
+        path.to_string_lossy().contains("latecorrupt")
+    }
+
     /// The fake render leg: mirrors the real mechanism's observable
     /// shape — ONE loop-top gate check before every read, the data
     /// plane decides after release, the drain verdict publishes once on
@@ -1169,6 +1178,9 @@ pub(crate) mod tests {
     struct FakePcmStream {
         remaining_blocks: usize,
         corrupt: bool,
+        /// Good (paced) reads served before the first error, for the
+        /// late-corrupt variant. Zero for the immediate-corrupt one.
+        corrupt_after_reads: usize,
         /// The fixture's event log. The stream records the seek requests
         /// that actually reach the decoder, so a test can witness that a
         /// shell command became a D14.5 provider request WITHOUT
@@ -1186,9 +1198,13 @@ pub(crate) mod tests {
         }
         fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
             if self.corrupt {
-                return Err(DecodeError {
-                    message: "synthetic mid-stream decode failure".to_owned(),
-                });
+                if self.corrupt_after_reads > 0 {
+                    self.corrupt_after_reads -= 1;
+                } else {
+                    return Err(DecodeError {
+                        message: "synthetic mid-stream decode failure".to_owned(),
+                    });
+                }
             }
             if self.remaining_blocks == 0 {
                 return Ok(DecodeOutcome::Eof);
@@ -1221,7 +1237,8 @@ pub(crate) mod tests {
             }
             Ok(Box::new(FakePcmStream {
                 remaining_blocks: if is_finite(path) { 8 } else { usize::MAX },
-                corrupt: is_corrupt(path),
+                corrupt: is_corrupt(path) || is_late_corrupt(path),
+                corrupt_after_reads: if is_late_corrupt(path) { 200 } else { 0 },
                 log: self.log.clone(),
             }))
         }
@@ -1284,7 +1301,7 @@ pub(crate) mod tests {
         pub(crate) log: Log,
         generation: AtomicU64,
         run_session_activation: bool,
-        violating_cleanup: bool,
+        pub(crate) violating_cleanup: bool,
         refuse_composition: bool,
         start_levels: Arc<Mutex<Vec<u8>>>,
         start_processing: Arc<Mutex<Vec<AudioProcessingConfig>>>,

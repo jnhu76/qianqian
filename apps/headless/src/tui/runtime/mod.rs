@@ -19,6 +19,9 @@ mod dispatch;
 mod picker;
 
 #[cfg(test)]
+mod error_recovery_tests;
+
+#[cfg(test)]
 mod testutil;
 
 use std::io::{self, Write};
@@ -33,11 +36,12 @@ use crossterm::terminal::{
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
+use crate::error_presentation::ErrorPresentation;
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 use crate::tui::view;
 
 use super::model::{Step, TuiModel, decode_key, decode_mouse};
-use dispatch::{dispatch, eof_feedback, pending_commit_feedback};
+use dispatch::{dispatch, opened_status, record_open_outcome};
 
 /// UI refresh cadence: 50 ms — 20 fps (Issue #233). The visualizer's
 /// per-frame deltas are whole terminal cells, and large-area cell
@@ -55,10 +59,15 @@ pub const TICK: Duration = Duration::from_millis(50);
 /// through this frame (normal quit, I/O error, panic unwind) before
 /// returning; the caller owns everything else (quit, disposal
 /// reporting, exit codes). `initial_status` is presented as the first
-/// operation feedback line (e.g. the startup Open's outcome).
+/// operation feedback line (e.g. the startup Open's outcome);
+/// `initial_error` is the startup Open's B1 projection (Issue #23 B2)
+/// when that outcome was an error — the same slot an in-shell
+/// operation records into, so a refused startup is viewable through
+/// `E` exactly like any other refused Open.
 pub fn run<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
     initial_status: Option<String>,
+    initial_error: Option<ErrorPresentation>,
 ) -> Result<(), String> {
     let mut guard =
         TerminalGuard::acquire().map_err(|error| format!("terminal setup failed: {error}"))?;
@@ -69,6 +78,7 @@ pub fn run<S: EpisodeStart>(
 
     let mut model = TuiModel::new(String::new());
     model.set_status(initial_status);
+    model.set_operation_error(initial_error);
     refresh(&mut model, player);
 
     loop {
@@ -130,7 +140,12 @@ fn settle_timers<S: EpisodeStart>(
         if matches!(outcome, OpenOutcome::Opened) {
             model.note_episode_replacement();
         }
-        model.set_status(Some(pending_commit_feedback(&outcome, player)));
+        record_open_outcome(
+            model,
+            &outcome,
+            "navigation",
+            opened_status("navigation", player),
+        );
         // The burst's commit stalled this loop like any Open replacement:
         // input queued during the stall never reaches the new episode's
         // geometry (T0 picker freeze).
@@ -144,7 +159,12 @@ fn settle_timers<S: EpisodeStart>(
         if matches!(outcome, OpenOutcome::Opened) {
             model.note_episode_replacement();
         }
-        model.set_status(Some(eof_feedback(&outcome, player)));
+        record_open_outcome(
+            model,
+            &outcome,
+            "auto-next",
+            opened_status("auto-next", player),
+        );
         // The advance stalled this loop like any Open replacement:
         // input queued during the stall never reaches the new
         // episode's geometry (T0 picker freeze).
@@ -210,6 +230,11 @@ pub(super) fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferenceP
     model.set_volume(Some(player.desired_volume()));
     model.set_order(player.playlist_order());
     model.set_repeat(player.playlist_repeat());
+    // The fail-stop latch is a presentation mirror refreshed with
+    // everything else (Issue #23 B2): the App's own seams stay the
+    // authority that refuses; the shell's gate and banner only read
+    // this projection.
+    model.set_fail_stopped(player.is_fail_stopped());
     model.note_desired_processing(player.desired_processing());
     model.set_playlist(player.playlist_revision(), || {
         player

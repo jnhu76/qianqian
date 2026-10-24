@@ -223,15 +223,48 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
 /// The bottom status/context line (§6): the latest operation feedback
 /// (application composition feedback, never a playback semantic) and
 /// one fixed keymap hint. The hint is secondary chrome — dim where the
-/// terminal carries color, plain everywhere else.
+/// terminal carries color, plain everywhere else. While the App's
+/// fail-stop latch stands, a persistent banner renders ABOVE the
+/// feedback (Issue #23 B2 §6.2): derived from the latch projection
+/// every draw — the B1 FailStop copy, no retry advice. Reading and
+/// quitting stay reachable: the hint line below the banner names `E`
+/// (while anything is viewable) and `Q`, so the severe state never
+/// rewrites the feedback underneath it.
 fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
     let mut lines: Vec<Line<'static>> = Vec::new();
+    if model.fail_stopped() {
+        let banner = crate::error_presentation::fail_stop_presentation();
+        let mut title = Line::from(format!("FAIL-STOP：{}", banner.title()));
+        title.style = Style::default().add_modifier(Modifier::BOLD);
+        lines.push(title);
+        lines.push(Line::from(banner.explanation().to_owned()));
+    }
     if let Some(status) = model.status() {
         for line in status.lines().take(MAX_STATUS_ROWS) {
-            lines.push(Line::from(line.to_owned()));
+            // The status block's NEWLINES are the product's own line
+            // structure only: every untrusted fragment (paths,
+            // diagnostics) is display-escaped at its composition site,
+            // BEFORE the text can join the status string and become
+            // layout, wrapping or truncation input (Issue #23 B2 owner
+            // review P2-02 — a raw newline is legal in a Linux
+            // filename and must never arrive as an extra status row).
+            // The per-line mapping below is the idempotent final gate
+            // (the one display-escape entry point) behind that
+            // composition discipline.
+            lines.push(Line::from(
+                crate::error_presentation::diagnostic_for_display(line),
+            ));
         }
     }
-    lines.push(Line::styled(HINT_LINE, Style::default().fg(theme::CHROME)));
+    let hint = if model.viewable_error().is_some() {
+        HINT_LINE_WITH_ERROR
+    } else {
+        HINT_LINE
+    };
+    lines.push(Line::styled(
+        hint.to_owned(),
+        Style::default().fg(theme::CHROME),
+    ));
     frame.render_widget(Paragraph::new(lines), area);
 }
 
@@ -239,14 +272,26 @@ fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
 /// "status / latest feedback" line). The FULL keymap lives in the Help
 /// modal; this line only names the foundation keys.
 const HINT_LINE: &str = "Tab=focus  Enter=activate  O=open  ?=help  Q=quit";
+/// The same foundation row while an error is viewable (Issue #23 B2
+/// §5): the `E` affordance is discoverable exactly when it works — no
+/// error, no advertised key.
+const HINT_LINE_WITH_ERROR: &str =
+    "Tab=focus  Enter=activate  O=open  ?=help  E=error details  Q=quit";
 
-/// How many rows the bottom bar needs: the status block (capped) plus
-/// the hint line — always at least one. The cap and the shape come
-/// from the model (the same shape its `set_status` arm invalidation
-/// compares).
+/// How many rows the bottom bar needs: the fail-stop banner (while it
+/// stands), the status block (capped), and the hint line — always at
+/// least one. The cap and the shape come from the model (the same
+/// shape its `set_status` arm invalidation compares); the banner rows
+/// are the B2 constant below, bounded by construction.
 fn status_line_count(model: &TuiModel) -> usize {
-    status_shape(model.status()) + 1
+    let banner = u32::from(model.fail_stopped()) as usize * FAIL_STOP_BANNER_ROWS;
+    banner + status_shape(model.status()) + 1
 }
+
+/// The persistent fail-stop banner's rows: the bold title line and the
+/// explanation line (Issue #23 B2 §6.2). A fixed constant — the banner
+/// never grows with diagnostics.
+const FAIL_STOP_BANNER_ROWS: usize = 2;
 /// The picker listing's first visible row: a STATELESS scroll that
 /// keeps the cursor inside the listing window (Issue #166 §21). No
 /// scroll offset is kept for the picker — the rule is a pure function

@@ -218,6 +218,7 @@ Keys in the player:
   S            stop
   O            open a file or folder
   [Open]       the transport button (same as O)
+  E            error details, when an error is showing
   ?            keyboard help
   Esc          cancel the current input / close help
   Q or Ctrl+C  quit
