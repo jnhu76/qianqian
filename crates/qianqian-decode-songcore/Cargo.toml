@@ -16,3 +16,11 @@ qianqian-songcore-sys = { path = "../qianqian-songcore-sys" }
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }
 serde_json = "1"
+
+# The enclosing workspace excludes this crate (it links the separately-built
+# SongCore native artifact), so it compiles as its own unit with this lockfile.
+# Declaring the (empty) workspace root here keeps `cargo test --manifest-path`
+# working from any checkout depth — a linked git worktree under the main
+# checkout would otherwise latch onto the main workspace's manifest above it,
+# whose exclude paths do not match this checkout's location.
+[workspace]
