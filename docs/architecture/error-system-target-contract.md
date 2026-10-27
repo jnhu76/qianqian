@@ -1150,11 +1150,12 @@ facade producer.
 **Goal.** Keep av_log discard-by-default; design an optional, opt-in, process-level
 bridge into DG-1 with bounded, lock-honest callback discipline; no per-handle routing.
 
-**Current facts (C, @e44aa80).** Discard callback `songcore_discard_av_log` (C:50-56);
-`songcore_quiet_ffmpeg_logging` (C:58-61): when `QIANQIAN_FFMPEG_LOG` is **unset** it
-installs the discarder; when set it leaves the callback untouched (FFmpeg's default
-logger remains). Re-installed on every `song_open` (C:822 — same-value pointer store,
-off any realtime path). The callback is process-global: concurrent handles share it
+**Current facts (C, @23844fa).** Discard callback `songcore_discard_av_log` (C:54-59);
+`songcore_quiet_ffmpeg_logging` (C:62-66): when `QIANQIAN_FFMPEG_LOG` is **unset or
+exactly `0`** it installs the discarder (byte-equal `strcmp` — the same predicate the
+Rust bridge applies in `av_log_bridge.rs`); any other set value leaves the callback
+untouched (FFmpeg's default logger remains). Re-installed on every `song_open` (C:827 —
+same-value pointer store, off any realtime path). The callback is process-global: concurrent handles share it
 (discarder is stateless). SongCore asserts it is the process's only FFmpeg user
 (C:43-44). **Not knowable from this tree**: which FFmpeg-internal locks are held while
 the callback runs — FFmpeg is pinned (native/ffmpeg/pin.json) but not vendored; this
