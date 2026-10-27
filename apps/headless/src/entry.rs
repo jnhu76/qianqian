@@ -259,6 +259,13 @@ fn attempt_exit_report(line: String, wait: Option<std::time::Duration>) {
     let spawned = std::thread::Builder::new()
         .name("qianqian-diagnostics-report".into())
         .spawn(move || {
+            #[cfg(test)]
+            {
+                tier2_tests::report_entered();
+                let result = qianqian_diagnostics::write_stderr_line(&line);
+                tier2_tests::report_returned(result.is_ok());
+            }
+            #[cfg(not(test))]
             let _ = qianqian_diagnostics::write_stderr_line(&line);
             signal.store(true, std::sync::atomic::Ordering::Release);
         });
@@ -696,3 +703,7 @@ pub(crate) fn run_machine_reports_for_test(
 /// see the module docs.
 #[cfg(test)]
 mod shutdown_tests;
+
+#[cfg(test)]
+#[path = "tier2_tests.rs"]
+mod tier2_tests;

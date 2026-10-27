@@ -67,6 +67,9 @@ mod cone_oracle_tests;
 #[cfg(all(test, windows))]
 mod a4_sink_controls;
 
+#[cfg(all(test, windows))]
+mod tier2_tests;
+
 /// The Host Render Backend this host assembly selects (PBK-003 §9):
 /// the owned Windows backend mechanism. Selection is configuration of
 /// the assembly, not composition truth; a future platform backend

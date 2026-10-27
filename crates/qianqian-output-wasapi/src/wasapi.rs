@@ -136,11 +136,15 @@ fn register_render_thread_diagnostics() -> Option<qianqian_diagnostics::AlphaReg
 /// Publish one mechanism diagnostic from the render thread. Best-effort by
 /// contract: it cannot block, cannot panic and cannot affect the episode.
 fn emit_render_diagnostic(level: qianqian_diagnostics::Level, message: qianqian_diagnostics::Text) {
+    #[cfg(test)]
+    crate::tier2_tests::before_emit(level);
     let _ = qianqian_diagnostics::emit(
         qianqian_diagnostics::Record::new("qianqian-wasapi", level)
             .with_message(message)
             .stamped(),
     );
+    #[cfg(test)]
+    crate::tier2_tests::after_emit(level);
 }
 
 /// Render a bounded diagnostic message from a static tag + an HRESULT.
