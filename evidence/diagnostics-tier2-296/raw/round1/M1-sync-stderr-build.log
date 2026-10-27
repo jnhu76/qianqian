@@ -1,0 +1,7 @@
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+   Compiling qianqian-output-wasapi v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-output-wasapi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.59s
+  Executable unittests src\lib.rs (target\debug\deps\qianqian_headless-eb67176d501597ed.exe)
+  Executable unittests src\lib.rs (target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe)

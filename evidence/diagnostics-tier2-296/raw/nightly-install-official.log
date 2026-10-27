@@ -1,0 +1,9 @@
+info: syncing channel updates for nightly-2025-11-22-x86_64-pc-windows-msvc
+info: latest update on 2025-11-22 for version 1.93.0-nightly (27b076af7 2025-11-21)
+info: downloading 3 components
+
+  nightly-2025-11-22-x86_64-pc-windows-msvc installed - rustc 1.93.0-nightly (27b076af7 2025-11-21)
+
+info: checking for self-update (current version: 1.29.0)
+info: downloading self-update (new version: 1.29.2)
+info: downloading component rust-std

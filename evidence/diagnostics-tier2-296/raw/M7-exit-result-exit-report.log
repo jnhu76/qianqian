@@ -1,0 +1,26 @@
+UTC=2026-10-27T16:30:19.5250387Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=551763C4AA757C0EBA4F0CB8B6E0318A63464E94BD973E4A6BCDFCCBCC8147B1
+FILTER=entry::tier2_tests::tier2_child OUTLET=exit-report MODE=broken SKIP_CLOSE=False
+PARENT_CLOSE -> stdin GO (child corroborates write Err)
+EXIT=101 ELAPSED_MS=2171
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-BROKEN-CONFIRMED
+Q296-EXIT-REPORT-RETURNED
+ASSERTION panicked at apps\headless\src\tier2_tests.rs:149:13:
+assertion `left == right` failed: REPORT-RESULT-ORACLE
+  left: 1
+ right: 2
+FAILED
+
+failures:
+
+failures:
+    entry::tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.00s
+
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

@@ -1,0 +1,79 @@
+[
+  {
+    "id": "M1-sync-stderr",
+    "file": "crates/qianqian-output-wasapi/src/tier2_tests.rs",
+    "expected_sha256": "BB471CF5FF84043EC7216BF888B03601EF3959FACDB914E05A998C800795A1A8",
+    "current_sha256": "BB471CF5FF84043EC7216BF888B03601EF3959FACDB914E05A998C800795A1A8",
+    "matches": true
+  },
+  {
+    "id": "M10-self-report-counter",
+    "file": "crates/qianqian-diagnostics/src/lib.rs",
+    "expected_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "current_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "matches": true
+  },
+  {
+    "id": "M11-self-report-shutdown-wait",
+    "file": "crates/qianqian-diagnostics/src/lib.rs",
+    "expected_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "current_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "matches": true
+  },
+  {
+    "id": "M2-consumer-wait",
+    "file": "crates/qianqian-output-wasapi/src/tier2_tests.rs",
+    "expected_sha256": "BB471CF5FF84043EC7216BF888B03601EF3959FACDB914E05A998C800795A1A8",
+    "current_sha256": "BB471CF5FF84043EC7216BF888B03601EF3959FACDB914E05A998C800795A1A8",
+    "matches": true
+  },
+  {
+    "id": "M3-drop-counter",
+    "file": "crates/qianqian-diagnostics/src/pool.rs",
+    "expected_sha256": "332C7162A882C4FF26234E2D6EDF60E837517D89A4640D8393C2D61C1E7D22AF",
+    "current_sha256": "332C7162A882C4FF26234E2D6EDF60E837517D89A4640D8393C2D61C1E7D22AF",
+    "matches": true
+  },
+  {
+    "id": "M4-failed-export-counter",
+    "file": "crates/qianqian-diagnostics/src/lib.rs",
+    "expected_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "current_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "matches": true
+  },
+  {
+    "id": "M5-critical-hook-chain",
+    "file": "apps/headless/src/machine_input.rs",
+    "expected_sha256": "516728DDD4F05F1206CE3A21BAE4EF8B1DEB26ED3694AF658FF37F37A19519BC",
+    "current_sha256": "516728DDD4F05F1206CE3A21BAE4EF8B1DEB26ED3694AF658FF37F37A19519BC",
+    "matches": true
+  },
+  {
+    "id": "M6-exit-join",
+    "file": "apps/headless/src/entry.rs",
+    "expected_sha256": "B004E71BD389E398973B6C096E7CBA07C1CDAD7943FADBC9DA21BFED41B17E00",
+    "current_sha256": "B004E71BD389E398973B6C096E7CBA07C1CDAD7943FADBC9DA21BFED41B17E00",
+    "matches": true
+  },
+  {
+    "id": "M7-exit-result",
+    "file": "apps/headless/src/entry.rs",
+    "expected_sha256": "B004E71BD389E398973B6C096E7CBA07C1CDAD7943FADBC9DA21BFED41B17E00",
+    "current_sha256": "B004E71BD389E398973B6C096E7CBA07C1CDAD7943FADBC9DA21BFED41B17E00",
+    "matches": true
+  },
+  {
+    "id": "M8-panic-sync-write",
+    "file": "crates/qianqian-diagnostics/src/lib.rs",
+    "expected_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "current_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "matches": true
+  },
+  {
+    "id": "M9-panic-consumer-wait",
+    "file": "crates/qianqian-diagnostics/src/lib.rs",
+    "expected_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "current_sha256": "9AFB7BF2DC5D29C4255A609A81A72BDAAD57AE1534135C96F4CC2A896A119EBA",
+    "matches": true
+  }
+]

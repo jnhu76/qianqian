@@ -1,0 +1,66 @@
+[
+  {
+    "path": "apps/headless/src/entry.rs",
+    "sha256": "b004e71bd389e398973b6c096e7cba07c1cdad7943fadbc9da21bfed41b17e00"
+  },
+  {
+    "path": "apps/headless/src/tier2_tests.rs",
+    "sha256": "432bc3bb882431b73bddaf888ab9f307a4d44d190a2553251e6a9b93611df493"
+  },
+  {
+    "path": "crates/qianqian-output-wasapi/src/lib.rs",
+    "sha256": "7cc1661ae1833b225ea9dead5e7608e557835cc84aae77a0e9e2141e1479a15e"
+  },
+  {
+    "path": "crates/qianqian-output-wasapi/src/wasapi.rs",
+    "sha256": "0b43323ffeb32c2382f304ec5e60faa7bd81a082996c7703bf46e8eedde3876d"
+  },
+  {
+    "path": "crates/qianqian-output-wasapi/src/tier2_tests.rs",
+    "sha256": "bb471cf5ff84043ec7216bf888b03601ef3959facdb914e05a998c800795a1a8"
+  },
+  {
+    "path": "crates/qianqian-diagnostics/src/lib.rs",
+    "sha256": "9afb7bf2dc5d29c4255a609a81a72bdaad57ae1534135c96f4cc2a896a119eba"
+  },
+  {
+    "path": "crates/qianqian-diagnostics/src/pool.rs",
+    "sha256": "332c7162a882c4ff26234e2d6edf60e837517d89a4640d8393c2d61c1e7d22af"
+  },
+  {
+    "path": "research/diagnostics-tier2/support.rs",
+    "sha256": "6d2adaabd32d4c8ccaf44b214e38c2e1fd470926d857ac0dea10f37620b66a65"
+  },
+  {
+    "path": "research/diagnostics-tier2/run.ps1",
+    "sha256": "f29a946217001f565355de9be1618a29e3422f42d51bbcb97f137c15c04000b1"
+  },
+  {
+    "path": "research/diagnostics-tier2/build.ps1",
+    "sha256": "eff802cd471bc082bb68376162b2e88b9d91eac5bb898553840c12041d70ae36"
+  },
+  {
+    "path": "research/diagnostics-tier2/matrix.ps1",
+    "sha256": "07e874ad9fe10d06993a11efe94b04fb7e9395caf2b1809a87793ccfd076efc4"
+  },
+  {
+    "path": "research/diagnostics-tier2/mutations.ps1",
+    "sha256": "62ceffc851f6228f7af5d6e8b7f081355f77d66bc8fc24088d113764137baea9"
+  },
+  {
+    "path": "research/diagnostics-tier2/results.ps1",
+    "sha256": "15bc54ab72e6cd04ed7fa1c4080dbad53fc997fadd7bd7173dfb4ad3e83324f0"
+  },
+  {
+    "path": "research/diagnostics-tier2/gate.ps1",
+    "sha256": "8bdb4b6bde9cb39124fcd6087418aaf34ad61d8c576eb652464ed94e16f4bb42"
+  },
+  {
+    "path": "research/diagnostics-tier2/linux-gate.sh",
+    "sha256": "88d7f7248a4bf8df6beb36ad5fb26c189b58a2eee1ddd7ee250e5f59af8082f8"
+  },
+  {
+    "path": "research/diagnostics-tier2/baseline-oracle.ps1",
+    "sha256": "056e652bdf5d9e09b45c849bff321a08ad24e3306b84abde9e379c388f9e75da"
+  }
+]

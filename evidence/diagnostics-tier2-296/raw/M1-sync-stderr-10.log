@@ -1,0 +1,24 @@
+UTC=2026-10-27T16:21:42.9104626Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe SHA256=FE9B13DD0DACD2CDC5E80F3C915D6B61F4869930C570123092146B06BBC9FF66
+FILTER=tier2_tests::tier2_child OUTLET=10 MODE=blocked SKIP_CLOSE=False
+CONTROLLED_STDERR_LOCK: child acquisition channel before work; pipe open and unread; no OS-full claim
+EXIT=101 ELAPSED_MS=5173
+STDOUT
+
+running 1 test
+test tier2_tests::tier2_child ... Q296-STDERR-LOCK-HELD
+M296-SYNC-STDERR
+ASSERTION panicked at crates\qianqian-output-wasapi\src\tier2_tests.rs:68:9:
+SITE-PREMISE: actual target emission never returned
+FAILED
+
+failures:
+
+failures:
+    tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 27 filtered out; finished in 5.07s
+
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

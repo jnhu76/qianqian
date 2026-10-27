@@ -1,0 +1,28 @@
+{
+  "fetched_at": "2026-10-27",
+  "issue": {
+    "url": "https://github.com/jnhu76/qianqian/issues/290",
+    "title": "MACHINE-STDOUT-FAILURE-CONFORMANCE-1 — E-9 flush-Err 构造与 D-D 处置 + E-8 主线程 report 站点类符合（自 #283 转移）",
+    "issue_number": 290,
+    "body": "SOURCE = #283（AF-5 / CC-6 / D-D / E-9；E-8；`error-system-migration.md` §1.7 行 #5 与 §5 验收表）\n\n## WHY_STILL_OPEN\n\nE-9 的 flush-Err 模式**从未被构造**（独立可达性未证——缓冲写成功后 EPIPE/ENOSPC 的显式 flush Err）；E-8 从未执行；`apps/headless/src/machine_input.rs:274` 仍是 `let _ = io::stdout().flush()`（#287 未触碰，AF-5 原样）。D-D（处置）按设计被阻塞在 E-9 的真实观测之后：先构造并分类真实错误，再决定是否修改产品处理逻辑。\n\n## AUTHORITATIVE_CONTRACT\n\n- playback execution model 的 T5-7 已文档化 host-failure 类（machine 输入：EOF 正常；Spawn / Read / caught-Panic 为 host failure；seal 等 ack）——本 issue 验证的是这些**现行文档类**，不发明新语义\n- `docs/architecture/error-system-migration.md` §1.7（协议写与诊断写的两类分离：协议写的失败是合法的 host-operation 失败，**不得**套用 logging-inertness oracle；两类站点的类必须精确分叉）\n\n## CURRENT_IMPLEMENTATION\n\n`print!` 写错误 panic → 被捕获 → `HostFailure::Panic`（已文档化类）；显式 flush 的 Err 被静默丢弃（无任何记录）。\n\n## CURRENT_EVIDENCE\n\n无——这两类站点（reader 协议写 / 主线程 report 站点）的运行时类符合性从未执行过（#283 VALIDATION §1：Protocol-write failure classes = NONE）。\n\n## EXACT_MISSING_EVIDENCE\n\n- **E-9**：reader 协议写的三模式记录（print panic / flush Err / blocking）——in-process 驱动 `read_input`/`spawn_reader` seam + 注入输出闭包 + 关闭 fd，或 Windows 下 reader-under-playback；三模式各自落点（哪个 catch / 哪个类 / 是否完全无记录）\n- **E-8**：主线程 report 站点 #1–#3（无 playback feature，Linux 可跑）+ #4/#7（playback，Windows）断言 broken-pipe 下 exit 101 + T5-7 类符合；与 E-9 reader 类**精确分叉**（migration §1.7）\n- flush-Err 落点观测 → D-D 裁决输入（措辞必须诚实：复用 \"reader panicked\" 会误标）\n\n## EXECUTION_DAG\n\n构造 flush-Err → 三模式 + 两站点类符合性记录 → owner D-D 裁决 →（仅裁决后）任何产品处置（CC-6：(a) 经 `fail_with_response` 以诚实措辞路由，可能需要 HostFailure 变体或改写报告；(b) 接受 flush 阶段的文档化丢失）。\n\n## LEGAL_OUTCOMES\n\nD-D 二选一并记录：(a) 分类 + 记录；(b) 接受文档化丢失（print-panic 类已覆盖，不重复处理）。观测若证伪\"flush-Err 可独立到达\"，则按检查点关闭该半边并记录。\n\n## FALSIFIER / NEGATIVE_CONTROL\n\n协议写 panic 逃出 catch；协议行像诊断一样被静默丢弃；seal 在无 ack 下推进；flush-Err 被误标为已文档化类（措辞冒充）。E-8 侧：exit code 偏离 101、或类偏离 T5-7 文档。\n\n## PLATFORM_REQUIREMENTS\n\nLinux 可跑半边：E-8 站点 #1–#3、E-9 的 in-process seam + closed fd 构造。Windows 半边：reader-under-playback（E-9）、E-8 站点 #4/#7。建议两段式执行（migration VALIDATION §3 的 two-sub-run 设计）。\n\n## ACCEPTANCE_CRITERIA\n\n三模式 + 两站点类各自的符合性记录（命令 / 日志 / commit / 平台）；两类站点分叉断言；D-D 结论写入 `error-system-decision-record.md`；产品变更（若有）走独立 PR 且负控制先行。\n\n## NON_GOALS\n\n不 blanket 吞 flush 错误；不给协议写套 logging-inertness oracle；不动 logging facility（DG-1 已另行落地）；不承载 E-2 真链测试入口（那是 migration §1.8 记录的独立待授权提案）；不触碰 #231 产品策略。\n",
+    "state": "open",
+    "user": {
+      "login": "jnhu76",
+      "name": "jnhu76",
+      "email": null,
+      "avatar_url": "https://avatars.githubusercontent.com/u/5766215?v=4",
+      "id": 5766215
+    },
+    "assignees": null,
+    "labels": null,
+    "milestone": null,
+    "state_reason": null,
+    "comments": 0,
+    "created_at": "2026-10-17T02:54:56Z",
+    "updated_at": "2026-10-17T02:54:56Z",
+    "closed_at": null,
+    "display_url": "https://github.com/jnhu76/qianqian/issues/290",
+    "display_title": "MACHINE-STDOUT-FAILURE-CONFORMANCE-1 — E-9 flush-Err 构造与 D-D 处置 + E-8 主线程 report 站点类符合（自 #283 转移）"
+  },
+  "comments": []
+}

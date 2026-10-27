@@ -1,0 +1,23 @@
+UTC=2026-10-27T16:00:43.4110142Z
+EXE=target/debug/deps/qianqian_headless-eb67176d501597ed.exe SHA256=34227CF0DEC1E6D358C7E442A6E8CBDA232B4502298056C172510D20D22BE78A
+FILTER=entry::tier2_tests::tier2_child OUTLET=exit-report MODE=blocked SKIP_CLOSE=False
+PIPE flags=1 outgoing=4096 incoming=4096 capacity=4096 stream=System.IO.FileStream
+OS_FULL available=8192 capacity=4096 -> stdin GO; no stderr reader exists
+EXIT=101 ELAPSED_MS=189
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-FILLING
+Q296-EXIT-REPORT-RETURNED
+ASSERTION panicked at apps\headless\src\..\..\..\research\diagnostics-tier2\support.rs:96:13:
+honest abandoned shutdown: ShutdownReport { drained: true, abandoned: false, undelivered_at_exit: 0, counters: Counters { beta_queued: 0, beta_rejected: 0, beta_consumed: 0, alpha_rejected: 0, copied_out: 0, exported: 0, export_failed: 0, outstanding: 0, self_diagnostics: 0, critical_panics: 0 } }
+FAILED
+
+failures:
+
+failures:
+    entry::tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.07s
+
+

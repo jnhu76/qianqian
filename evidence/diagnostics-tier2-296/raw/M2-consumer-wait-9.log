@@ -1,0 +1,25 @@
+UTC=2026-10-27T16:21:59.4925300Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe SHA256=DD89A1FB628019105399ACB1853AE3F97698648B0FE3706D988AAF7A46613BC3
+FILTER=tier2_tests::tier2_child OUTLET=9 MODE=stopped SKIP_CLOSE=False
+EXIT=101 ELAPSED_MS=5164
+STDOUT
+
+running 1 test
+test tier2_tests::tier2_child ... Q296-CONSUMER-HELD
+M296-CONSUMER-WAIT
+ASSERTION panicked at crates\qianqian-output-wasapi\src\tier2_tests.rs:68:9:
+SITE-PREMISE: actual target emission never returned
+FAILED
+
+failures:
+
+failures:
+    tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 27 filtered out; finished in 5.06s
+
+
+STDERR
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

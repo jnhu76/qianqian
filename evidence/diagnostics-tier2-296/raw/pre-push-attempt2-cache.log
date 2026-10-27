@@ -1,0 +1,41 @@
+[38;2;56;56;56m╭─────────────────────────────────────╮[m
+[38;2;56;56;56m│[m lefthook  v2.1.17   hook:  [1mpre-push[m [38;2;56;56;56m│[m
+[38;2;56;56;56m╰─────────────────────────────────────╯[m
+┃  commit-convention ❯ 
+PASS: self-test (11 valid, 12 invalid cases)
+PASS: no commits in range origin/main..HEAD; nothing to validate
+
+┃  vocabulary ❯ 
+VOCABULARY GATE PASS: no stale identifiers found; workflow negative control FAIL→PASS verified
+
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+error: no matching package named `public-api` found
+location searched: `ustc` index (which is replacing registry `crates-io`)
+required by package `audio-api-surface v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\tools\audio-api-surface)`
+note: offline mode (via `--offline`) can sometimes cause surprising resolution failures
+help: if this error is too confusing you may wish to retry without `--offline`
+┃  plugin-boundary ❯ 
+RESULT trigger-crates/qianqian-audio-api/build.rs RED (legacy profile misses both events; current covers)
+RESULT trigger-apps/headless/src/tui/model/projection.rs RED (legacy profile misses both events; current covers)
+PLUGIN_BOUNDARY_TRIGGERS: PASS (pull_request + push; local input parity)
+
+exit status 101
+│  rust-fmt (skip) broken pipe
+│  rust-clippy (skip) broken pipe
+│  rust-test (skip) broken pipe
+│  release-policy (skip) broken pipe
+│  docs-verify (skip) broken pipe
+[38;2;56;56;56m  ────────────────────────────────────[m
+summary: (done in 5.69 seconds)
+✓ commit-convention (1.22 seconds)
+✓ vocabulary (2.14 seconds)
+✗ plugin-boundary (2.34 seconds)
+GATE_EXIT=1

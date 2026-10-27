@@ -1,0 +1,25 @@
+UTC=2026-10-27T16:20:04.3257601Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=BDACA2DD3D1116771A2A4E5F868ACAD0E0A079EBAE72262DE38A3939C0157C5E
+FILTER=entry::tier2_tests::tier2_child OUTLET=panic MODE=capacity SKIP_CLOSE=False
+EXIT=101 ELAPSED_MS=1636
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-CONSUMER-HELD
+Q296-ALPHA-FULL
+Q296-PREVIOUS-HOOK panicked at apps\headless\src\tier2_tests.rs:56:14:
+HOOK-PROGRESS-ORACLE: Disconnected
+FAILED
+
+failures:
+
+failures:
+    entry::tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 0.00s
+
+
+STDERR
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

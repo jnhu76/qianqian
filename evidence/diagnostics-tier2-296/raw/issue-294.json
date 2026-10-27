@@ -1,0 +1,53 @@
+{
+  "fetched_at": "2026-10-27",
+  "issue": {
+    "url": "https://github.com/jnhu76/qianqian/pull/294",
+    "title": "test(wasapi): #288 windows error-cone runtime verification campaign",
+    "issue_number": 294,
+    "body": "Closes nothing; evidence delivery for #288 (Windows Native Error-Cone Runtime Verification). Do not merge before owner review; issue closure and merge are owner-gated.\n\n## What this delivers\n\nRuntime-verification evidence for the landed Windows WASAPI failure cone, the diagnostic writer swap (sites #8/#9/#10), carrier B (`DrainVerdict::Aborted` carrying `AbortReason`), and the diagnostics close protocol — executed on a real Windows 11 host (Realtek endpoint, WASAPI shared/event-driven, engine SRC every open) via cross-compiled x86_64-pc-windows-gnu test binaries.\n\n- `evidence/windows-runtime-288/EXECUTION_DAGS.md` (R1): the four execution chains (failure cone, writer swap, carrier B, close protocol) reconstructed from source at fc81b68 with file:line nodes and classified causal edges (PO/SW/scheduling).\n- `evidence/windows-runtime-288/SCENARIO_MATRIX.md` (R2): the frozen A1–A8 oracle/scenario matrix with 9 recorded design decisions.\n- `evidence/windows-runtime-288/LEDGER.md`: executed verdicts bound to raw receipts; findings F1–F6; claim ceiling; executed-source provenance addendum; retained superseded receipts.\n- `evidence/windows-runtime-288/raw/`: 50 unedited per-row logs, mutation hash bookkeeping, binary identity.\n\n## Verdicts (each bound to raw receipts)\n\n- **A1/A2** cone necessity + order: PASS with witnesses (relayed carrier B payload observed; M2 mutation pins the order oracle).\n- **A3** production mutations M1 (delete-stop) / M2 (swap-order): both exact-RED at the designed bound, byte-restored (hash bookkeeping).\n- **A4** writer-swap sink matrix: broken ≡ healthy on terminal class/exit across all three sites; the three pre-swap hazards (N-01 hang, F5 blocked wedge, #9/#10 Failed-instead-of-Stopped misattribution) reproduced as designed REDs; the #11-class residual keyed on blocked ∧ default hook ∧ `--nocapture`, eliminated by the DG-4b product posture; seam-arm matched pair (VF=1 vs VF=0) with an in-child `apply_calls` synchronization witness.\n- **A5** N-01 four premises: confirmed pre-swap, eliminated post-swap.\n- **A6** carrier B: pipeline PASS through the real cone/session/presentation (Device-class reason end-to-end with the real HRESULT); real-endpoint device-INITIATED row honestly BLOCKED_ENVIRONMENT (non-elevated host).\n- **A7** close protocol: diagnostics 16/16, integration subprocess oracles 2/2 + 2/2, headless 372/372, playback 207/207 — all on real Windows.\n- **A8** E-7 tier-2: deferred with recorded inertness evidence.\n\n## Production change\n\nNONE. All source additions are cfg(test)/cfg(all(test, windows)) — witness printouts, child oracles, the volume-apply seam (design-named minimal injection, migration §7.3). In non-test builds `wasapi.rs` gains only the inlined `apply_stream_volume` wrapper whose body is the identical direct COM call it replaced.\n\n## Review\n\nTwo independent reviews (concurrency/causal; oracle/evidence integrity): APPROVE_WITH_NOTES; all P2 findings closed in the review-round commit (seam counter + matched VF pair + provenance addendum + ledger corrections) and delta re-verified.\n\nGate: `lefthook run pre-push --all-files` green (commit-convention, vocabulary, plugin-boundary, fmt, clippy, workspace tests, release-policy, docs-verify).\n",
+    "state": "closed",
+    "user": {
+      "login": "jnhu76",
+      "name": "jnhu76",
+      "email": null,
+      "avatar_url": "https://avatars.githubusercontent.com/u/5766215?v=4",
+      "id": 5766215
+    },
+    "assignees": null,
+    "labels": null,
+    "milestone": null,
+    "state_reason": null,
+    "comments": 2,
+    "created_at": "2026-10-18T10:24:55Z",
+    "updated_at": "2026-10-18T11:05:26Z",
+    "closed_at": "2026-10-18T10:57:34Z",
+    "display_url": "https://github.com/jnhu76/qianqian/pull/294",
+    "display_title": "test(wasapi): #288 windows error-cone runtime verification campaign"
+  },
+  "comments": [
+    {
+      "url": "https://github.com/jnhu76/qianqian/pull/294#issuecomment-6248729299",
+      "body": "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n<!-- This is an auto-generated comment: skip review by coderabbit.ai -->\n\n> [!IMPORTANT]\n> - [ ] <!-- {\"checkboxId\":\"e9bb8d72-00e8-4f67-9cb2-caf3b22574fe\"} --> 🔍 Trigger review\n> \n> This repository does not receive automatic reviews because it has fewer than 10 stars.\n> \n> <details>\n> <summary><strong>⚙️ Run configuration</strong></summary>\n> <dl>\n> <dd>\n> \n> - **Configuration used**: defaults\n> - **Review profile**: CHILL\n> - **Plan**: Advanced\n> - **Run ID**: `ddc0250a-ff8c-41cf-88ab-048f91461e02`\n> \n> </dd>\n> </dl>\n> </details>\n\n<!-- end of auto-generated comment: skip review by coderabbit.ai -->\n\n<!-- autopilot:start -->\n- [ ] <!-- {\"checkboxId\":\"2708ad07-9f24-4260-9c11-7dc76a49f2e3\"} --> <strong title=\"Keep fixing CodeRabbit findings and required CI, and resolving merge conflicts\">Autofix</strong> · Keep fixing CodeRabbit findings and required CI, and resolving merge conflicts\n<!-- autopilot:end -->\n<!-- tips_start -->\n\n\n\nThanks for using [CodeRabbit](https://coderabbit.ai?utm_source=oss&utm_medium=github&utm_campaign=jnhu76/qianqian&utm_content=294)! It's free for OSS, and your support helps us grow. If you like it, consider giving us a shout-out.\n\n<details>\n<summary><strong>❤️ Share</strong></summary>\n<dl>\n<dd>\n\n- [X](https://twitter.com/intent/tweet?text=I%20just%20used%20%40coderabbitai%20for%20my%20code%20review%2C%20and%20it%27s%20fantastic%21%20It%27s%20free%20for%20OSS%20and%20offers%20a%20free%20trial%20for%20the%20proprietary%20code.%20Check%20it%20out%3A&url=https%3A//coderabbit.ai)\n- [Mastodon](https://mastodon.social/share?text=I%20just%20used%20%40coderabbitai%20for%20my%20code%20review%2C%20and%20it%27s%20fantastic%21%20It%27s%20free%20for%20OSS%20and%20offers%20a%20free%20trial%20for%20the%20proprietary%20code.%20Check%20it%20out%3A%20https%3A%2F%2Fcoderabbit.ai)\n- [Reddit](https://www.reddit.com/submit?title=Great%20tool%20for%20code%20review%20-%20CodeRabbit&text=I%20just%20used%20CodeRabbit%20for%20my%20code%20review%2C%20and%20it%27s%20fantastic%21%20It%27s%20free%20for%20OSS%20and%20offers%20a%20free%20trial%20for%20proprietary%20code.%20Check%20it%20out%3A%20https%3A//coderabbit.ai)\n- [LinkedIn](https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fcoderabbit.ai&mini=true&title=Great%20tool%20for%20code%20review%20-%20CodeRabbit&summary=I%20just%20used%20CodeRabbit%20for%20my%20code%20review%2C%20and%20it%27s%20fantastic%21%20It%27s%20free%20for%20OSS%20and%20offers%20a%20free%20trial%20for%20proprietary%20code)\n\n</dd>\n</dl>\n</details>\n\n\n<sub>Comment `@coderabbitai help` to get the list of available commands.</sub>\n\n<!-- tips_end -->",
+      "user": {
+        "login": "coderabbitai[bot]",
+        "name": "coderabbitai[bot]",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/in/347564?v=4",
+        "id": 136622811
+      },
+      "created_at": null
+    },
+    {
+      "url": "https://github.com/jnhu76/qianqian/pull/294#issuecomment-6249005499",
+      "body": "## Owner acceptance — bounded #288 scope (2026-10-18)\n\nOwner has directed merge of PR #294, transfer of A6-E/A8, and closure of #288. The acceptance is bounded to the **actually executed** Windows runtime verification evidence in this PR; it is **not** a declaration that all Windows error paths or diagnostic outlets are proven.\n\n- A1/A2/A3: real-endpoint cone necessity/order and two oracle-pinning mutations PASS.\n- A4/A5: pre-swap N-01 / #9/#10 misattribution and blocked-sink hazards reproduced; post-swap terminal/exit properties match healthy controls for the executed rows. **Blocked-sink isolation is not claimed**: drainer blocking/abandonment is a documented residual. The precondition's frozen-counter sampling across a time window is an observational blocked-writer witness, not a formal synchronization/happens-before proof; unexecuted gate-off × blocked combinations are not retroactively marked PASS.\n- A6-P: deterministic HRESULT/carrier-B pipeline PASS, **A6-E real device-initiated loss NOT_RUN/BLOCKED_ENVIRONMENT → #295**.\n- A7: Windows diagnostics/close/exit witnesses PASS within the stated local limits.\n- **A8 E-7 Tier-2 DEFERRED → #296**, which will classify per-outlet faults and the panic-hook/FFmpeg residuals.\n- No production behavior, D11/D14/K0 or SongCore ABI changes are authorized by this merge. No device-initiated loss, MSVC target, exhaustive latency or global architecture-proof claim.\n- Subagent reviews were independent locally; this is not represented as formal GitHub review approval. CI at head `4c4cd69bbedffcdde7b21e31beba0ac623ed1f5c`: Plugin Boundary Gate, Rust Regression, Windows Compile Gate all SUCCESS.\n- Packaging caveat: `native/build/artifacts-mingw/libsongcore.a` was observed byte-identical to the Linux artifact; this belongs to **#172** and is not accepted as a real Windows SongCore release artifact.\n\nThis comment records the scope waiver and transferred debt before owner-authorized merge.",
+      "user": {
+        "login": "jnhu76",
+        "name": "jnhu76",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/5766215?v=4",
+        "id": 5766215
+      },
+      "created_at": null
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected' (11292) panicked at C:\Users\fred1\AppData\Local\Temp\q296-baseline-d85f664308e041509c5a0596da2a84db\CRLF\render_order_oracle.rs:728:9:
+a commented-out publication is not a publication: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected ... FAILED
+
+failures:
+
+failures:
+    render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
