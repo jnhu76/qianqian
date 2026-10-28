@@ -37,12 +37,17 @@ raw/                            closeout-3 receipts (see raw/README.md)
 ## Reproduce
 
 ```bash
-# From a checkout of the fix branch (Linux only):
-./evidence/analyst-join-321/replay.sh origin/main HEAD
+# From a checkout that contains the fix (Linux only).
+# Default baseline is the pre-#322 main commit 61d834a (defect present);
+# default fix revision is HEAD.
+./evidence/analyst-join-321/replay.sh
 
-# Optional explicit revisions / log directory:
+# Explicit revisions / log directory:
 OUT=/tmp/analyst-join-logs ./evidence/analyst-join-321/replay.sh <baseline-rev> <fix-rev>
 ```
+
+Do not use `origin/main` as the baseline after #322 merges: it would contain the
+fix and the baseline branch would no longer wedge.
 
 The script creates two detached scratch worktrees, applies the overlay, and requires:
 
@@ -86,12 +91,13 @@ moved after the protected region)           ORACLE observed=Wedged again
 
 ## Provenance
 
-The raw receipts were produced by the closeout-3 independent verification on
-`main@98ff343` and the fix branch `3af2f48`; both agents' records are in the repository
-history for this evidence package. The replay harness at that time injected the panic
-immediately before the `catch_unwind`; the versioned overlay now injects it **inside**
-the protected region, which is the stricter shape (the fix's catch must return). The
-observed outcomes are unchanged.
+The closeout-3 receipts were produced on `main@98ff343` and the fix branch
+`3af2f48`. The versioned `raw/replay-final/` receipts were re-run from the final
+reviewed head against the pre-#322 main `61d834a`; `ENVIRONMENT.txt` records the
+exact revisions. The closeout-3 harness injected the panic immediately before the
+`catch_unwind`; the versioned overlay now injects it **inside** the protected
+region, which is the stricter shape (the fix's catch must return). The observed
+outcomes are unchanged.
 
 Authority remains: `docs/architecture/error-system-target-contract.md` §DG-4b
 (DESIGN_CANDIDATE / NOT AUTHORITY), `error-system-implementation-record.md` §2/§6/§15

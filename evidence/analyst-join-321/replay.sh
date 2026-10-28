@@ -14,7 +14,9 @@
 # the protected region (must wedge again).
 #
 # Usage: ./replay.sh [baseline-rev] [fix-rev]
-#   defaults: origin/main and HEAD
+#   defaults: the pre-#322 main commit 61d834a (defect present) and HEAD
+#   (the checkout must contain the fix). Do NOT default the baseline to
+#   origin/main after #322 merges: it would then be fix-vs-fix.
 # Environment: OUT=<log dir> (default: a temp dir printed at the end)
 #
 # The script never writes to the product worktree and never touches the network.
@@ -24,7 +26,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
-BASELINE_REV="${1:-origin/main}"
+BASELINE_REV="${1:-61d834ad63bd5b0195496cf9de3a77395dd12a71}"
 FIX_REV="${2:-HEAD}"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/qianqian-analyst-join-321.XXXXXX")"

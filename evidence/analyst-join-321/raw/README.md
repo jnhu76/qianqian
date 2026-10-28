@@ -38,9 +38,9 @@ the overlay.
 
 ## Final replay receipts (`replay-final/`)
 
-Produced by `replay.sh origin/main HEAD` after the rebase onto
-`main@61d834a`, with the fix at `c25d133`. `ENVIRONMENT.txt` records the
-revisions, rustc and host.
+Produced by `replay.sh` (default baseline `61d834a`) at the fix commit recorded
+in `ENVIRONMENT.txt`. The receipt commit that adds these logs changes no product
+source; `git diff <fix_rev>..HEAD -- crates apps` is empty.
 
 ```text
 01-baseline-wedge.log             base: ORACLE observed=Wedged, previous hook

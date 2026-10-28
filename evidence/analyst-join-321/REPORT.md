@@ -131,8 +131,10 @@ one pending analysis, not an arbitrary timeout.
 ## 6. Evidence integrity
 
 ```text
-baseline tree        main@98ff343 (later main revisions are test/docs-only there)
-fix tree             3af2f48 + #322 review fixes
+closeout-3 baseline  main@98ff343 (original receipts)
+replay baseline      main@61d834a (pre-#322; includes #318/#319/#320)
+fix tree             3af2f48 + #322 review fixes; the product-tree delta from
+                     61d834a is the analyst registration and comments only
 harness              evidence/analyst-join-321/harness/analyst_join_e2e_tests.rs
 overlay              evidence/analyst-join-321/overlay/000-harness.patch
 negative control     evidence/analyst-join-321/overlay/001-...patch

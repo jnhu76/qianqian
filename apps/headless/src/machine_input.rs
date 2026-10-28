@@ -203,8 +203,9 @@ const READER_THREAD_NAME: &str = "qianqian-stdin";
 /// worker's exit and the teardown's `worker.join()`), the render leg by the
 /// failure-publication cone that follows its catch. An unknown hook — usually
 /// the std default, whose panic print is a DIRECT raw fd 2 write on Unix
-/// (rustc 1.97.1: `sys::stdio::panic_output` returns the raw `FileDesc`, not
-/// the `io::stderr()` handle whose global lock a diagnostics writer can hold),
+/// (rustc 1.97.1: `sys::stdio::panic_output` returns the sys `Stderr` wrapper,
+/// whose write goes through `FileDesc::from_raw_fd(2)`, not the `io::stderr()`
+/// handle whose global lock a diagnostics writer can hold),
 /// and therefore BLOCKS while the pipe is full and unread — must never run on
 /// those threads, or a diagnostic sink would decide when a join/completion
 /// happens. (Windows uses the same sys-level path to `STD_ERROR_HANDLE`;

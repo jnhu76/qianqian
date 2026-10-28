@@ -246,9 +246,11 @@ impl ObservationTap {
                 // diagnostic sink would decide when the join — and therefore the
                 // authoritative disposal verdict — completes.
                 //
-                // Registration must stay the FIRST statement: the hook consults
-                // the thread fact before `catch_unwind`, so arming it inside the
-                // protected closure would leave the same gap. Its own failure
+                // Registration must stay the FIRST statement, OUTSIDE the
+                // `catch_unwind`: the hook consults the thread fact before the
+                // catch, so arming it after the panic point (including later
+                // inside the protected closure) would leave the same gap, and an
+                // inside binding would also be gone before the exit tail. Its own failure
                 // boundary is narrow and sink-independent: `register()` is a
                 // cold-path allocation plus registry lock (and rejects a
                 // duplicate on this fresh thread by contract), so it performs no

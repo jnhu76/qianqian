@@ -1158,8 +1158,8 @@ facade producer.
 > hook installer, real session and K0 dispose, subprocess child) shows: without the registration,
 > a panicking analyst × blocked stderr wedges `analyst.join()` → `worker.join()` → no
 > `DisposeVerdict`; with it, the terminal commits `Completed` and dispose returns `Discharged`.
-> This is an implementation fact and a defect correction under the already-adopted criterion,
-> not adoption of a new candidate obligation. N-01's residual scope is correspondingly narrowed
+> This is an implementation fact and a defect correction under the already-settled
+> registration criterion (the #287 owner review), not adoption of a new candidate obligation. N-01's residual scope is correspondingly narrowed
 > to non-class-α threads (reconciliation addendum). Registration only isolates panics AFTER it;
 > it does not make an analyst hang bounded for unrelated reasons.
 
