@@ -141,6 +141,44 @@ fn analyst_consumes_off_path_and_publishes_the_probe_record() {
     assert!(tap.latest().worker_closed);
 }
 
+/// The analyst's progress is awaited by the decode worker's single exit
+/// funnel (`session.rs`: `observation.close(); analyst.join()`), and session
+/// teardown joins that worker before its K0 relation can report `Discharged`.
+/// The DG-4b panic-hook posture keys isolation on the thread's OWN
+/// registration fact, so the analyst must register like the other
+/// isolation-obligated producers. Without it, a panic on this thread chains to
+/// the previous hook (the std default) BEFORE its `catch_unwind`, and a
+/// blocked diagnostic sink decides when the join — and therefore the
+/// authoritative disposal verdict — completes.
+#[test]
+fn the_analyst_thread_is_a_registered_isolation_obligated_producer() {
+    assert!(
+        !qianqian_diagnostics::is_alpha_producer(),
+        "the registration is thread-local: the spawning thread must not \
+         already hold the analyst's fast path"
+    );
+    let tap = ObservationTap::new(TEST_FORMAT, 1024);
+    let worker = tap.spawn_worker().expect("the off-path analyst spawns");
+    tap.close();
+    within(Duration::from_secs(5), move || {
+        worker.join().expect("the analyst exits on close");
+    });
+    let latest = tap.latest();
+    assert!(latest.worker_closed, "the analyst reached its exit tail");
+    assert!(
+        latest.worker_alpha,
+        "the observation analyst must hold its own class-α registration; its \
+         progress is joined by the decode worker's exit funnel, so an \
+         unregistered panic would let a diagnostic sink decide when session \
+         teardown and K0 Discharge complete"
+    );
+    assert!(
+        !qianqian_diagnostics::is_alpha_producer(),
+        "the analyst's registration is created and dropped on the analyst \
+         thread; it must not leak into the joining thread"
+    );
+}
+
 #[test]
 fn teardown_never_requires_consumer_progress_or_production() {
     // A block pending at close: the join completes without further

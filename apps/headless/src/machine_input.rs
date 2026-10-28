@@ -198,12 +198,18 @@ const READER_THREAD_NAME: &str = "qianqian-stdin";
 /// producers), so the two cannot drift apart. Every such thread registers at
 /// thread start, and each one's progress is awaited by another thread's
 /// completion path: the stdin reader by the machine transport's seal, the
-/// decode worker by the session teardown's join, the render leg by the
+/// decode worker by the session teardown's join, the observation analyst by the
+/// decode worker's exit funnel (its `analyst.join()` stands between that
+/// worker's exit and the teardown's `worker.join()`), the render leg by the
 /// failure-publication cone that follows its catch. An unknown hook — usually
-/// the std default, whose print takes the process-global stderr lock, and
-/// therefore BLOCKS while any thread is blocked inside a sink write — must
-/// never run on those threads, or a diagnostic sink would decide when a
-/// join/completion happens.
+/// the std default, whose panic print is a DIRECT raw fd 2 write on Unix
+/// (rustc 1.97.1: `sys::stdio::panic_output` returns the sys `Stderr` wrapper,
+/// whose write goes through `FileDesc::from_raw_fd(2)`, not the `io::stderr()`
+/// handle whose global lock a diagnostics writer can hold),
+/// and therefore BLOCKS while the pipe is full and unread — must never run on
+/// those threads, or a diagnostic sink would decide when a join/completion
+/// happens. (Windows uses the same sys-level path to `STD_ERROR_HANDLE`;
+/// runtime evidence there is NOT_RUN, source-derived only.)
 ///
 /// On every other thread the hook chains to the captured previous hook
 /// (fail-open: preserving debuggers/tracers/hosts, and a miss can only fail to

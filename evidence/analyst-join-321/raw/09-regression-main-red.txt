@@ -1,0 +1,32 @@
+   Compiling autocfg v1.5.1
+   Compiling strength_reduce v0.2.4
+   Compiling qianqian-composition v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join-verify-main/crates/qianqian-composition)
+   Compiling qianqian-diagnostics v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join-verify-main/crates/qianqian-diagnostics)
+   Compiling num-traits v0.2.19
+   Compiling qianqian-app v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join-verify-main/crates/qianqian-app)
+   Compiling qianqian-audio-api v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join-verify-main/crates/qianqian-audio-api)
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling transpose v0.2.3
+   Compiling primal-check v0.3.4
+   Compiling rustfft v6.4.1
+   Compiling realfft v3.5.0
+   Compiling qianqian-playback v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join-verify-main/crates/qianqian-playback)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.15s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_playback-48caa188b9a62be6)
+
+running 1 test
+
+thread 'observation_tests::the_analyst_thread_is_a_registered_isolation_obligated_producer' (574377) panicked at crates/qianqian-playback/src/observation_tests.rs:163:5:
+the observation analyst must hold its own class-α registration; its progress is joined by the decode worker's exit funnel, so an unregistered panic would let a diagnostic sink decide when session teardown and K0 Discharge complete
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test observation_tests::the_analyst_thread_is_a_registered_isolation_obligated_producer ... FAILED
+
+failures:
+
+failures:
+    observation_tests::the_analyst_thread_is_a_registered_isolation_obligated_producer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 211 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p qianqian-playback --lib`

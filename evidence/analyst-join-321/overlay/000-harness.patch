@@ -1,0 +1,25 @@
+diff --git a/apps/headless/src/lib.rs b/apps/headless/src/lib.rs
+index 36dbab2..4f1a2b4 100644
+--- a/apps/headless/src/lib.rs
++++ b/apps/headless/src/lib.rs
+@@ -48 +48,5 @@ pub mod status;
+ pub mod tui;
++
++#[cfg(all(test, target_os = "linux"))]
++#[path = "analyst_join_e2e_tests.rs"]
++mod analyst_join_e2e_tests;
+diff --git a/crates/qianqian-playback/src/observation.rs b/crates/qianqian-playback/src/observation.rs
+index 6796913..cd5a26e 100644
+--- a/crates/qianqian-playback/src/observation.rs
++++ b/crates/qianqian-playback/src/observation.rs
+@@ -233,2 +233,10 @@ impl ObservationTap {
+                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                    // EVIDENCE OVERLAY ONLY (evidence/analyst-join-321): no product
++                    // input reaches a panic in the analyst, so the causal witness
++                    // injects one INSIDE the real protected region, on the real
++                    // "qianqian-observation" thread. The replay script applies this
++                    // patch to a scratch worktree; it is absent from the product tree.
++                    if std::env::var_os("QIANQIAN_ANALYST_JOIN_INJECT_PANIC").is_some() {
++                        panic!("analyst-join evidence: injected panic inside the protected analyst region");
++                    }
+                     analyst_loop(&shared)

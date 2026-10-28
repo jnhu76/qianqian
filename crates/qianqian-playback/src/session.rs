@@ -939,8 +939,11 @@ pub(crate) fn decode_worker<P: ProcessingRuntime>(
     completion.abort_stranded_seek();
     // Observation teardown: one stop path, one join path, one owner
     // (this worker), at its single exit funnel — normal and panic paths
-    // alike. Bounded by one analyst iteration; the join result is
-    // telemetry, never playback truth.
+    // alike. On the normal path this waits for at most one pending
+    // analysis. An analyst PANIC is class α-registered (observation.rs),
+    // so its hook cannot be gated on a diagnostic sink; a block inside the
+    // analyst's own analysis is not bounded here — `close()` only stops new
+    // work. The join result is telemetry, never playback truth.
     observation.close();
     if let Some(analyst) = analyst {
         let _ = analyst.join();

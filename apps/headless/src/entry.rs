@@ -141,10 +141,12 @@ fn run_playback(
     let diagnostics = install_host_diagnostics();
     // The panic-hook posture (DG-4b) is established HERE, before any transport
     // starts: every isolation-obligated thread the transports create — the
-    // decode worker, the render leg — registers at thread start, and the
-    // posture must already be in place when it does, so a panic on such a
-    // thread never enters an unknown synchronous sink (whose default print
-    // takes the process-global stderr lock and can therefore block).
+    // stdin reader, decode worker, observation analyst and render leg —
+    // registers at thread start, and the posture must already be in place when
+    // it does, so a panic on such a thread never enters an unknown synchronous
+    // sink. The std default hook is such a sink: on Unix (rustc 1.97.1) its
+    // write goes straight to raw fd 2, not through `io::stderr()`'s global
+    // lock, and it blocks while the pipe is full and unread.
     crate::machine_input::install_panic_hook_posture();
     // The desired Audio Processing configuration (D14.11): the App owns
     // it; each episode establishment binds its own applied snapshot, so

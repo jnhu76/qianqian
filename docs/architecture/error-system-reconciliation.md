@@ -421,6 +421,22 @@ for every non-reader thread) share the blocking mode (ledger #11) — no platfor
 is claimed for it (T5-8). Class: mechanism CODE_FACT; reachability requires the gated
 log plus the matching sink condition (`STATIC_INFERENCE`, not executed).
 
+> **Addendum (2026-10-28, #321) — N-01 scope after the analyst correction.** The
+> frozen finding above remains the baseline record; this note does not rewrite it.
+> Executed E2E now shows the SAME blocking mode reachable through the panic hook's
+> chain-to-previous on a thread whose progress was awaited: the observation analyst
+> (`qianqian-observation`) was joined by the decode worker's exit funnel but did not
+> hold a class-α registration, so an analyst panic × full/unread stderr blocked inside
+> the default hook's raw fd 2 write before its `catch_unwind`; `analyst.join()` →
+> `worker.join()` → K0 `DisposeVerdict` never completed (`TERMINAL=Completed` was
+> already published; D11 is unaffected). Reachability is therefore no longer
+> `STATIC_INFERENCE` for that edge. The correction is the adopted DG-4b classification:
+> the analyst now registers class α at thread start, and the same oracle flips to
+> `Completed` / `Discharged`. N-01's unbounded-sink residual remains admissible only on
+> threads that are not class α and whose progress no join/completion awaits; it is not
+> admissible on a thread whose join gates mandatory teardown/Discharge. Evidence:
+> `evidence/analyst-join-321/`.
+
 **N-02 (structural, no identified trigger).** If the edge lock was poisoned (a prior panic
 while holding it — no production point identified today), post-catch `render_input.stop()`
 panics on `.expect("pcm edge lock")` (edge.rs:90) with the same skip-the-rest consequence.
@@ -441,8 +457,13 @@ poisoned completion lock).
   chains to the previous hook for every non-`qianqian-stdin` thread and is deliberately
   never restored (:192-207). Reader write failures (`print!` on stdout status responses,
   :230-233) panic into the catch → `HostFailure::Panic` → `request_stop` if unsettled.
+  *(Addendum 2026-10-28: this is the frozen 5e60da4c baseline. The landed predicate is
+  the thread's own class-α registration fact, not a name list; the stdin reader, decode
+  worker, render leg and — since #321 — the observation analyst are registered.)*
 - Analyst: own `catch_unwind` (observation.rs:233); its join result is telemetry
-  (`session.rs:929`).
+  (`session.rs:929`). *(Addendum: the join's RESULT is telemetry, but the join's
+  COMPLETION gates the decode worker's exit and therefore K0 Discharge; #321 registers
+  the analyst class α so a panic cannot hand that completion to a diagnostic sink.)*
 
 ### 3.4 K0 teardown and the main thread
 
