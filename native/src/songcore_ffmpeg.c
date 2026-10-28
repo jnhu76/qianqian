@@ -44,9 +44,13 @@
  * SongCore is the only FFmpeg user in the process and already surfaces
  * every failure as a typed song_status diagnostic, so the chatter has no
  * consumer — but it corrupts any full-screen terminal UI that shares the
- * console. Silence it by default; QIANQIAN_FFMPEG_LOG=1 restores the
- * default logger for mechanism debugging. Installed on every song_open
- * (a benign same-value pointer store; opens are off any realtime path). */
+ * console. Silence it by default: the discard baseline stands both when the
+ * variable is unset and when it is explicitly "0" (byte-equal, the same
+ * opt-in predicate the Rust bridge applies in av_log_bridge.rs). Any other
+ * set value leaves the default logger up for mechanism debugging — and a
+ * bridged host then owns the callback from plugin activation, which this
+ * per-open reinstall must never clobber. Installed on every song_open (a
+ * benign same-value pointer store; opens are off any realtime path). */
 static void songcore_discard_av_log(void *avcl, int level, const char *fmt,
                                     va_list vl) {
     (void)avcl;
@@ -56,7 +60,8 @@ static void songcore_discard_av_log(void *avcl, int level, const char *fmt,
 }
 
 static void songcore_quiet_ffmpeg_logging(void) {
-    if (getenv("QIANQIAN_FFMPEG_LOG") == NULL)
+    const char *opt = getenv("QIANQIAN_FFMPEG_LOG");
+    if (opt == NULL || strcmp(opt, "0") == 0)
         av_log_set_callback(songcore_discard_av_log);
 }
 

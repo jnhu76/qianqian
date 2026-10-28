@@ -8,3 +8,12 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
+
+# This crate is excluded from the enclosing workspace (it binds the
+# separately-built SongCore native artifact). Declaring the (empty)
+# workspace root here keeps `cargo metadata` working for the plugin
+# boundary gate from a linked git worktree under the main checkout —
+# otherwise the manifest search latches onto the main workspace's
+# manifest above it, whose exclude paths do not match this checkout's
+# location. Same mechanics as qianqian-decode-songcore's table.
+[workspace]
