@@ -1,0 +1,146 @@
+{
+  "task": "#296 E-7 decode-read × C1–C4 native runtime fault matrix (closeout3)",
+  "authority": {
+    "R0": "out/closeout2/native-controls-map.md §1 decode-read × C1–C4 = NOT_RUN, mechanism applicable",
+    "R1": "PR #318 48-cell ledger: 22 PASS + 3 KNOWN_RESIDUAL + 11 NOT_APPLICABLE + 12 NOT_RUN; decode-read ×4 = NOT_RUN",
+    "R2–R4": "#296 exit criteria: run all 12 Linux-executable native cells at native runtime; PASS or classify per R2–R4"
+  },
+  "environment": {
+    "date": "2026-10-28",
+    "commit": "a343abb35c62768dc80e408b3df267a9cb830ac3",
+    "branch_base": "PR #320 head / fix/closeout2-ffmpeg-log-gate",
+    "worktree": "/home/hoo/Source/qianqian/.worktrees/nat-decode-read",
+    "target": "linux-x86_64 (WSL2 kernel 6.18.54.1-microsoft-standard-WSL2, x86_64-linux-gnu, glibc runtime of the host)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "artifact": "/home/hoo/Source/qianqian/.worktrees/ffmpeg/native/build/artifacts/libsongcore.a",
+    "artifact_sha256": "a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056",
+    "artifact_bytes": 4067772,
+    "ffmpeg_pin": "n9.0.1 bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "fixture": "native/experiments/songcore-equivalence/fixtures/flac-16-44-stereo.flac",
+    "fixture_sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+    "corruption": "byte 76000 ^= 0x01 (FLAC frame body, frame header intact)",
+    "ffmpeg_log_env": "QIANQIAN_FFMPEG_LOG=1 (real Rust av_log bridge installed at plugin activation)",
+    "run_style": "one exact test per fresh process: cargo test ... -- --ignored --exact <cell> --nocapture --test-threads=1 (process-global facility and av_log callback); the default crate suite skips the four controlled cells and is green (crate-default-tests.log)"
+  },
+  "cells": [
+    {
+      "outlet": "decode-read",
+      "control": "C1 BLOCKED_SINK",
+      "status": "PASS",
+      "ten_tuple": {
+        "PREMISE": "Helper thread acquires the REAL process-global std stderr lock and never releases it (mpsc acquisition witness). The facility's sole real drainer is seeded with one β record; counters beta_consumed=1 with exported=0 witness the drainer is blocked inside the real StderrExporter write. Real native decode-read fault: committed FLAC fixture (sha256 d8062668…) with byte 76000 ^= 0x01 inside a frame body; real SongCore artifact a0a3baf8… (static link) through the real CompositionKernel decode plugin and PcmDecode service; error returned by real song_read_pcm (no upper-layer DecodeError fabricated). Independent C-probe witness: SONG_ERR_DECODE_ERROR (108), native=-1094995529 (AVERROR_INVALIDDATA), msg=\"pending decode error\", plus native av_log lines \"invalid residual\" / \"decode_frame() failed\". QIANQIAN_FFMPEG_LOG=1 installs the real av_log bridge.",
+        "PRODUCER_PROGRESS": "Real producer thread (class-α registration, production decode-worker shape) returned while the real sink was blocked; first DecodeError and the terminal repeat both arrived; drop(stream)→song_close completed on that thread before the receipt was sent.",
+        "RELIABLE_RESULT": "DecodeError message \"pending decode error\" from the native adapter; terminal repeat byte-identical.",
+        "TERMINAL_OUTCOME": "Fatal decode error persists unchanged on the terminal call. No D11 terminal Fact is involved at this adapter-scoped outlet (no Playback Session in this harness); mandatory resource release completed.",
+        "TEARDOWN_OUTCOME": "shutdown(50ms) returned honestly: drained=false, abandoned=true, undelivered_at_exit=3; the stuck drainer was not joined.",
+        "LOSS_ACCOUNTING": "attempted=4, accepted=2, rejected=2, copied_out=0, outstanding=2 (α pool bound); alpha_rejected=2; beta_queued=1, beta_consumed=1, exported=0, export_failed=0; attempted=accepted+rejected; 2 pool records + 1 drainer-held seed = 3 undelivered. Nothing was misreported as delivered.",
+        "COUNTERFACTUAL": "MUTANT: emit_decode_fault performs a synchronous producer-side write_stderr_line before emit (temporary, byte-restored). Exact RED: test ran 1 test, panicked at tests/native_decode_read_controls.rs:349 with C1-PRODUCER-PROGRESS (bounded 10 s receive); exit 101; no compile error. Restored file sha256 verified; git diff empty.",
+        "ENVIRONMENT": "linux-x86_64 WSL2 6.18.54.1; rustc 1.97.1; commit a343abb; artifact a0a3baf8… (4,067,772 B); FFmpeg n9.0.1 bf1b838f; QIANQIAN_FFMPEG_LOG=1; one fresh process per cell",
+        "RAW_RECEIPT": [
+          "final-c1.log",
+          "c1-run.log",
+          "c1-counterfactual-run.log",
+          "c1-counterfactual-restore.log"
+        ],
+        "VERDICT": "PASS — Linux native runtime. Producer isolation, α drop accounting and bounded honest abandonment reproduced with the real SongCore artifact and real decode path. Windows native NOT_RUN (#172 artifact prerequisite unmet)."
+      }
+    },
+    {
+      "outlet": "decode-read",
+      "control": "C2 STOPPED_CONSUMER",
+      "status": "PASS",
+      "ten_tuple": {
+        "PREMISE": "The sole real drainer is held inside a test Exporter (entered.send→arm.recv witness) after consuming a β seed and is never released: the consumer is STOPPED for the whole property. Real native decode-read fault: committed FLAC fixture (sha256 d8062668…) with byte 76000 ^= 0x01 inside a frame body; real SongCore artifact a0a3baf8… (static link) through the real CompositionKernel decode plugin and PcmDecode service; error returned by real song_read_pcm (no upper-layer DecodeError fabricated). Independent C-probe witness: SONG_ERR_DECODE_ERROR (108), native=-1094995529 (AVERROR_INVALIDDATA), msg=\"pending decode error\", plus native av_log lines \"invalid residual\" / \"decode_frame() failed\". QIANQIAN_FFMPEG_LOG=1 installs the real av_log bridge.",
+        "PRODUCER_PROGRESS": "Real producer thread returned while the consumer was stopped; song_close completed before the receipt.",
+        "RELIABLE_RESULT": "DecodeError \"pending decode error\"; native C-probe witness status 108 / native -1094995529.",
+        "TERMINAL_OUTCOME": "Fatal persists unchanged; no D11 Fact at this adapter-scoped outlet; resource release completed.",
+        "TEARDOWN_OUTCOME": "Close (shutdown(50ms)) was executed on a worker and returned inside a 3 s fail-closed observation: drained=false, abandoned=true, undelivered_at_exit=3; drained∧abandoned never reported; stuck drainer not joined.",
+        "LOSS_ACCOUNTING": "attempted=4, accepted=2, rejected=2, copied_out=0, outstanding=2; alpha_rejected=2; beta_consumed=1; exported=0; undelivered_at_exit=3. Abandoned is reported as abandoned, never as drained.",
+        "COUNTERFACTUAL": "MUTANT: the shutdown deadline branch is disabled (if false && elapsed>=deadline), so a stopped consumer makes shutdown wait forever (temporary, byte-restored). Exact RED: test ran 1 test, panicked at tests/native_decode_read_controls.rs:540 with C2-TEARDOWN bounded-deadline assertion after the 3 s receive timeout; exit 101; no compile error. Restored sha256 verified; git diff empty.",
+        "ENVIRONMENT": "linux-x86_64 WSL2 6.18.54.1; rustc 1.97.1; commit a343abb; artifact a0a3baf8… (4,067,772 B); FFmpeg n9.0.1 bf1b838f; QIANQIAN_FFMPEG_LOG=1; one fresh process per cell",
+        "RAW_RECEIPT": [
+          "final-c2.log",
+          "c2-run.log",
+          "c2-counterfactual-run.log",
+          "c2-counterfactual-restore.log"
+        ],
+        "VERDICT": "PASS — Linux native runtime. Bounded abandonment and honest accounting reproduced; the counterfactual proves the bounded wait is load-bearing. Windows native NOT_RUN (#172)."
+      }
+    },
+    {
+      "outlet": "decode-read",
+      "control": "C3 CAPACITY_EXHAUSTION",
+      "status": "PASS",
+      "ten_tuple": {
+        "PREMISE": "Stopped-consumer seam as C2. The REAL producer is the flood: one native fault emits the decoder's two av_log records, then one fault record; three more fault records ride the latched fatal. Six real presentations against the two-slot α pool. Real native decode-read fault: committed FLAC fixture (sha256 d8062668…) with byte 76000 ^= 0x01 inside a frame body; real SongCore artifact a0a3baf8… (static link) through the real CompositionKernel decode plugin and PcmDecode service; error returned by real song_read_pcm (no upper-layer DecodeError fabricated). Independent C-probe witness: SONG_ERR_DECODE_ERROR (108), native=-1094995529 (AVERROR_INVALIDDATA), msg=\"pending decode error\", plus native av_log lines \"invalid residual\" / \"decode_frame() failed\". QIANQIAN_FFMPEG_LOG=1 installs the real av_log bridge.",
+        "PRODUCER_PROGRESS": "Real producer thread returned for every fault/repeat; no unbounded block.",
+        "RELIABLE_RESULT": "Native DecodeError \"pending decode error\" on every terminal call; all terminal messages identical.",
+        "TERMINAL_OUTCOME": "Fatal persists unchanged; no D11 Fact at this adapter-scoped outlet.",
+        "TEARDOWN_OUTCOME": "shutdown(50ms): drained=false, abandoned=true, undelivered_at_exit=3; no join of the stopped drainer.",
+        "LOSS_ACCOUNTING": "attempted=6, accepted=2, rejected=4, copied_out=0, outstanding=2; alpha_rejected=4; attempted=accepted+rejected; capacity bound 2 and outstanding never exceeds it (bounded allocation/ownership, no unbounded growth).",
+        "COUNTERFACTUAL": "MUTANT: the pool full-pool branch drops the rejection path (returns true without publishing or counting; temporary, byte-restored). Exact RED: test ran 1 test, panicked at tests/native_decode_read_controls.rs:605 on C3-DROP-ACCOUNTING (left rejected=0, right 4); exit 101; no compile error. Restored sha256 verified; git diff empty.",
+        "ENVIRONMENT": "linux-x86_64 WSL2 6.18.54.1; rustc 1.97.1; commit a343abb; artifact a0a3baf8… (4,067,772 B); FFmpeg n9.0.1 bf1b838f; QIANQIAN_FFMPEG_LOG=1; one fresh process per cell",
+        "RAW_RECEIPT": [
+          "final-c3.log",
+          "c3-run.log",
+          "c3-counterfactual-run.log",
+          "c3-counterfactual-restore.log"
+        ],
+        "VERDICT": "PASS — Linux native runtime. Real-producer capacity exhaustion is bounded and every over-capacity presentation is rejected+counted; the drop path is proven load-bearing by exact RED. Windows native NOT_RUN (#172)."
+      }
+    },
+    {
+      "outlet": "decode-read",
+      "control": "C4 WRITE_FAILURE",
+      "status": "PASS",
+      "ten_tuple": {
+        "PREMISE": "fd 2 is redirected onto the write end of a pipe whose READ end is closed (Linux portability lesson: close the reader, not an arbitrary fd); a canary write_stderr_line returns a real OS Err inside this process before any work. Facility uses the real StderrExporter. Real native decode-read fault: committed FLAC fixture (sha256 d8062668…) with byte 76000 ^= 0x01 inside a frame body; real SongCore artifact a0a3baf8… (static link) through the real CompositionKernel decode plugin and PcmDecode service; error returned by real song_read_pcm (no upper-layer DecodeError fabricated). Independent C-probe witness: SONG_ERR_DECODE_ERROR (108), native=-1094995529 (AVERROR_INVALIDDATA), msg=\"pending decode error\", plus native av_log lines \"invalid residual\" / \"decode_frame() failed\". QIANQIAN_FFMPEG_LOG=1 installs the real av_log bridge.",
+        "PRODUCER_PROGRESS": "Real producer thread returned; the drainer's export returned ExportError, disabled the exporter exactly once, and the producer result was unchanged. attempted=3, accepted=2, rejected=1 (the fault record was rejected at the full two-slot pool while the two native log records were being exported).",
+        "RELIABLE_RESULT": "DecodeError \"pending decode error\"; C-probe witness status 108 / native -1094995529.",
+        "TERMINAL_OUTCOME": "Fatal unchanged; no D11 Fact at this adapter-scoped outlet; song_close completed.",
+        "TEARDOWN_OUTCOME": "All admitted records reached the drain boundary; shutdown(5 s) returned drained=true, abandoned=false, undelivered_at_exit=0; fd 2 restored and verified writable.",
+        "LOSS_ACCOUNTING": "copied_out=2, exported=0, export_failed=2, self_diagnostics=1 (one disable), alpha_rejected=1; drain identity copied_out+beta_consumed == exported+export_failed (2=0+2); no failed write counted as delivered.",
+        "COUNTERFACTUAL": "MUTANT: a failed export is counted as exported in deliver()'s Err branch (temporary, byte-restored). Exact RED: test ran 1 test, panicked at tests/native_decode_read_controls.rs:738 on C4-WRITE-FAILURE (left exported=1, right 0); exit 101; no compile error. Restored sha256 verified; git diff empty.",
+        "ENVIRONMENT": "linux-x86_64 WSL2 6.18.54.1; rustc 1.97.1; commit a343abb; artifact a0a3baf8… (4,067,772 B); FFmpeg n9.0.1 bf1b838f; QIANQIAN_FFMPEG_LOG=1; one fresh process per cell",
+        "RAW_RECEIPT": [
+          "final-c4.log",
+          "c4-run.log",
+          "c4-counterfactual-run.log",
+          "c4-counterfactual-restore.log"
+        ],
+        "VERDICT": "PASS — Linux native runtime. Real OS write failure is isolated from the producer and honestly booked as export loss; the accounting oracle is proven load-bearing by exact RED. Windows native NOT_RUN (#172)."
+      }
+    }
+  ],
+  "windows_native": {
+    "status": "NOT_RUN",
+    "reason": "#172 verified Windows SongCore artifact prerequisite unmet; no cross-platform PASS claimed"
+  },
+  "not_covered": [
+    "Windows native decode-read C1–C4: NOT_RUN (#172 artifact prerequisite unmet)",
+    "macOS/other targets: NOT_RUN (target-specific, no artifact)",
+    "D11 Playback Session terminal Fact: not exercised; this outlet is the native adapter boundary (no Session in the harness)",
+    "Full application host (TUI/headless transport): not exercised; production plugin activation + production PcmDecode path were used",
+    "valgrind/Miri leak-level resource proof: not run; release evidence is drop→song_close completion and continued operation",
+    "The 12-cell matrix beyond decode-read (ffmpeg-bridge ×4, decode-seek ×4): other agents' scope, not claimed here"
+  ],
+  "artifacts": {
+    "harness_source": [
+      "harness/native_decode_read_controls.rs",
+      "harness/fault_probe.c"
+    ],
+    "c_probe_binary_sha256": "970e37b92011e3cc1efd7179e87e840910b41d15cb89848e4cd3b27244f215f9",
+    "native_probe": [
+      "native-probe-build.log",
+      "native-probe-flip.log",
+      "native-probe-read.log",
+      "native-probe-avlog.log"
+    ],
+    "environment_receipt": "00-environment.log",
+    "build_receipt": "00-build.log",
+    "restore_integrity": "restore-verification.log",
+    "crate_default_suite": "crate-default-tests.log",
+    "harness_sha256": "c0fe4d91fecfe11cce6120123695db6a1e67eb4837b53065e64410728abb68bd"
+  }
+}

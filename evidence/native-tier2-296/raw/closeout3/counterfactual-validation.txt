@@ -1,0 +1,70 @@
+# counterfactual validation — each mutant is a temporary production edit, restored byte-for-byte
+
+cell=C1
+  base_sha256_receipt=raw/C1-counterfactual-base.sha256
+  mutant_diff=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C1-counterfactual-final.diff (bytes=1397)
+  raw_log=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C1-counterfactual-final.log
+  running_1_test=yes
+  assertion_fired=yes
+  signature_present=yes
+  test_result_failed_0_passed=yes
+  cell_pass_absent=yes
+  exit_101=yes
+  no_outer_timeout_kill=yes
+  mutant_diff_nonempty=yes
+  witness: ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:355:9:
+  witness: PRODUCER-NOT-BACKPRESSURED: the real native producer did not complete within 2s while the diagnostic consumer was held
+  witness: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.76s
+  VERDICT=EXACT_RED
+
+cell=C2
+  base_sha256_receipt=raw/C2-counterfactual-base.sha256
+  mutant_diff=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C2-counterfactual-final.diff (bytes=708)
+  raw_log=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C2-counterfactual-final.log
+  running_1_test=yes
+  assertion_fired=yes
+  signature_present=yes
+  test_result_failed_0_passed=yes
+  cell_pass_absent=yes
+  exit_101=yes
+  no_outer_timeout_kill=yes
+  mutant_diff_nonempty=yes
+  witness: ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:562:5:
+  witness: TEARDOWN-OUTCOME: a stopped consumer must yield an honest abandoned shutdown, never a claimed drain: ShutdownReport { drained: true, abandoned: false, undelivered_at_exit: 3, counters: Counters { beta_queued: 1, beta_rejected: 0, beta_consumed: 1, alpha_rejected: 2, copied_out: 0, exported: 0, export_failed: 0, outstanding: 2, self_diagnostics: 0, critical_panics: 0 } }
+  witness: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.21s
+  VERDICT=EXACT_RED
+
+cell=C3
+  base_sha256_receipt=raw/C3-counterfactual-base.sha256
+  mutant_diff=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C3-counterfactual-final.diff (bytes=554)
+  raw_log=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C3-counterfactual-final.log
+  running_1_test=yes
+  assertion_fired=yes
+  signature_present=yes
+  test_result_failed_0_passed=yes
+  cell_pass_absent=yes
+  exit_101=yes
+  no_outer_timeout_kill=yes
+  mutant_diff_nonempty=yes
+  witness: ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:618:5:
+  witness: assertion `left == right` failed: REJECT-ACCOUNTING: every full-pool attempt must be rejected and counted
+  witness: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.32s
+  VERDICT=EXACT_RED
+
+cell=C4
+  base_sha256_receipt=raw/C4-counterfactual-base.sha256
+  mutant_diff=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C4-counterfactual-final.diff (bytes=497)
+  raw_log=/home/hoo/Source/qianqian/out/closeout3/native/ffmpeg-bridge/raw/C4-counterfactual-final.log
+  running_1_test=yes
+  assertion_fired=yes
+  signature_present=yes
+  test_result_failed_0_passed=yes
+  cell_pass_absent=yes
+  exit_101=yes
+  no_outer_timeout_kill=yes
+  mutant_diff_nonempty=yes
+  witness: ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:718:5:
+  witness: assertion `left == right` failed: LOSS-ACCOUNTING: a failed write must never be counted as delivered
+  witness: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.37s
+  VERDICT=EXACT_RED
+

@@ -1,0 +1,9 @@
+# artifact identity (starting point; copied from .worktrees/ffmpeg/native/build/artifacts)
+a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056  native/build/artifacts/libsongcore.a
+4fa6cbd3c11488eaca4303ebd481743bc76293ff83fd84c248fce611ca0d1a6d  native/build/artifacts/shared/libsongcore.so
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  native/include/songcore.h
+55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6  native/src/songcore_ffmpeg.c
+d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2  native/experiments/songcore-equivalence/fixtures/flac-16-44-stereo.flac
+libsongcore.a_size=4067772
+libsongcore.so_size=2288536
+ffmpeg_pin=n9.0.1 (build/artifacts inherited from closeout2 native-build.md)

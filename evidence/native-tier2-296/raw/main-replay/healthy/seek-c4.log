@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/decode_seek_controls.rs (crates/qianqian-decode-songcore/target/debug/deps/decode_seek_controls-7455f645c4f04f27)
+
+running 1 test
+test c4_write_failure ... CELL=C4 WRITE_FAILURE
+C4-ARTIFACT=a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056
+C4-ENV=linux-x86_64 ffmpeg=n9.0.1 QIANQIAN_FFMPEG_LOG=1 pid=645413
+C4-HEALTHY diag="could not reach a landing point" post="decode error" beta_diag="could not reach a landing point" beta_post="decode error" typed_110=true delivered=4
+C4-HEALTHY-COUNTERS beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=6 copied_out=2 exported=4 export_failed=0 outstanding=0 self_diagnostics=0
+[qianqian-diagnostics] exporter control-switchable disabled: closeout3 decode-seek injected export failure
+C4-FAILING diag="could not reach a landing point" post="decode error" alpha_attempted=16 alpha_accepted=5 alpha_rejected=11 counters=beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=11 copied_out=3 exported=4 export_failed=1 outstanding=2 self_diagnostics=1
+C4-SHUTDOWN drained=true abandoned=false undelivered=0 beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=11 copied_out=5 exported=4 export_failed=3 outstanding=0 self_diagnostics=1
+C4-ACCOUNTING-OK
+C4-PASS
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.02s
+
