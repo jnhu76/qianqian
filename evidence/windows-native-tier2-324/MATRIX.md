@@ -79,8 +79,10 @@ A LIVENESS RED is still an in-test named assertion that exits 101 — not the
 outer watchdog, not a build error, not a zero-test arm. The alternative (an
 unbounded wait) would be a hang, which the task forbids as evidence. See
 REVIEW.md finding D-1 for the strict-vs-scoped reading, and `ORACLE-CLASS.md`
-for the analysis of whether a STATE-only falsifier exists for those four (it
-does not, under the mutations the task mandates).
+for the oracle-class analysis: no in-process product-visible state oracle
+exists for those four, while an out-of-process thread-context oracle exists in
+principle for three of them (one mutation-aware only) and is documented there
+as an option that was not adopted.
 
 seek-C4's counterfactual zeroes the *first* failure counter; the disabled-
 exporter path still counts later losses, so the exact RED is the drain-boundary

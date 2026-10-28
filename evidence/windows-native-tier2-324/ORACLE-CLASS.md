@@ -1,11 +1,14 @@
-# ORACLE-CLASS — the four LIVENESS REDs, and why no program-state oracle replaces them
+# ORACLE-CLASS — the four LIVENESS REDs: what oracle class is achievable
 
 ```text
 TRUTH CLASS   verification-evidence analysis (about the evidence), NOT architecture authority
 SUBJECT       REVIEW.md finding 1 / D-1: ffmpeg-C1, read-C1, read-C2, seek-C1
+VERSION       v2 — corrected after a fresh-context adversarial review of v1
+              (see REVIEW.md "Delta review of ORACLE-CLASS"). v1's flat claim
+              "no program-state oracle exists" was an overclaim: it is retracted
+              and replaced by the qualified result below.
 SCOPE         analysis only. No cell was re-run, no verdict changed, no source
-              or receipt edited. This note answers a question D-1 left open; it
-              does not re-verdict Review C.
+              or receipt edited.
 ```
 
 ## Question
@@ -16,24 +19,41 @@ illegal program state. D-1 suggested a possible redesign ("a producer-side
 progress latch independent of the receipt channel") and left the decision to
 the owner.
 
-This note answers the prior question:
+This note answers:
 
-> **Does a program-state oracle exist for these four cells, under the mutation
+> **What oracle class is achievable for these four cells, under the mutation
 > each cell is required to apply?**
 
-Answer: **no** — not without changing the mutation away from the task's
-mandated fault, over-constraining the oracle, coupling it to the mutation's own
-arbitrary constant, or introducing an unearned OS-thread-introspection
-mechanism. The four REDs are not an unresolved oracle defect; they are the only
-finite oracle class for a progress property.
+## Answer (v2)
+
+```text
+No in-process, product-visible state oracle exists for any of the four cells.
+That is the claim the package needs, and it holds.
+
+An OUT-OF-PROCESS thread-context oracle does exist in principle for three of
+the four: read-C1 and seek-C1 (without mutation awareness) and ffmpeg-C1 (only
+mutation-aware). It is a debugger with a hardware execute breakpoint filtered
+to the producer thread, waiting on debug events instead of timers. It is NOT
+adopted and NOT executed here: it is a new observation mechanism, it changes
+the evidence class from program-visible behavior to sampled thread context,
+and for ffmpeg-C1 it depends on an address that exists only in the mutant.
+
+read-C2 has no such construction: its property is completion-within-bound, and
+the mutant exposes no state that marks deadline expiry.
+```
+
+So the four REDs are the strongest oracle available inside the package's
+earned mechanisms, not the only oracle that could ever be built. Adopting the
+thread-context mechanism would be a new harness/observation scope — an owner
+decision, not a documentation fix.
 
 ## 1. Property class: state vs progress
 
 The other eight cells assert a **state predicate**: a counter identity
 (`attempted = accepted + rejected`), a report field (`drained` / `abandoned` /
 `undelivered_at_exit`), or a delivered/lost classification. The mutant reaches
-an illegal state and stays there; the assertion reads it. A single state read at
-a synchronized point is sufficient.
+an illegal state and stays there; one state read at a synchronized point is
+enough.
 
 The four in question assert a **progress predicate**:
 
@@ -44,20 +64,20 @@ The four in question assert a **progress predicate**:
 | read-C2 | `shutdown` returns inside its bound while the consumer is stopped | remove/disable the bounded shutdown deadline |
 | seek-C1 | the seek producer finishes while the sink is blocked | synchronous sink write on the producer path |
 
-For each, the healthy receipt shows that the event occurred *while the fault was
-in force*; the mutant receipt shows that it did not. "Occurred" is an event, not
-a state: `¬◇event` is not a program state at any point — it is the *absence* of
-a state change over an unbounded interval. Any finite test of `¬◇event` must
-either stop waiting at a bound (a liveness assertion) or never stop (a hang,
-which the task forbids as evidence).
+The violation is `¬◇event` — non-completion. That is not a program-visible state
+at any point; it is the absence of a state change over an unbounded interval.
+A finite in-process observation of it can only be "not yet", i.e. a bounded
+wait. §4 shows the one class of observation that escapes this: reading the
+producer thread's execution context out of process.
 
-## 2. Per-cell: why a program-state read cannot decide the property
+## 2. Per-cell: why program-visible state cannot decide the property
 
 ### ffmpeg-C1
 
 ```text
-MUTATION   Pool::publish waits (30 s cap) for a free slot where the real code
-           rejects and counts; base 9f923666… → mutant be6d3976… → restored 9f923666…
+MUTATION   Pool::publish waits (30 s cap per full attempt) for a free slot
+           where the real code rejects and counts;
+           base 9f923666… → mutant be6d3976… → restored 9f923666…
 HEALTHY    raw/healthy/ffmpeg-C1.log
            QFB-C1-PRODUCER … elapsed_us=3241
            QFB-PREMISE EXPORTER_ENTERED=1 SINK_STILL_BLOCKED=1
@@ -67,20 +87,15 @@ MUTANT     raw/mutants/ffmpeg-C1-red.log
            within 10s while the diagnostic consumer was held      exit 101
 ```
 
-Until the producer's wait ends, every program-visible counter equals the healthy
-run's value at the same point (`attempted=4 accepted=2`); the only difference is
-that the producer is parked. After the wait ends there are two worlds:
-
-1. still full → the mutant rejects, and the final counters are *identical* to
-   the healthy run — no state distinguishes them;
-2. the oracle releases the sink → the mutant publishes, and the counters
-   differ — but they differ because **the oracle released the fault**, not
-   because the product violated isolation.
-
-Reaching either world deterministically requires the oracle to outwait the
-mutant's own 30 s constant, i.e. an oracle fitted to the mutation's number, not
-a property test. No program state separates the two runs at the point of
-violation.
+At the park the mutant is `attempted=3, accepted=2, rejected=0` — the
+`attempted` increment precedes the wait (`pool.rs:153-158`), so this is a legal
+prefix state the healthy producer also passes through, not a state the healthy
+run never shows. After the waits end (two full-pool attempts, each capped at
+30 s), the mutant's final counters are `attempted=4 accepted=2 rejected=2`,
+identical to the healthy run. No program-visible counter, record, or report
+distinguishes the two runs at any quiescent point. Any discriminating oracle
+must either outwait the mutant's completion (~60 s) or assert a duration — both
+temporal, neither a state read.
 
 ### read-C1
 
@@ -96,13 +111,14 @@ MUTANT     C1-PRODUCER-PROGRESS: real decode producer did not return while the
            real sink was blocked … : Timeout                    exit 101
 ```
 
-The mutant's write copies **zero bytes** (the pipe has no space), so no
-counter, record, or sink content changes while it is parked. After a release the
-pipe contains the extra line — but that line is the mutation's *added
-operation*, not its blocking; asserting it would pass/fail on "a write statement
-exists", which the mutation adds by construction. The only faithful falsifier of
-"the producer must not synchronously write a blocked sink" is that the producer
-does not return while the sink is blocked.
+The real `StderrExporter` drainer is already parked inside
+`write_stderr_line` on the full pipe, and that call holds the process-wide std
+stderr `ReentrantMutex` (`lib.rs:1242-1247`). The mutated producer's
+`write_stderr_line` therefore blocks acquiring that mutex **before it reaches
+the pipe** and copies zero bytes. The receipt keeps the task's required
+distinction: the premise is OS pipe backpressure (two parked raw writes); the
+mutant parks on the std lock, which the sink blockage keeps held. No counter,
+record, or sink content changes while it is parked.
 
 ### read-C2
 
@@ -115,12 +131,13 @@ MUTANT     C2-TEARDOWN: shutdown did not return inside its bounded deadline:
            Timeout                                               exit 101
 ```
 
-To read *any* report the oracle must first stop the consumer — but stopping the
-consumer is the oracle's own interference, and a report that then says
-`drained=true` is legal for that schedule. Asserting `abandoned=true` after a
-release would over-constrain the contract: it would forbid a slow but successful
-drain, which the contract permits. The contract's content is precisely "returns
-bounded while the consumer is stopped", i.e. a completion-within-bound.
+The consumer is already stopped. To read a report at all, the oracle must first
+**release** it — but that release is the oracle's own interference, and a report
+that then says `drained=true` is legal for that schedule. Asserting
+`abandoned=true` after a release would over-constrain the contract: it would
+forbid a slow but successful drain, which the contract permits. The contract's
+content is precisely "returns bounded while the consumer is stopped", i.e. a
+completion-within-bound.
 
 ### seek-C1
 
@@ -136,47 +153,76 @@ MUTANT     C1-PRODUCER … finished_while_held=false sink_still_blocked=false
 `finished_while_held` is a genuine state read, but its value is decided at the
 instant the cell's 10 s fail-closed valve releases the lock — an instant chosen
 by a bound. Without the valve the mutant parks on the lock forever, which is a
-hang. The reviewer's LIVENESS classification is therefore correct and is kept
-unchanged.
+hang. The reviewer's LIVENESS classification is correct and is kept unchanged.
 
-## 3. The three degenerate state oracles
+## 3. The degenerate in-process substitutes
 
-Every attempt to remove the bound lands in one of these:
+Every in-process attempt to remove the bound lands in one of these:
 
 | Shape | Example | Why it is invalid |
 |---|---|---|
-| outwait the mutant's own constant | ffmpeg-C1: wait 40 s, then compare counters | the oracle is fitted to the mutation's 30 s cap, not to the property; a different mutation defeats it |
+| outwait the mutant's completion | ffmpeg-C1: wait past both full-pool waits (≥60 s), then compare counters | temporal, and the comparison is only meaningful after the waits; it also depends on the mutant's cap |
+| duration threshold | read-C1/seek-C1: assert `elapsed_us < 5 s` | a bounded-time predicate, not a state read; for seek-C1 the measured value is the valve's own 10 s |
 | release the fault, then assert the post-release state | read-C2: release the consumer, assert `abandoned` | the asserted state is legal under the interference schedule; for read-C1 the distinguishing bytes are the mutation's added operation |
 | sample state at a fixed instant, no wait | read-C1: poll counters once | races the healthy path and yields false REDs; the observation point itself becomes the oracle |
 
 Each is strictly weaker evidence than a named, bounded, in-child assertion: it
 either proves less than the property or depends on the mutation's internals.
 
-## 4. The one non-temporal alternative, and why it was not adopted
+## 4. The thread-context oracle that does exist (not adopted, not executed)
 
-A real state oracle exists in principle: suspend the producer thread at a chosen
-point and read its instruction pointer/stack to prove it is parked inside
-`NtWriteFile` (or the std mutex wait) while the sink is blocked. That observes a
-state — the thread execution context — rather than a deadline.
+A genuine non-temporal oracle exists for three cells as an **out-of-process
+monitor**. Sketched by the v1 adversarial review; recorded here as an option,
+not as evidence:
 
-It was not adopted because:
+```text
+MECHANISM  spawn the child under DEBUG_ONLY_THIS_PROCESS; resolve
+           write_stderr_line (and the mutex wait) from the child's symbols;
+           set a HARDWARE execute breakpoint (Dr0–Dr3 via SetThreadContext,
+           so no code byte is modified) filtered to the producer thread's ID;
+           wait on debug events only — no timers.
+ASSERTION  the producer thread reaches write_stderr_line and its context is
+           inside the stderr-mutex wait while the test-held sink is blocked.
+EVENTS     {producer write-path breakpoint, producer thread EXIT}
+FIRES      mutant: breakpoint (RED); healthy: only EXIT (PASS), because the
+           healthy producer never calls write_stderr_line — the thread filter
+           is mandatory, since the drainer does.
+TERMINATION one of the two events occurs in each run; no outer watchdog needed.
+```
 
-- it is a different observation mechanism (thread suspension, module-range
-  resolution, IP symbolization) whose own premise needs independent proof;
-- suspension itself perturbs the schedule it observes, and a single sample can
-  miss the window, so it reintroduces either sampling loops (temporal again) or
-  false negatives;
-- the campaign does not need it to establish the claimed property, and adding a
-  new low-level observation mechanism is not earned by this test-only evidence
-  package.
+Per cell:
 
-It is recorded as an option, not implemented and not counted as evidence.
+```text
+read-C1      construction applies without mutation awareness
+seek-C1      same construction; the drainer also calls write_stderr_line, so the
+             producer thread-ID filter is mandatory
+ffmpeg-C1    the mutant spins in userspace (no wait-function event), so the
+             breakpoint must target the mutant's own publish wait-loop address —
+             mutation-aware, which is the construction's weakness
+read-C2      no construction: the property is completion-within-bound, and the
+             mutant exposes no state that marks deadline expiry; a debugger stack
+             sample cannot distinguish "polling inside the bound" from
+             "polling after it" without a clock
+```
+
+Why it is not adopted:
+
+- it is a new observation mechanism (debug privilege, symbolization, hardware
+  breakpoint accounting) whose own premise needs independent proof;
+- it changes the evidence class from program-visible behavior to sampled thread
+  execution context;
+- the ffmpeg-C1 variant is mutation-aware;
+- none of it is executed here. Building it would be a new harness scope and a
+  fresh run — a mechanism/scope decision, not a documentation fix.
 
 ## 5. Task-wording check
 
+Both quoted constraints are from the #324 campaign brief, not repository text
+(the issue body does not contain them); they are cited as the task statement.
+
 The task forbids "仅外层 timeout" — the outer cleanup watchdog — and separately
-requires "先设计可证明触发的同步控制，并允许在捕获断言所需的证据后有界释放或清理故障 sink".
-Both are satisfied across all 36 arms:
+requires bounded release/cleanup of the fault sink after the evidence is
+captured. All 36 arms satisfy both:
 
 ```text
 timed_out=false                    36 / 36  (12 healthy + 12 mutant + 12 restored)
@@ -195,13 +241,34 @@ process; they are not the parent's cleanup watchdog.
 ```text
 VERDICTS          unchanged: 12/12 cells, healthy PASS / PRECISE_RED / restored GREEN
 REVIEW C          unchanged: PASS_WITH_EXPLICIT_GAP (strict reading: FAIL)
-D-1 STATUS        the "possible redesign" is now answered: no program-state oracle
-                  exists for these four mutations without one of the degeneracies
-                  in §3 or the unearned mechanism in §4
-OWNER DECISION    remains, but its content is now a class-acceptance decision:
-                  "is a named, bounded, in-child progress assertion acceptable as a
-                  PRECISE_RED for C1/C2?" — not "is a missing state oracle unbuilt?"
+D-1 STATUS        answered precisely: no in-process product-visible state oracle
+                  exists for the four; an out-of-process thread-context oracle
+                  exists in principle for three (one mutation-aware), none for
+                  read-C2; it is not adopted here
+OWNER DECISION    class acceptance ("is a named, bounded, in-child progress
+                  assertion acceptable as a PRECISE_RED for C1/C2?") — or
+                  authorization to build the thread-context harness as a new
+                  scope with a fresh run
 ```
 
-This note adds no architecture noun, no product change, and no new claim. It is
-analysis of receipts already in the package.
+## Corrections applied in v2
+
+The v1 adversarial review corrected six factual statements; v2 incorporates all
+of them:
+
+```text
+1  "only finite oracle class"           → no in-process product-visible state
+                                          oracle; the thread-context option exists
+2  ffmpeg-C1 park state                 → attempted=3 accepted=2 rejected=0 (a legal
+                                          prefix), final counters equal healthy
+3  ffmpeg-C1 "fitted to 30 s"           → two waits ≈60 s; any discriminating
+                                          oracle must outwait completion (temporal)
+4  read-C1 "copies zero bytes at pipe"  → the producer blocks on the std stderr
+                                          mutex before reaching the pipe
+5  read-C2 "must first stop the consumer"→ the consumer is already stopped; the
+                                          oracle must release it
+6  §3 "wait 40 s" example               → must exceed both 30 s waits (≥60 s)
+```
+
+Attribution: the corrections came from a fresh-context adversarial review that
+did not write v1; the record is in REVIEW.md.

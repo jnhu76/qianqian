@@ -104,15 +104,18 @@ LIMIT           A liveness property cannot be asserted without a bound: the
                 The bound is inside the child and is part of the cell's
                 predicate; it is not the outer cleanup watchdog.
 OWNER DECISION  The redesign question was analysed on the recorded receipts and
-                mutation shapes (ORACLE-CLASS.md): for these four
-                task-mandated mutations no program-state oracle exists — the
-                difference is non-completion, and every state-only substitute
-                either is legal under the oracle's own release, is fitted to
-                the mutation's constant, or needs unearned OS thread
-                introspection. The decision left to the owner is therefore
-                class acceptance (is a named, bounded, in-child progress
-                assertion a valid PRECISE_RED for C1/C2?), not an unbuilt fix.
-                Verdicts above are unchanged.
+                mutation shapes (ORACLE-CLASS.md, v2 after an adversarial
+                delta review). No in-process product-visible state oracle
+                exists for these four mutations — the difference is
+                non-completion, and every in-process substitute is temporal or
+                over-constrained. An out-of-process thread-context oracle
+                exists in principle for three of the four (read-C1 and seek-C1
+                without mutation awareness; ffmpeg-C1 mutation-aware only) and
+                for none of read-C2; it is not adopted, not executed, and would
+                be a new mechanism/scope with a fresh run. The decision left to
+                the owner is therefore class acceptance (is a named, bounded,
+                in-child progress assertion a valid PRECISE_RED for C1/C2?) —
+                or authorizing that new harness. Verdicts above are unchanged.
 ```
 
 seek-C1's valve is now documented rather than implied: the helper waits 10 s for
@@ -148,7 +151,7 @@ fired.
 
 | # | Finding | Class | Disposition |
 |---|---|---|---|
-| 1 | Four C1/C2 REDs are bounded-liveness, not STATE | BLOCKER (strict) | **labelled** LIVENESS + documented here; `ORACLE-CLASS.md` answers the redesign question (no program-state oracle exists for these mutations); owner class-acceptance decision remains (D-1) |
+| 1 | Four C1/C2 REDs are bounded-liveness, not STATE | BLOCKER (strict) | **labelled** LIVENESS + documented here; `ORACLE-CLASS.md` answers the redesign question (no in-process product-visible state oracle; a thread-context option is documented but not adopted); owner class-acceptance decision remains (D-1) |
 | 2 | `COMMANDS.md` reproduced from the base commit, which lacks the evidence/tests | BLOCKER | **fixed**: §0 now checks out the PR head; §2 copies the harnesses into the test tree |
 | 3 | `REVIEW.md` / `RECEIPTS.sha256` advertised but absent | BLOCKER | **fixed**: this file + `RECEIPTS.sha256` added |
 | 4 | seek-C1's 10 s auto-release undisclosed | SHOULD_FIX | **fixed**: documented in MATRIX/EXECUTION_DAGS/REVIEW |
@@ -166,6 +169,37 @@ fired.
 | 16 | Read receipts lacked `pid` | NOTE | **fixed**: each read cell prints `<CELL>-ENV=… pid=…` |
 | 17 | Consumer `.exe` is a build product, not committed | NOTE | **documented**: binary removed from the package; hash + source + command recorded |
 | 18 | Manifest `toolchain.system=linux` is the build host | NOTE | **documented** (target block is the identity gate) |
+| 19 | `ORACLE-CLASS.md` v1 overclaimed "no program-state oracle exists" (contradicting its own §4) | BLOCKER (delta review) | **fixed** in `ORACLE-CLASS.md` v2 and the derivative pointers; the thread-context construction is documented per cell and marked unexecuted |
+
+## Delta review of ORACLE-CLASS (fresh-context, adversarial)
+
+After the original review, `ORACLE-CLASS.md` (commit `890d0af`) was checked by a
+second fresh-context reviewer whose explicit task was to falsify it. It did not
+write the document and ran read-only.
+
+```text
+VERDICT  PARTIALLY_OVERCLAIMED
+```
+
+Confirmed unchanged: the four mutations, the base/mutant/restored hashes, every
+log quote, the 12/12 RED/GREEN records, 36/36 `timed_out=false`, and that no
+verdict was silently changed by `890d0af`.
+
+Corrected in v2: v1's absolute "no program-state oracle exists" contradicted its
+own §4. The review supplied a concrete out-of-process construction (child under
+`DEBUG_ONLY_THIS_PROCESS`, hardware execute breakpoint filtered to the producer
+thread, debug events instead of timers) that decides read-C1 and seek-C1
+without touching the mutation, a mutation-aware variant for ffmpeg-C1, and no
+construction for read-C2. It also corrected five factual statements: the
+ffmpeg-C1 park state and the two-wait duration, where read-C1 actually parks
+(std stderr mutex held by the blocked drainer, before the pipe), the inverted
+read-C2 direction, and the §3 wait example. `ORACLE-CLASS.md` v2 incorporates
+all corrections and labels the thread-context construction as an unexecuted
+option.
+
+Residual: the construction is a design sketch, not evidence; adopting it would
+be a new harness/observation mechanism and a fresh run. The campaign's RED
+class and every verdict are unchanged.
 
 ## Reproducibility answer (post-fix)
 

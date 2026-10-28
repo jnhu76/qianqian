@@ -64,8 +64,10 @@ ENVIRONMENT.md     Windows host, toolchains, measured sink primitives,
 ARTIFACT.md        the verified windows-x86_64 artifact, closure provenance,
                    ABI gate and real C consumer smoke
 MATRIX.md          the 12-cell table, RED validity, Windows confirmations, limits
-ORACLE-CLASS.md    why four REDs are bounded-liveness assertions and why no
-                   program-state oracle exists for their mandated mutations
+ORACLE-CLASS.md    why four REDs are bounded-liveness assertions: no in-process
+                   product-visible state oracle exists for their mutations, and
+                   the out-of-process thread-context option is documented but
+                   not adopted
 EXECUTION_DAGS.md  happens-before structure per arm (SW / SCHED / LIVE)
 TEST-QUALITY.md    six-question authoring record + CI-coverage disclosure
 COMMANDS.md        exact replay procedure on a Windows host
