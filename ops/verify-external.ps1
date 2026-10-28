@@ -9,7 +9,13 @@
 # test and of this script.
 #
 # Pipeline (fail-closed end to end; every child exit code propagated):
-#   1. Zip identity: Get-FileHash(zip) must equal -ExpectedZipSha256.
+#   1. Zip identity: Get-FileHash(zip) must equal the identity pin. The
+#      DEFAULT pin is read from the SHA256SUMS sidecar next to the zip
+#      (fail-closed: missing sidecar / no matching line / malformed line all
+#      FAIL). -ExpectedZipSha256 overrides the sidecar (used by the negative
+#      receipt run: 64 zeros must FAIL). Review C F1: a hardcoded container
+#      hash in this script would fork the identity away from the attested
+#      SHA256SUMS; the sidecar is the single pin source.
 #   2. Extract to %TEMP%\songcore-external-verify-<stamp> (recreated).
 #   3. In-package integrity: re-hash every metadata/checksums.txt entry.
 #   4. Write an independent C consumer (embedded below, written from
@@ -31,16 +37,20 @@
 # Prerequisites (machine-level, not repo-level): a mingw-w64 gcc with
 # binutils (default probe: -GccDir, then PATH), ffmpeg for media generation.
 #
-# Identity note: the S2 ask pinned SHA256 b2c222cd4efa6b0e8f4fc090181a0cf7e
-# b7beb9b35c4f5b2ddf07733f223aa7, but per verdicts/s2-package.md §6 that is
-# the FIRST container, deliberately voided and not retained ("作废，不另留
-# 副本"). The current sidecar-attested container (SHA256SUMS +
-# package-summary.json, rebuilt 2026-10-29 07:05) is the default below.
+# Identity note (review C F1): the container hash is NOT hardcoded here.
+# Earlier pins (b2c222cd… the voided first container; then hardcoded
+# 7b4d0615…) are gone: the default pin is the SHA256SUMS sidecar next to the
+# zip, which the frozen verdict addendum (verdicts/s2-package.md) declares
+# as the single current-container identity (7b4d0615…, 1,448,965 B, frozen —
+# package-rc.ps1 is not to be re-run). A stale sidecar against a rebuilt zip
+# therefore fails loudly instead of silently verifying the wrong container.
 
 [CmdletBinding()]
 param(
     [string]$ZipPath = "C:\Users\fred1\source\qianqian-172\evidence\songcore-172\package\songcore-v0.2.0-rc.1-windows-x86_64.zip",
-    [string]$ExpectedZipSha256 = "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415",
+    # Empty (default) = read the pin from the SHA256SUMS sidecar next to the
+    # zip. A non-empty value overrides the sidecar (negative receipt runs).
+    [string]$ExpectedZipSha256 = "",
     [string]$GccDir = "C:\Users\fred1\tools\mingw64\bin",
     [string]$MediaFile = "",
     [string]$LogRoot = "C:\Users\fred1\source\qianqian-172\evidence\songcore-172\external-accept"
@@ -57,19 +67,44 @@ function Fail([string]$stage, [string]$msg) {
     throw "fail-closed: $stage"
 }
 
-if (-not (Test-Path $ZipPath)) { Fail "preflight" "zip not found: $ZipPath" }
-
-# --- 1. zip identity ---
-$zipHash = (Get-FileHash -Algorithm SHA256 $ZipPath).Hash.ToLowerInvariant()
-Write-Host "zip sha256: $zipHash"
-if ($zipHash -ne $ExpectedZipSha256.ToLowerInvariant()) {
-    Fail "zip-identity" "sha256 mismatch: got $zipHash expected $ExpectedZipSha256"
-}
-
+# The transcript starts BEFORE the identity gate (review C F3): a zip-pin
+# failure must leave its own receipt on disk, not only on the console.
 if (-not (Test-Path $LogRoot)) { New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null }
 $logPath = Join-Path $LogRoot "$stamp-external-log.txt"
 Start-Transcript -Path $logPath | Out-Null
+$verdict = "FAIL"
+$zipHash = ""
 try {
+    # --- 0. identity pin (default: SHA256SUMS sidecar next to the zip) ---
+    if ($ExpectedZipSha256 -eq "") {
+        $sidecar = Join-Path (Split-Path -Parent $ZipPath) "SHA256SUMS"
+        if (-not (Test-Path $sidecar)) {
+            Fail "pin" "SHA256SUMS sidecar missing: $sidecar (no attested identity; refusing to proceed)"
+        }
+        $zipName = Split-Path -Leaf $ZipPath
+        $line = Get-Content $sidecar | Where-Object { $_ -match [regex]::Escape($zipName) } | Select-Object -First 1
+        if (-not $line) {
+            Fail "pin" "SHA256SUMS has no entry for $zipName"
+        }
+        $parts = $line -split "\s+", 2
+        if ($parts.Count -ne 2 -or $parts[0] -notmatch "^[0-9a-fA-F]{64}$") {
+            Fail "pin" "malformed SHA256SUMS line: $line"
+        }
+        $ExpectedZipSha256 = $parts[0].Trim()
+        Write-Host "identity pin: from SHA256SUMS sidecar -> $ExpectedZipSha256 ($zipName)"
+    } else {
+        Write-Host "identity pin: explicit -ExpectedZipSha256 override"
+    }
+
+    if (-not (Test-Path $ZipPath)) { Fail "preflight" "zip not found: $ZipPath" }
+
+    # --- 1. zip identity ---
+    $zipHash = (Get-FileHash -Algorithm SHA256 $ZipPath).Hash.ToLowerInvariant()
+    Write-Host "zip sha256: $zipHash"
+    if ($zipHash -ne $ExpectedZipSha256.ToLowerInvariant()) {
+        Fail "zip-identity" "sha256 mismatch: got $zipHash expected $ExpectedZipSha256"
+    }
+
     # --- 2. extract ---
     if (Test-Path $tempRoot) { Remove-Item -Recurse -Force $tempRoot }
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
@@ -265,8 +300,24 @@ int main(int argc, char **argv) {
     Write-Host ""
     Write-Host "EXTERNAL-CONSUMER ACCEPTANCE: PASS"
     $verdict = "PASS"
+} catch {
+    # Fail-closed with a receipt: the failure is already inside the
+    # transcript above; record it and exit nonzero below (review C F3).
+    Write-Host ("FAIL-CLOSED: " + $_.Exception.Message)
 } finally {
     Stop-Transcript | Out-Null
+}
+
+if ($verdict -ne "PASS") {
+    [ordered]@{
+        check      = "songcore-172 s2-external external-consumer acceptance"
+        zip        = $ZipPath
+        zip_sha256 = $zipHash
+        verdict    = "FAIL"
+        failures   = @($failures)
+        log        = $logPath
+    } | ConvertTo-Json -Depth 4 -Compress
+    exit 1
 }
 
 $summary = [ordered]@{
