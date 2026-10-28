@@ -1,0 +1,41 @@
+﻿===CELL_BEGIN===
+cell=seek-C4
+test=c4_write_failure
+mode=drain
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\decode_seek_controls-29c40123343adb53.exe
+exe_sha256=ce5e92e518baf80cbe2b8a3a499c532076ac4caaac4695afc6bc653590eaa8c8
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1
+exit_code=0
+timed_out=False
+duration_ms=1599
+stderr_mode=drain
+stderr_peek=drained_by_parent
+--- stdout ---
+
+running 1 test
+test c4_write_failure ... CELL=C4 WRITE_FAILURE
+ARTIFACT_PATH=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\../../native/build/artifacts/libsongcore.a
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+C4-ENV=windows-x86_64 ffmpeg=n9.0.1 QIANQIAN_FFMPEG_LOG=1 pid=27088 stderr_file_type=3
+C4-HEALTHY diag="could not reach a landing point" post="decode error" beta_diag="could not reach a landing point" beta_post="decode error" typed_110=true delivered=4
+C4-HEALTHY-COUNTERS beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=6 copied_out=2 exported=4 export_failed=0 outstanding=0 self_diagnostics=0
+C4-BROKEN-STDERR-CONFIRMED raw_os_error=232
+C4-FAILING diag="could not reach a landing point" post="decode error" alpha_attempted=16 alpha_accepted=5 alpha_rejected=11 counters=beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=11 copied_out=3 exported=4 export_failed=1 outstanding=2 self_diagnostics=1
+C4-SHUTDOWN drained=true abandoned=false undelivered=0 beta_queued=2 beta_rejected=0 beta_consumed=2 alpha_rejected=11 copied_out=5 exported=4 export_failed=3 outstanding=0 self_diagnostics=1
+C4-ACCOUNTING-OK
+C4-PASS
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.15s
+
+
+--- stderr ---
+[qianqian-decode-songcore] error status=110 native=-1094995529 ts_us=16608 could not reach a landing point
+[ffmpeg] warn ts_us=8821 AVCodecContext: sample/frame number mismatch in adjacent frames
+
+[ffmpeg] warn ts_us=8945 AVCodecContext: sample/frame number mismatch in adjacent frames
+
+[qianqian-decode-songcore] error status=108 native=-1094995529 ts_us=16759 decode error
+
+===CELL_END===

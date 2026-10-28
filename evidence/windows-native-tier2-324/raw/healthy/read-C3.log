@@ -1,0 +1,33 @@
+﻿===CELL_BEGIN===
+cell=read-C3
+test=c3_capacity_exhaustion_native_decode_read
+mode=ignore
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_decode_read_controls-43645974850c11f6.exe
+exe_sha256=ec7255eb30b0f9ae067830e58c9d0bdddf30ff2bf144876a3c28324fb08c5cf0
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1
+exit_code=0
+timed_out=False
+duration_ms=241
+stderr_mode=ignore
+stderr_peek=peek_ok=3/3 max_avail=0 never_read=true
+--- stdout ---
+
+running 1 test
+test c3_capacity_exhaustion_native_decode_read ... ARTIFACT_PATH=C:/Users/fred1/source/qianqian-324\native\build/artifacts/libsongcore.a
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+C3-ENV=windows-x86_64 pid=26528
+C3-PREMISE CONSUMER_HELD=1
+C3-PRODUCER-RETURNED ProducerReceipt { first_message: "pending decode error", terminal_messages: ["pending decode error", "pending decode error", "pending decode error"], attempted: 6, accepted: 2, rejected: 4, copied_out: 0, outstanding: 2 }
+C3-POOL attempted=6 accepted=2 rejected=4 copied_out=0 outstanding=2
+C3-SHUTDOWN ShutdownReport { drained: false, abandoned: true, undelivered_at_exit: 3, counters: Counters { beta_queued: 1, beta_rejected: 0, beta_consumed: 1, alpha_rejected: 4, copied_out: 0, exported: 0, export_failed: 0, outstanding: 2, self_diagnostics: 0, critical_panics: 0 } }
+C3-VERDICT=PASS
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.17s
+
+
+--- stderr ---
+
+===CELL_END===

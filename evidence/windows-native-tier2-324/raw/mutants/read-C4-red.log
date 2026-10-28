@@ -1,0 +1,40 @@
+﻿===CELL_BEGIN===
+cell=read-C4
+test=c4_write_failure_native_decode_read
+mode=ignore
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_decode_read_controls-43645974850c11f6.exe
+exe_sha256=23a28445d5ddb25b1d0b2d47373051478a34caaeccc05e358b08bd12a0c823cc
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1
+exit_code=101
+timed_out=False
+duration_ms=1608
+stderr_mode=ignore
+stderr_peek=peek_ok=2/2 max_avail=0 never_read=true
+--- stdout ---
+
+running 1 test
+test c4_write_failure_native_decode_read ... ARTIFACT_PATH=C:/Users/fred1/source/qianqian-324\native\build/artifacts/libsongcore.a
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+C4-ENV=windows-x86_64 pid=19636
+C4-PREMISE BROKEN-STDERR-CONFIRMED raw_os_error=232
+C4-PRODUCER-RETURNED ProducerReceipt { first_message: "pending decode error", terminal_messages: [], attempted: 3, accepted: 2, rejected: 1, copied_out: 0, outstanding: 2 }
+C4-COUNTERS Counters { beta_queued: 0, beta_rejected: 0, beta_consumed: 0, alpha_rejected: 1, copied_out: 2, exported: 1, export_failed: 2, outstanding: 0, self_diagnostics: 1, critical_panics: 0 }
+ASSERTION panicked at tests\native_decode_read_controls.rs:974:5:
+assertion `left == right` failed: C4-WRITE-FAILURE: a failed export is never counted as delivered
+  left: 1
+ right: 0
+FAILED
+
+failures:
+
+failures:
+    c4_write_failure_native_decode_read
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.13s
+
+
+--- stderr ---
+
+===CELL_END===

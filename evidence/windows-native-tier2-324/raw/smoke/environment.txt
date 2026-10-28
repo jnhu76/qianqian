@@ -1,0 +1,45 @@
+=== #324 Windows host environment (captured 2026-10-28T09:47:26Z) ===
+--- git ---
+9ffcaba945eb8f47b9e30dddc67c805a5bda078a
+?? crates/qianqian-decode-songcore/tests/decode_seek_controls.rs
+?? crates/qianqian-decode-songcore/tests/native_decode_read_controls.rs
+?? crates/qianqian-decode-songcore/tests/native_ffmpeg_bridge_controls.rs
+?? crates/qianqian-decode-songcore/tests/windows_ffmpeg_callback_ownership.rs
+?? crates/qianqian-decode-songcore/tests/windows_native_smoke.rs
+autocrlf=false
+--- rust ---
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-pc-windows-msvc
+release: 1.96.0
+LLVM version: 22.1.2
+cargo 1.96.0 (30a34c682 2026-05-25)
+stable-x86_64-pc-windows-msvc (default)
+x86_64-pc-windows-gnu
+x86_64-pc-windows-msvc
+--- windows ---
+5.1.26100.9711
+Microsoft Windows 10.0.26300 
+X64
+10.0.26300.0
+12th Gen Intel(R) Core(TM) i7-12700H
+--- mingw (windows native) ---
+gcc.exe (MinGW-W64 x86_64-msvcrt-posix-seh, built by Brecht Sanders, r1) 16.2.0
+x86_64-w64-mingw32
+GNU ld (Binutils for MinGW-W64 x86_64, built by Brecht Sanders, r1) 2.47.20260726
+GNU ar (Binutils for MinGW-W64 x86_64, built by Brecht Sanders, r1) 2.47.20260726
+which_gcc=/c/Users/fred1/tools/mingw64/bin/gcc
+which_ld=/c/Users/fred1/tools/mingw64/bin/ld
+--- git coreutils ---
+sha256sum (GNU coreutils) 8.32
+/usr/bin/sha256sum
+--- python ---
+Python 3.13.14
+C:\Users\fred1\AppData\Local\Programs\Python\Python313\python.exe
+--- wsl build helper ---
+Ubuntu 26.04.1 LTS
+6.18.54.1-microsoft-standard-WSL2
+[0m[1mxmake v2.9.7+20250101, A cross-platform build utility based on Lua[0m[0m
+x86_64-w64-mingw32-gcc (GCC) 13-win32

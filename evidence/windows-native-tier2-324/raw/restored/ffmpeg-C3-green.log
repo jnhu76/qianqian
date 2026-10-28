@@ -1,0 +1,34 @@
+﻿===CELL_BEGIN===
+cell=ffmpeg-C3
+test=qfb_native_ffmpeg_bridge_cell
+mode=ignore
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe
+exe_sha256=e09f1850abc4eb929045e4f2f0bb34a3394f3e2249c8def9c404e9653f07fe9e
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1;Q324_CELL=C3
+exit_code=0
+timed_out=False
+duration_ms=1578
+stderr_mode=ignore
+stderr_peek=peek_ok=3/3 max_avail=0 never_read=true
+--- stdout ---
+
+running 1 test
+test qfb_native_ffmpeg_bridge_cell ... QFB-ENV cell=C3 qianqian_ffmpeg_log=1 pid=27932
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+QFB-PREMISE consumer_held_in_export=1
+QFB-CAPACITY fill_attempts=3 accepted=2 rejected=1 first_reject_attempt=Some(3)
+QFB-C3-PRODUCER artifact_abi=1 media_sha256=0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f reads=16 frames_before_fault=115200 first_error="pending decode error" terminal_error="pending decode error" elapsed_us=3583
+QFB-C3-REGISTRATION attempted=7 accepted=2 rejected=5 outstanding=2
+QFB-C3-TARGET attempts=4 accepted=0 rejected=4
+QFB-C3-COUNTERS beta_queued=1 beta_rejected=0 beta_consumed=1 alpha_rejected=5 copied_out=0 exported=0 export_failed=0 outstanding=2 self_diagnostics=0 critical_panics=0
+QFB-C3-SHUTDOWN drained=false abandoned=true undelivered_at_exit=3
+QFB-C3-CELL-PASS
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.17s
+
+
+--- stderr ---
+
+===CELL_END===

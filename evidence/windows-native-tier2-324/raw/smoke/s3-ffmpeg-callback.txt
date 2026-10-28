@@ -1,0 +1,40 @@
+e25dee441f653791193ac32b01d72225eda6802be8c23f129d1b65f0b45bfa7d */c/Users/fred1/source/qianqian-324/crates/qianqian-decode-songcore/target/x86_64-pc-windows-gnu/debug/deps/windows_ffmpeg_callback_ownership-77221f01e09e4a76.exe
+--- case unset ---
+
+running 2 tests
+test common::tests::matches_known_vectors ... ok
+test windows_ffmpeg_callback_ownership ... S3-CASE=unset QIANQIAN_FFMPEG_LOG=None pid=26576
+S3-PRODUCER first_error="pending decode error" alpha_attempted=1 alpha_accepted=1 alpha_rejected=0
+S3-DELIVERED total=1 ffmpeg=0 ffmpeg_first=None fault_site_delivered=true
+S3-SHUTDOWN drained=true abandoned=false undelivered=0
+S3_VERDICT=PASS
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+--- case zero ---
+
+running 2 tests
+test common::tests::matches_known_vectors ... ok
+test windows_ffmpeg_callback_ownership ... S3-CASE=zero QIANQIAN_FFMPEG_LOG=Some("0") pid=27208
+S3-PRODUCER first_error="pending decode error" alpha_attempted=1 alpha_accepted=1 alpha_rejected=0
+S3-DELIVERED total=1 ffmpeg=0 ffmpeg_first=None fault_site_delivered=true
+S3-SHUTDOWN drained=true abandoned=false undelivered=0
+S3_VERDICT=PASS
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+--- case one ---
+
+running 2 tests
+test common::tests::matches_known_vectors ... ok
+test windows_ffmpeg_callback_ownership ... S3-CASE=one QIANQIAN_FFMPEG_LOG=Some("1") pid=19024
+S3-PRODUCER first_error="pending decode error" alpha_attempted=3 alpha_accepted=2 alpha_rejected=1
+S3-DELIVERED total=2 ffmpeg=2 ffmpeg_first=Some("ffmpeg|error|AVCodecContext: invalid residual\n") fault_site_delivered=false
+S3-SHUTDOWN drained=true abandoned=false undelivered=0
+S3_VERDICT=PASS
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
