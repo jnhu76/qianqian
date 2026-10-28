@@ -198,7 +198,9 @@ const READER_THREAD_NAME: &str = "qianqian-stdin";
 /// producers), so the two cannot drift apart. Every such thread registers at
 /// thread start, and each one's progress is awaited by another thread's
 /// completion path: the stdin reader by the machine transport's seal, the
-/// decode worker by the session teardown's join, the render leg by the
+/// decode worker by the session teardown's join, the observation analyst by the
+/// decode worker's exit funnel (its `analyst.join()` stands between that
+/// worker's exit and the teardown's `worker.join()`), the render leg by the
 /// failure-publication cone that follows its catch. An unknown hook — usually
 /// the std default, whose print takes the process-global stderr lock, and
 /// therefore BLOCKS while any thread is blocked inside a sink write — must

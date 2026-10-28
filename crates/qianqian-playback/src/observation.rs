@@ -139,6 +139,9 @@ pub(crate) struct ProbeEvidence {
     pub(crate) delivered_frames: u64,
     pub(crate) cuts: u64,
     pub(crate) worker_closed: bool,
+    /// Whether the analyst thread held its own class-α registration at its
+    /// exit tail. Oracle-only: pins the DG-4b isolation fact.
+    pub(crate) worker_alpha: bool,
 }
 
 struct Shared {
@@ -176,6 +179,7 @@ impl ObservationTap {
                         delivered_frames: 0,
                         cuts: 0,
                         worker_closed: false,
+                        worker_alpha: false,
                     },
                 }),
                 block_ready: Condvar::new(),
@@ -229,6 +233,19 @@ impl ObservationTap {
         let worker = std::thread::Builder::new()
             .name("qianqian-observation".into())
             .spawn(move || {
+                // The analyst is an isolation-obligated (class α) diagnostic
+                // producer (error-system target contract §DG-1/§DG-4b): its
+                // progress is awaited by the decode worker's single exit funnel
+                // (`session.rs`: `observation.close(); analyst.join()`), and
+                // session teardown joins that worker before its K0 relation can
+                // report `Discharged`. The hook's isolation predicate IS this
+                // thread's own registration, so a panic here takes the
+                // atomics-only arm and reaches the `catch_unwind` below; without
+                // it the panic would chain to an unknown synchronous sink (the
+                // std default's stderr write) BEFORE the catch, and a blocked
+                // diagnostic sink would decide when the join — and therefore the
+                // authoritative disposal verdict — completes.
+                let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
                 // Observation failure closes this reader only, never playback.
                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     analyst_loop(&shared)
@@ -237,6 +254,7 @@ impl ObservationTap {
                 slot.closed = true;
                 #[cfg(all(test, not(loom)))]
                 {
+                    slot.evidence.worker_alpha = qianqian_diagnostics::is_alpha_producer();
                     slot.evidence.worker_closed = true;
                 }
             })
