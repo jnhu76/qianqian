@@ -1,0 +1,24 @@
+CASE e (the REAL crate (fixed build.rs), scratch target dir): appended a line to the tracked header — expect rerun and a NEW digest
+IMPL: the REAL crate (fixed build.rs), scratch target dir
+COMMAND: cargo build --manifest-path /mnt/c/Users/fred1/source/qianqian-172/crates/qianqian-songcore-sys/Cargo.toml --target-dir /home/hoo/d1-harness/scratch-green/case-e-target -v
+--- cargo output ---
+warning: `/mnt/c/Users/fred1/.cargo/config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+       Dirty qianqian-songcore-sys v0.1.0 (/mnt/c/Users/fred1/source/qianqian-172/crates/qianqian-songcore-sys): the file `/home/hoo/d1-harness/scratch-green/case-e/tree/native/include/songcore.h` has changed (1793206763.163190047s, 1s after last build at 1793206762.790224842s)
+   Compiling qianqian-songcore-sys v0.1.0 (/mnt/c/Users/fred1/source/qianqian-172/crates/qianqian-songcore-sys)
+     Running `/home/hoo/d1-harness/scratch-green/case-e-target/debug/build/qianqian-songcore-sys-596abe855e8180db/build-script-build`
+     Running `/home/hoo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name qianqian_songcore_sys --edition=2024 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=4a0b114c300b682e -C extra-filename=-f110b0036cbbfe50 --out-dir /home/hoo/d1-harness/scratch-green/case-e-target/debug/deps -C incremental=/home/hoo/d1-harness/scratch-green/case-e-target/debug/incremental -L dependency=/home/hoo/d1-harness/scratch-green/case-e-target/debug/deps -L native=/home/hoo/d1-harness/scratch-green/case-e/tree/native/build/artifacts -l static=songcore -l m -l pthread`
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
+cargo exit code: 0
+build-script rerun lines observed: 1
+QN_SONGCORE_HEADER_SHA256  (cargo-recorded, after change): b032ab4a05d872496fa6614d3ffc3abafe63786dcfc3d3973880f13587fd56ff
+QN_SONGCORE_ARTIFACT_SHA256(cargo-recorded, unchanged artifact): 322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+ORACLE(coreutils) header after change: b032ab4a05d872496fa6614d3ffc3abafe63786dcfc3d3973880f13587fd56ff
+ASSERTION PASS: header-change rebuild exits 0
+ASSERTION PASS: header content change DOES re-run the build script
+ASSERTION PASS: digest actually changed after content change
+ASSERTION PASS: digest is exactly 64 lowercase hex chars (no prefix): value='b032ab4a05d872496fa6614d3ffc3abafe63786dcfc3d3973880f13587fd56ff'
+ASSERTION PASS: digest hex payload == coreutils oracle (b032ab4a05d872496fa6614d3ffc3abafe63786dcfc3d3973880f13587fd56ff)
+ASSERTION PASS: post-change header digest == python hashlib oracle
+ASSERTION PASS: artifact digest unchanged (artifact file untouched)

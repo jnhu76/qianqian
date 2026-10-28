@@ -1,0 +1,27 @@
+CASE: a) absolute path as the build script passes it to sha256sum
+PHASE: red    OS: linux (6.18.54.1-microsoft-standard-WSL2)
+IMPL: pre-fix snapshot build_rs_prefix_snapshot.rs (byte-identical to build.rs at base 05f5fef)
+PROBE SOURCE SHA256: 3cb898c6d25c2efdb26858c81c6b9e1d079a38d52c9e991dd11c734af6f9db3e
+CARGO_MANIFEST_DIR: /home/hoo/d1-harness/scratch-red/case-a/tree/crates/fake-sys
+COMMAND: env CARGO_MANIFEST_DIR="/home/hoo/d1-harness/scratch-red/case-a/tree/crates/fake-sys" probe-red
+--- probe stdout+stderr ---
+cargo:rustc-env=QN_SONGCORE_HEADER_SHA256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+cargo:rustc-env=QN_SONGCORE_ARTIFACT_SHA256=322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+cargo:rustc-link-search=native=/home/hoo/d1-harness/scratch-red/case-a/tree/native/build/artifacts
+cargo:rustc-link-lib=static=songcore
+cargo:rustc-link-lib=m
+cargo:rustc-link-lib=pthread
+cargo:rerun-if-changed=/home/hoo/d1-harness/scratch-red/case-a/tree/native/include/songcore.h
+cargo:rerun-if-changed=/home/hoo/d1-harness/scratch-red/case-a/tree/native/build/artifacts/libsongcore.a
+cargo:rerun-if-changed=build.rs
+cargo:rerun-if-env-changed=QIANQIAN_NATIVE_DIR
+--- probe exit code: 0 ---
+ORACLE(coreutils) header:   cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+ORACLE(coreutils) artifact: 322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+ORACLE(hashlib)   header:   cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+ORACLE(hashlib)   artifact: 322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+ASSERTION PASS: probe exited 0 (build script completes)
+ASSERTION PASS: digest is exactly 64 lowercase hex chars (no prefix): value='cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536'
+ASSERTION PASS: digest hex payload == coreutils oracle (cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536)
+ASSERTION PASS: digest is exactly 64 lowercase hex chars (no prefix): value='322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9'
+ASSERTION PASS: digest hex payload == coreutils oracle (322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9)

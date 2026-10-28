@@ -1,0 +1,29 @@
+CASE: c) path containing non-ASCII characters
+PHASE: green    OS: windows (MINGW64)
+IMPL: current post-fix build.rs (copied live from the crate at green-run time)
+PROBE SOURCE SHA256: 8b28bef54add7ad83ff1a146546c69761a624190548e6f87e0f3fd295e3b228e
+CARGO_MANIFEST_DIR: C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-green\case-c\ünïcodé-中文\tree\crates\fake-sys
+COMMAND: env CARGO_MANIFEST_DIR="C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-green\case-c\ünïcodé-中文\tree\crates\fake-sys" probe-green.exe
+--- probe stdout+stderr ---
+cargo:rustc-env=QN_SONGCORE_HEADER_SHA256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+cargo:rustc-env=QN_SONGCORE_ARTIFACT_SHA256=322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+cargo:rustc-link-search=native=C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-green\case-c\ünïcodé-中文\tree\native\build\artifacts
+cargo:rustc-link-lib=static=songcore
+cargo:rustc-link-lib=m
+cargo:rustc-link-lib=pthread
+cargo:rerun-if-changed=C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-green\case-c\ünïcodé-中文\tree\native\include\songcore.h
+cargo:rerun-if-changed=C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-green\case-c\ünïcodé-中文\tree\native\build\artifacts\libsongcore.a
+cargo:rerun-if-changed=build.rs
+cargo:rerun-if-env-changed=QIANQIAN_NATIVE_DIR
+--- probe exit code: 0 ---
+ORACLE(coreutils) header:   cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+ORACLE(coreutils) artifact: 322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+ORACLE(hashlib)   header:   cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+ORACLE(hashlib)   artifact: 322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9
+ASSERTION PASS: probe exited 0 (build script completes)
+ASSERTION PASS: digest is exactly 64 lowercase hex chars (no prefix): value='cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536'
+ASSERTION PASS: digest hex payload == coreutils oracle (cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536)
+ASSERTION PASS: digest is exactly 64 lowercase hex chars (no prefix): value='322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9'
+ASSERTION PASS: digest hex payload == coreutils oracle (322dbf2e1023a74f8f9b14911b190e578a100acf3244cc423828340e397a1ea9)
+ASSERTION PASS: digest hex == independent python hashlib oracle (header)
+ASSERTION PASS: digest hex == independent python hashlib oracle (artifact)

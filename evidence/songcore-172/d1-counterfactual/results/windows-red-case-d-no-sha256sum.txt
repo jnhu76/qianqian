@@ -1,0 +1,14 @@
+CASE: d) sha256sum absent from PATH
+PHASE: red    OS: windows (MINGW64)
+IMPL: pre-fix snapshot build_rs_prefix_snapshot.rs (byte-identical to build.rs at base 05f5fef)
+PROBE SOURCE SHA256: 3cb898c6d25c2efdb26858c81c6b9e1d079a38d52c9e991dd11c734af6f9db3e
+CARGO_MANIFEST_DIR: C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-red\case-d\tree\crates\fake-sys
+COMMAND: env CARGO_MANIFEST_DIR="C:\Users\fred1\source\qianqian-172\evidence\songcore-172\d1-counterfactual\scratch-red\case-d\tree\crates\fake-sys" PATH=<stripped-to-emptybin> probe-red.exe
+--- probe stdout+stderr ---
+
+thread 'main' (11888) panicked at C:/Users/fred1/source/qianqian-172/evidence/songcore-172/d1-counterfactual/build_rs_prefix_snapshot.rs:9:10:
+sha256sum failed: Error { kind: NotFound, message: "program not found" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+--- probe exit code: 101 ---
+ASSERTION PASS: build script PANICS without sha256sum (spawn failure), exit code 101
+ASSERTION PASS: panic message names sha256sum
