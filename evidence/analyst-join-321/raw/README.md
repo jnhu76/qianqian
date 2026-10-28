@@ -38,9 +38,10 @@ the overlay.
 
 ## Final replay receipts (`replay-final/`)
 
-Produced by `replay.sh` (default baseline `61d834a`) at the fix commit recorded
-in `ENVIRONMENT.txt`. The receipt commit that adds these logs changes no product
-source; `git diff <fix_rev>..HEAD -- crates apps` is empty.
+Produced by `replay.sh` at fix `86bd991` against baseline `61d834a`
+(`ENVIRONMENT.txt` records both). The commit that adds these receipts changes
+no product source: `git diff 86bd991..HEAD -- crates apps` is empty, and the
+product-tree delta from `61d834a` is the analyst registration plus comments.
 
 ```text
 01-baseline-wedge.log             base: ORACLE observed=Wedged, previous hook
