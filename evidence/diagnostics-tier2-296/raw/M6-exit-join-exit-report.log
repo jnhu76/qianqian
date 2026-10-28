@@ -1,0 +1,14 @@
+UTC=2026-10-27T16:29:42.8985917Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=FC872DC643835BB2C5B08CF01B34922801F35174B83D645543248B90E52D7BF0
+FILTER=entry::tier2_tests::tier2_child OUTLET=exit-report MODE=blocked SKIP_CLOSE=False
+CONTROLLED_STDERR_LOCK: child acquisition channel before work; pipe open and unread; no OS-full claim
+WATCHDOG_RED timeout; process killed; never PASS
+EXIT=-1 ELAPSED_MS=9697
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-STDERR-LOCK-HELD
+M296-JOIN-DETACHED
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

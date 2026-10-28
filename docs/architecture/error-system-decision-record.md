@@ -118,7 +118,7 @@ recommendation wording as the design-freeze record.)
 |---|---|
 | E-7 tier 1 runtime rows (#8/#9/#10 × gate × sink) | migration §7.3 harness on a Windows host; pre-swap rows must reproduce the documented hazards (N-01 hang, #10 misattribution) before any post-swap claim |
 | E-1 calibration + W1–W6 | migration §7.4/§7.5 harnesses; platform-neutral (E1-ABI needs the native lib built; E1-WORKER is pure Rust) |
-| FFmpeg av_log lock behavior at the pinned version | fetch the FFmpeg source pinned by `native/ffmpeg/pin.json`, read `libavutil/log.c` for the callback's lock context; record as assumption-verified or revised (DG-4c) |
+| FFmpeg av_log lock behavior at the pinned version | SOURCE_CONTEXT_VERIFIED (2026-10-28): exact pinned `log.c`, source hash and the local callback/mutex distinction are retained in [the #296 execution report](../../evidence/diagnostics-tier2-296/REPORT.md#pinned-ffmpeg-source-and-artifact-boundary). This does not exclude caller-held locks or establish native runtime behavior; those rows remain NOT_RUN under #296/#172. |
 | N-01 four-precondition end-to-end observation | the §7.1 T2 tier + §7.3 broken-sink pre-swap rows jointly produce it |
 | Real-cone oracle existence | implement §7.1–7.2 (shares machinery with E-7 tier 1); D-E's cone production mutation only after it exists |
 | M7 targeted-oracle blinding follow-up | seek_seam's producer-freeze witness no longer catches the M7 defect after 8542386 (this round re-pinned the gate to the stateful continuation probe — see the gate's header note and the incident log); decide whether the freeze witness should be repaired or retired as the M7 oracle |

@@ -1,0 +1,14 @@
+UTC=2026-10-27T16:35:14.1419502Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe SHA256=C8134168BD7ED9ADF16EE656494A1C2A8642A7E17F61E6214D97EF13760E1834
+FILTER=tier2_tests::tier2_child OUTLET=10 MODE=broken SKIP_CLOSE=False
+PARENT_CLOSE -> stdin GO (child corroborates write Err)
+EXIT=0 ELAPSED_MS=200
+STDOUT
+
+running 1 test
+test tier2_tests::tier2_child ... Q296-BROKEN-CONFIRMED
+Q296-TERMINAL outlet=10 hits=1 joined=true
+Q296-DRAINED Counters { beta_queued: 0, beta_rejected: 0, beta_consumed: 0, alpha_rejected: 0, copied_out: 3, exported: 1, export_failed: 2, outstanding: 0, self_diagnostics: 1, critical_panics: 0 }
+Q296-PASS
+
+RUNNER_RESULT=GREEN

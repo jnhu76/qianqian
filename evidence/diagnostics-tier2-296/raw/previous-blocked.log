@@ -1,0 +1,12 @@
+UTC=2026-10-27T16:35:18.5978086Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=D94D4C31D383D4FFB03660B399B26C90CC18EFA7DE9029435654FB5BEC9DDB78
+FILTER=entry::tier2_tests::tier2_child OUTLET=previous MODE=blocked SKIP_CLOSE=False
+CONTROLLED_STDERR_LOCK: child acquisition channel before work; pipe open and unread; no OS-full claim
+EXIT=0 ELAPSED_MS=101
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-STDERR-LOCK-HELD
+Q296-KNOWN-RESIDUAL predecessor wrapper entered; inherited call next in PO, actual default-call entry unobserved; real stderr lock remains held; no join claimed
+
+RUNNER_RESULT=GREEN

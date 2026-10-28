@@ -1,0 +1,14 @@
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+   Compiling qianqian-diagnostics v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-diagnostics)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.76s
+  Executable unittests src\lib.rs (target\debug\deps\qianqian_diagnostics-09dd2d34b4b9e0e9.exe)
+  Executable tests\alpha_pool_bound.rs (target\debug\deps\alpha_pool_bound-5482be055552b8a7.exe)
+  Executable tests\alpha_producer.rs (target\debug\deps\alpha_producer-dce1236624e0f3d8.exe)
+  Executable tests\beta_queue_full.rs (target\debug\deps\beta_queue_full-e90070187b8daf86.exe)
+  Executable tests\clock_cold_path.rs (target\debug\deps\clock_cold_path-fdabbf1ab2962617.exe)
+  Executable tests\exporter_failure.rs (target\debug\deps\exporter_failure-78b93b693a63213f.exe)
+  Executable tests\shutdown_abandoned.rs (target\debug\deps\shutdown_abandoned-67d243d20deb4da1.exe)
+  Executable tests\shutdown_admission.rs (target\debug\deps\shutdown_admission-618fb9325b865697.exe)
+  Executable tests\stderr_delivery_failure.rs (target\debug\deps\stderr_delivery_failure-1f4d129428abbe79.exe)

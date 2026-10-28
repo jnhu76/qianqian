@@ -1,0 +1,23 @@
+UTC=2026-10-27T16:25:44.7164581Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=A06B091A7412DE16FEE9E41F0236EECDCFAD2CA43D6D2949F797317A7213AF47
+FILTER=entry::tier2_tests::tier2_child OUTLET=self-report MODE=broken SKIP_CLOSE=False
+PARENT_CLOSE -> stdin GO (child corroborates write Err)
+EXIT=101 ELAPSED_MS=6642
+STDOUT
+
+running 1 test
+test entry::tier2_tests::tier2_child ... Q296-BROKEN-CONFIRMED
+ASSERTION panicked at apps\headless\src\tier2_tests.rs:128:13:
+SELF-DIAGNOSTIC-PREMISE
+FAILED
+
+failures:
+
+failures:
+    entry::tier2_tests::tier2_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 431 filtered out; finished in 5.00s
+
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED

@@ -1,0 +1,40 @@
+[38;2;56;56;56m╭─────────────────────────────────────╮[m
+[38;2;56;56;56m│[m lefthook  v2.1.17   hook:  [1mpre-push[m [38;2;56;56;56m│[m
+[38;2;56;56;56m╰─────────────────────────────────────╯[m
+┃  commit-convention ❯ 
+PASS: self-test (11 valid, 12 invalid cases)
+PASS: commit 8517c1f5abe4: test(diagnostics): add per-outlet Tier-2 fault controls
+
+┃  vocabulary ❯ 
+VOCABULARY GATE PASS: no stale identifiers found; workflow negative control FAIL→PASS verified
+
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+┃  plugin-boundary ❯ 
+RESULT trigger-crates/qianqian-audio-api/build.rs RED (legacy profile misses both events; current covers)
+RESULT trigger-apps/headless/src/tui/model/projection.rs RED (legacy profile misses both events; current covers)
+PLUGIN_BOUNDARY_TRIGGERS: PASS (pull_request + push; local input parity)
+PLUGIN_BOUNDARY_GATE: PASS
+SUITE: PASS (topology allowlist + export surface clean)
+TOOLING-FAIL: crates/qianqian-audio-api/src/lib.rs is dirty; refusing to run negative controls
+
+exit status 2
+│  rust-fmt (skip) broken pipe
+│  rust-clippy (skip) broken pipe
+│  rust-test (skip) broken pipe
+│  release-policy (skip) broken pipe
+│  docs-verify (skip) broken pipe
+[38;2;56;56;56m  ────────────────────────────────────[m
+summary: (done in 10.46 seconds)
+✓ commit-convention (1.83 seconds)
+✓ vocabulary (2.11 seconds)
+✗ plugin-boundary (6.52 seconds)
+GATE_EXIT=1

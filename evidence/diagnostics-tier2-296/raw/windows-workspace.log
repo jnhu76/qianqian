@@ -1,0 +1,984 @@
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+   Compiling qianqian-audio-api v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-audio-api)
+   Compiling qianqian-diagnostics v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-diagnostics)
+   Compiling qianqian-app v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-app)
+   Compiling qianqian-composition v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-composition)
+   Compiling qianqian-playback v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-playback)
+   Compiling qianqian-output-wasapi v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\crates\qianqian-output-wasapi)
+   Compiling qianqian-headless v0.1.0 (C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\apps\headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 22s
+     Running unittests src\lib.rs (target\debug\deps\qianqian_app-7b1196215731f523.exe)
+
+running 7 tests
+test tests::new_root_is_empty_and_quiet ... ok
+test tests::activation_failure_lands_failed_without_ghost_provisions ... ok
+test tests::disposal_does_not_claim_success_past_a_latched_violation ... ok
+test tests::explicit_disposal_runs_registered_inverses ... ok
+test tests::plugin_authored_components_enter_composition ... ok
+test tests::sibling_consumer_instances_withdraw_independently_in_kernel_truth ... ok
+test tests::withdrawing_the_provider_degrades_the_consumer_to_pending ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\real_resource_lifecycle\main.rs (target\debug\deps\real_resource_lifecycle-a9b51cbc902eea9a.exe)
+
+running 5 tests
+test worker_thread_stops_and_joins_before_service_release ... ok
+test os_file_handle_released_by_registered_inverse ... ok
+test root_disposal_drains_all_real_resources ... ok
+test partial_activation_failure_unwinds_real_resources_lifo ... ok
+test provider_withdrawal_quiesces_consumer_before_release ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\deps\qianqian_audio_api-f8eb1e9646f2dc17.exe)
+
+running 1 test
+test ports::gate_pause_timing_tests::a_pause_routed_mid_read_parks_at_the_legs_next_loop_top ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\direct_pcm_flow\main.rs (target\debug\deps\direct_pcm_flow-9ccd10508643c73c.exe)
+
+running 21 tests
+test finite_reference_rejects_nonfinite_and_out_of_tolerance_samples ... ok
+test mutations::kill_tests::partial_middle_block_storage_substitution_is_killed_by_storage_identity ... ok
+test mutations::kill_tests::frame_reorder_inside_a_block_is_detected_by_the_value_oracle ... ok
+test each_participant_is_visited_exactly_once_per_quantum_in_stream_order ... ok
+test mutations::kill_tests::lookup_hidden_inside_processing_helper_is_detected ... ok
+test mutations::kill_tests::control_path_lookup_per_quantum_delivers_correct_data_but_violates_the_firewall ... ok
+test honest_path_observes_reused_storage_without_intermediates ... ok
+test mutations::kill_tests::mid_stream_format_change_is_rejected_at_the_sink ... ok
+test mutations::kill_tests::same_interface_storage_substitution_is_killed_by_storage_identity ... ok
+test mutations::kill_tests::same_interface_storage_substitution_allocates_per_quantum ... ok
+test mutations::kill_tests::duplicate_block_delivery_is_detected_by_the_value_oracle ... ok
+test mutations::kill_tests::silent_mid_stream_block_loss_is_killed_and_the_loss_is_visible_in_the_cursors ... ok
+test composition_withdrawal_does_not_revoke_an_already_extracted_flow ... ok
+test mutations::kill_tests::silent_final_block_loss_breaks_frame_conservation ... ok
+test prebound_flow_survives_arbitrary_block_sizes_and_a_partial_final_block ... ok
+test setup_allocation_is_observable_and_steady_state_is_allocation_free_measured ... ok
+test transforming_stage_value_flows_through_the_middle_participant ... ok
+test prebound_flow_delivers_the_stream_across_quantum_counts ... ok
+test steady_state_performs_zero_composition_plane_operations_measured ... ok
+test compile_fail_check::positive_control_honest_stage_use_compiles ... ok
+test compile_fail_check::negative_control_retaining_block_past_call_fails_to_compile ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.12s
+
+     Running tests\pcm_edge_contract\main.rs (target\debug\deps\pcm_edge_contract-5af38ff4647d0081.exe)
+
+running 34 tests
+test borrowed_flow_partial_final_block_is_delivered ... ok
+test borrowed_flow_arbitrary_block_sizes_deliver_the_whole_stream ... ok
+test mutations::explicit_format_boundary_via_new_edge_is_legal ... ok
+test mutations::in_place_write_through_span_is_visible_in_same_storage ... ok
+test in_place_and_pull_steady_states_are_allocation_free_measured ... ok
+test borrowed_flow_delivers_stream_for_mono_stereo_and_three_channel ... ok
+test mutations::borrowed_baseline_observes_producer_storage_identity ... ok
+test mutations::borrowed_steady_state_is_allocation_free_measured ... ok
+test mutations::hidden_copy_is_killed_by_allocation_measurement ... ok
+test mutations::channel_order_corruption_is_killed_by_value_oracle ... ok
+test mutations::frame_scalar_confusion_is_killed_by_capacity_oracle ... ok
+test borrowed_shapes_hand_over_producer_storage_without_intermediates ... ok
+test mutations::out_of_range_access_returns_none_instead_of_aliasing ... ok
+test mutations::owned_transfer_cost_is_measured_by_allocator ... ok
+test mutations::all_or_nothing_acceptance_with_retry_conserves_frames ... ok
+test mutations::hidden_copy_is_killed_by_pointer_identity ... ok
+test mutations::in_place_modification_is_observed_by_verifier_at_exact_sample ... ok
+test mutations::frame_capacity_baseline_requests_whole_frames ... ok
+test mutations::silent_format_change_is_killed_by_format_identity_oracle ... ok
+test mutations::partial_acceptance_with_explicit_remainder_conserves_frames ... ok
+test mutations::silent_remainder_drop_is_killed_by_conservation_oracle ... ok
+test mutations::trailing_partial_frame_is_rejected_not_truncated ... ok
+test mutations::whole_frame_payloads_are_accepted ... ok
+test mutations::value_oracle_distinguishes_channels ... ok
+test mutations::zero_channel_format_is_rejected_at_construction ... ok
+test mutations::zero_frame_as_eof_is_killed_by_conservation_oracle ... ok
+test mutations::zero_frame_payload_passes_through_and_terminal_is_out_of_band ... ok
+test owned_shape_reports_consumer_observed_storage ... ok
+test pull_capacity_slack_is_never_written_as_partial_frames ... ok
+test producer_and_consumer_cursors_reconcile_across_all_shapes ... ok
+test pull_flow_respects_consumer_capacity_and_conserves_frames ... ok
+test pull_fill_is_observed_directly_in_the_consumer_owned_destination ... ok
+test compile_fail_check::positive_control_sequential_borrow_compiles ... ok
+test compile_fail_check::negative_control_retained_borrow_fails_to_compile ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.76s
+
+     Running tests\position_evidence.rs (target\debug\deps\position_evidence-d049594fed709900.exe)
+
+running 13 tests
+test a_committed_rebase_is_the_one_legal_backward_step ... ok
+test publication_is_monotone_even_when_the_raw_estimate_regresses ... ok
+test repeated_reads_are_pure_loads ... ok
+test the_encoding_saturates_instead_of_wrapping_at_its_domain_boundary ... ok
+test a_tail_reading_above_the_handed_off_total_is_capped_not_wrapped ... ok
+test reads_after_a_rebase_stay_pure_and_stable ... ok
+test a_zero_landing_is_a_position_not_undefined ... ok
+test an_unknown_landing_withdraws_the_sample_forever_on_the_writers_discipline ... ok
+test the_eof_drain_rises_to_the_exact_handed_off_total ... ok
+test the_published_sample_never_exceeds_the_writers_handed_off_accounting ... ok
+test the_rejected_two_cell_reader_pair_tears_backward_by_one_block ... ok
+test undefined_is_none_not_zero_until_the_first_publication ... ok
+test pause_drain_advances_to_the_handed_off_total_and_then_holds ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\realtime_view_publication\main.rs (target\debug\deps\realtime_view_publication-d6e26b1abc5307a0.exe)
+
+running 24 tests
+test acquisition_and_release_are_allocation_free ... ok
+test certification_ignoring_older_generations_is_detected ... ok
+test queued_reference_counts_against_reclamation ... ok
+test certification_ignoring_queued_references_is_detected ... ok
+test release_at_publication_is_an_observable_use_after_release ... ok
+test shared_resources_survive_per_view_retirement ... ok
+test new_acquisition_never_enters_a_retired_view ... ok
+test old_reader_finishes_after_publication ... ok
+test pre_bound_reader_executes_without_the_publication_mechanism ... ok
+test reclaimable_does_not_mean_released ... ok
+test acquisition_observes_whole_views_only ... ok
+test stale_acquisition_enters_a_retired_view_and_is_detected ... ok
+test split_publication_produces_mixed_generation_observation ... ok
+test failed_publication_leaves_the_current_view_untouched ... ok
+test resources_are_destroyed_only_after_all_referencing_views_are_released ... ok
+test final_destruction_runs_on_the_control_thread_when_reader_releases_first ... ok
+test publication_does_not_wait_for_readers ... ok
+test final_drop_on_the_reader_thread_destroys_there_hazard_witness ... ok
+test stalled_reader_blocks_reclaimability_until_it_exits ... ok
+test three_generations_overlap_with_shared_resources ... ok
+test publisher_waiting_for_reader_blocks_reader_acquisition ... ok
+test blocking_destruction_does_not_hold_the_publication_lock ... ok
+test destructor_premise_and_assertion_unwind_release_and_collect ... ok
+test concurrent_publication_and_readers_observe_only_whole_views ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\render_gate.rs (target\debug\deps\render_gate-8d8b28517923de5b.exe)
+
+running 8 tests
+test an_unengaged_gate_parks_nothing_and_publishes_nothing ... ok
+test a_release_that_lands_before_the_park_publishes_nothing ... ok
+test a_closed_gate_never_parks_or_engages_again ... ok
+test a_failed_tail_observation_exits_the_pause_park_without_quiescence ... ok
+test a_pause_assertion_after_engagement_releases_and_joins ... ok
+test a_failed_pause_park_still_delivers_a_routed_committed_payload ... ok
+test tail_quiescence_belongs_to_each_engagement_separately ... ok
+test a_park_publishes_engagement_quiescence_and_disengagement_then_returns ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests\render_gate_seek.rs (target\debug\deps\render_gate_seek-21a1d5182101eb1b.exe)
+
+running 13 tests
+test an_unheld_seek_gate_parks_nothing_and_publishes_nothing ... ok
+test a_seek_release_landing_before_the_park_is_consumed_at_the_gate ... ok
+test a_failed_tail_observation_exits_the_seek_park_reported_and_settled ... ok
+test a_committed_release_reaches_the_parked_leg_exactly_once ... ok
+test a_new_hold_drops_a_stale_unconsumed_release ... ok
+test a_closed_gate_never_seek_parks_again ... ok
+test the_seek_park_calls_the_tail_observation_only_while_parked ... ok
+test a_committed_release_rebases_a_pause_parked_leg_while_still_parked ... ok
+test release_during_an_in_flight_observation_starts_no_new_probe ... ok
+test a_release_routed_inside_a_failed_pause_probe_is_delivered_at_exit ... ok
+test assertions_before_and_after_park_release_and_join_the_owned_leg ... ok
+test a_seek_park_publishes_only_seek_events_in_order ... ok
+test every_release_shape_is_delivered_once_at_each_gate_outlet ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src\lib.rs (target\debug\deps\qianqian_composition-fe5911f41ffe1746.exe)
+
+running 7 tests
+test kernel::verify::k1_stale_fiber_id_never_addresses_a_reused_slot ... ok
+test kernel::verify::k3_effect_inverses_fire_at_most_once_in_lifo_order ... ok
+test kernel::verify::k2_relied_provider_is_never_removed_behind_an_open_committed_view ... ok
+test kernel::verify::k4a_removed_fibers_leave_nothing_owed_clean ... ok
+test kernel::verify::k6_single_source_survives_replacement_and_violation ... ok
+test kernel::verify::k4b_removed_fibers_leave_nothing_owed_violations ... ok
+test kernel::verify::k5_quiet_is_the_fixed_point_of_step ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\adversarial_review.rs (target\debug\deps\adversarial_review-4975df58160d06f0.exe)
+
+running 23 tests
+test a19_revision_tokens_never_collide ... ok
+test a16_component_definitions_are_immutable ... ok
+test a10_failed_settles ... ok
+test a6_violated_unwind_never_reaches_failed ... ok
+test a2_fresh_revision_creates_fresh_generation ... ok
+test a15_payload_traffic_does_zero_kernel_operations ... ok
+test a17_violated_inverse_keeps_provenance_authority ... ok
+test a3_dependency_churn_fabricates_no_retry ... ok
+test a19c_fresh_revision_after_raw_token_is_a_real_revision ... ok
+test a14_kernel_depends_on_nothing ... ok
+test a20_capability_diagnostic_names_are_unique_per_kernel ... ok
+test a12_half_staged_replacement_never_settles ... ok
+test a21_explicit_dispose_violation_never_lands_active ... ok
+test a11_violation_never_settles ... ok
+test a5_provider_release_waits_for_dependents ... ok
+test a18_committed_bindings_trace_the_teardown_window ... ok
+test a19b_raw_revision_cannot_enter_the_fresh_domain - should panic ... ok
+test a1_identical_revision_never_retries_failed ... ok
+test a4_no_two_providers_during_replacement ... ok
+test a7_owner_local_effect_has_no_key ... ok
+test a8_binding_diagnosed_without_effect_kind ... ok
+test a9_no_second_mutable_truth ... ok
+test a13_kernel_sources_carry_no_domain_vocabulary ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\capability_oracles.rs (target\debug\deps\capability_oracles-5f3aff67083403e8.exe)
+
+running 8 tests
+test provider_before_consumer_activates ... ok
+test inactive_access_is_unrepresentable_outside_episodes ... ok
+test missing_dependency_settles_pending_without_crash ... ok
+test ambiguous_providers_refused_at_plan_time ... ok
+test consumer_before_provider_is_pending_then_activates ... ok
+test capability_identity_survives_provider_replacement ... ok
+test undeclared_access_is_rejected ... ok
+test provider_flap_n_times_settles_on_final_generation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\confluence_oracles.rs (target\debug\deps\confluence_oracles-33b110c2a26761cc.exe)
+
+running 6 tests
+test m4_shape_violated_teardown_is_not_sanitizable ... ok
+test m4_fail_then_revise_is_sanitary ... ok
+test m13_root_disposal_from_quiescent_state ... ok
+test m3_mount_order_is_invisible_at_quiescence ... ok
+test m5_contribution_orders_conflate ... ok
+test m1_m2_history_with_flaps_and_replacements_conflates ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\data_edge_oracles.rs (target\debug\deps\data_edge_oracles-6f7726355aa793e4.exe)
+
+running 3 tests
+test binding_releases_inside_the_withdrawal_window ... ok
+test binding_provenance_is_projected_from_the_single_effect_authority ... ok
+test payload_traffic_performs_zero_kernel_operations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\dependency_firewall.rs (target\debug\deps\dependency_firewall-fc800b70d7cec18c.exe)
+
+running 2 tests
+test kernel_crate_has_no_product_dependencies ... ok
+test minimal_kernel_hosts_an_anonymous_component ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\effect_oracles.rs (target\debug\deps\effect_oracles-6f5fa0db685544e0.exe)
+
+running 6 tests
+test owner_local_effect_carries_no_relation ... ok
+test double_dispose_is_idempotent ... ok
+test owner_local_effects_unwind_lifo ... ok
+test removal_of_unrelated_x_leaves_y_untouched ... ok
+test same_key_contribution_removal_leaves_foreign_contribution ... ok
+test y_contribution_survives_x_provider_churn ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\lifecycle_oracles.rs (target\debug\deps\lifecycle_oracles-c64f6688bcc418fd.exe)
+
+running 6 tests
+test raise_with_zero_effects_lands_failed ... ok
+test violated_raise_unwind_latches_and_never_reaches_failed ... ok
+test violated_dependent_teardown_blocks_provider_final_release ... ok
+test raise_after_n_effects_unwinds_lifo_then_fails ... ok
+test failed_fiber_does_not_disturb_siblings ... ok
+test dependent_consumer_violation_loci_preserve_k0_guard_semantics ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\replacement_oracles.rs (target\debug\deps\replacement_oracles-2db897bbd70e54b1.exe)
+
+running 3 tests
+test replacement_leaves_uninvolved_fibers_untouched ... ok
+test replacement_a1_to_a2_is_staged_with_pointwise_single_source ... ok
+test replacement_a1_a2_a1_round_trip ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\revision_quiescence_oracles.rs (target\debug\deps\revision_quiescence_oracles-557a38a2cde417d3.exe)
+
+running 11 tests
+test d1_unchanged_incarnation_never_retries ... ok
+test revision_staging_is_visible_in_step_boundaries ... ok
+test d3_fresh_incarnation_stages_visible_revision ... ok
+test latched_violation_does_not_settle_and_step_is_blocked ... ok
+test half_finished_staged_replacement_does_not_settle ... ok
+test unloading_does_not_settle ... ok
+test quiet_is_not_healthy_nor_successful ... ok
+test d0_fresh_incarnation_fails_into_discharged_failed ... ok
+test pending_settles ... ok
+test d4_repeated_reconcile_at_new_incarnation_is_idempotent ... ok
+test d2_unrelated_dependency_churn_fabricates_no_retry ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\staged_mount_oracles.rs (target\debug\deps\staged_mount_oracles-c94523b31b26f558.exe)
+
+running 2 tests
+test replacement_provider_mount_stays_withheld_behind_latched_provider ... ok
+test replacement_provider_mount_stays_withheld_behind_violation_latched_guard ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\withdrawal_oracles.rs (target\debug\deps\withdrawal_oracles-0b0afdd9dd8fae13.exe)
+
+running 3 tests
+test withdrawing_provider_service_readable_until_dependents_close ... ok
+test dependent_teardown_needing_provider_completes_before_final_release ... ok
+test withdrawal_sequence_is_ordered_and_observable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\qianqian_diagnostics-09dd2d34b4b9e0e9.exe)
+
+running 16 tests
+test pool::tests::r6_skip0_rule_withdrawn_counterexample ... ok
+test pool::tests::arithmetic_pool_boundary_accounting_and_no_skip_consumption ... ok
+test pool::tests::arithmetic_first_publish_two_consecutive_full_rejection_reuse ... ok
+test pool::tests::a_retired_pool_still_yields_its_residual_records ... ok
+test pool::tests::arithmetic_cross_wrap_slot_alternation_and_admission ... ok
+test tests::retired_pools_are_residual_drained_folded_and_released ... ok
+test tests::a_thread_may_register_again_after_its_registration_drops ... ok
+test pool::tests::real_thread_handoff_recycle_window_is_race_free ... ok
+test tests::a_beta_publication_outlasting_the_quiescence_window_is_not_reported_drained ... ok
+test tests::a_failed_flush_is_a_self_diagnostic_not_a_lost_record ... ok
+[qianqian-diagnostics] exporter flush-failing flush failed: the test sink cannot flush
+test tests::a_retired_pool_with_residual_records_is_released_only_after_they_are_delivered ... ok
+test tests::a_second_registration_on_the_same_thread_is_rejected ... ok
+test tests::an_alpha_publication_outlasting_the_quiescence_window_is_not_reported_drained ... ok
+test tests::an_in_flight_alpha_publication_is_delivered_by_the_final_sweep ... ok
+test tests::an_in_flight_beta_publication_is_delivered_by_the_final_sweep ... ok
+test tests::registration_lifetimes_are_per_thread_and_drop_order_is_irrelevant ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests\alpha_pool_bound.rs (target\debug\deps\alpha_pool_bound-5482be055552b8a7.exe)
+
+running 1 test
+test alpha_pool_full_admission_is_the_only_loss_site ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\alpha_producer.rs (target\debug\deps\alpha_producer-dce1236624e0f3d8.exe)
+
+running 1 test
+test alpha_pool_records_reach_the_drainer_with_their_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\beta_queue_full.rs (target\debug\deps\beta_queue_full-e90070187b8daf86.exe)
+
+running 1 test
+test a_blocked_sink_fills_the_queue_and_rejections_are_counted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\clock_cold_path.rs (target\debug\deps\clock_cold_path-fdabbf1ab2962617.exe)
+
+running 1 test
+test stamping_never_starts_the_process_clock_and_the_cold_paths_do ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\exporter_failure.rs (target\debug\deps\exporter_failure-78b93b693a63213f.exe)
+
+running 1 test
+[qianqian-diagnostics] exporter failing disabled: synthetic sink failure
+test a_failing_exporter_is_disabled_once_and_its_losses_are_counted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\shutdown_abandoned.rs (target\debug\deps\shutdown_abandoned-67d243d20deb4da1.exe)
+
+running 1 test
+test a_stuck_sink_is_abandoned_not_awaited ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests\shutdown_admission.rs (target\debug\deps\shutdown_admission-618fb9325b865697.exe)
+
+running 2 tests
+test shutdown_admission_child_witness ... ok
+test a_class_alpha_presentation_after_shutdown_is_dropped_and_counted ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests\stderr_delivery_failure.rs (target\debug\deps\stderr_delivery_failure-1f4d129428abbe79.exe)
+
+running 2 tests
+test broken_stderr_child_witness ... ok
+test a_broken_stderr_descriptor_is_counted_as_a_failed_delivery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running unittests src\lib.rs (target\debug\deps\qianqian_headless-eb67176d501597ed.exe)
+
+running 432 tests
+test cli::tests::empty_argv_is_the_interactive_invocation ... ok
+test cli::tests::machine_flag_rejects_wrong_arity_and_unknown_subcommands ... ok
+test cli::tests::help_and_version_flags_parse_alone ... ok
+test cli::tests::help_or_version_with_trailing_arguments_is_an_arity_error ... ok
+test cli::tests::one_positional_source_is_the_existing_play_intent ... ok
+test cli::tests::interactive_blank_lines_are_empty_not_unknown ... ok
+test cli::tests::interactive_unknown_tokens_report_the_offending_token ... ok
+test cli::tests::play_accepts_shuffle_immediately_after_the_subcommand ... ok
+test cli::tests::machine_flag_selects_the_scriptable_transport ... ok
+test cli::tests::an_unrecognized_first_token_reports_the_offending_token ... ok
+test cli::tests::plain_play_is_not_the_machine_transport ... ok
+test cli::tests::interactive_one_argument_commands_keep_their_token_opaque ... ok
+test cli::tests::interactive_wrong_arity_reports_command_expected_and_got ... ok
+test cli::tests::play_takes_one_or_more_files_for_the_startup_playlist ... ok
+test cli::tests::play_accepts_an_eq_preset_in_command_position ... ok
+test cli::tests::interactive_zero_argument_commands_parse_from_one_line ... ok
+test cli::tests::play_without_a_file_is_an_arity_error ... ok
+test cli::tests::play_with_one_file_parses_as_a_playback_invocation ... ok
+test cli::tests::repeated_flags_in_the_leading_block_are_last_wins ... ok
+test cli::tests::the_interactive_invocation_never_swallows_a_typed_token ... ok
+test cli::tests::seek_time_tokens_read_as_media_time_or_none ... ok
+test cli::tests::the_shuffle_flag_never_widens_the_play_grammar ... ok
+test cli::tests::the_eq_flag_never_widens_the_play_grammar ... ok
+test entry::shutdown_tests::drained_report_child_witness ... ok
+test cli::tests::the_usage_text_documents_the_shipped_surface_only ... ok
+test entry::shutdown_tests::host_shutdown_report_child_witness ... ok
+test entry::tier2_tests::tier2_child ... ok
+test error_presentation::tests::a_new_episode_observation_cannot_inherit_the_old_episode_error ... ok
+test error_presentation::tests::diagnostic_prefixes_never_dispatch_the_presentation_kind ... ok
+test error_presentation::tests::only_failed_terminal_facts_create_episode_presentations ... ok
+test error_presentation::tests::open_outcomes_map_without_forging_episode_failure ... ok
+test error_presentation::tests::invisible_unicode_escapes_for_display_while_normal_text_survives ... ok
+test input::tests::a_newline_in_a_path_fragment_escapes_before_the_status_layout ... ok
+test error_presentation::tests::the_feedback_tags_come_from_the_kind_not_the_text ... ok
+test input::tests::a_complete_expansion_keeps_the_compact_opened_lines ... ok
+test error_presentation::tests::technical_detail_preserves_raw_unicode_paths_and_length_but_escapes_controls_for_display ... ok
+test input::tests::an_all_corrupt_expansion_refuses_without_touching_the_player ... ok
+test input::tests::an_argv_start_over_an_empty_expansion_keeps_the_refusal ... ok
+test assembly::tests::active_fiber_and_absent_diagnostic_cannot_replace_the_session_result ... ok
+test assembly::tests::admission_failure_has_one_machine_reference_semantic_result ... ok
+test input::tests::a_probe_refused_candidate_is_dropped_and_the_next_opens ... ok
+test assembly::tests::machine_and_reference_consume_the_same_failure_result_without_terminal_wait ... ok
+test assembly::tests::extra_desired_failure_demonstrates_why_the_canonical_scope_is_structural ... ok
+test assembly::tests::consumers_cannot_override_not_established_with_source_or_active_evidence ... ok
+test assembly::tests::terminal_before_host_consumption_does_not_erase_establishment ... ok
+test input::tests::a_nonexistent_path_refuses_with_a_diagnostic ... ok
+test input::tests::an_empty_directory_refuses_without_diagnostics ... ok
+test input::tests::open_expanded_opens_the_first_candidate_and_seeds_on_commit ... ok
+test input::tests::open_expanded_over_an_empty_expansion_touches_nothing ... ok
+test input::tests::an_unreadable_directory_reports_one_honest_diagnostic ... ok
+test input::tests::path_preparation_preserves_literal_text_and_expands_only_home_prefix ... ok
+test input::tests::rejected_candidates_render_bounded_not_playable_lines ... ok
+test input::tests::summary_counts_candidates_and_skips ... ok
+test input::tests::a_single_regular_file_is_accepted_as_itself ... ok
+test input::tests::summary_counts_duplicates_and_unplayable_files ... ok
+test input::tests::the_dedup_key_folds_case_and_slashes_only_for_windows ... ok
+test input::tests::the_interactive_launch_prepares_nothing_and_reports_nothing ... ok
+test input::tests::an_argv_start_over_a_partially_unreadable_folder_reports_the_warnings ... ok
+test input::tests::a_partial_scan_still_reports_when_a_candidate_opens ... ok
+test input::tests::an_explicit_file_bypasses_the_extension_prefilter ... ok
+test input::tests::a_complete_single_file_argv_start_stays_quiet ... ok
+test machine::tests::disposal_warnings_are_exactly_the_latched_violations ... ok
+test machine::tests::each_terminal_fact_reports_its_contracted_line_and_stream ... ok
+test machine::tests::exit_codes_are_quiet_gated_exactly_for_completed_and_stopped ... ok
+test machine::tests::start_failures_report_on_their_contracted_exit_codes ... ok
+test machine::tests::the_activation_report_states_the_diagnostic_or_its_absence ... ok
+test machine::tests::the_disposal_verdict_warning_pins_the_violation_spelling ... ok
+test machine::tests::the_reference_exit_table_never_pays_success_for_a_failed_shell ... ok
+test machine_input::tests::commands_then_eof_adds_no_failure_or_implicit_stop ... ok
+test input::tests::an_explicit_hidden_root_still_expands ... ok
+test machine_input::tests::dg4b_blocked_stderr_child_witness ... ok
+test machine_input::tests::dg4b_child_witness ... ok
+test machine_input::tests::admitted_output_panic_records_before_ack_even_during_seal ... ok
+test machine_input::tests::eof_without_commands_naturally_completes_and_disposes ... ok
+test machine_input::tests::existing_user_stop_and_host_failure_keep_one_genuine_terminal ... ok
+test machine_input::tests::failure_is_recorded_before_response_and_lock_is_released ... ok
+test input::tests::an_explicit_hidden_file_root_still_expands ... ok
+test machine_input::tests::first_failure_storage_is_bounded_and_sealed_result_immutable ... ok
+test machine_input::tests::flush_err_swallow_is_indistinguishable_from_success ... ok
+test machine_input::tests::outer_reader_panic_boundary_records_failure_without_join ... ok
+test machine_input::tests::postseal_commands_reports_and_failures_are_inert ... ok
+test input::tests::an_explicit_file_passed_twice_is_one_candidate ... ok
+test machine_input::tests::final_owner_reports_preserve_terminal_and_distinct_failure_domains ... ok
+test machine_input::tests::read_error_records_and_stops_before_terminal_wait ... ok
+test machine_input::tests::finite_episode_returns_while_stdin_blocked_and_late_wake_is_inert ... ok
+test machine_input::tests::reader_panic_hook_subprocess_probe ... ok
+test machine_input::tests::reader_output_panic_full_transport_contract ... ok
+test machine_input::tests::read_and_panic_failures_stop_real_episode_without_forging_failed ... ok
+test machine_input::tests::seal_final_read_witnesses_failure_response_and_drop_ack ... ok
+test machine_input::tests::seal_final_read_witnesses_failure_returned_response_with_held_guard ... ok
+test machine_input::tests::seal_final_read_witnesses_normal_response_and_drop_ack ... ok
+test machine_input::tests::seal_final_read_witnesses_normal_returned_response_with_held_guard ... ok
+test machine_input::tests::preseal_failure_preserves_natural_completed_and_runtime_failed ... ok
+test machine_input::tests::seal_retains_admitted_postclosure_output_failure_and_rejects_fresh_work ... ok
+test machine_input::tests::spawn_failure_stops_established_episode_and_returns_host_failure ... ok
+test player::tests::a_composition_refused_start_is_failure_clean ... ok
+test player::tests::a_fail_stopped_quit_reports_and_retains ... ok
+test player::tests::a_failed_episode_never_auto_advances_and_a_pending_burst_still_resolves ... ok
+test input::tests::multiple_roots_keep_the_typed_order_with_sorted_contents ... ok
+test input::tests::a_root_named_twice_deduplicates_exact_paths ... ok
+test player::tests::a_paused_old_settles_through_the_ordinary_stop_semantics ... ok
+test input::tests::overlapping_roots_deduplicate_shared_children ... ok
+test player::tests::a_single_entry_or_empty_playlist_arms_nothing ... ok
+test player::tests::a_stopped_episode_never_auto_advances_and_a_pending_burst_still_resolves ... ok
+test input::tests::hidden_entries_are_skipped_and_never_traversed ... ok
+test player::tests::a_violating_cleanup_of_an_attempted_root_fails_stop ... ok
+test input::tests::the_picker_listing_hides_hidden_entries ... ok
+test player::tests::a_clean_failed_auto_next_leaves_no_episode_and_is_spent ... ok
+test player::tests::a_collapsed_burst_hands_back_to_the_normal_completed_policy ... ok
+test input::tests::a_directory_is_enumerated_sorted_with_unsupported_entries_skipped ... ok
+test player::tests::active_projection_and_no_diagnostic_cannot_establish_a_session ... ok
+test input::tests::the_picker_listing_orders_directories_first_then_audio_files ... ok
+test player::tests::an_invalid_candidate_is_refused_before_any_destructive_step ... ok
+test player::tests::activation_failure_after_the_old_side_is_gone_is_failure_clean ... ok
+test input::tests::the_picker_listing_hides_non_audio_and_names_nothing_it_cannot_classify ... ok
+test input::tests::nested_directories_enumerate_in_deterministic_preorder ... ok
+test player::tests::an_explicit_open_supersedes_the_pending_burst ... ok
+test player::tests::change_volume_routes_without_touching_terminal_truth ... ok
+test input::tests::enumeration_order_is_stable_across_calls ... ok
+test input::tests::open_and_add_share_real_tree_admission_but_have_distinct_disposition ... ok
+test player::tests::desired_volume_defaults_clamps_and_survives_replacement ... ok
+test player::tests::an_old_side_teardown_violation_fails_stop ... ok
+test player::tests::append_and_noncurrent_remove_preserve_the_episode_and_entry_relations ... ok
+test player::tests::an_np_burst_inside_one_window_nets_zero_opens ... ok
+test player::tests::fail_stop_disables_navigation ... ok
+test player::tests::first_open_establishes_without_forging_a_disposal ... ok
+test player::tests::direct_open_replaces_the_playlist_on_commit ... ok
+test player::tests::enter_plays_the_selection_and_commits_only_on_success ... ok
+test player::tests::a_refused_auto_next_is_reported_and_never_retried_or_skipped ... ok
+test player::tests::desired_dsp_persists_and_live_refusal_keeps_it_truthful ... ok
+test player::tests::navigation_activation_failure_keeps_the_cursor_at_the_old_entry ... ok
+test player::tests::home_replay_uses_terminal_current_while_browsing_another_entry ... ok
+test player::tests::navigation_refusal_leaves_index_and_playback_untouched ... ok
+test player::tests::direct_manual_steps_supersede_the_pending_burst ... ok
+test player::tests::navigation_at_both_ends_is_inert ... ok
+test player::tests::open_during_a_seek_replacement_owns_the_larger_lifecycle ... ok
+test player::tests::next_commits_the_cursor_on_the_replacement_commit ... ok
+test player::tests::manual_navigation_walks_the_traversal_and_wraps_only_under_repeat_all ... ok
+test player::tests::order_and_repeat_keys_never_touch_the_episode ... ok
+test player::tests::open_replaces_the_playlist_and_keeps_the_preferences ... ok
+test player::tests::play_selected_supersedes_the_pending_burst ... ok
+test player::tests::an_inert_boundary_key_restarts_the_window_and_never_commits_early ... ok
+test player::tests::an_already_terminal_old_is_cleared_without_a_stop_command ... ok
+test player::tests::intent_bursts_follow_the_repeat_policy ... ok
+test player::tests::quit_settles_disposes_and_reports ... ok
+test player::tests::remove_current_and_clear_retire_before_mutating_and_keep_preferences ... ok
+test player::tests::replacement_runs_the_frozen_sequence_over_a_live_episode ... ok
+test player::tests::selection_movement_never_touches_playback ... ok
+test player::tests::fail_stop_disables_the_eof_policy ... ok
+test player::tests::intent_bursts_follow_the_shuffle_permutation_both_ways ... ok
+test player::tests::a_pending_burst_precedes_the_completed_fact_auto_next ... ok
+test player::tests::stop_cancels_the_pending_burst ... ok
+test player::tests::retirement_failure_preserves_the_whole_list_and_latches_edit_refusal ... ok
+test player::tests::stopped_and_failed_never_auto_advance ... ok
+test player::tests::repeated_replacement_stays_clean ... ok
+test player::tests::the_playing_cursor_names_the_committed_source ... ok
+test player::tests::a_transition_into_a_completed_episode_advances_at_most_once_more ... ok
+test player::tests::one_completed_episode_drives_exactly_one_transition ... ok
+test player::tests::sustained_input_defers_but_never_starves_a_due_burst ... ok
+test playlist::tests::a_repeat_all_shuffle_wrap_builds_a_fresh_cycle_without_an_immediate_repeat ... ok
+test playlist::tests::a_repeat_all_wrap_keeps_a_browsing_selection_on_its_entry ... ok
+test playlist::tests::a_shuffle_cycle_contains_every_entry_exactly_once ... ok
+test playlist::tests::a_single_entry_playlist_is_coherent_under_every_policy ... ok
+test playlist::tests::an_empty_playlist_is_inert_under_every_operation ... ok
+test player::tests::quit_drops_the_pending_burst_without_a_new_episode ... ok
+test playlist::tests::chained_previews_walk_the_traversal_without_touching_anything ... ok
+test playlist::tests::edits_follow_surviving_entries_across_shuffle_and_compaction ... ok
+test playlist::tests::entering_shuffle_anchors_the_committed_entry_without_moving_it ... ok
+test player::tests::shuffle_drives_the_pane_navigation_and_eof_from_one_permutation ... ok
+test player::tests::traversal_edits_cancel_the_burst_and_cycle_repeat_keeps_it ... ok
+test playlist::tests::establishing_replaces_the_traversal_and_reanchors_the_cursors ... ok
+test playlist::tests::leaving_shuffle_restores_the_canonical_traversal ... ok
+test playlist::tests::order_toggling_moves_nothing_but_the_traversal_and_its_cursors ... ok
+test playlist::tests::preview_boundaries_are_the_manual_boundaries ... ok
+test playlist::tests::preview_follows_the_current_order_not_a_frozen_one ... ok
+test playlist::tests::preview_from_the_committed_position_agrees_with_the_manual_step ... ok
+test playlist::tests::repeat_all_shuffle_cycles_indefinitely ... ok
+test player::tests::a_finite_chain_advances_once_per_completed_episode ... ok
+test playlist::tests::repeat_all_wraps_at_both_ends ... ok
+test playlist::tests::rows_mark_playing_and_selected_independently ... ok
+test playlist::tests::repeat_one_replays_on_eof_and_never_traps_manual_navigation ... ok
+test playlist::tests::selection_movement_is_bounded_and_never_touches_playback ... ok
+test playlist::tests::sequential_off_walks_the_canonical_order_and_stops_at_the_end ... ok
+test playlist::tests::sequential_eof_advances_one_entry_and_the_selection_follows_conditionally ... ok
+test playlist::tests::shuffle_eof_walks_the_permutation_once ... ok
+test playlist::tests::the_policy_matrix_holds_for_every_order_repeat_and_size ... ok
+test playlist::tests::the_revision_moves_only_when_the_rows_could_differ ... ok
+test playlist::tests::the_same_seed_produces_the_same_permutation ... ok
+test playlist::tests::shuffle_manual_navigation_is_deterministic_in_both_directions ... ok
+test playlist::tests::the_track_projection_reads_the_committed_position ... ok
+test playlist::tests::the_selection_follows_its_entry_across_reorders_and_never_moves_playback ... ok
+test tui::model::audio::tests::a_desired_change_elsewhere_discards_the_stale_drafts_with_a_notice ... ok
+test player::tests::two_bursts_are_two_independent_windows ... ok
+test tui::model::audio::tests::a_net_zero_preamp_round_trip_is_not_an_edit ... ok
+test tui::model::audio::tests::an_untouched_neutral_eq_draft_over_no_stage_is_clean ... ok
+test tui::model::audio::tests::the_audio_focus_targets_carry_their_operation_actions ... ok
+test tui::model::audio::tests::cancel_and_revert_discard_their_own_operation_only ... ok
+test tui::model::audio::tests::the_band_stepper_clamps_at_the_product_band_bound ... ok
+test tui::model::audio::tests::the_preamp_stepper_silences_at_zero_and_invents_no_ceiling ... ok
+test tui::model::audio::tests::the_presets_menu_moves_its_cursor_and_reports_the_choice ... ok
+test tui::model::audio::tests::the_first_preamp_edit_seeds_a_draft_and_marks_it_dirty ... ok
+test tui::model::input::tests::a_text_modal_captures_its_editing_keys ... ok
+test tui::model::input::tests::any_other_key_is_presentation_noise ... ok
+test tui::model::input::tests::arrows_map_to_the_small_and_large_seek_actions ... ok
+test tui::model::input::tests::ctrl_c_keeps_its_conventional_quit_meaning_everywhere ... ok
+test tui::model::input::tests::s_maps_to_stop_and_q_maps_to_quit ... ok
+test tui::model::input::tests::tab_and_enter_decode_to_the_focus_vocabulary ... ok
+test tui::model::input::tests::the_application_keys_map_to_their_actions ... ok
+test tui::model::input::tests::the_confirm_modal_lets_only_its_keys_through ... ok
+test tui::model::input::tests::the_help_modal_lets_only_its_close_and_scroll_keys_through ... ok
+test tui::model::input::tests::up_down_are_contextual_to_the_focused_list ... ok
+test tui::model::interaction::tests::a_modal_below_the_minimum_only_cancels ... ok
+test tui::model::interaction::tests::at_most_one_modal_exists_and_closing_restores_a_valid_focus ... ok
+test tui::model::interaction::tests::route_change_moves_only_presentation_state ... ok
+test tui::model::interaction::tests::tab_moves_through_visible_enabled_controls_only ... ok
+test player::tests::the_navigation_projection_follows_the_cursor_not_the_episode ... ok
+test player::tests::terminal_current_edit_disposes_without_relabeling_or_stopping ... ok
+test tui::model::interaction::tests::the_confirm_modal_starts_cancel_focused ... ok
+test player::tests::the_quiet_window_boundary_is_strict_and_deadline_first ... ok
+test tui::model::interaction::tests::the_focus_cycle_lists_tabs_then_route_local_controls ... ok
+test tui::model::interaction::tests::the_goto_modal_parses_with_the_shared_reader_and_fails_open_for_correction ... ok
+test tui::model::interaction::tests::the_help_overlay_scrolls_and_reopens_at_the_top ... ok
+test tui::model::interaction::tests::the_nav_bar_buttons_focus_activate_and_never_catch_the_fallback ... ok
+test tui::model::interaction::tests::the_open_picker_field_edits_and_never_commits_from_the_model ... ok
+test tui::model::interaction::tests::the_open_picker_keyboard_grammar_walks_field_list_and_buttons ... ok
+test tui::model::interaction::tests::the_picker_cursor_moves_and_clamps ... ok
+test tui::model::interaction::tests::the_picker_subject_prefers_the_selection_and_an_edit_clears_it ... ok
+test tui::model::interaction::tests::the_seek_buttons_hold_focus_stops_only_with_position_and_rate ... ok
+test tui::model::interaction::tests::the_shell_never_invents_a_keyboard_focus ... ok
+test tui::model::interaction::tests::use_this_folder_makes_the_displayed_directory_the_subject ... ok
+test player::tests::the_pending_open_rides_the_frozen_failure_classes ... ok
+test tui::model::input::tests::space_activates_the_focused_control_before_the_global_accelerator ... ok
+test player::tests::pending_precedence_holds_under_repeat_all_and_shuffle ... ok
+test tui::model::mouse::tests::a_click_on_the_seek_bar_decodes_to_a_per_mille_of_the_bar ... ok
+test tui::model::mouse::tests::a_modal_click_moves_focus_only_for_the_path_field ... ok
+test tui::model::mouse::tests::a_modal_open_ignores_background_clicks ... ok
+test tui::model::interaction::tests::a_modal_close_restores_the_prior_route_focus ... ok
+test tui::model::mouse::tests::a_playlist_revision_change_disarms_a_row_press ... ok
+test tui::model::mouse::tests::a_double_click_stays_two_single_clicks ... ok
+test tui::model::mouse::tests::a_release_on_a_different_cell_of_the_same_control_is_inert ... ok
+test tui::model::mouse::tests::a_wheel_step_cancels_an_armed_press ... ok
+test player::tests::repeat_all_wraps_the_chain_and_repeat_one_replays_the_same_source ... ok
+test tui::model::mouse::tests::an_unmatched_up_is_no_action ... ok
+test tui::model::mouse::tests::down_resize_up_is_no_action ... ok
+test tui::model::mouse::tests::an_episode_replacement_disarms_a_press_even_at_the_same_cell ... ok
+test tui::model::mouse::tests::a_status_shape_change_disarms_but_a_same_shape_feedback_keeps_the_arm ... ok
+test tui::model::mouse::tests::down_on_a_up_on_b_is_no_action ... ok
+test tui::model::projection::tests::diagnostics_stay_ordered_and_absent_without_content ... ok
+test tui::model::projection::tests::row_labels_use_the_file_name_and_keep_unicode ... ok
+test tui::model::mouse::tests::drag_cances_and_movement_is_inert ... ok
+test tui::model::projection::tests::the_format_stays_pending_until_activation_publishes_one ... ok
+test tui::model::projection::tests::the_dsp_summary_names_the_desired_configuration_only ... ok
+test tui::model::mouse::tests::the_armed_click_rule_down_arms_and_up_activates_without_moving_focus ... ok
+test tui::model::projection::tests::the_order_and_repeat_labels_follow_the_app_state ... ok
+test tui::model::projection::tests::the_paused_label_follows_the_establishment_conjunction_only ... ok
+test tui::model::projection::tests::the_position_bar_renders_only_from_both_sides_evidence ... ok
+test tui::model::projection::tests::the_seek_fraction_target_needs_published_duration_evidence ... ok
+test tui::model::projection::tests::the_seek_target_is_a_fixed_step_of_the_coherent_observation_or_inert ... ok
+test tui::model::projection::tests::the_status_line_records_operation_feedback ... ok
+test tui::model::projection::tests::the_terminal_label_names_only_pending_and_the_three_facts ... ok
+test tui::model::mouse::tests::down_route_change_up_is_no_action ... ok
+test tui::model::state::tests::a_committed_replacement_closes_the_details_overlay ... ok
+test tui::model::mouse::tests::keyboard_and_mouse_activation_converge_on_one_action ... ok
+test tui::model::projection::tests::the_timeline_label_follows_the_observation_only ... ok
+test tui::model::state::tests::a_failure_arriving_after_an_operation_error_takes_the_details_back ... ok
+test tui::model::state::tests::a_failed_fact_without_a_diagnostic_forges_no_detail ... ok
+test tui::model::state::tests::a_refusal_recorded_after_a_standing_failure_is_what_e_shows ... ok
+test tui::model::responsive::tests::the_shell_fit_follows_the_terminal_size ... ok
+test tui::model::state::tests::a_successful_open_clears_the_operation_error_slot ... ok
+test tui::model::mouse::tests::right_click_is_ignored ... ok
+test tui::model::state::tests::an_ordinary_status_line_does_not_erase_the_episode_failure ... ok
+test tui::model::state::tests::the_model_follows_the_player_committed_episode ... ok
+test tui::model::state::tests::completed_stopped_and_pending_derive_no_error ... ok
+test tui::model::state::tests::the_playlist_rows_rebuild_only_when_the_revision_moves ... ok
+test tui::runtime::dispatch::tests::a_seek_per_mille_without_evidence_sends_nothing ... ok
+test tui::runtime::dispatch::tests::activating_the_already_active_route_brings_the_tab_row_focus_home ... ok
+test tui::model::state::tests::a_list_edit_recenters_the_window_on_the_selection ... ok
+test tui::model::mouse::tests::the_wheel_over_the_playlist_scrolls_only_the_viewport ... ok
+test tui::model::mouse::tests::the_idle_pane_is_inert_and_open_is_the_visible_affordance ... ok
+test tui::runtime::dispatch::tests::esc_cancels_the_open_audio_drafts_and_sends_nothing ... ok
+test player::tests::intent_burst_matrix_coalesces_to_at_most_one_replacement ... ok
+test tui::runtime::dispatch::tests::activating_a_route_takes_a_tab_row_focus_along ... ok
+test tui::runtime::dispatch::tests::enter_on_the_live_row_refuses_in_scan_clean_vocabulary ... ok
+test tui::runtime::dispatch::tests::a_picker_commit_takes_a_tab_row_focus_along ... ok
+test tui::runtime::dispatch::tests::add_folder_mode_refuses_a_file_subject ... ok
+test tui::runtime::dispatch::tests::q_from_the_idle_state_exits_and_touches_nothing ... ok
+test tui::runtime::dispatch::tests::home_play_follows_the_frozen_truth_table ... ok
+test tui::model::mouse::tests::the_wheel_steps_the_controls_that_own_an_axis ... ok
+test tui::runtime::dispatch::tests::one_modal_enter_performs_at_most_one_product_operation ... ok
+test tui::runtime::dispatch::tests::clearing_with_a_live_episode_asks_and_cancel_keeps_everything ... ok
+test tui::runtime::dispatch::tests::the_audio_route_cancels_discard_only_their_own_draft ... ok
+test tui::runtime::dispatch::tests::a_resize_invalidates_geometry_and_preserves_a_valid_focus ... ok
+test tui::runtime::dispatch::tests::policy_and_volume_route_to_the_player ... ok
+test tui::runtime::dispatch::tests::the_audio_route_commits_each_operation_through_its_own_seam ... ok
+test tui::runtime::dispatch::tests::the_audio_route_applies_a_preset_with_a_live_episode ... ok
+test tui::runtime::dispatch::tests::a_modal_click_never_leaks_and_a_close_consumes_its_event ... ok
+test tui::runtime::dispatch::tests::n_and_p_route_the_manual_navigation ... ok
+test tui::runtime::dispatch::tests::a_same_file_replay_disarms_a_press_at_the_same_cell ... ok
+test tui::runtime::dispatch::tests::a_background_click_while_the_picker_is_open_dispatches_nothing ... ok
+test tui::runtime::dispatch::tests::a_toolbar_click_activates_the_clicked_button_not_the_focused_one ... ok
+test tui::runtime::dispatch::tests::removing_a_non_live_row_removes_directly ... ok
+test tui::runtime::dispatch::tests::the_pause_resume_action_routes_through_the_seam_both_ways ... ok
+test tui::runtime::dispatch::tests::removing_the_live_row_asks_first_then_retires_it ... ok
+test tui::runtime::dispatch::tests::the_seek_action_changes_nothing_when_the_position_is_unknown ... ok
+test tui::runtime::dispatch::tests::route_switching_is_presentation_only_and_parity_holds ... ok
+test tui::runtime::dispatch::tests::tab_moves_focus_through_the_real_cycle ... ok
+test tui::runtime::dispatch::tests::the_stop_action_routes_through_the_request_stop_seam_only ... ok
+test tui::runtime::dispatch::tests::the_nav_bar_help_and_quit_answer_the_mouse ... ok
+test tui::runtime::error_recovery_tests::nc1_diagnostic_prefixes_never_select_the_presentation ... ok
+test tui::runtime::error_recovery_tests::case_a_a_refused_open_reports_b1_copy_and_e_shows_the_detail ... ok
+test tui::runtime::error_recovery_tests::e_without_any_error_is_fully_inert ... ok
+test tui::runtime::error_recovery_tests::error_details_scrolls_and_a_reopen_resets_the_snapshot ... ok
+test tui::runtime::dispatch::tests::the_toolbar_add_file_appends_without_starting_playback ... ok
+test tui::runtime::picker::tests::a_bad_folder_open_from_idle_preserves_the_idle_state ... ok
+test tui::runtime::error_recovery_tests::the_details_overlay_owns_the_keyboard_and_quits_with_q ... ok
+test tui::runtime::error_recovery_tests::case_e_n_after_a_failure_moves_through_the_burst_and_revokes_the_error ... ok
+test tui::runtime::dispatch::tests::the_playlist_route_selects_and_plays ... ok
+test tui::runtime::dispatch::tests::transport_activation_parity_holds ... ok
+test tui::runtime::error_recovery_tests::case_c_a_failed_episode_presents_from_the_d11_fact ... ok
+test tui::runtime::picker::tests::a_failed_field_confirm_keeps_the_picker_context_for_retry ... ok
+test tui::runtime::picker::tests::esc_cancels_the_open_modal_without_touching_the_player ... ok
+test tui::runtime::error_recovery_tests::the_details_overlay_renders_diagnostics_display_safe ... ok
+test tui::runtime::picker::tests::a_bad_folder_open_while_playing_leaves_playback_untouched ... ok
+test tui::runtime::picker::tests::an_add_reports_added_skipped_and_warnings ... ok
+test tui::runtime::error_recovery_tests::a_refused_open_after_a_failed_episode_is_what_e_shows ... ok
+test tui::runtime::picker::tests::enter_on_the_parent_row_ascends ... ok
+test player::tests::burst_matrix_one_full_replacement_per_raw_manual_step ... ok
+test tui::runtime::error_recovery_tests::case_f_a_fail_stopped_shell_sends_no_open_or_play_intents ... ok
+test tui::runtime::picker::tests::clicking_the_open_button_opens_the_picker_over_the_running_directory ... ok
+test tui::runtime::error_recovery_tests::case_b_a_clean_activation_failure_forges_no_playback ... ok
+test tui::runtime::picker::tests::a_relative_typed_line_resolves_against_the_displayed_directory ... ok
+test tui::runtime::tests::the_guard_unwinds_entered_modes_when_a_later_step_fails ... ok
+test tui::runtime::picker::tests::o_from_no_episode_opens_a_real_file ... ok
+test tui::runtime::tests::a_resize_event_through_the_loop_clears_the_frame ... ok
+test tui::runtime::picker::tests::o_folder_seeds_the_list_and_navigates ... ok
+test tui::runtime::tests::the_poll_timeout_is_the_tick_shortened_to_the_burst_deadline ... ok
+test tui::runtime::tests::the_refresh_tick_is_the_20fps_band ... ok
+test tui::runtime::picker::tests::use_this_folder_commits_the_displayed_directory_without_entering_it ... ok
+test tui::runtime::picker::tests::picker_success_routes_follow_the_frozen_dispositions ... ok
+test tui::view::audio::tests::the_audio_route_degrades_in_compact ... ok
+test tui::runtime::tests::the_shell_classes_are_the_ones_the_draw_publishes ... ok
+test tui::view::modal::tests::an_overlong_word_fills_the_current_line_before_hard_breaking ... ok
+test tui::runtime::picker::tests::the_picker_add_button_appends_without_touching_the_episode ... ok
+test tui::runtime::tests::settle_hands_a_collapsed_burst_to_the_normal_eof_policy ... ok
+test tui::runtime::picker::tests::the_picker_rows_navigate_and_a_file_row_only_selects ... ok
+test tui::runtime::tests::settle_without_a_burst_is_the_ordinary_eof_policy ... ok
+test tui::view::modal::tests::the_error_details_overlay_renders_the_safe_snapshot ... ok
+test tui::runtime::picker::tests::the_picker_navigates_by_mouse_alone ... ok
+test tui::view::audio::tests::the_refusal_line_shows_while_the_episode_carries_one ... ok
+test tui::view::modal::tests::the_goto_prompt_keeps_its_suffix_under_a_long_input ... ok
+test tui::view::audio::tests::the_headroom_line_appears_only_with_eq_and_rate ... ok
+test tui::view::audio::tests::the_audio_route_renders_truth_lines_and_the_band_grid ... ok
+test tui::view::modal::tests::the_confirm_consequence_wraps_whole_inside_the_popup ... ok
+test tui::view::modal::tests::the_goto_prompt_keeps_its_typed_input_visible_at_the_supported_minimum ... ok
+test tui::view::audio::tests::the_audio_route_publishes_band_and_toolbar_regions ... ok
+test tui::view::modal::tests::the_target_note_escapes_its_directory_spelling_and_stays_bounded ... ok
+test tui::runtime::tests::settle_resolves_a_due_burst_instead_of_the_completed_auto_next ... ok
+test tui::view::modal::tests::the_help_overlay_wraps_its_widest_lines_at_the_supported_minimum ... ok
+test tui::view::modal::tests::the_presets_consequence_wraps_whole_at_the_supported_minimum ... ok
+test tui::view::modal::tests::a_focused_modal_control_is_unmistakable ... ok
+test tui::view::modal::tests::the_help_overlay_advertises_every_quickstart_key ... ok
+test tui::view::modal::tests::the_target_note_renders_its_directory_display_safe ... ok
+test tui::view::modal::tests::the_open_picker_publishes_regions_for_its_rows_and_buttons ... ok
+test tui::view::now_playing::tests::a_mode_change_never_moves_the_preference_row ... ok
+test tui::view::modal::tests::the_help_overlay_pages_and_tells_the_truth_about_it ... ok
+test tui::view::now_playing::tests::an_engaged_preference_toggle_is_bold ... ok
+test tui::view::now_playing::tests::the_now_playing_route_renders_the_episode_and_transport ... ok
+test tui::view::now_playing::tests::the_desired_dsp_summary_renders_while_idle ... ok
+test tui::view::now_playing::tests::the_seek_bar_publishes_a_region_only_with_duration_evidence ... ok
+test tui::view::now_playing::tests::the_preference_toggles_render_whole_at_the_compact_boundary ... ok
+test tui::view::modal::tests::the_picker_buttons_fit_at_the_supported_minimum_and_degrade_truthfully ... ok
+test tui::view::now_playing::tests::transport_regions_carry_their_own_labels ... ok
+test tui::view::now_playing::tests::the_seek_buttons_render_with_evidence_and_vanish_without_it ... ok
+test tui::view::playlist::tests::an_engaged_summary_toggle_is_bold_and_focus_is_still_the_inversion ... ok
+test tui::view::modal::tests::the_picker_note_wraps_its_diagnostic_inside_the_bounded_rows ... ok
+test tui::view::playlist::tests::the_pane_viewport_follows_the_selection_up_and_down ... ok
+test tui::view::playlist::tests::a_mode_change_never_moves_the_summary_toggles ... ok
+test tui::view::playlist::tests::a_held_press_lights_the_button_and_the_release_bounces_it_back ... ok
+test tui::view::modal::tests::the_modals_render_as_visible_popups ... ok
+test tui::view::playlist::tests::playlist_row_regions_match_the_visible_window ... ok
+test tui::view::now_playing::tests::the_dsp_line_renders_desired_and_hides_in_compact ... ok
+test tui::view::tests::a_below_minimum_frame_has_no_interactive_geometry ... ok
+test tui::view::now_playing::tests::the_volume_steppers_render_visible_glyphs_in_their_own_geometry ... ok
+test tui::view::playlist::tests::the_playlist_rows_are_spaced_so_a_click_cannot_land_on_the_neighbour ... ok
+test tui::view::playlist::tests::the_playlist_pane_marks_playing_and_selected_independently ... ok
+test tui::view::playlist::tests::the_playlist_pane_windows_a_large_list_around_the_selection ... ok
+test tui::view::playlist::tests::the_playing_row_carries_the_live_color ... ok
+test tui::view::playlist::tests::the_playlist_toolbar_is_visible_and_hittable ... ok
+test tui::view::playlist::tests::the_compact_layout_drops_the_summary_toggles_everywhere ... ok
+test tui::view::tests::a_no_episode_frame_says_so_and_fabricates_nothing ... ok
+test tui::view::tests::a_long_source_path_clips_without_corrupting_other_rows ... ok
+test tui::view::tests::a_fresh_episode_renders_pending_without_inventing_state ... ok
+test tui::view::playlist::tests::the_summary_toggles_render_their_labels_on_the_one_row ... ok
+test tui::view::tests::a_resize_sequence_keeps_the_shell_coherent ... ok
+test tui::view::tests::the_active_tab_is_accent_over_bold_and_inactive_is_plain ... ok
+test tui::view::tests::the_keymap_hint_line_is_dim_chrome ... ok
+test tui::view::tests::the_minimum_class_shortens_the_tab_labels ... ok
+test tui::view::tests::cjk_filenames_render_and_edit_structurally ... ok
+test tui::view::tests::diagnostics_render_as_diagnostics ... ok
+test tui::view::tests::the_minimum_shell_renders_every_interactive_label_whole ... ok
+test tui::view::tests::operation_feedback_renders_as_composition_feedback ... ok
+test tui::view::tests::each_terminal_fact_renders_its_own_label ... ok
+test tui::view::theme::tests::a_rendered_title_is_accent_over_bold_and_the_frame_is_chrome ... ok
+test tui::view::theme::tests::the_meter_gradient_has_three_zones_with_fixed_boundaries ... ok
+test tui::view::theme::tests::the_palette_uses_only_the_named_ansi_colors ... ok
+test tui::view::tests::the_paused_line_follows_the_frozen_establishment_conjunction ... ok
+test tui::view::tests::the_pane_shows_no_playing_marker_when_no_episode_is_live ... ok
+test tui::view::tests::the_visualizer_route_renders_honest_unavailable_without_telemetry ... ok
+test tui::view::tests::the_tab_row_carries_the_tabs_in_order ... ok
+test tui::view::visualizer::tests::a_sub_cell_waveform_keeps_the_silence_baseline ... ok
+test tui::view::visualizer::tests::silence_is_a_real_snapshot_not_an_absence ... ok
+test tui::view::tests::the_volume_line_renders_the_desired_factor ... ok
+test tui::view::visualizer::tests::the_levels_meter_colors_its_zones ... ok
+test tui::view::visualizer::tests::the_mode_action_switches_the_panel ... ok
+test tui::view::visualizer::tests::the_spectrum_carries_the_meter_gradient ... ok
+test tui::view::visualizer::tests::the_active_mode_button_is_accent_over_bold ... ok
+test tui::view::tests::the_status_line_renders_feedback_and_the_hint ... ok
+test tui::view::tests::tiny_terminals_degrade_without_panicking_or_fabricating ... ok
+test tui::view::visualizer::tests::the_spectrum_mode_renders_bars_from_the_snapshot ... ok
+test tui::view::visualizer::tests::the_visualizer_route_degrades_in_compact ... ok
+test tui::view::visualizer::tests::the_waveform_trace_is_trace_colored_over_a_dim_midline ... ok
+test tui::view::tests::a_held_press_lights_every_control_family ... ok
+test tui::view::tests::the_shell_shows_the_four_frozen_tabs ... ok
+test tui::view::tests::every_route_renders_whole_at_the_class_boundaries ... ok
+test tui::runtime::error_recovery_tests::case_d_space_replay_replaces_the_episode_and_revokes_the_error ... ok
+test entry::shutdown_tests::a_drained_report_never_makes_the_host_exit_path_wait_on_its_sink ... ok
+test tui::view::modal::tests::the_goto_prompt_keeps_a_usable_input_window_at_every_class_width ... ok
+test machine_input::tests::dg4b_the_hook_isolates_critical_threads_and_chains_elsewhere ... ok
+test entry::shutdown_tests::an_abandoned_drainer_never_makes_the_host_exit_path_wait_on_its_sink ... ok
+test machine_input::tests::real_reader_panic_hook_is_silent_after_seal_and_other_hooks_preserved ... ok
+test machine_input::tests::dg4b_an_isolated_panic_never_waits_on_a_blocked_stderr ... ok
+test input::tests::a_thousand_file_tree_enumerates_completely ... ok
+
+test result: ok. 432 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.86s
+
+     Running unittests src\bin\qianqian.rs (target\debug\deps\qianqian-0f250947616a753c.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\qianqian_headless-3f709d6938c12b8e.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\grammar.rs (target\debug\deps\grammar-756991a23abb43c7.exe)
+
+running 12 tests
+test empty_argv_routes_to_the_interactive_transport_not_a_usage_error ... ok
+test play_with_missing_file_is_a_usage_error ... ok
+test positional_convenience_does_not_swallow_unknown_options ... ok
+test play_with_extra_files_hits_the_feature_gate_without_playback ... ok
+test play_without_the_playback_feature_reports_the_rebuild_hint ... ok
+test machine_play_without_the_playback_feature_reports_the_rebuild_hint ... ok
+test the_product_binary_reports_its_own_identity ... ok
+test unknown_command_is_rejected_with_the_offending_token ... ok
+test usage_documents_both_transports ... ok
+test help_flag_prints_usage_to_stdout_and_exits_zero ... ok
+test version_flag_prints_the_binary_identity_and_exits_zero ... ok
+test machine_flag_without_a_well_formed_play_tail_is_a_usage_error ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+
+     Running tests\quickstart_usage.rs (target\debug\deps\quickstart_usage-c2302086ca4fee39.exe)
+
+running 2 tests
+test the_usage_key_section_has_no_key_quickstart_does_not_document ... ok
+test every_quickstart_key_row_matches_the_usage_text ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\status.rs (target\debug\deps\status-34c609561281f7b4.exe)
+
+running 17 tests
+test the_conversion_uses_the_published_source_rate ... ok
+test the_forbidden_vocabulary_scan_catches_a_relabeled_pending ... ok
+test a_settled_episode_never_projects_paused ... ok
+test a_failed_fact_without_a_diagnostic_still_projects_its_semantic_line ... ok
+test a_failed_fact_projects_semantics_first_and_diagnostic_separately ... ok
+test an_activation_failure_projects_the_diagnostic_not_a_forged_fact ... ok
+test a_settled_episode_projects_no_position_but_keeps_the_duration ... ok
+test stop_intent_projects_as_command_state_not_as_a_fact ... ok
+test a_position_without_a_published_format_projects_as_unknown ... ok
+test pause_projects_through_the_frozen_establishment_conjunction ... ok
+test the_duration_side_is_independent_evidence ... ok
+test the_scan_covers_every_forbidden_word_and_passes_clean_text ... ok
+test a_fresh_episode_projects_pending_without_inventing_state ... ok
+test the_forbidden_vocabulary_scan_catches_smuggled_buffer_health ... ok
+test the_timeline_projects_each_side_independently ... ok
+test the_clock_truncates_and_does_not_wrap_at_an_hour ... ok
+test each_terminal_fact_projects_its_own_line ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe)
+
+running 28 tests
+[a4 skip] no QIANQIAN_A4_MODE — inert outside the campaign harness
+[a4 skip] no QIANQIAN_A4_MODE — inert outside the campaign harness
+[a4 skip] no QIANQIAN_A4_MODE — inert outside the campaign harness
+test a4_sink_controls::a4_child_cone_injected ... ok
+test a4_sink_controls::a4_child_cone_volume_stop ... ok
+test a4_sink_controls::a6_child_device_reason_enrichment ... ok
+test cone_oracle_tests::o_cone_order_the_relay_is_synchronous_and_forwards_the_verdict ... ok
+test event_handle_lifetime_tests::windows::a_closed_event_is_observable_as_invalid ... ok
+test render_order_oracle::tests::a_drain_path_that_stops_publishing_is_rejected ... ok
+test render_order_oracle::tests::a_park_slice_that_does_not_publish_is_rejected ... ok
+test render_order_oracle::tests::a_publication_that_bypasses_the_helper_is_rejected ... ok
+test render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected ... FAILED
+test render_order_oracle::tests::a_reintroduced_retired_park_call_is_rejected ... ok
+test render_order_oracle::tests::a_second_credit_site_is_rejected ... ok
+test render_order_oracle::tests::a_park_slice_that_skips_its_quiescent_publication_is_rejected ... FAILED
+test render_order_oracle::tests::a_second_loop_top_gate_call_is_rejected ... ok
+test render_order_oracle::tests::crediting_before_a_successful_submission_is_rejected ... ok
+test render_order_oracle::tests::the_mis_paired_total_overstates_the_consumed_sample_by_one_block ... ok
+test render_order_oracle::tests::a_second_publication_after_the_credit_is_rejected ... ok
+test render_order_oracle::tests::publishing_from_the_post_submission_total_is_rejected ... ok
+test render_order_oracle::tests::publishing_after_device_buffer_acquisition_is_rejected ... ok
+test tier2_tests::tier2_child ... ok
+test open_abort::tests::aborting_a_seek_parked_leg_releases_the_gate_before_the_join ... ok
+test open_abort::tests::a_hostile_repause_after_the_close_cannot_repark_the_aborting_leg ... ok
+test render_order_oracle::tests::a_failed_tail_observation_masked_as_pending_is_rejected ... ok
+test render_order_oracle::tests::the_production_render_loop_has_the_frozen_order ... ok
+test open_abort::tests::aborting_a_parked_leg_releases_the_gate_before_the_join ... ok
+[cone-evidence o-cone-order] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=1 terminal=Failed relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+test cone_oracle_tests::o_cone_order_the_verdict_becomes_visible_only_after_the_edge_cut ... ok
+[cone-evidence o-cone-necessity] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=1 terminal=Failed relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+test cone_oracle_tests::o_cone_necessity_the_real_cone_settles_without_an_external_stop ... ok
+[cone-evidence facility-leg] terminal=Failed failure_diagnostic=Some("device") stop_requested=false relayed_verdict=Some("Aborted { reason: Some(AbortReason { class: Panic, message: \"render loop panicked\" }) }") shutdown(drained=true abandoned=false undelivered=0) counters(copied_out=0 exported=0 export_failed=0 alpha_rejected=0 beta_queued=0 critical_panics=0)
+[cone-evidence facility-leg] reads=3 injected=true edge_cuts=2 verdict_reached=true verdict_snapshot=1 terminal=Failed relayed_verdict=Aborted { reason: Some(AbortReason { class: Panic, message: "render loop panicked" }) }
+test cone_oracle_tests::o_cone_evidence_facility_leg_witnesses_records_and_shutdown ... ok
+test event_handle_lifetime_tests::windows::repeated_open_stop_cycles_do_not_leak_event_handles ... ok
+
+failures:
+
+---- render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected stdout ----
+
+thread 'render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected' (13952) panicked at crates\qianqian-output-wasapi\src\render_order_oracle.rs:728:9:
+a commented-out publication is not a publication: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- render_order_oracle::tests::a_park_slice_that_skips_its_quiescent_publication_is_rejected stdout ----
+
+thread 'render_order_oracle::tests::a_park_slice_that_skips_its_quiescent_publication_is_rejected' (20892) panicked at crates\qianqian-output-wasapi\src\render_order_oracle.rs:631:9:
+a conditional park publication must be rejected: []
+
+
+failures:
+    render_order_oracle::tests::a_park_slice_that_skips_its_quiescent_publication_is_rejected
+    render_order_oracle::tests::a_publication_moved_into_a_comment_is_rejected
+
+test result: FAILED. 26 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s
+
+error: test failed, to rerun pass `-p qianqian-output-wasapi --lib`

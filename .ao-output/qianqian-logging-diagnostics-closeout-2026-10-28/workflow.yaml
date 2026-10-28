@@ -1,0 +1,31 @@
+name: qianqian-logging-diagnostics-closeout
+agents_dir: agency-agents-zh
+inputs:
+  - name: repository
+    required: true
+    default: jnhu76/qianqian
+steps:
+  - id: baseline
+    role: testing/testing-evidence-collector
+    task: Verify current main, governance, issues, merged SHAs and evidence grades. Preserve existing work.
+    output: baseline
+  - id: closeout_290
+    role: testing/testing-evidence-collector
+    depends_on: [baseline]
+    task: Refresh scoped E-9/E-8 accounting, B2 repair, D-D, NOT_RUN lanes and T1-T4; recommend only owner-scoped closure.
+    output: closeout_290
+  - id: tier2_296
+    role: testing/testing-reality-checker
+    depends_on: [closeout_290]
+    task: Execute R0-R4 per actual outlet; retain causal controls, mutations, raw logs, artifact provenance and explicit partial results. No production changes.
+    output: tier2_296
+  - id: independent_review
+    role: testing/testing-reality-checker
+    depends_on: [tier2_296]
+    task: Independently review causality, oracle falsification, platform attribution and evidence integrity. Do not accept residuals for owner.
+    output: review
+  - id: delivery
+    role: testing/testing-evidence-collector
+    depends_on: [independent_review]
+    task: Open one scoped verification PR; deliver matrix and owner decisions. Do not merge or close issue 296.
+    output: delivery

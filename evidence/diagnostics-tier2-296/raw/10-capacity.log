@@ -1,0 +1,16 @@
+UTC=2026-10-27T16:35:13.8252916Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_output_wasapi-f2975c5d78da4cb6.exe SHA256=C8134168BD7ED9ADF16EE656494A1C2A8642A7E17F61E6214D97EF13760E1834
+FILTER=tier2_tests::tier2_child OUTLET=10 MODE=capacity SKIP_CLOSE=False
+EXIT=0 ELAPSED_MS=268
+STDOUT
+
+running 1 test
+test tier2_tests::tier2_child ... Q296-CONSUMER-HELD
+Q296-ALPHA-FULL
+Q296-TERMINAL outlet=10 hits=1 joined=true
+Q296-ABANDONED Counters { beta_queued: 1, beta_rejected: 0, beta_consumed: 1, alpha_rejected: 3, copied_out: 0, exported: 0, export_failed: 0, outstanding: 2, self_diagnostics: 0, critical_panics: 0 }
+Q296-PASS
+
+STDERR
+
+RUNNER_RESULT=GREEN

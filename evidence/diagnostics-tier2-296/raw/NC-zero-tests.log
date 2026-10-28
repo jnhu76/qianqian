@@ -1,0 +1,15 @@
+UTC=2026-10-27T16:35:19.2810649Z
+EXE=C:\Users\fred1\.codex\worktrees\diagnostics-tier2-4534\qianqian\target\debug\deps\qianqian_headless-eb67176d501597ed.exe SHA256=D94D4C31D383D4FFB03660B399B26C90CC18EFA7DE9029435654FB5BEC9DDB78
+FILTER=no_such_test OUTLET=panic MODE=healthy SKIP_CLOSE=False
+EXIT=0 ELAPSED_MS=94
+STDOUT
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 432 filtered out; finished in 0.00s
+
+
+STDERR
+
+ORACLE_RED missing exact execution/result marker
+RUNNER_RESULT=RED
