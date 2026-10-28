@@ -103,11 +103,16 @@ LIMIT           A liveness property cannot be asserted without a bound: the
                 unbounded form is a hang, which the task forbids as evidence.
                 The bound is inside the child and is part of the cell's
                 predicate; it is not the outer cleanup watchdog.
-OWNER DECISION  If the owner requires STATE-only falsifiers for C1/C2, the four
-                cells need a new oracle design (e.g. a producer-side
-                progress latch independent of the receipt channel) and a fresh
-                run. That is a scope change, not a documentation fix, and is
-                left to the owner rather than silently re-labelled.
+OWNER DECISION  The redesign question was analysed on the recorded receipts and
+                mutation shapes (ORACLE-CLASS.md): for these four
+                task-mandated mutations no program-state oracle exists — the
+                difference is non-completion, and every state-only substitute
+                either is legal under the oracle's own release, is fitted to
+                the mutation's constant, or needs unearned OS thread
+                introspection. The decision left to the owner is therefore
+                class acceptance (is a named, bounded, in-child progress
+                assertion a valid PRECISE_RED for C1/C2?), not an unbuilt fix.
+                Verdicts above are unchanged.
 ```
 
 seek-C1's valve is now documented rather than implied: the helper waits 10 s for
@@ -143,7 +148,7 @@ fired.
 
 | # | Finding | Class | Disposition |
 |---|---|---|---|
-| 1 | Four C1/C2 REDs are bounded-liveness, not STATE | BLOCKER (strict) | **labelled** LIVENESS + documented here; owner decision required for a STATE-only redesign (D-1) |
+| 1 | Four C1/C2 REDs are bounded-liveness, not STATE | BLOCKER (strict) | **labelled** LIVENESS + documented here; `ORACLE-CLASS.md` answers the redesign question (no program-state oracle exists for these mutations); owner class-acceptance decision remains (D-1) |
 | 2 | `COMMANDS.md` reproduced from the base commit, which lacks the evidence/tests | BLOCKER | **fixed**: §0 now checks out the PR head; §2 copies the harnesses into the test tree |
 | 3 | `REVIEW.md` / `RECEIPTS.sha256` advertised but absent | BLOCKER | **fixed**: this file + `RECEIPTS.sha256` added |
 | 4 | seek-C1's 10 s auto-release undisclosed | SHOULD_FIX | **fixed**: documented in MATRIX/EXECUTION_DAGS/REVIEW |
