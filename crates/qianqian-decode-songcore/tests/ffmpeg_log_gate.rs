@@ -1,3 +1,12 @@
+// POSIX-only witness. The observable under test (fd 2) is read by redirecting it
+// with `dup`/`dup2` and `AsRawFd`; those APIs do not exist on Windows. The
+// production C gate and the Rust predicate are platform-neutral, and the
+// Windows test target must still COMPILE, so the whole witness is compiled out
+// there via this file-level cfg. On Windows this binary therefore contains zero
+// tests: absence of the witness is not a pass. Windows runtime evidence for the
+// gate remains a separate #172 obligation and stays NOT_RUN here.
+#![cfg(unix)]
+
 //! closeout2 反事实测试 — `QIANQIAN_FFMPEG_LOG=0` 下两层 av_log gate 的一致性。
 //!
 //! 冻结契约：`out/closeout2/ffmpeg-contract.md` §3 — 取值 `"0"` 与 unset 同类：
