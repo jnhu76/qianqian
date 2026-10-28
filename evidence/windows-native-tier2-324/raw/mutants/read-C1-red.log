@@ -1,0 +1,38 @@
+﻿===CELL_BEGIN===
+cell=read-C1
+test=c1_blocked_sink_native_decode_read
+mode=ignore
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_decode_read_controls-43645974850c11f6.exe
+exe_sha256=25bb0bca2a197613d71686e54a7e0600f70ce33c2b895838a2a73d41ba379d8c
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1
+exit_code=101
+timed_out=False
+duration_ms=12490
+stderr_mode=ignore
+stderr_peek=peek_ok=163/163 max_avail=0 never_read=true
+--- stdout ---
+
+running 1 test
+test c1_blocked_sink_native_decode_read ... ARTIFACT_PATH=C:/Users/fred1/source/qianqian-324\native\build/artifacts/libsongcore.a
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+C1-ENV=windows-x86_64 pid=29816
+C1-PREMISE stderr_file_type=3 pipe=1 read_end_held_not_read=1
+C1-PREMISE SINK_HOLD_ENTERED queued_bytes=65536 flood_bytes=65536 flood_outstanding=1 second_write_outstanding=1
+C1-PREMISE EXPORTER_ENTERED beta_consumed=1 exported=0
+ASSERTION panicked at tests\native_decode_read_controls.rs:662:68:
+C1-PRODUCER-PROGRESS: real decode producer did not return while the real sink was blocked (counterfactual: a synchronous producer sink write never returns): Timeout
+FAILED
+
+failures:
+
+failures:
+    c1_blocked_sink_native_decode_read
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 10.33s
+
+
+--- stderr ---
+
+===CELL_END===

@@ -1,0 +1,302 @@
+[
+  {
+    "cell": "ffmpeg-C1",
+    "arm": "ffmpeg-bridge",
+    "control": "C1",
+    "test_binary": "native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe",
+    "test_binary_sha256": "c68a468cd9f2e249033f059a5f728eccba046380ee2a3607714d8a233dc6d568",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\ffmpeg-C1.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "ffmpeg-C2",
+    "arm": "ffmpeg-bridge",
+    "control": "C2",
+    "test_binary": "native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe",
+    "test_binary_sha256": "c68a468cd9f2e249033f059a5f728eccba046380ee2a3607714d8a233dc6d568",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\ffmpeg-C2.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "ffmpeg-C3",
+    "arm": "ffmpeg-bridge",
+    "control": "C3",
+    "test_binary": "native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe",
+    "test_binary_sha256": "c68a468cd9f2e249033f059a5f728eccba046380ee2a3607714d8a233dc6d568",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\ffmpeg-C3.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "ffmpeg-C4",
+    "arm": "ffmpeg-bridge",
+    "control": "C4",
+    "test_binary": "native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe",
+    "test_binary_sha256": "c68a468cd9f2e249033f059a5f728eccba046380ee2a3607714d8a233dc6d568",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\ffmpeg-C4.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "read-C1",
+    "arm": "decode-read",
+    "control": "C1",
+    "test_binary": "native_decode_read_controls-43645974850c11f6.exe",
+    "test_binary_sha256": "ec7255eb30b0f9ae067830e58c9d0bdddf30ff2bf144876a3c28324fb08c5cf0",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\read-C1.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "read-C2",
+    "arm": "decode-read",
+    "control": "C2",
+    "test_binary": "native_decode_read_controls-43645974850c11f6.exe",
+    "test_binary_sha256": "ec7255eb30b0f9ae067830e58c9d0bdddf30ff2bf144876a3c28324fb08c5cf0",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\read-C2.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "read-C3",
+    "arm": "decode-read",
+    "control": "C3",
+    "test_binary": "native_decode_read_controls-43645974850c11f6.exe",
+    "test_binary_sha256": "ec7255eb30b0f9ae067830e58c9d0bdddf30ff2bf144876a3c28324fb08c5cf0",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\read-C3.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "read-C4",
+    "arm": "decode-read",
+    "control": "C4",
+    "test_binary": "native_decode_read_controls-43645974850c11f6.exe",
+    "test_binary_sha256": "ec7255eb30b0f9ae067830e58c9d0bdddf30ff2bf144876a3c28324fb08c5cf0",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\read-C4.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "seek-C1",
+    "arm": "decode-seek",
+    "control": "C1",
+    "test_binary": "decode_seek_controls-29c40123343adb53.exe",
+    "test_binary_sha256": "474e2a1c8afe3178751229d5a57e0407e9153e9351c99d7a5bfa270e3e71d7dc",
+    "mode": "drain",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\seek-C1.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "seek-C2",
+    "arm": "decode-seek",
+    "control": "C2",
+    "test_binary": "decode_seek_controls-29c40123343adb53.exe",
+    "test_binary_sha256": "474e2a1c8afe3178751229d5a57e0407e9153e9351c99d7a5bfa270e3e71d7dc",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\seek-C2.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "seek-C3",
+    "arm": "decode-seek",
+    "control": "C3",
+    "test_binary": "decode_seek_controls-29c40123343adb53.exe",
+    "test_binary_sha256": "474e2a1c8afe3178751229d5a57e0407e9153e9351c99d7a5bfa270e3e71d7dc",
+    "mode": "ignore",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\seek-C3.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  },
+  {
+    "cell": "seek-C4",
+    "arm": "decode-seek",
+    "control": "C4",
+    "test_binary": "decode_seek_controls-29c40123343adb53.exe",
+    "test_binary_sha256": "474e2a1c8afe3178751229d5a57e0407e9153e9351c99d7a5bfa270e3e71d7dc",
+    "mode": "drain",
+    "artifact_sha256": "90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2",
+    "source_sha256": {
+      "crates/qianqian-diagnostics/src/pool.rs": "9f923666b1593385af20b9410571c99dec352966c413874f4b6d852d9d6b3478",
+      "crates/qianqian-diagnostics/src/lib.rs": "98891d1dc6a16de2f9ea9d00999b8275ef977bf9a606b66ee754d141f4d39afb",
+      "crates/qianqian-decode-songcore/src/lib.rs": "08eee845e001e852f0752f9abe9e2386996db798f4b4ea39dc11f115d43e14ca"
+    },
+    "log": "raw\\healthy\\seek-C4.log",
+    "exit": 0,
+    "timed_out": false,
+    "verdict": "PASS",
+    "checks": {
+      "exit_zero": true,
+      "not_timed_out": true,
+      "executed_one": true,
+      "pass_marker": true,
+      "test_result_ok": true
+    }
+  }
+]

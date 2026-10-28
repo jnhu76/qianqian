@@ -1,0 +1,35 @@
+﻿===CELL_BEGIN===
+cell=ffmpeg-C1
+test=qfb_native_ffmpeg_bridge_cell
+mode=ignore
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe
+exe_sha256=2f44230e85a8662eb2a53baf9f1be5910efff14e9742af6c0bc59a727cfb552c
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1;Q324_CELL=C1
+exit_code=101
+timed_out=False
+duration_ms=11761
+stderr_mode=ignore
+stderr_peek=peek_ok=163/163 max_avail=0 never_read=true
+--- stdout ---
+
+running 1 test
+test qfb_native_ffmpeg_bridge_cell ... QFB-ENV cell=C1 qianqian_ffmpeg_log=1 pid=16124
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+QFB-PREMISE stderr_file_type=3 pipe=1 read_end_held_not_read=1
+QFB-PREMISE SINK_HOLD_ENTERED queued_bytes=65536 flood_bytes=65536 flood_outstanding=1 second_write_outstanding=1
+ASSERTION panicked at tests\native_ffmpeg_bridge_controls.rs:493:9:
+PRODUCER-NOT-BACKPRESSURED: the real native producer did not complete within 10s while the diagnostic consumer was held
+FAILED
+
+failures:
+
+failures:
+    qfb_native_ffmpeg_bridge_cell
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 10.33s
+
+
+--- stderr ---
+
+===CELL_END===

@@ -1,0 +1,42 @@
+﻿===CELL_BEGIN===
+cell=seek-C1
+test=c1_blocked_sink
+mode=drain
+exe=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\decode_seek_controls-29c40123343adb53.exe
+exe_sha256=474e2a1c8afe3178751229d5a57e0407e9153e9351c99d7a5bfa270e3e71d7dc
+env=QIANQIAN_NATIVE_DIR=C:/Users/fred1/source/qianqian-324\native;CARGO_TERM_COLOR=never;QIANQIAN_FFMPEG_LOG=1
+exit_code=0
+timed_out=False
+duration_ms=1535
+stderr_mode=drain
+stderr_peek=drained_by_parent
+--- stdout ---
+
+running 1 test
+test c1_blocked_sink ... CELL=C1 BLOCKED_SINK
+ARTIFACT_PATH=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\../../native/build/artifacts/libsongcore.a
+ARTIFACT_SHA256=90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+ARTIFACT_BUILD_TIME_SHA256_RAW=\90bde1ca3f9924842ebb06005219f746d5053499a03fc3afafebccd1d57ba6d2
+C1-ENV=windows-x86_64 ffmpeg=n9.0.1 QIANQIAN_FFMPEG_LOG=1 pid=29668 stderr_file_type=3
+C1-STDERR-LOCK-HELD
+C1-CONSUMER-BLOCKED
+C1-PRODUCER diag="could not reach a landing point" post="decode error" finished_while_held=true sink_still_blocked=true elapsed_ms=2
+C1-ALPHA attempted=8 accepted=2 rejected=6 outstanding=2
+C1-BLOCKED-COUNTERS beta_queued=1 beta_rejected=0 beta_consumed=1 alpha_rejected=6 copied_out=0 exported=0 export_failed=0 outstanding=2 self_diagnostics=0
+C1-EXPORT-ENTRIES=3 first=Some("decode-seek-control|info|seed")
+C1-SHUTDOWN drained=true abandoned=false undelivered=0 beta_queued=1 beta_rejected=0 beta_consumed=1 alpha_rejected=6 copied_out=2 exported=3 export_failed=0 outstanding=0 self_diagnostics=0
+C1-ACCOUNTING-OK
+C1-PASS
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.13s
+
+
+--- stderr ---
+[decode-seek-control] info ts_us=0 seed
+[ffmpeg] warn ts_us=8604 AVCodecContext: sample/frame number mismatch in adjacent frames
+
+[ffmpeg] warn ts_us=8718 AVCodecContext: sample/frame number mismatch in adjacent frames
+
+
+===CELL_END===

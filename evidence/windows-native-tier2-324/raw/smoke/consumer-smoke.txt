@@ -1,0 +1,13 @@
+# build: gcc 16.2.0 (WinLibs) -I native/include harness/songcore_consumer_smoke.c native/build/artifacts/libsongcore.a -lbcrypt
+f54c15a94fbefdbe36b1705cde318552c1fc78756bc361772f38ed571d0e528f */c/Users/fred1/source/qianqian-324/evidence/windows-native-tier2-324/raw/smoke/songcore_consumer_smoke.exe
+PLATFORM=windows-x86_64 CONSUMER=windows-x86_64-native-c
+ABI_VERSION=1
+SOURCE_BYTES=146237
+OPEN status=0
+PROBE status=0 rate=44100 channels=2 mask=3 duration_us=4000000 codec=flac container=flac streams=1 selected=0
+METADATA status=0 has_title=1 has_artist=1
+READ_FRAMES=176400 reads=22 eof=1
+SEEK status=0 landing_us=940408
+POST_SEEK_READ status=0 frames=8192
+CONSUMER_SMOKE=PASS
+EXIT=0
