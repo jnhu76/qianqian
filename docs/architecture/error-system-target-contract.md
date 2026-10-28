@@ -1051,34 +1051,40 @@ presentation only.
 critical threads, conditional chaining elsewhere, never-restore on exit — and no panic
 recovery is granted by any of it.
 
-**Current fact.** Single installer `install_reader_panic_hook`
-(machine_input.rs:192-207): `Once`-guarded install, `take_hook()` captures previous,
-chaining condition = `thread::current().name() != Some("qianqian-stdin")`
-(:200-202), never restored after the host returns (:205-207 — rationale: a detached
-reader must not late-print after seal). Reader-side panics are separately caught at
-three seams (:119 → `HostFailure::Panic` :142-145; :253-255; :277 → :288-291).
+**Current implementation fact (reference, not adoption).** Single installer
+`install_panic_hook_posture` (`apps/headless/src/machine_input.rs`): `Once`-guarded
+install, `take_hook()` captures the previous hook, never restored after the host
+returns (rationale: a detached reader must not late-print after seal). The chaining
+condition is the calling thread's own registration fact — `!is_alpha_producer()` —
+not a name list: registered class-α threads (stdin reader, decode worker, observation
+analyst, render leg) take the atomics-only arm and never call the previous hook; every
+other thread chains. Reader-side panics are separately caught at three seams
+(dispatch → `HostFailure::Panic`; whole-reader; per-OS-read).
 
 **Compared postures.**
 
 | Posture | Assessment |
 |---|---|
 | status quo (filter-only hook) | chains everything except the reader thread; suppresses the default print on the reader thread only |
-| **critical-thread isolation + conditional chaining elsewhere (recommended)** | the hook maintains a registered set of critical thread names (`qianqian-stdin` today; render/decode names if their default prints ever need suppression): on a critical thread the hook performs **atomic bookkeeping only** (relaxed counter increment per panic, at most one publication into DG-1's ownership-handoff pool — the panicking thread's own registered pool; bounded in-flight loss at the publish check; no concurrent record access exists to race) and **never calls the previous hook** (an unknown synchronous sink must not run on a thread whose timing/allocations are load-bearing); on any other context it chains to the captured previous hook (preserves host/user tooling — today's behavior) | 
+| **critical-thread isolation + conditional chaining elsewhere (recommended)** | the hook keys on the calling thread's own class-α registration fact (today: stdin reader, decode worker, observation analyst, render leg): on a registered thread it performs **atomic bookkeeping only** (relaxed counter increment per panic, at most one publication into DG-1's ownership-handoff pool — the panicking thread's own registered pool; bounded in-flight loss at the publish check; no concurrent record access exists to race) and **never calls the previous hook** (an unknown synchronous sink must not run on a thread whose timing/allocations are load-bearing); on any other context it chains to the captured previous hook (preserves host/user tooling — today's behavior) | 
 | full-process replacement (never chain) | Rejected without evidence: silently breaks debuggers/tracers/hosts that installed meaningful hooks; no failure class on record demands it |
 
-**Context identification.** Thread names registered at spawn
-(`Builder::name(...)` — machine_input.rs:215-218 already names the reader). Cost ~zero
-(a lock-free read of the registered static set). Reliability limits: unnamed threads
-and name collisions resolve to the chaining branch (fail-open to today's behavior —
-the isolation is opt-in per named critical thread, so a miss cannot create a new
-hazard, only fail to suppress a print).
+**Context identification.** Registration is a per-thread fact created at thread start
+(`AlphaRegistration::register()`, thread-local fast path); the hook's per-panic read is
+lock-free. Reliability limits: an unregistered thread resolves to the chaining branch
+(fail-open to today's behavior). A miss does not invent a print, but it does forfeit
+isolation — and when that thread's progress is awaited by a join/completion, the missed
+registration is a classification defect, not a benign fallback: the analyst case in
+#321 wedged `analyst.join()` on a blocked diagnostic sink until it was registered. The
+registration set must therefore be kept equal to the set of threads whose progress is
+awaited, not to a naming convention.
 
-**Previous-hook admission.** Chaining is allowed only off critical threads (above).
+**Previous-hook admission.** Chaining is allowed only off class-α threads (above).
 The hook cannot introspect what the previous hook is; the design therefore does not
-claim unknown sinks are safe — it confines them to non-critical contexts and records
+claim unknown sinks are safe — it confines them to non-registered contexts and records
 that confinement as the T5-8 ruling point (the "chain-to-previous is a condition, not
 an unconditional obligation" R1.2 wording becomes: the condition is
-`!critical_thread(current)`).
+`!is_alpha_producer()`).
 
 **Reentry / allocation / blocking / recording failure (atomics-only; R2 review
 2026-10-16).** The critical-thread path performs **atomic operations only**: a
@@ -1104,16 +1110,16 @@ catching the panic: unwinding still proceeds into the thread's own catch_unwind 
 (render: wasapi.rs:251/:320; reader: machine_input.rs:119/:253/:277) or, on the main
 thread, exits the process (D-7 unchanged).
 
-**Evidence.** machine_input.rs:190-207/:209-240 (facts above); render-thread catches
-(wasapi.rs:251-256/:320-327); main-thread zero `catch_unwind` (#283 AF-7 re-verified).
-A dedicated reentry/isolation witness test belongs to this package (not E-3): inject a
-panic on a named critical thread in a subprocess, assert no previous-hook output and
-process behavior otherwise unchanged.
+**Evidence.** `machine_input.rs` posture; render-thread catches
+(wasapi.rs:251-256/:320-327); main-thread zero `catch_unwind` (#283 AF-7 re-verified);
+registered/unregistered hook witnesses in `apps/headless/src/machine_input/tests.rs`;
+#321 E2E for the analyst join edge (`evidence/analyst-join-321/`).
 
-**Remaining decisions (owner).** T5-8 adoption; the critical-thread registry
-membership (reader-only vs reader+render+decode names); whether anything is rendered
-from the counters (pure silence + counter is the recommended default); whether the
-proven-non-blocking-write option is ever admitted.
+**Remaining decisions (owner).** T5-8 adoption; whether anything is rendered from the
+counters (pure silence + counter is the recommended default); whether the
+proven-non-blocking-write option is ever admitted. Registry membership is settled
+operationally by the registration fact; #321 adds the observation analyst because its
+progress is joined by the decode worker's exit funnel.
 
 **Migration and deletions.** The install site stays machine_input (single installer
 rule); if DG-1 lands, the hook's counter/slot are read by the drainer or shutdown
@@ -1135,15 +1141,27 @@ facade producer.
 > predicate is the DIAGNOSTIC OUTLET'S OWN thread fact — `is_alpha_producer()`, i.e. "this
 > thread registered a class-α pool" — not a name list. That is the same fact the producer
 > classification uses (DG-1's "class α = isolation-obligated producers"), so the two cannot
-> drift, and the render leg, the decode worker and the stdin reader are all covered by
-> construction. Rationale made explicit: each of those threads' progress is awaited by another
-> thread (the session teardown joins the decode worker; the render leg's catch must reach the
-> failure-publication cone; the machine transport seals on the reader), and std's default hook
-> prints through the process-global stderr lock — so chaining it from such a thread would let a
+> drift, and the render leg, the decode worker, the stdin reader and (since #321) the
+> observation analyst are all covered by construction. Rationale made explicit: each of those
+> threads' progress is awaited by another thread (the session teardown joins the decode worker;
+> the analyst is joined inside that worker's exit funnel; the render leg's catch must reach the
+> failure-publication cone; the machine transport seals on the reader), and the std default hook
+> performs a direct raw fd 2 write on Unix (rustc 1.97.1; not the `io::stderr()` handle whose
+> global lock a diagnostics writer can hold) — so chaining it from such a thread would let a
 > diagnostic sink decide when a join or a completion happens. Witnessed on real threads: a
 > registered thread with a non-critical name is isolated, a reader-NAMED thread that never
 > registered chains, and a registered thread panicking twice while stderr is a full pipe still
 > unwinds and ends (`apps/headless/src/machine_input/tests.rs`).
+>
+> **Implementation status (2026-10-28, #321)**: the observation analyst registers class α at
+> its thread start. The E2E causal witness (real analyst thread, real decode worker, production
+> hook installer, real session and K0 dispose, subprocess child) shows: without the registration,
+> a panicking analyst × blocked stderr wedges `analyst.join()` → `worker.join()` → no
+> `DisposeVerdict`; with it, the terminal commits `Completed` and dispose returns `Discharged`.
+> This is an implementation fact and a defect correction under the already-adopted criterion,
+> not adoption of a new candidate obligation. N-01's residual scope is correspondingly narrowed
+> to non-class-α threads (reconciliation addendum). Registration only isolates panics AFTER it;
+> it does not make an analyst hang bounded for unrelated reasons.
 
 ### DG-4c — FFmpeg av_log posture (T5-9)
 

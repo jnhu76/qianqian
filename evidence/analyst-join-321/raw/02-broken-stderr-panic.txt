@@ -1,0 +1,14 @@
+# broken stderr (fd 2 closed -> EBADF) + real analyst panic
+
+running 1 test
+HOOK-INSTALLED broken-stderr-panic
+ESTABLISHMENT=Established
+PREVIOUS-HOOK-ENTERED-ANALYST
+PREVIOUS-HOOK-RETURNED-ANALYST
+TERMINAL=Completed
+IS-CLOSED=true
+DISPOSE-ENTERED
+DISPOSE-RETURNED verdict=Discharged quiet=true
+OUTPUT-EFFECT-DISCHARGED=true
+ANALYST-THREAD-GONE=true
+exit=0

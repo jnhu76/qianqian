@@ -1,0 +1,12 @@
+# healthy control (real session/decode worker/analyst/dispose), no injection
+
+running 1 test
+HOOK-INSTALLED healthy
+ESTABLISHMENT=Established
+TERMINAL=Completed
+IS-CLOSED=true
+DISPOSE-ENTERED
+DISPOSE-RETURNED verdict=Discharged quiet=true
+OUTPUT-EFFECT-DISCHARGED=true
+ANALYST-THREAD-GONE=true
+exit=0

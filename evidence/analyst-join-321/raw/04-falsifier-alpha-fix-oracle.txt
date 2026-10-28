@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+ORACLE observed=Completed critical_panics=CRITICAL-PANICS=1 analyst_gone=ANALYST-THREAD-GONE=true
+ORACLE expected=Completed observed=Completed
+test analyst_join_e2e_tests::analyst_join_e2e_blocked_stderr_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 464 filtered out; finished in 0.51s
+

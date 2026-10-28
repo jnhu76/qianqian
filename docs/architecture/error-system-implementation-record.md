@@ -65,8 +65,10 @@ priority, recovery strategy, public semantics, the SongCore ABI, or K0 authority
    panic, with the posture installed at transport startup (the #287 review round
    replaced the first landed reading — a static registry of thread NAMES — after the
    review showed a render/decode panic could chain into the default hook and block on
-   the stderr lock before its `catch_unwind`; §9). A thread that never registered chains
-   (fail-open). The hook's critical path is atomics-only and never renders: the counter
+   the default hook's raw fd 2 write before its `catch_unwind`; §9). A thread that never
+   registered chains (fail-open). The registered set is the threads whose progress is
+   awaited: stdin reader, decode worker, render leg, and (since #321) the observation
+   analyst. The hook's critical path is atomics-only and never renders: the counter
    and the one-shot pool record are read by non-critical threads.
 6. **DG-4c install point** — the bridge is crate-private and installs from the
    decode plugin's activation. The reason is authority-backed, not convenience:
@@ -194,14 +196,23 @@ interpolated values are required; none exists today.
 (rather than through activation), the decode chain's frozen public surface needs
 its own amendment. Not requested here.
 
-**DG-4b registry membership — SETTLED by the owner's #287 review (§9).** The
-predicate is the outlet's own thread fact (`is_alpha_producer`), not a name list, and
-the posture installs at transport startup. The review's finding showed the
-"reader-only" reading was wrong in principle: a render/decode panic that chains to
-the previous hook can block on the process stderr lock (the default hook prints
-through it) BEFORE its `catch_unwind`, and the threads that `join` those legs — the
-session teardown's worker join, the render cone that must run after the catch —
-would then wait on a diagnostic sink.
+**DG-4b registry membership — SETTLED by the owner's #287 review (§9); extended by
+#321.** The predicate is the outlet's own thread fact (`is_alpha_producer`), not a
+name list, and the posture installs at transport startup. The review's finding showed
+the "reader-only" reading was wrong in principle: a render/decode panic that chains to
+the previous hook can block in the default hook's direct raw fd 2 write (rustc 1.97.1:
+`sys::stdio::panic_output` returns the raw `FileDesc`, not the `io::stderr()` handle)
+BEFORE its `catch_unwind`, and the threads that `join` those legs — the session
+teardown's worker join, the render cone that must run after the catch — would then
+wait on a diagnostic sink.
+
+The same criterion applied incompletely to the observation analyst: its progress is
+joined inside the decode worker's exit funnel (`session.rs`: `observation.close();
+analyst.join()`), yet it did not register, so a panicking analyst × blocked stderr
+could wedge the funnel before `worker.join()` and leave K0 without a `DisposeVerdict`.
+#321 adds the analyst registration at its thread start (one registration per fresh
+thread, created and dropped on that thread). This is a defect correction under the
+adopted criterion, not a new obligation.
 
 **Residual representation parameters** — record message bound (192 bytes), β
 capacity (256), drain deadline (500 ms), and the abort-reason message cap (512
@@ -231,6 +242,7 @@ DG-2 (carrier B)                         ports.rs surface (+ audio-api snapshot)
 DG-3 / DG-4a (retention, attribution)    decode-songcore unit tests + e1_abi_tests typed-fault test
 DG-4b (panic hook)                       machine_input.rs posture + the registration fact
                                          (`is_alpha_producer`) + tests.rs subprocess witness
+                                         + #321 analyst join E2E (evidence/analyst-join-321/)
 DG-4c (av_log)                           decode-songcore av_log_bridge tests (6)
 §7.1/§7.2 real cone                      qianqian-output-wasapi cone_oracle_tests (Windows-only)
 §7.4 E1-ABI                              decode-songcore e1_abi_tests (8)
@@ -249,7 +261,7 @@ documentation note. What changed, and how each one is witnessed:
 |---|---|---|---|
 | P1 — pool roles not enforced by the API | `AlphaPool` was `Sync` with public safe `publish(&self)`/`drain(&self, …)` and a public `AlphaRegistration::pool() -> &'static AlphaPool`: safe code could put two producers (or two consumers) on one pool — a data race in safe Rust | The core is crate-private; the producer role is the thread-bound `AlphaRegistration` (not `Send`/`Sync`/`Clone`) via that thread's TLS pointer; the consumer role is the drainer's walk with the position inside the core | protocol suites unchanged and green (arithmetic, Loom, Miri); `pool()` gone from the public surface; the av_log/exit witnesses now observe at the drainer's sink |
 | P1 — abandonment report re-entered the stuck sink | `shutdown_host_diagnostics` wrote its report synchronously after `shutdown` returned `abandoned`; for stderr that means waiting on the process stderr lock the stuck drainer holds — exit handed back to the sink | Abandoned reports are attempted by a detached, never-joined writer without a wait; the drained case still wrote synchronously here and was corrected in round 2 (§10: a drained drain does not prove the sink has room for one more line) | `apps/headless/src/entry/shutdown_tests.rs`: child with an unread stderr pipe, drainer stalled at `consumed=1263` with a 256-record backlog (the pipe is objectively full), child printed `SHUTDOWN-RETURNED` and exited 0 |
-| P1 — `previous(info)` on render/decode panics | The hook's isolation predicate was a thread-NAME list (`qianqian-stdin`), so a panic on a registered decode/render thread chained into an unknown hook — the default one prints through the global stderr lock and blocks BEFORE `catch_unwind`, so the join/completion paths that wait on those threads were gated on a diagnostic sink | The predicate is the outlet's own registration fact (`is_alpha_producer`); the posture installs at transport startup, before any decode worker/render thread exists | `machine_input/tests.rs` DG-4b witness: registered-noncritical-name isolated, reader-named-unregistered chains, and a registered thread panicking twice with a FULL stderr still unwinds and ends |
+| P1 — `previous(info)` on render/decode panics | The hook's isolation predicate was a thread-NAME list (`qianqian-stdin`), so a panic on a registered decode/render thread chained into an unknown hook — the default one writes directly to raw fd 2 and blocks BEFORE `catch_unwind`, so the join/completion paths that wait on those threads were gated on a diagnostic sink | The predicate is the outlet's own registration fact (`is_alpha_producer`); the posture installs at transport startup, before any decode worker/render thread exists | `machine_input/tests.rs` DG-4b witness: registered-noncritical-name isolated, reader-named-unregistered chains, and a registered thread panicking twice with a FULL stderr still unwinds and ends |
 | P2 — real sink write failures counted as delivered | `write_stderr_line` swallowed the I/O result and `StderrExporter::export` returned `Ok(())` unconditionally: a closed descriptor (EPIPE) incremented `exported` | The writer returns its I/O result; the exporter maps a failure to an export failure (counted lost, exporter disabled, one self-diagnostic); a failed `flush` went to `export_failed` here and was corrected in round 2 (§10: a flush outcome is a sink-level self-diagnostic, not a record loss); blocked-vs-failed is now explicit | `crates/qianqian-diagnostics/tests/stderr_delivery_failure.rs`: child whose stderr read end is dropped — `exported=0`, `export_failed=5`, identity holds, `self_diagnostics=1` |
 | P2 — producer path could wait on clock init | `Record::stamped` called `OnceLock::get_or_init`, so the first producer on a fresh clock entered initialization synchronization | The clock is started on cold paths (installation, registration); `stamped` only reads and reports `0` = no timestamp | `crates/qianqian-diagnostics/tests/clock_cold_path.rs` (own process): two stamps with a 5 ms gap stay 0; registration and installation each start it |
 | P2 — per-episode pools leaked and poll cost grew | Every registration `Box::leak`ed a pool into an append-only registry; `poll_pools` searched a cursor per pool, so cost grew with the process's episode history (decode/render threads are per-episode) | Registration `Drop` publishes `retired` (Release); the drainer walks the residual records ordered behind its Acquire load, folds the counters into the facility totals, and releases the pool; the drain cursor lives in the core (no lookup) | `crates/qianqian-diagnostics/src/lib.rs` unit oracles: live pool never reaped, retired pool residual-drained then released (`Arc::strong_count == 1`), counters folded |
@@ -1644,3 +1656,44 @@ ACK_SEAL_ORDER        VERIFIED (B5 oracles + B4 parked-ack seal block)
 D11_BOUNDARY          PRESERVED (no D11 change anywhere in this round)
 D_D_OWNER_RULING      PENDING (decision-record §7; owner only)
 ```
+
+## 15. Analyst registration correction (#321, 2026-10-28) — K0 Discharge liveness
+
+**Status.** Executed E2E causal witness; defect confirmed; minimal fix in #322.
+
+**Defect.** The observation analyst thread (`qianqian-observation`) is joined by the
+decode worker's single exit funnel (`session.rs`: `observation.close(); analyst.join()`),
+and session teardown joins that worker before the `PcmDecode` relation can return
+`Discharged`. The analyst did not register a class-α pool, so the DG-4b hook chained a
+panic on it to the previous hook. With the stderr pipe full and unread, the default
+hook's direct raw fd 2 write blocked before the analyst's `catch_unwind`; the funnel
+never completed `analyst.join()`, `worker.join()` never returned, and `dispose_root`
+produced no `DisposeVerdict` (neither `Discharged` nor `Violated`). D11's terminal Fact
+was already committed (`Completed`) and is not violated; the violated obligation is K0
+teardown/Discharge liveness and the adopted DG-4b classification.
+
+**Fix.** `AlphaRegistration::register()` as the first statement of the real analyst
+thread closure (`observation.rs`); one registration created and dropped on that fresh
+thread. No join-decoupling, detach, second lifecycle, Plugin or new noun. The join
+result remains telemetry; the normal-path bound remains at most one pending analysis,
+and registration does not bound an analyst hang for unrelated reasons.
+
+**Executed evidence.** `evidence/analyst-join-321/`:
+
+```text
+baseline main                   Wedged: previous hook entered, not returned; analyst
+                                in anon_pipe_write; decode in analyst.join; pipe
+                                unread=65536; no DisposeVerdict; TERMINAL=Completed
+fix HEAD                        Completed / Discharged; critical_panics=1; previous
+                                hook never entered; output effect discharged
+blocked sink, no panic          Discharged
+broken stderr (EBADF) + panic   previous hook returns; Discharged
+negative control (registration
+moved inside catch_unwind)      Wedged
+permanent unit oracle           observer thread registered; spawning/joining thread not
+```
+
+**Truth class.** Implementation record only. The panic injection is test-only and lives
+in the evidence overlay (`evidence/analyst-join-321/overlay/`), never in the product
+tree. Windows runtime: NOT_RUN (Linux host). Replay:
+`evidence/analyst-join-321/replay.sh`.

@@ -242,9 +242,20 @@ impl ObservationTap {
                 // thread's own registration, so a panic here takes the
                 // atomics-only arm and reaches the `catch_unwind` below; without
                 // it the panic would chain to an unknown synchronous sink (the
-                // std default's stderr write) BEFORE the catch, and a blocked
+                // std default's fd 2 write) BEFORE the catch, and a blocked
                 // diagnostic sink would decide when the join — and therefore the
                 // authoritative disposal verdict — completes.
+                //
+                // Registration must stay the FIRST statement: the hook consults
+                // the thread fact before `catch_unwind`, so arming it inside the
+                // protected closure would leave the same gap. Its own failure
+                // boundary is narrow and sink-independent: `register()` is a
+                // cold-path allocation plus registry lock (and rejects a
+                // duplicate on this fresh thread by contract), so it performs no
+                // diagnostic write and cannot block on a sink. That isolation
+                // covers panics AFTER this point; it does not bound a hang
+                // inside `analyst_loop` (the normal-path join still waits for at
+                // most one pending analysis).
                 let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
                 // Observation failure closes this reader only, never playback.
                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

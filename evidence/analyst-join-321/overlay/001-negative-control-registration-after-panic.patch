@@ -1,0 +1,18 @@
+diff --git a/crates/qianqian-playback/src/observation.rs b/crates/qianqian-playback/src/observation.rs
+index 0e0521d..d1665a9 100644
+--- a/crates/qianqian-playback/src/observation.rs
++++ b/crates/qianqian-playback/src/observation.rs
+@@ -246,5 +246,4 @@ impl ObservationTap {
+                 // diagnostic sink would decide when the join — and therefore the
+                 // authoritative disposal verdict — completes.
+-                let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
+                 // Observation failure closes this reader only, never playback.
+                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+@@ -259,4 +258,7 @@ impl ObservationTap {
+                     analyst_loop(&shared)
+                 }));
++                // NEGATIVE CONTROL: registration arrives AFTER the protected
++                // region, so the injected panic runs unregistered.
++                let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
+                 let mut slot = shared.lock_slot();
+                 slot.closed = true;

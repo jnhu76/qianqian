@@ -1,0 +1,13 @@
+# blocked stderr, NO analyst panic (difference control)
+
+running 1 test
+HOOK-INSTALLED blocked-stderr-panic chunks=1
+ESTABLISHMENT=Established
+TERMINAL=Completed
+IS-CLOSED=true
+DISPOSE-ENTERED
+DISPOSE-RETURNED verdict=Discharged quiet=true
+OUTPUT-EFFECT-DISCHARGED=true
+CRITICAL-PANICS=0
+ANALYST-THREAD-GONE=true
+exit=0

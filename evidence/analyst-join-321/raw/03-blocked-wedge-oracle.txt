@@ -1,0 +1,22 @@
+   Compiling qianqian-playback v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join/crates/qianqian-playback)
+   Compiling qianqian-headless v0.1.0 (/home/hoo/Source/qianqian/.worktrees/analyst-join/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.86s
+     Running unittests src/lib.rs (target/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+PROC blocked tid=538361 comm=qianqian_headle state=S wchan=futex_do_wait
+PROC blocked tid=538363 comm=analyst_join_e2 state=S wchan=futex_do_wait
+PROC blocked tid=538364 comm=analyst_join_e2 state=S wchan=anon_pipe_write
+PROC blocked tid=538366 comm=qianqian-decode state=S wchan=futex_do_wait
+PROC blocked tid=538368 comm=qianqian-observ state=S wchan=anon_pipe_write
+PROC blocked-late tid=538361 comm=qianqian_headle state=S wchan=futex_do_wait
+PROC blocked-late tid=538363 comm=analyst_join_e2 state=S wchan=futex_do_wait
+PROC blocked-late tid=538364 comm=analyst_join_e2 state=S wchan=anon_pipe_write
+PROC blocked-late tid=538366 comm=qianqian-decode state=S wchan=futex_do_wait
+PROC blocked-late tid=538368 comm=qianqian-observ state=S wchan=anon_pipe_write
+ORACLE observed=Wedged unread=65536 analyst_tid=538368 decode_tid=538366 killed=ExitStatus(unix_wait_status(9))
+ORACLE expected=Wedged observed=Wedged
+test analyst_join_e2e_tests::analyst_join_e2e_blocked_stderr_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 464 filtered out; finished in 12.51s
+
