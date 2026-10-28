@@ -152,6 +152,11 @@ fn analyst_consumes_off_path_and_publishes_the_probe_record() {
 /// authoritative disposal verdict — completes.
 #[test]
 fn the_analyst_thread_is_a_registered_isolation_obligated_producer() {
+    assert!(
+        !qianqian_diagnostics::is_alpha_producer(),
+        "the registration is thread-local: the spawning thread must not \
+         already hold the analyst's fast path"
+    );
     let tap = ObservationTap::new(TEST_FORMAT, 1024);
     let worker = tap.spawn_worker().expect("the off-path analyst spawns");
     tap.close();
@@ -166,6 +171,11 @@ fn the_analyst_thread_is_a_registered_isolation_obligated_producer() {
          progress is joined by the decode worker's exit funnel, so an \
          unregistered panic would let a diagnostic sink decide when session \
          teardown and K0 Discharge complete"
+    );
+    assert!(
+        !qianqian_diagnostics::is_alpha_producer(),
+        "the analyst's registration is created and dropped on the analyst \
+         thread; it must not leak into the joining thread"
     );
 }
 
