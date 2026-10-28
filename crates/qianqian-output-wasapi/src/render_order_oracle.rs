@@ -331,6 +331,17 @@ fn publish_consumed(
 }
 "#;
 
+    /// `wasapi.rs` as the checker will see it, with line endings
+    /// normalized to LF. `include_str!` reads the checkout's raw bytes,
+    /// so a CRLF checkout hands this text `\r\n` endings while the
+    /// multi-line anchors below are spelled with `\n`; without
+    /// normalization their `replace` would silently match nothing and
+    /// the mutation would never be applied. (Single-line anchors are
+    /// line-ending-immune and do not need this.)
+    fn normalized_mechanism_source() -> String {
+        include_str!("wasapi.rs").replace('\r', "")
+    }
+
     /// The production mechanism itself: the shipped render loop has the
     /// frozen order. This is the regression pin — a reordering of
     /// `wasapi.rs` (publishing after the credit, crediting before the
@@ -623,11 +634,17 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// condition that skips the quiescent slice.
     #[test]
     fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
-        let source = include_str!("wasapi.rs").replace(
+        let source = normalized_mechanism_source();
+        let mutated = source.replace(
             "GateSlice::TailProbe => {\n                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                        return TailProbeOutcome::Failed;\n                    };\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
             "GateSlice::TailProbe => {\n                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                        return TailProbeOutcome::Failed;\n                    };\n                    if padding != 0 {\n                        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                    }",
         );
-        let violations = check_render_order(&source);
+        assert!(
+            mutated != source,
+            "mutation not applied: the anchor matched nothing, so this \
+             control would judge an unmutated source"
+        );
+        let violations = check_render_order(&mutated);
         assert!(
             violations.iter().any(|v| v.starts_with("P8")),
             "a conditional park publication must be rejected: {violations:?}"
@@ -720,11 +737,17 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// publication degraded into renaming it.
     #[test]
     fn a_publication_moved_into_a_comment_is_rejected() {
-        let source = include_str!("wasapi.rs").replace(
+        let source = normalized_mechanism_source();
+        let mutated = source.replace(
             "pins this.\n        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
             "pins this.\n        // publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
         );
-        let violations = check_render_order(&source);
+        assert!(
+            mutated != source,
+            "mutation not applied: the anchor matched nothing, so this \
+             control would judge an unmutated source"
+        );
+        let violations = check_render_order(&mutated);
         assert!(
             violations
                 .iter()
