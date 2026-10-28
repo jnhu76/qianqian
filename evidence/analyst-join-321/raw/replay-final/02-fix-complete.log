@@ -1,0 +1,106 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling libc v0.2.189
+   Compiling autocfg v1.5.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling allocator-api2 v0.2.21
+   Compiling rustversion v1.0.23
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling cfg-if v1.0.4
+   Compiling ident_case v1.0.1
+   Compiling strsim v0.11.1
+   Compiling bitflags v2.13.2
+   Compiling thiserror v2.0.20
+   Compiling heck v0.5.0
+   Compiling either v1.18.0
+   Compiling parking_lot_core v0.9.12
+   Compiling static_assertions v1.1.0
+   Compiling ryu v1.0.23
+   Compiling instability v0.3.13
+   Compiling signal-hook v0.3.18
+   Compiling unicode-width v0.2.2
+   Compiling itoa v1.0.18
+   Compiling critical-section v1.2.0
+   Compiling indoc v2.0.7
+   Compiling log v0.4.34
+   Compiling smallvec v1.16.1
+   Compiling rustix v1.1.4
+   Compiling scopeguard v1.2.0
+   Compiling deranged v0.5.8
+   Compiling linux-raw-sys v0.12.1
+   Compiling lock_api v0.4.14
+   Compiling strength_reduce v0.2.4
+   Compiling itertools v0.14.0
+   Compiling num_threads v0.1.7
+   Compiling powerfmt v0.2.0
+   Compiling time-core v0.1.9
+   Compiling litrs v1.0.0
+   Compiling num-conv v0.2.2
+   Compiling line-clipping v0.3.8
+   Compiling hashbrown v0.17.1
+   Compiling hashbrown v0.16.1
+   Compiling qianqian-composition v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/crates/qianqian-composition)
+   Compiling convert_case v0.10.0
+   Compiling qianqian-diagnostics v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/crates/qianqian-diagnostics)
+   Compiling num-traits v0.2.19
+   Compiling castaway v0.2.4
+   Compiling compact_str v0.9.1
+   Compiling document-features v0.2.12
+   Compiling qianqian-audio-api v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/crates/qianqian-audio-api)
+   Compiling qianqian-app v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/crates/qianqian-app)
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+   Compiling lru v0.18.4
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling errno v0.3.14
+   Compiling mio v1.2.3
+   Compiling time v0.3.55
+   Compiling signal-hook-registry v1.4.8
+   Compiling parking_lot v0.12.5
+   Compiling transpose v0.2.3
+   Compiling primal-check v0.3.4
+   Compiling rustfft v6.4.1
+   Compiling signal-hook-mio v0.2.5
+   Compiling unicode-truncate v2.0.1
+   Compiling strum_macros v0.28.0
+   Compiling derive_more-impl v2.1.1
+   Compiling derive_more v2.1.1
+   Compiling crossterm v0.29.0
+   Compiling strum v0.28.0
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.20
+   Compiling kasuari v0.4.12
+   Compiling ratatui-core v0.1.2
+   Compiling realfft v3.5.0
+   Compiling qianqian-playback v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/crates/qianqian-playback)
+   Compiling darling_macro v0.24.1
+   Compiling darling v0.24.1
+   Compiling ratatui-widgets v0.3.2
+   Compiling ratatui-crossterm v0.1.2
+   Compiling ratatui-macros v0.7.2
+   Compiling ratatui v0.30.2
+   Compiling qianqian-headless v0.1.0 (/tmp/qianqian-analyst-join-321.luFlxu/fix/apps/headless)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.84s
+     Running unittests src/lib.rs (/tmp/qianqian-analyst-join-321.luFlxu/target-fix/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+CHILD-LINE=
+CHILD-LINE=running 1 test
+CHILD-LINE=HOOK-INSTALLED blocked-stderr-panic chunks=1
+CHILD-LINE=ESTABLISHMENT=Established
+CHILD-LINE=TERMINAL=Completed
+CHILD-LINE=IS-CLOSED=true
+CHILD-LINE=DISPOSE-ENTERED
+CHILD-LINE=DISPOSE-RETURNED verdict=Discharged quiet=true
+CHILD-LINE=OUTPUT-EFFECT-DISCHARGED=true
+CHILD-LINE=CRITICAL-PANICS=1
+CHILD-LINE=ANALYST-THREAD-GONE=true
+ORACLE observed=Completed critical_panics=CRITICAL-PANICS=1 analyst_gone=ANALYST-THREAD-GONE=true
+ORACLE expected=Completed observed=Completed
+test analyst_join_e2e_tests::analyst_join_e2e_blocked_stderr_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 466 filtered out; finished in 0.26s
+

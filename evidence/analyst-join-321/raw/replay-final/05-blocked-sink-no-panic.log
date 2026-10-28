@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (/tmp/qianqian-analyst-join-321.luFlxu/target-fix/debug/deps/qianqian_headless-f84825ee7a57de88)
+
+running 1 test
+CHILD-LINE=
+CHILD-LINE=running 1 test
+CHILD-LINE=HOOK-INSTALLED blocked-sink-control chunks=1
+CHILD-LINE=ESTABLISHMENT=Established
+CHILD-LINE=TERMINAL=Completed
+CHILD-LINE=IS-CLOSED=true
+CHILD-LINE=DISPOSE-ENTERED
+CHILD-LINE=DISPOSE-RETURNED verdict=Discharged quiet=true
+CHILD-LINE=OUTPUT-EFFECT-DISCHARGED=true
+CHILD-LINE=CRITICAL-PANICS=0
+CHILD-LINE=ANALYST-THREAD-GONE=true
+test analyst_join_e2e_tests::analyst_join_e2e_blocked_sink_without_panic_discharges ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 466 filtered out; finished in 0.26s
+

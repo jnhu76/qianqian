@@ -30,7 +30,6 @@ FIX_REV="${2:-HEAD}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/qianqian-analyst-join-321.XXXXXX")"
 OUT="${OUT:-$TMP/logs}"
 mkdir -p "$OUT"
-export CARGO_TARGET_DIR="$TMP/target"
 
 archived=0
 archive_logs() {
@@ -71,9 +70,15 @@ prepare() {
 run() {
     local dir="$1" expect="$2" log="$3" test="$4"
     local rc=0
+    # A SHARED target dir lets Cargo reuse the other checkout's artifact for the
+    # same crate/feature set, which would silently run the baseline binary in the
+    # fix worktree. Keep one target per checkout; the negative control reuses the
+    # fix target because it changes source inside the same path.
+    local target="$TMP/target-$(basename "$dir")"
     (
         cd "$dir"
-        QIANQIAN_ANALYST_JOIN_EXPECT="$expect" \
+        CARGO_TARGET_DIR="$target" \
+            QIANQIAN_ANALYST_JOIN_EXPECT="$expect" \
             timeout 600 cargo test -p qianqian-headless --lib -- "$test" --nocapture
     ) >"$log" 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then

@@ -35,3 +35,25 @@ The versioned overlay now injects it **inside** the protected region; the replay
 script re-derives the same baseline/fix outcomes with that stricter shape. The
 outcomes in these receipts are unchanged and are not presented as if produced by
 the overlay.
+
+## Final replay receipts (`replay-final/`)
+
+Produced by `replay.sh origin/main HEAD` after the rebase onto
+`main@61d834a`, with the fix at `c25d133`. `ENVIRONMENT.txt` records the
+revisions, rustc and host.
+
+```text
+01-baseline-wedge.log             base: ORACLE observed=Wedged, previous hook
+                                  entered, unread=65536, no DISPOSE-RETURNED
+02-fix-complete.log               fix: ORACLE observed=Completed,
+                                  DISPOSE-RETURNED verdict=Discharged,
+                                  CRITICAL-PANICS=1, previous hook absent
+03-healthy.log                    Discharged
+04-broken-stderr-panic.log        previous hook returns, Discharged
+05-blocked-sink-no-panic.log      Discharged, CRITICAL-PANICS=0
+06-negative-control-wedge.log     registration after the protected region:
+                                  ORACLE observed=Wedged again
+```
+
+These are generated evidence, not hand-edited. The script's RUN lines are the
+authority for the sequence; the logs are the raw child output.

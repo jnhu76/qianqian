@@ -1,14 +1,14 @@
 diff --git a/crates/qianqian-playback/src/observation.rs b/crates/qianqian-playback/src/observation.rs
-index 0e0521d..d1665a9 100644
+index 5b53e63..52e2d86 100644
 --- a/crates/qianqian-playback/src/observation.rs
 +++ b/crates/qianqian-playback/src/observation.rs
-@@ -246,5 +246,4 @@ impl ObservationTap {
-                 // diagnostic sink would decide when the join — and therefore the
-                 // authoritative disposal verdict — completes.
+@@ -257,5 +257,4 @@ impl ObservationTap {
+                 // inside `analyst_loop` (the normal-path join still waits for at
+                 // most one pending analysis).
 -                let _diagnostics = qianqian_diagnostics::AlphaRegistration::register();
                  // Observation failure closes this reader only, never playback.
                  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-@@ -259,4 +258,7 @@ impl ObservationTap {
+@@ -270,4 +269,7 @@ impl ObservationTap {
                      analyst_loop(&shared)
                  }));
 +                // NEGATIVE CONTROL: registration arrives AFTER the protected
