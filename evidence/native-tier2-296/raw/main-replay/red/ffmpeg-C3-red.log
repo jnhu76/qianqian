@@ -1,0 +1,26 @@
+   Compiling qianqian-diagnostics v0.1.0 (/home/hoo/Source/qianqian/.worktrees/native-main/crates/qianqian-diagnostics)
+   Compiling qianqian-decode-songcore v0.1.0 (/home/hoo/Source/qianqian/.worktrees/native-main/crates/qianqian-decode-songcore)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running tests/native_ffmpeg_bridge_controls.rs (crates/qianqian-decode-songcore/target/debug/deps/native_ffmpeg_bridge_controls-8ecb93a7ae555888)
+
+running 1 test
+test qfb_native_ffmpeg_bridge_cell ... QFB-ENV cell=C3 qianqian_ffmpeg_log=1 artifact_sha256=a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056 pid=649690
+QFB-PREMISE consumer_held_in_export=1
+QFB-CAPACITY fill_attempts=3 accepted=2 rejected=1 first_reject_attempt=Some(3)
+QFB-C3-PRODUCER artifact_abi=1 media_sha256=0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f reads=16 frames_before_fault=115200 first_error="pending decode error" terminal_error="pending decode error" elapsed_us=2540
+QFB-C3-REGISTRATION attempted=7 accepted=2 rejected=0 outstanding=2
+QFB-C3-TARGET attempts=4 accepted=0 rejected=0
+ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:618:5:
+assertion `left == right` failed: REJECT-ACCOUNTING: every full-pool attempt must be rejected and counted
+  left: 0
+ right: 4
+FAILED
+
+failures:
+
+failures:
+    qfb_native_ffmpeg_bridge_cell
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `--test native_ffmpeg_bridge_controls`

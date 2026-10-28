@@ -1,0 +1,26 @@
+   Compiling qianqian-diagnostics v0.1.0 (/home/hoo/Source/qianqian/.worktrees/native-main/crates/qianqian-diagnostics)
+   Compiling qianqian-decode-songcore v0.1.0 (/home/hoo/Source/qianqian/.worktrees/native-main/crates/qianqian-decode-songcore)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running tests/native_ffmpeg_bridge_controls.rs (crates/qianqian-decode-songcore/target/debug/deps/native_ffmpeg_bridge_controls-8ecb93a7ae555888)
+
+running 1 test
+test qfb_native_ffmpeg_bridge_cell ... QFB-ENV cell=C4 qianqian_ffmpeg_log=1 artifact_sha256=a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056 pid=650363
+QFB-PREMISE broken_stderr_canary=Err
+QFB-C4-PRODUCER artifact_abi=1 media_sha256=0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f reads=16 frames_before_fault=115200 first_error="pending decode error" terminal_error="pending decode error" elapsed_us=2685
+QFB-C4-REGISTRATION attempted=4 accepted=2 rejected=2 outstanding=2
+QFB-PREMISE drainer_entered_real_export=1 broken_stderr=1
+QFB-C4-COUNTERS beta_queued=0 beta_rejected=0 beta_consumed=0 alpha_rejected=2 copied_out=2 exported=1 export_failed=2 outstanding=0 self_diagnostics=1 critical_panics=0
+ASSERTION panicked at tests/native_ffmpeg_bridge_controls.rs:718:5:
+assertion `left == right` failed: LOSS-ACCOUNTING: a failed write must never be counted as delivered
+  left: 1
+ right: 0
+FAILED
+
+failures:
+
+failures:
+    qfb_native_ffmpeg_bridge_cell
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `--test native_ffmpeg_bridge_controls`

@@ -1,0 +1,122 @@
+# closeout3 native ffmpeg-bridge × C1–C4 — ten-tuples
+# truth class: execution evidence, not architecture authority
+# artifact: libsongcore.a a0a3baf8eb61be8e991517d9653156a3efe0f67c9ba09fff1deb30187e5fe056 (FFmpeg n9.0.1)
+# producer: real FFmpeg av_log from a real SongCore decode (committed FLAC truncated to 100000 B,
+#           sha256 0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f)
+#           -> real Rust av_log bridge (QIANQIAN_FFMPEG_LOG=1, installed by real plugin activation)
+#           -> real qianqian-diagnostics admission. No mock producer.
+# harness: crates/qianqian-decode-songcore/tests/native_ffmpeg_bridge_controls.rs
+#          sha256 b5801386114bcebf0764c1fb7d2193fb2bc967fa0decc4d941b799b3df4a0fae (test-only; no production change)
+
+CELL C1 BLOCKED_SINK — PASS
+PREMISE:            external helper holds the REAL std stderr lock (acquired signal before the
+                    producer starts); the facility's single drainer was witnessed entering the REAL
+                    StderrExporter (QFB-PREMISE drainer_entered_real_export=1) and its write could not
+                    complete; QIANQIAN_FFMPEG_LOG=1 installed the bridge; the producer thread is the
+                    α-registered decode-side thread.
+PRODUCER_PROGRESS:  real song_read_pcm reached the native fault after 16 reads / 115200 frames
+                    (25 x 4608 intact frames) in 2872 us, while the sink stayed blocked; it emitted
+                    4 real bridge/fault records into the α pool and returned. No backpressure.
+RELIABLE_RESULT:    DecodeError("pending decode error") surfaced unchanged; the prefix PCM stayed
+                    intact (115200 frames); the typed native code is NOT claimed here (records were
+                    not delivered) — closeout2's C probe owns native=-1094995529.
+TERMINAL_OUTCOME:   terminal repeat returned the same "pending decode error"; the diagnostic sink
+                    was never a precondition of the terminal classification.
+TEARDOWN_OUTCOME:   shutdown(50 ms) = {drained:false, abandoned:true, undelivered_at_exit:2};
+                    the held sink was never claimed as drained and never joined.
+LOSS_ACCOUNTING:    pool attempted=4 = accepted=2 + rejected=2; outstanding=2; global
+                    alpha_rejected=2; copied_out=0; exported=0; export_failed=0;
+                    self_diagnostics=0 (blocked != failed).
+COUNTERFACTUAL:     pool full branch changed so the producer waits (bounded 5 s) for the blocked
+                    consumer: exact RED at the assertion "PRODUCER-NOT-BACKPRESSURED ... did not
+                    complete within 2s while the diagnostic consumer was held" (test ran, finished
+                    2.76 s, exit 101; no outer timeout kill, no compile error, no zero execution).
+ENVIRONMENT:        linux-x86_64 (WSL2 6.18.54.1), glibc, rustc/cargo 1.97.1, gcc 15.2.0,
+                    FFmpeg n9.0.1 static closure inside libsongcore.a a0a3baf8…, worktree HEAD
+                    a343abb35c62768dc80e408b3df267a9cb830ac3. Windows native NOT_RUN (#172).
+RAW_RECEIPT:        raw/C1-healthy-final.log, raw/C1-healthy-post-restore.log,
+                    raw/C1-counterfactual-final.log, raw/C1-counterfactual-final.diff,
+                    raw/C1-counterfactual-base.sha256, counterfactual-validation.txt,
+                    environment.txt, artifact-identity.txt.
+VERDICT:            PASS (scoped to this Linux native controlled boundary).
+
+CELL C2 STOPPED_CONSUMER — PASS
+PREMISE:            the facility's real single drainer consumed one real β seed
+                    (beta_queued=1, beta_consumed=1) and is stopped inside a real Exporter::export
+                    (entered signal, happens-before the test); the gate is never released;
+                    QIANQIAN_FFMPEG_LOG=1 and a real FFmpeg producer.
+PRODUCER_PROGRESS:  16 reads / 115200 frames / 3641 us; real decode fault and terminal repeat
+                    completed while the consumer stayed stopped.
+RELIABLE_RESULT:    DecodeError("pending decode error") unchanged; prefix intact.
+TERMINAL_OUTCOME:   terminal repeat identical; no diagnostic-consumer dependency.
+TEARDOWN_OUTCOME:   shutdown(50 ms) = {drained:false, abandoned:true, undelivered_at_exit:3}
+                    (2 α outstanding + 1 in-flight seed). Abandoned was never reported as drained.
+LOSS_ACCOUNTING:    pool attempted=4 = accepted=2 + rejected=2; outstanding=2;
+                    beta_queued=1 / beta_consumed=1; exported=0; export_failed=0;
+                    self_diagnostics=0; undelivered_at_exit=3.
+COUNTERFACTUAL:     shutdown's stuck-drainer return changed to {drained:true, abandoned:false}:
+                    exact RED at "TEARDOWN-OUTCOME ... never a claimed drain" (report shown in the
+                    assertion), test ran, finished 0.21 s, exit 101.
+ENVIRONMENT:        as C1.
+RAW_RECEIPT:        raw/C2-healthy-final.log, raw/C2-healthy-post-restore.log,
+                    raw/C2-counterfactual-final.log, raw/C2-counterfactual-final.diff,
+                    raw/C2-counterfactual-base.sha256, counterfactual-validation.txt.
+VERDICT:            PASS (scoped to this Linux native controlled boundary).
+
+CELL C3 CAPACITY_EXHAUSTION — PASS
+PREMISE:            consumer held as in C2; on the producing α thread the real emit path fills its
+                    own current pool in a bounded loop (3 attempts max): 2 accepted, first
+                    AlphaRejected on attempt 3 — the pool's two-slot bound is witnessed without
+                    assuming free slots; the pool stays full for the whole target.
+PRODUCER_PROGRESS:  real decode ran 16 reads / 115200 frames / 2899 us to the fault; 4 real target
+                    bridge/fault records were attempted at the full pool and none blocked.
+RELIABLE_RESULT:    DecodeError("pending decode error") unchanged; prefix intact.
+TERMINAL_OUTCOME:   terminal repeat identical.
+TEARDOWN_OUTCOME:   shutdown(50 ms) = {drained:false, abandoned:true, undelivered_at_exit:3}.
+LOSS_ACCOUNTING:    target attempts=4, accepted=0, rejected=4; per-pool attempted=7 =
+                    accepted=2 + rejected=5; global alpha_rejected=5 (= fill 1 + target 4);
+                    outstanding=2 (stays at the pool bound: bounded publish, no loop/CAS/lock/
+                    allocation on the fault path; bridge copy is bounded to MSG_CAP).
+COUNTERFACTUAL:     removed the pool's rejected-counter increment (rejection still returns
+                    AlphaRejected): exact RED at "REJECT-ACCOUNTING ... left: 0 right: 4",
+                    test ran, finished 0.32 s, exit 101.
+ENVIRONMENT:        as C1.
+RAW_RECEIPT:        raw/C3-healthy-final.log, raw/C3-healthy-post-restore.log,
+                    raw/C3-counterfactual-final.log, raw/C3-counterfactual-final.diff,
+                    raw/C3-counterfactual-base.sha256 (pool.rs identity), counterfactual-validation.txt.
+VERDICT:            PASS (scoped to this Linux native controlled boundary).
+
+CELL C4 WRITE_FAILURE — PASS
+PREMISE:            fd 2 redirected to /dev/full; inside the child the REAL write_stderr_line
+                    (the exact writer used by StderrExporter) returned Err — canary corroborated;
+                    drainer witnessed entering the REAL StderrExporter; QIANQIAN_FFMPEG_LOG=1;
+                    real FFmpeg producer.
+PRODUCER_PROGRESS:  16 reads / 115200 frames / 2828 us; 4 real bridge/fault records attempted;
+                    producer returned before/independently of the sink outcome.
+RELIABLE_RESULT:    DecodeError("pending decode error") unchanged despite the failing sink;
+                    prefix intact.
+TERMINAL_OUTCOME:   terminal repeat identical; no semantic diversion.
+TEARDOWN_OUTCOME:   fd 2 restored, shutdown(2 s) = {drained:true, abandoned:false,
+                    undelivered_at_exit:0}; final sweep completed and flush reached a live fd.
+LOSS_ACCOUNTING:    pool attempted=4 = accepted=2 + rejected=2; copied_out=2 + beta_consumed=0 =
+                    exported=0 + export_failed=2; self_diagnostics=1 (one exporter disable);
+                    exported stayed 0: a failed write is never counted as delivered.
+COUNTERFACTUAL:     failed export also counted as exported: exact RED at "LOSS-ACCOUNTING: a
+                    failed write must never be counted as delivered" (left 1 right 0), test ran,
+                    finished 0.37 s, exit 101.
+ENVIRONMENT:        as C1; /dev/full is the real OS failure (ENOSPC), not a mock.
+RAW_RECEIPT:        raw/C4-healthy-final.log, raw/C4-healthy-post-restore.log,
+                    raw/C4-counterfactual-final.log, raw/C4-counterfactual-final.diff,
+                    raw/C4-counterfactual-base.sha256 (lib.rs identity), counterfactual-validation.txt.
+VERDICT:            PASS (scoped to this Linux native controlled boundary).
+
+# NOT_RUN / boundary
+- Windows native rows: NOT_RUN. #172 S2 verified Windows artifact absent; windows-x86_64 recipe is
+  provisional. No cross-platform inference is made from these Linux rows.
+- Production Playback-Session worker registration (session.rs) is not mounted; the harness thread
+  plays the isolation-obligated α producer role while using the real plugin + adapter + bridge.
+- Typed (status, native_code) attribution is not observable in these four cells because the fault
+  records were rejected/undelivered; closeout2's C probe owns that receipt.
+- "No unbounded allocation" is supported structurally (preallocated two-slot pool, bounded
+  MSG_CAP copy, bounded single-attempt publish) plus the observed bound outstanding<=2, not by an
+  allocator-instrumented measurement.
