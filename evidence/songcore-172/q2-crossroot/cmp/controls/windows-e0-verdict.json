@@ -1,0 +1,20 @@
+{
+  "target": "windows",
+  "cmp_dir": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-windows-e0",
+  "static": {
+    "artifact": "static",
+    "exit": 1,
+    "identical": false,
+    "identical_occurrences": 273,
+    "differing_occurrences": 9,
+    "order_identical": "yes",
+    "duplicate_names": 9,
+    "leak_r1": "{'/home/hoo/qq329/win-r1': 1, '/home/': 1, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "leak_r2": "{'/home/hoo/qq329/windows-root-two': 1, '/home/': 1, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "cmp_file": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-windows-e0/static-cmp.txt"
+  },
+  "shared": null,
+  "static_sha_r1": "a652706e6eb514a49fd259b8968eadb9ccf6a579059c91346e3aca8d69d717b1",
+  "static_sha_r2": "63e6d3ffe0c86c1d92d48e27d8a916f61c498166e300c22218325f850764e4f9",
+  "all_identical": false
+}

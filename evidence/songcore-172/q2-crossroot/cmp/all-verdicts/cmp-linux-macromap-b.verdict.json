@@ -1,0 +1,33 @@
+{
+  "target": "linux",
+  "cmp_dir": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-linux-macromap-b",
+  "static": {
+    "artifact": "static",
+    "exit": 0,
+    "identical": true,
+    "identical_occurrences": 282,
+    "differing_occurrences": 0,
+    "order_identical": "yes",
+    "duplicate_names": 9,
+    "leak_r1": "{'/home/hoo/qq329/lin-r1': 0, '/home/': 0, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "leak_r2": "{'/home/hoo/qq329/linux-root-two': 0, '/home/': 0, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "cmp_file": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-linux-macromap-b/static-cmp.txt"
+  },
+  "shared": {
+    "artifact": "shared",
+    "exit": 0,
+    "identical": true,
+    "identical_occurrences": null,
+    "differing_occurrences": null,
+    "order_identical": "shared-sha256",
+    "duplicate_names": null,
+    "leak_r1": null,
+    "leak_r2": null,
+    "cmp_file": ""
+  },
+  "static_sha_r1": "7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a",
+  "static_sha_r2": "7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a",
+  "shared_sha_r1": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+  "shared_sha_r2": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+  "all_identical": true
+}
