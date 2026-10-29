@@ -1,7 +1,8 @@
 # SongCore Release Contract
 
 ```text
-TRUTH CLASS   FINAL contract text for Issue #172 S1 (Release Contract
+TRUTH CLASS   OWNER-RATIFIED repository authority for the SongCore
+              component release domain (Issue #172 S1 Release Contract
               Freeze). Finalized 2026-10-29 on branch
               songcore-172/pr-b-windows-release-lane from the S1 draft
               (docs/release/songcore-contract-draft.md): the content below
@@ -9,10 +10,16 @@ TRUTH CLASS   FINAL contract text for Issue #172 S1 (Release Contract
               the campaign's contract review returned APPROVE on
               (REVISION 1/2 below and the §15 appendix record the applied
               deltas). Committed here, it is the written contract S2/S3
-              campaign work implements and verifies against. It is still
-              NOT owner-ratified repository authority: owner adoption
-              under AGENTS.md routing remains the authority act, and §14
-              (Owner 待决) holds the decisions only the owner may take.
+              campaign work implements and verifies against. Ratified
+              2026-10-30 as repository authority by the explicit approval
+              PR reviewed under Issue #330 — that PR is the owner adoption
+              act under AGENTS.md routing; an issue comment does not
+              change a truth class. The frozen clauses (§1–§13) are
+              adopted as written; §14 (Owner 待决) still holds the
+              decisions only the owner may take, and Q1 (next release
+              version), Q4 (linux glibc symbol floor) and Q5 (publication
+              mechanism) remain owner-reserved — ratification does NOT
+              answer them.
 FINALIZED     2026-10-29 (this file). Body identical to the S1 draft at
               REVISION 2 except: this header block, the §14 heading (now
               "Owner 待决 (openQuestions)"), and the §15 finalization

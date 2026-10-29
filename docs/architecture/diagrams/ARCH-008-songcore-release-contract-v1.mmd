@@ -1,0 +1,33 @@
+flowchart TB
+    subgraph CONTRACT["SongCore Release Contract — OWNER-RATIFIED (Issue #172 S1, #330)"]
+        direction LR
+        ID["Component identity\nsongcore, songcore-vX.Y.Z\nABI version 1 (songcore.h)"]
+        TGT["Supported targets\nlinux-x86_64 / windows-x86_64\ncapability profile codec-base"]
+        SRC["Source discipline\nclean tree, pinned FFmpeg\npin + recipe + profile hashes"]
+    end
+
+    SRC --> G0
+    ID --> G4
+    TGT --> G0
+
+    subgraph GATES["Correctness gates (contract §11) — five-state ladder BUILD…RELEASE"]
+        direction TB
+        G0["G0 BUILD\npinned import + xmake replay\nmember format audit"]
+        G1["G1 LINK\nconsumer compile/link\n15-symbol per-form audit"]
+        G2["G2 CORE_RUNTIME\nS-BIND §7.1 parity scenario\nreal runtime"]
+        G3["G3 BINDING_RUNTIME\nsame scenario via bindings\nconstruction-time ABI check"]
+        G4["G4 RELEASE\npackage + manifest V1–V7\nlicense O1–O4 / B1–B4"]
+        G0 --> G1 --> G2 --> G3 --> G4
+    end
+
+    subgraph PACKAGE["Package (contract §7/§8/§10)"]
+        direction TB
+        TREE["songcore-vX.Y.Z-<target>\ninclude / lib / LICENSES / metadata"]
+        MAN["metadata/manifest.json schema 2\nfiles{} + checksums.txt + symbols.txt"]
+        LIC["LICENSES\nFFmpeg COPYING set + notices\nLICENSE-MIT + LICENSE-APACHE"]
+    end
+
+    G4 --> TREE
+    TREE --> MAN
+    TREE --> LIC
+    MAN --> PUB["Publication\nnever re-tags history\n(§14 Q1/Q4/Q5 owner-reserved)"]
