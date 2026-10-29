@@ -397,11 +397,13 @@ closure {
   reference_archives { <lib>: {bytes, sha256} }                  (S-IMP :377–382)
 }
 files { <packaged-path>: {sha256, bytes} }  every packaged file EXCEPT
-                                            checksums.txt itself (the same
-                                            set checksums.txt covers) — this
-                                            is the binding to real
-                                            release-file SHA256s; must equal
-                                            checksums.txt line for line
+                                            checksums.txt and the manifest
+                                            itself (checksums.txt covers one
+                                            more file — manifest.json — so
+                                            files[] keys == checksums.txt
+                                            entries MINUS manifest.json);
+                                            this is the binding to real
+                                            release-file SHA256s
 runtime_dependencies { per §9, per target }
 license { ffmpeg_effective, gpl_enabled, version3_enabled, nonfree_enabled,
           external_libs[], license_files { COPYING.*: sha256 } }
@@ -419,10 +421,14 @@ time, adapted from S-CHK):
 
 ```text
 V1  every files[] entry re-hashes to the actual packaged bytes; the set of
-    files[] keys == the set of checksums.txt entries == the §7 content set
-    MINUS checksums.txt itself (checksums.txt hashes manifest.json and the
-    other payloads but not itself; the manifest hashes neither itself nor
-    checksums.txt — verified shape: 13 package files, 12 checksum entries)
+    checksums.txt entries == the §7 content set MINUS checksums.txt itself,
+    and the set of files[] keys == that checksums.txt set MINUS
+    manifest.json (checksums.txt hashes manifest.json and the other
+    payloads but not itself; the manifest hashes neither itself nor
+    checksums.txt — verified shapes: v0.1.0 13 package files / 12 checksum
+    entries; windows RC 14 package files / 13 checksum entries / 12
+    files{} entries — receipt evidence/songcore-172/package/
+    package-summary.json "V1_sets")
 V2  abi_header_sha256 == sha256(packaged include/songcore.h) == sha256 of
     the header at the source commit
 V3  pin.* and closure.* agree with native/ffmpeg/pin.json and the imported
@@ -768,6 +774,11 @@ Q5  songcore-v* publication mechanism: v0.1.0 was published manually; the
     protections, or stay manual with G4 as the written gate?
 ```
 
+Differentials raised by the Issue #330 review that need an owner decision
+are recorded in §16 and are owner-reserved exactly like the questions
+above: they are recorded with their counterfactuals, not silently
+answered, and no code or `songcore.h` text was changed for them.
+
 ## 15. Drafting-session evidence appendix (what was actually run/read)
 
 ```text
@@ -826,4 +837,106 @@ Still NOT_RUN: the L1–L3 two-root comparison (T1–T6). S2's build lane
        (ops/build-rc.ps1, -BuildDir) produces the second independent root
        for that comparison; the diff/classification itself (T2–T5) and
        the L1/L2/L3 verdicts remain S2/S3 execution work.
+```
+
+## 16. Differential dispositions — Issue #330 review (2026-10-30)
+
+Issue #330 lane 2 asked for three source/contract differentials to be
+independently recorded and decided, each classified as a code bug, a spec
+ambiguity, or an acceptable implementation within contract, with a precise
+counterfactual, and with no code fix merely to satisfy prose and no
+normative-ABI amendment without owner review. Each disposition below cites
+both sides as read in this repository. Items marked `needsOwnerDecision`
+are recorded only — deliberately NOT fixed in code or in `songcore.h`
+here; compiled-semantics changes require an authorized fix PR (Issue #330
+boundaries). No disposition promotes new lifecycle, vocabulary or
+authority (AGENTS.md verification-authority boundary).
+
+### D1 — `song_open` failure phrase vs implementation — needsOwnerDecision
+
+```text
+Differential    native/include/songcore.h:218 says of the listed
+                song_open failures: "*out_handle is then untouched";
+                native/src/songcore_ffmpeg.c:823–825 sets
+                *out_handle = NULL immediately after the argument guard,
+                so every post-guard failure (the three listed statuses)
+                leaves NULL, not the caller's prior value. Only the
+                pre-guard SONG_ERR_INVALID_ARGUMENT path leaves it
+                untouched.
+Classification  header-text defect (the phrase contradicts the shipped
+                implementation), not an implementation bug: the code's
+                NULL-first behavior is defensive and strictly safer for
+                callers.
+Counterfactual  a caller that initializes *out_handle to a private
+                sentinel to detect "song_open never reached the deposit
+                point", or that relies on a prior handle value surviving
+                a failed re-open, observes the sentinel clobbered to
+                NULL — behavior the current header sentence forbids and
+                the code performs, on every post-guard failure.
+Conclusion      needsOwnerDecision: either re-word the header sentence
+                (a normative-ABI amendment: "*out_handle is set to NULL
+                on failure") or change the code to preserve the caller's
+                value (a compiled-semantics change on both targets).
+                Recorded only; neither side changed here.
+```
+
+### D2 — contract `files{}` wording vs package/matcher semantics — fixed in place
+
+```text
+Differential    §8's files{} comment and rule V1 said the set of files[]
+                keys equals the set of checksums.txt entries, while the
+                actual packaged/matcher semantics are: checksums.txt
+                covers every packaged file except itself, and files{}
+                covers that set MINUS manifest.json (the manifest never
+                hashes itself). Evidence in this repository: the RC
+                receipt evidence/songcore-172/package/
+                package-summary.json check "V1_sets" (14 packaged files;
+                checksums.txt 13 entries; files{} 12 entries = checksums
+                set minus manifest.json); the staged
+                metadata/checksums.txt lists metadata/manifest.json while
+                the staged manifest's files{} does not; the product-side
+                matcher precedent tools/check_release.py:208 ("R5
+                manifest exact payload set (no self-hash)").
+Classification  spec ambiguity in this contract's prose (the §8 comment
+                and V1's equality claim could not both be implemented),
+                not a package defect: the shipped RC package already
+                matches the parenthetical sentence ("the manifest hashes
+                neither itself nor checksums.txt").
+Counterfactual  a G4 verifier implementing the literal equality would
+                red-light every real package (its files{} can never
+                include manifest.json — that would be a self-hash); a
+                packager implementing the equality symmetrically would
+                emit exactly the circular self-hash the same sentence
+                forbids.
+Conclusion      spec ambiguity — fixed in place in §8 and V1 (this
+                commit) to state the verified set arithmetic; no code,
+                packaging or package-evidence change. The historical RC
+                container and its receipts stay untouched.
+```
+
+### D3 — `song_read_pcm` dual-invalid call leaves `produced` unchanged — needsOwnerDecision
+
+```text
+Differential    native/include/songcore.h:358 promises for every typed
+                error from song_read_pcm: "*out_frames_produced == 0 in
+                that call", but native/src/songcore_ffmpeg.c:1112–1114
+                returns SONG_ERR_INVALID_ARGUMENT for !dst BEFORE
+                zeroing *out_frames_produced, so a dst==NULL call
+                (including the dual-invalid dst==NULL + frame_capacity==0
+                call) leaves *out_frames_produced unchanged. The
+                capacity==0-only path does zero it (line 1113 runs
+                first).
+Classification  code-level deviation from a clear header promise (a real
+                contract violation on the NULL-dst path), not prose
+                ambiguity — but the fix is a compiled-semantics change.
+Counterfactual  a caller that sets *out_frames_produced = UINT64_MAX
+                before the call and asserts the header-derived invariant
+                "produced == 0 after any error" fails exactly and only on
+                the NULL-dst path: an observer can distinguish the guard
+                order in the binary from the header text alone.
+Conclusion      needsOwnerDecision: either fix the code (zero
+                *out_frames_produced before the dst guard — an authorized
+                fix PR; the #330 governance lane does not change
+                Windows/Linux compiled semantics) or amend the header
+                promise (normative ABI). Recorded only; no code changed.
 ```
