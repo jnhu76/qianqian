@@ -1,0 +1,10 @@
+clone-source-path=/mnt/c/Users/fred1/source/qianqian
+clone-transport=file:// (--no-local, smart transport)
+note=clone from the worktree path failed on Linux git (its .git gitfile carries a Windows-absolute gitdir C:/Users/fred1/source/qianqian/.git/worktrees/qianqian-172, unresolvable on Linux, and file:// upload-pack did not walk up); fell back to the owning repository /mnt/c/Users/fred1/source/qianqian, which holds the same object store and refs as the worktree. Branch content is identical; verified by HEAD sha + tree archive digest below.
+--- clone-worktree-path.log ---
+Cloning into '/home/hoo/qianqian-172-linux'...
+fatal: not a git repository: /mnt/c/Users/fred1/source/qianqian-172/C:/Users/fred1/source/qianqian/.git/worktrees/qianqian-172
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.

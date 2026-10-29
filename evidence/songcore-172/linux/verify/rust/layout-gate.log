@@ -1,0 +1,10 @@
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling qianqian-songcore-sys v0.1.0 (/home/hoo/qianqian-172-linux/crates/qianqian-songcore-sys)
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling songcore-call-comparison v0.1.0 (/home/hoo/qianqian-172-linux/experiments/songcore-call-comparison)
+    Finished `release` profile [optimized] target(s) in 3.31s
+     Running `target/release/songcore-call-comparison layout`
+layout PASS

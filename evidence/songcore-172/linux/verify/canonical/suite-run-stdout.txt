@@ -1,0 +1,29 @@
+canonical: abi=True artifact=True correctness=PASS
+  misc: exit=0 failed=none
+  mp3-cbr-id3v23:scenario: exit=0 failed=none
+  mp3-cbr-id3v23:frozen_reference_match: {'rate_match': True, 'channels_match': True, 'codec_match': True, 'frames_match': True, 'pcm_sha256_match': True, 'pass': True}
+  mp3-cbr-id3v23:trunc50: exit=0 failed=none
+  mp3-cbr-id3v23:trunc4k: exit=0 failed=none
+  mp3-cbr-id3v23:empty: exit=0 failed=none
+  mp3-cbr-id3v23:lifetime: exit=0 failed=none
+  flac-16-44-stereo:scenario: exit=0 failed=none
+  flac-16-44-stereo:frozen_reference_match: {'rate_match': True, 'channels_match': True, 'codec_match': True, 'frames_match': True, 'pcm_sha256_match': True, 'pass': True}
+  flac-16-44-stereo:trunc50: exit=0 failed=none
+  flac-16-44-stereo:trunc4k: exit=0 failed=none
+  flac-16-44-stereo:empty: exit=0 failed=none
+  flac-16-44-stereo:corrupt16@20pct: exit=0 failed=none
+  flac-16-44-stereo:lifetime: exit=0 failed=none
+  alac-16-44-stereo:scenario: exit=0 failed=none
+  alac-16-44-stereo:frozen_reference_match: {'rate_match': True, 'channels_match': True, 'codec_match': True, 'frames_match': True, 'pcm_sha256_match': True, 'pass': True}
+  alac-16-44-stereo:trunc50: exit=0 failed=none
+  alac-16-44-stereo:trunc4k: exit=0 failed=none
+  alac-16-44-stereo:empty: exit=0 failed=none
+  alac-16-44-stereo:lifetime: exit=0 failed=none
+  alac-long:scenario: exit=0 failed=none
+  alac-long:frozen_reference_match: {'rate_match': True, 'channels_match': True, 'codec_match': True, 'frames_match': True, 'pcm_sha256_match': True, 'pass': True}
+  alac-long:trunc50: exit=0 failed=none
+  alac-long:trunc4k: exit=0 failed=none
+  alac-long:empty: exit=0 failed=none
+  alac-long:lifetime: exit=0 failed=none
+verdict: PASS
+wrote /home/hoo/qianqian-172-linux/ops/verify-evidence/c-suite-receipt.json

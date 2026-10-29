@@ -1,0 +1,14 @@
+   Compiling qianqian-songcore-sys v0.1.0 (/home/hoo/qianqian-172-linux/crates/qianqian-songcore-sys)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.70s
+     Running unittests src/lib.rs (crates/qianqian-songcore-sys/target/debug/deps/qianqian_songcore_sys-cda4b457d71cc587)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests qianqian_songcore_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

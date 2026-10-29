@@ -1,0 +1,1 @@
+no fetch lines this run (closure reused)

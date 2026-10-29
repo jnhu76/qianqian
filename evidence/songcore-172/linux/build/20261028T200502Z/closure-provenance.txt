@@ -1,0 +1,11 @@
+# closure provenance 2026-10-28T20:05:04Z
+target=linux-x86_64
+head=bf23516b5851174dc63fb5058997fa5478751713
+tree=3247b280f26efe6bc4174307758d791100c12b0d
+os=Linux 6.18.54.1-microsoft-standard-WSL2
+gcc=gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+xmake=xmake v2.9.7+20250101, A cross-platform build utility based on Lua
+ffmpeg_tag=n9.0.1
+ffmpeg_commit=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+no fetch lines this run (closure reused)
