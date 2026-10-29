@@ -923,20 +923,29 @@ Differential    native/include/songcore.h:358 promises for every typed
                 returns SONG_ERR_INVALID_ARGUMENT for !dst BEFORE
                 zeroing *out_frames_produced, so a dst==NULL call
                 (including the dual-invalid dst==NULL + frame_capacity==0
-                call) leaves *out_frames_produced unchanged. The
-                capacity==0-only path does zero it (line 1113 runs
-                first).
+                call) leaves *out_frames_produced unchanged. Line 1111
+                (`if (!h) return SONG_ERR_INVALID_ARGUMENT;`) likewise
+                returns before the zeroing, so a NULL-handle call with a
+                valid out pointer equally leaves *out_frames_produced
+                unchanged — a second violation path of the same header
+                promise. The capacity==0-only path does zero it (line
+                1113 runs first).
 Classification  code-level deviation from a clear header promise (a real
-                contract violation on the NULL-dst path), not prose
-                ambiguity — but the fix is a compiled-semantics change.
+                contract violation on both pre-zeroing guard paths), not
+                prose ambiguity — but the fix is a compiled-semantics
+                change.
 Counterfactual  a caller that sets *out_frames_produced = UINT64_MAX
                 before the call and asserts the header-derived invariant
-                "produced == 0 after any error" fails exactly and only on
-                the NULL-dst path: an observer can distinguish the guard
-                order in the binary from the header text alone.
+                "produced == 0 after any error" fails on both pre-zeroing
+                guard paths — the NULL-handle path (line 1111) and the
+                NULL-dst path (line 1112): an observer can distinguish
+                the guard order in the binary from the header text alone.
 Conclusion      needsOwnerDecision: either fix the code (zero
                 *out_frames_produced before the dst guard — an authorized
                 fix PR; the #330 governance lane does not change
                 Windows/Linux compiled semantics) or amend the header
-                promise (normative ABI). Recorded only; no code changed.
+                promise (normative ABI). Any code fix must cover both
+                pre-zeroing guard paths (line 1111 !h and line 1112
+                !dst), not only the dst guard. Recorded only; no code
+                changed.
 ```
