@@ -434,9 +434,9 @@ after a stop is NOT_RUN for that run. Known host conditionals, as of
 2026-10-30:
 
 ```text
-release-policy  needs python3, git, gcc, ar, objdump, the
-                x86_64-w64-mingw32 cross toolchain (gcc/ar/nm/objdump),
-                cargo/rustc and xmake on PATH. A Windows host lacking
+release-policy  needs python3, git, ar, objdump, the
+                x86_64-w64-mingw32 cross toolchain (gcc/ar), rustc and
+                xmake on PATH. A Windows host lacking
                 them (this repository's actual Windows setup: no
                 gcc/ar/objdump/mingw cross; `python3` resolves to the
                 non-functional WindowsApps alias) cannot run it — run it
