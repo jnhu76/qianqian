@@ -14,6 +14,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
 | Output Plugin / host-audio backend boundary, cross-platform output work | `adr/ADR-PBK-003.md` — stable Output Plugin identity + backend-neutral Host Render Contract; concrete backend owned mechanism by default |
 | SongCore one-core/many-bindings architecture, raw vs ergonomic binding boundary, binding parity oracle, target support maturity (BUILD…RELEASE) | `architecture/songcore-binding-architecture.md` — binding-architecture authority (Issue #173); the canonical ABI description itself is `../native/include/songcore.h` |
+| SongCore component release — release contract, gates G0–G4, package layout, provenance schema, license obligations | `release/songcore-release-contract.md` — **OWNER-RATIFIED** (Issue #172 S1; ratified 2026-10-30 by the explicit approval PR reviewed under Issue #330; §14 owner decisions incl. Q1/Q4/Q5 stay reserved) |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Playback temporal semantics — how commands are accepted, what establishes ordering, evidence classes (world-state vs operation), commit boundaries, observation vs truth (timing/order/causality questions) | `architecture/playback-temporal-semantics.md` — cross-cutting temporal vocabulary + reading model over existing mechanisms; protocol predicates stay with their owners (D11 / D14.5 / D14.7 / D14.8 / D14.11) |
 | Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **FROZEN** (Stage 7 #210; subject `a225d524`), Stage 5 #208 over merged Stage 4 #207/#214; §12 holds 20/20 traceability; merged C1 #205 and C2 #213; D1–D6 ACCEPTED by #209 (PASS_ARCHITECTURE_ACCEPTED); validation contract #212 (PLAYBACK-EXECUTION-VALIDATION-v1), execution #211 not started; owner #198, umbrella #201; protocol authorities retain their predicates |
@@ -82,6 +83,13 @@ NORMATIVE AUTHORITY
       -> architecture/songcore-binding-architecture.md
          (canonical SongCore ABI description:
           ../native/include/songcore.h)
+
+  SongCore component release contract (component identity, version
+  rule, supported targets, gates G0–G4, package layout, provenance
+  schema, license obligations, reproducibility layers)
+      -> release/songcore-release-contract.md
+         (OWNER-RATIFIED 2026-10-30 via the Issue #330 explicit
+          approval PR; §14 owner decisions stay reserved)
 
   DSP product semantics
       -> architecture/dsp-product-model.md

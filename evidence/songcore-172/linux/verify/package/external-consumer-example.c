@@ -5,9 +5,18 @@
  * include/songcore.h and lib/ plus the C standard library, and walks the
  * minimal real path  open → probe → decode → seek → EOF → close.
  *
- * Build (static, contract §9 link line):
+ * Build (static, contract §9 linux link line):
  *   cc -O2 -Iinclude external-consumer-example.c \
  *      -Llib -lsongcore -lm -lpthread -o songcore-consumer-example
+ *
+ * Build (Windows static, contract §9 link line — -lbcrypt is REQUIRED
+ * there: the archive's Win32 entropy path imports BCrypt*
+ * (BCryptOpenAlgorithmProvider/GenRandom/CloseAlgorithmProvider, audited
+ * per contract §9); observed in the #325 consumer smoke and printed in
+ * the package README. Evidence added by the #330 P3 disposition:
+ * without it a Windows consumer following this example fails to link):
+ *   gcc -O2 -Iinclude external-consumer-example.c \
+ *      -Llib -lsongcore -lbcrypt -o songcore-consumer-example.exe
  *
  * Build (shared):
  *   cc -O2 -Iinclude external-consumer-example.c \
@@ -20,6 +29,18 @@
  *
  * Exit 0 = the smoke passed; any stage failure exits 1 with a typed status.
  * The consumer supplies its own media file; the package ships no media.
+ *
+ * Evidence note (2026-10-30, #330 P3): the Windows build line above was
+ * added to this packaging template. The S3 verification receipts
+ * evidence/songcore-172/linux/verify/sha256-manifest.txt:8 and
+ * evidence/songcore-172/linux/verify/verify-copy-sha256-win.txt:8 bind the
+ * pre-edit bytes (sha256
+ * d14547312c12e07fdaf1e826ed2236d3694808a5ba233181c07c6dbb71ce1552) and
+ * remain records of the verification performed then; the archived RC
+ * container's packaged copy is likewise unchanged (frozen zip sha256
+ * 7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415).
+ * Future packs copy this updated template (ops/package-rc.ps1
+ * $ConsumerExample default).
  */
 #include <inttypes.h>
 #include <stdint.h>

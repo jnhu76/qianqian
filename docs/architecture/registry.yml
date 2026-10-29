@@ -216,3 +216,33 @@ architectures:
     evidence:
       - docs/architecture/component-boundary-a0.md
       - git tag playback-reference-v1
+
+  - id: ARCH-008
+    name: SongCore Release Contract
+    version: 1
+    status: CURRENT
+
+    # Release governance for the SongCore component (Issue #172 S1):
+    # component identity, version rule, supported targets, capability
+    # profile, gates G0-G4, package layout, provenance schema, license
+    # obligations. Owner-ratified 2026-10-30 by the explicit approval PR
+    # reviewed under Issue #330; section 14 owner decisions stay reserved.
+    # The text file is the only authority; the diagram is a derived flow
+    # projection of its gate pipeline, not a second contract.
+    diagram:
+      source: docs/architecture/diagrams/ARCH-008-songcore-release-contract-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/release/songcore-release-contract.md
+
+    decisions:
+      - issue: 172
+      - issue: 330
+
+    implementation:
+      - pr: 327
+
+    evidence:
+      - evidence/songcore-172/package/package-summary.json
+      - evidence/songcore-172/verdicts/review-C.md

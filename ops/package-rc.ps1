@@ -33,8 +33,8 @@
 #      bytes; write metadata/symbols.txt, metadata/checksums.txt (13
 #      entries: every packaged file except itself, v0.1.0 shape) and
 #      manifest files{} (the same set minus manifest.json itself --
-#      non-circular binding; recorded differential to the section 8
-#      "same set" wording, the same reading the S3 linux lane enforced).
+#      non-circular binding; this set arithmetic is what contract section 8
+#      V1 states since the Issue #330 differential disposition).
 #   4. V1-V7 + O1/O2 + B4 re-verification on the staged tree; any failure
 #      aborts with exit 1 and no container.
 #   5. write the .zip container (System.IO.Compression, forward-slash entry
@@ -282,6 +282,48 @@ TMPD=$(mktemp -d)
 tar -xzf "$V010" -C "$TMPD" "$V010_MEMBER"
 mv "$TMPD/$V010_MEMBER" "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt"
 rm -rf "$TMPD"
+
+# P3 wording refresh (Issue #330; review-C F4 / P3-3): the v0.1.0-extracted
+# notices carry two stale statements — the v0.1.0/linux identity header and
+# the "carry no open-source license yet ... NOT granted by this package"
+# Qianqian paragraph, which contradicts the LICENSE-MIT/LICENSE-APACHE texts
+# shipped alongside in the same package (B4) and the repo-root dual license.
+# The historical RC container keeps the stale wording on purpose: archived
+# evidence is not rewritten (frozen zip sha256 7b4d0615d25af464739373a0a356
+# 5f77f3208ce9c263f59e578d443801536415 unchanged). Every pack from this
+# script forward gets the corrected identity header and component-license
+# paragraph below; the extracted FFmpeg section stays byte-identical to the
+# v0.1.0 asset. Fail-closed: if the v0.1.0-extracted shape ever drifts, the
+# run aborts (exit 24) instead of shipping a silent partial rewrite.
+python3 - "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" <<'PY'
+import os, sys
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().split("\n")
+if not (len(lines) >= 3 and lines[0].startswith("Third-party notices")
+        and lines[1] and set(lines[1]) == {"="}):
+    sys.stderr.write("FAIL: notices identity header shape drifted\n")
+    sys.exit(24)
+q = [i for i, l in enumerate(lines) if l == "Qianqian"]
+if len(q) != 1:
+    sys.stderr.write("FAIL: expected exactly one Qianqian section, got %d\n" % len(q))
+    sys.exit(24)
+title = "Third-party notices \u2014 SongCore %s (%s)" % (
+    os.environ["QR_NOTICES_VERSION"], os.environ["QR_NOTICES_TARGET"])
+lines[0] = title
+lines[1] = "=" * len(title)
+paragraph = [
+    "Qianqian",
+    "  The Qianqian sources (songcore.h and the SongCore implementation) are",
+    "  dual-licensed: MIT or Apache-2.0, at the recipient's option. The",
+    "  complete license texts ship in this package as LICENSES/LICENSE-MIT",
+    "  and LICENSES/LICENSE-APACHE and are sha256-bound in",
+    "  metadata/checksums.txt. This is an engineering statement, not legal",
+    "  advice; each release's license block is owner-reviewed before",
+    "  publication (contract section 10).",
+]
+open(path, "w", encoding="utf-8", newline="\n").write(
+    "\n".join(lines[:q[0]] + paragraph) + "\n")
+PY
 echo "NOTICES_SHA256=$(sha256sum "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" | awk '{print $1}')"
 
 # R3 archive target identity (method mirror of tools/check_release.py:117).
@@ -335,7 +377,9 @@ $env:QR_V010_SHA      = $V010TarSha256
 $env:QR_STAGE_WSL     = $stageWsl
 $env:QR_WORKTREE_WSL  = Convert-ToWslPath $ProjectRoot
 $env:QR_ARTIFACT_WSL  = Convert-ToWslPath $ArtifactPath
-$env:WSLENV           = "QR_PINNED_ZIP:QR_V010_TAR:QR_V010_SHA:QR_STAGE_WSL:QR_WORKTREE_WSL:QR_ARTIFACT_WSL"
+$env:QR_NOTICES_VERSION = "v$Version"
+$env:QR_NOTICES_TARGET  = "windows-x86_64"
+$env:WSLENV           = "QR_PINNED_ZIP:QR_V010_TAR:QR_V010_SHA:QR_STAGE_WSL:QR_WORKTREE_WSL:QR_ARTIFACT_WSL:QR_NOTICES_VERSION:QR_NOTICES_TARGET"
 
 $auditOut = & wsl.exe -d $WslDistro -- bash (Convert-ToWslPath $auditScript) 2>&1
 $auditRc = $LASTEXITCODE
@@ -572,10 +616,14 @@ $manifest = [ordered]@{
              "(contract section 14 Q1); this is a release-candidate verification archive, not a release (contract " +
              "section 11: a produced archive is not a release), and must never be published under the songcore-v* " +
              "namespace without owner ratification. " +
-             "files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; recorded " +
-             "differential to section 8's 'same set' wording, the same reading the S3 linux lane enforced). " +
+             "files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; the set " +
+             "arithmetic contract section 8 V1 states since the Issue #330 differential disposition). " +
              "LICENSES/THIRD_PARTY_NOTICES.txt was extracted from the sha256-verified published songcore-v0.1.0 " +
-             "asset ($V010TarSha256); the FFmpeg COPYING texts were extracted from the pinned n9.0.1 source zip " +
+             "asset ($V010TarSha256) and then wording-refreshed per the Issue #330 P3 disposition: identity " +
+             "header updated to this package's version/target and the stale component-license paragraph " +
+             "replaced by the dual-license statement (LICENSE-MIT/LICENSE-APACHE ship alongside, B4); the " +
+             "FFmpeg section stays byte-identical to the v0.1.0 asset. " +
+             "The FFmpeg COPYING texts were extracted from the pinned n9.0.1 source zip " +
              "re-verified against pin.json source_sha256 on this run (O1). " +
              "Machine license checks verify presence, hash identity and configure-arg provenance only; they cannot " +
              "certify legal sufficiency (contract section 10 limit).")
@@ -596,7 +644,7 @@ foreach ($n in $CopyingNames) {
 }
 $manifest.license.license_files = $licenseFiles
 $summary.checks["O1_license_texts"] = "PASS (4 FFmpeg COPYING texts extracted from the pin-verified source zip; staged shas == extraction shas)"
-$summary.checks["O2_B3_notices"] = "PASS (THIRD_PARTY_NOTICES.txt extracted from the sha-verified v0.1.0 asset; hashed in checksums.txt/files{} below)"
+$summary.checks["O2_B3_notices"] = "PASS (THIRD_PARTY_NOTICES.txt extracted from the sha-verified v0.1.0 asset, then #330 P3 wording-refreshed: identity header + component-license paragraph; hashed in checksums.txt/files{} below)"
 $b4Ok = $true
 foreach ($pair in @(@("LICENSE-MIT", "LICENSES\LICENSE-MIT"), @("LICENSE-APACHE", "LICENSES\LICENSE-APACHE"))) {
     if ((Get-Sha256 (Join-Path $ProjectRoot $pair[0])) -ne (Get-Sha256 (Join-Path $stagePkg $pair[1]))) { $b4Ok = $false }

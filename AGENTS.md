@@ -416,6 +416,42 @@ Rust paths changed:     plugin boundary gate (incl. its negative
 docs/website changed:   website verify + VitePress build
                         (node scripts/verify.mjs && npx vitepress build;
                         needs `cd website && npm ci` once)
+release/* changed:      release-policy controls — python3
+                        tools/test_release.py (E01–E18 causal controls
+                        in temporary synthetic fixtures). Triggers:
+                        tools/*release*, tools/package-windows.sh,
+                        tools/publish-qianqian.py, CHANGELOG.md,
+                        docs/releasing.md,
+                        .github/workflows/release-qianqian.yml,
+                        native/**, lefthook.yml
+```
+
+Host-conditional gate selection and NOT_RUN discipline (Issue #330 lanes
+3–5): a gate that did not execute is NOT_RUN and must never be reported
+PASS — not in commit messages, PR bodies, or evidence records. The run is
+piped in priority order and stops at the first red gate, so every gate
+after a stop is NOT_RUN for that run. Known host conditionals, as of
+2026-10-30:
+
+```text
+release-policy  needs python3, git, ar, objdump, the
+                x86_64-w64-mingw32 cross toolchain (gcc/ar), rustc and
+                xmake on PATH. A Windows host lacking
+                them (this repository's actual Windows setup: no
+                gcc/ar/objdump/mingw cross; `python3` resolves to the
+                non-functional WindowsApps alias) cannot run it — run it
+                in WSL (`python3 tools/test_release.py`, PASS
+                2026-10-30) or record NOT_RUN. The E14 ELF control uses
+                the committed host-independent fixture
+                tools/release-fixtures/elf64-x86-64-minimal.o, so the
+                control no longer depends on the host gcc emitting ELF.
+docs-verify     needs node/npm plus website/node_modules. On the Windows
+                host it runs via the documented route
+                `cmd /c <tools>\docs-verify.cmd <worktree-root>`
+                (npm ci, then verify.mjs, then the VitePress build).
+                Latest run: PASS, 2026-10-30 (Issue #330 lane-3
+                evidence; npm ci 244 packages, verify.mjs 0 errors /
+                0 warnings, VitePress build complete).
 ```
 
 What it proves / does not prove:
@@ -428,7 +464,10 @@ proves:       the current WORKING TREE passes the fast deterministic local
 does not      Windows / cfg(windows) compilation, TLA+/TLC formal suites,
 prove:        Miri, Loom, mutation negatives, WASAPI/device evidence,
               PR-title convention (a PR title has no local existence;
-              derive it from the commit header)
+              derive it from the commit header), a real release artifact
+              (release-policy proves machine-check rejection paths on
+              synthetic fixtures, never native reconstructibility), and
+              any gate that was NOT_RUN on the host
 ```
 
 On a real `git push`, commands with `glob` are narrowed to the pushed changeset (Lefthook's native push-file detection; it can only narrow on a real, known delta and never silently skips a real change). The manual `--all-files` run is always the complete gate. Install and prerequisites: `CONTRIBUTING.md`.
