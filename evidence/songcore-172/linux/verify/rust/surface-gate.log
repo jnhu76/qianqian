@@ -1,0 +1,6 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/songcore-call-comparison surface`
+surface mp3-cbr-id3v23 select=0/0 seek=0/0 actual_us=496327/496327 first_frames=1024/1024 PASS
+surface flac-16-44-stereo select=0/0 seek=0/0 actual_us=417959/417959 first_frames=1024/1024 PASS
+surface alac-16-44-stereo select=0/0 seek=0/0 actual_us=464399/464399 first_frames=1024/1024 PASS
+surface alac-long select=0/0 seek=0/0 actual_us=464399/464399 first_frames=1024/1024 PASS

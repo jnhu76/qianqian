@@ -1,0 +1,8 @@
+ABI: 15/15 exports, extras=0, leaks=0+0
+artifacts: static 280 members, shared NEEDED=['libc.so.6', 'libm.so.6']
+correctness: PASS
+  mp3-cbr-id3v23: sha=True frames=True terminal=True
+  flac-16-44-stereo: sha=True frames=True terminal=True
+  alac-16-44-stereo: sha=True frames=True terminal=True
+  alac-long: sha=True frames=True terminal=True
+wrote /home/hoo/qianqian-172-linux/ops/verify-evidence/equivalence.json

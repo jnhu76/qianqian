@@ -1,0 +1,5 @@
+external-consumer-test
+package=/home/hoo/qianqian-172-linux/ops/package/songcore-v0.0.0-s3-verify-linux-x86_64.tar.gz
+media=/home/hoo/qianqian-172-linux/native/experiments/songcore-equivalence/fixtures/flac-16-44-stereo.flac (from the canonical corpus; the package ships no media)
+unpack_dir=/tmp/s3-external (fresh /tmp dir)
+include/lib usage only: yes (compile lines above use -Iinclude -Llib[-shared])

@@ -1,0 +1,6 @@
+Cloning into '/home/hoo/qianqian-172-linux'...
+fatal: not a git repository: /mnt/c/Users/fred1/source/qianqian-172/C:/Users/fred1/source/qianqian/.git/worktrees/qianqian-172
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.

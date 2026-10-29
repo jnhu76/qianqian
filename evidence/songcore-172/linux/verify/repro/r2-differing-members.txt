@@ -1,0 +1,8 @@
+flac_picture.c.o
+hdr_dynamic_metadata.c.o
+iamf_parse.c.o
+iamf_reader.c.o
+lcevc.c.o
+oggparseflac.c.o
+oggparseogm.c.o
+oggparsevorbis.c.o

@@ -1,0 +1,90 @@
+install prefix            install
+source path               /home/hoo/qianqian-172-linux/native/build/ffmpeg-src
+C compiler                gcc
+C library                 glibc
+ARCH                      x86 (generic)
+big-endian                no
+runtime cpu detection     yes
+standalone assembly       no
+x86 assembler             nasm
+MMX enabled               yes
+MMXEXT enabled            yes
+SSE enabled               yes
+SSSE3 enabled             yes
+AESNI enabled             yes
+CLMUL enabled             yes
+AVX enabled               yes
+AVX2 enabled              yes
+AVX-512 enabled           yes
+AVX-512ICL enabled        yes
+XOP enabled               yes
+FMA3 enabled              yes
+FMA4 enabled              yes
+i686 features enabled     yes
+CMOV is fast              yes
+EBX available             yes
+EBP available             yes
+debug symbols             no
+strip symbols             yes
+optimize for size         no
+optimizations             yes
+static                    yes
+shared                    no
+network support           no
+threading support         pthreads
+safe bitstream reader     yes
+texi2html enabled         no
+perl enabled              yes
+pod2man enabled           yes
+makeinfo enabled          no
+makeinfo supports HTML    no
+experimental features     yes
+xmllint enabled           no
+
+External libraries:
+iconv
+
+External libraries providing hardware acceleration:
+
+Libraries:
+avcodec                 avutil
+avformat                swresample
+
+Programs:
+
+Enabled decoders:
+aac                     opus                    pcm_s24le
+alac                    pcm_f32le               pcm_s32le
+flac                    pcm_f64le               pcm_u8
+mp3float                pcm_s16le               vorbis
+
+Enabled encoders:
+
+Enabled hwaccels:
+
+Enabled parsers:
+flac                    mpegaudio
+
+Enabled demuxers:
+aac                     mov                     ogg
+flac                    mp3                     wav
+
+Enabled muxers:
+
+Enabled protocols:
+
+Enabled filters:
+
+Enabled bsfs:
+
+Enabled indevs:
+
+Enabled outdevs:
+
+License: LGPL version 2.1 or later
++ /home/hoo/qianqian-172-linux/native/build/ffmpeg-src/configure --prefix=install --disable-everything --disable-programs --disable-doc --disable-debug --disable-autodetect --disable-x86asm --disable-network --disable-protocols --disable-devices --disable-avdevice --disable-avfilter --disable-swscale --enable-avformat --enable-avcodec --enable-swresample --enable-demuxer=aac --enable-demuxer=flac --enable-demuxer=mov --enable-demuxer=mp3 --enable-demuxer=ogg --enable-demuxer=wav --enable-decoder=aac --enable-decoder=alac --enable-decoder=flac --enable-decoder=mp3float --enable-decoder=opus --enable-decoder=pcm_f32le --enable-decoder=pcm_f64le --enable-decoder=pcm_s16le --enable-decoder=pcm_s24le --enable-decoder=pcm_s32le --enable-decoder=pcm_u8 --enable-decoder=vorbis --enable-parser=mpegaudio --target-os=linux --arch=x86_64
++ make -j 20 V=1 libavutil/libavutil.a libavcodec/libavcodec.a libavformat/libavformat.a libswresample/libswresample.a
+wrote build/ffmpeg-xmake/manifest.json
+closure: 279 translation units (0 generated)
+toolchain: {'system': 'linux', 'machine': 'x86_64', 'cc': 'gcc', 'cc_ident': 'gcc 15 (Ubuntu 15.2.0-16ubuntu1)', 'arch': 'x86', 'target_os': None}
+normal builds may now run: xmake build qianqian_av
