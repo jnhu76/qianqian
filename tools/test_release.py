@@ -116,9 +116,12 @@ def main():
         cr.write_json(receipt_path, good_receipt)
         archive_path = native / 'build/artifacts/libsongcore.a'
         archive_bytes = archive_path.read_bytes()
-        call(['gcc', '-c', 'main.c', '-o', 'elf.o'], pe_root)
+        # Real ELF member from the committed host-independent fixture, not a
+        # host gcc (a MinGW host gcc cannot emit ELF): identity and provenance
+        # in tools/release-fixtures/README.md.
+        elf = ROOT / 'tools/release-fixtures/elf64-x86-64-minimal.o'
         archive_path.unlink()
-        call(['ar', 'rcs', str(archive_path), 'elf.o'], pe_root)
+        call(['ar', 'rcs', str(archive_path), str(elf)], pe_root)
         checker('native', ['--native', native], 2, 'POLICY_RED: R3 native archive target mismatch', 'E14-real-ELF')
         archive_path.write_bytes(archive_bytes)
         closure['target']['id'] = 'linux-x86_64'; cr.write_json(native / 'build/ffmpeg-xmake/manifest.json', closure)
