@@ -1,0 +1,27 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261029074115
+用户名: WUJIE\fred1
+RunAs 用户: WUJIE\fred1
+配置名称: 
+计算机: WUJIE (Microsoft Windows NT 10.0.26300.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File ops/verify-external.ps1 -ExpectedZipSha256 0000000000000000000000000000000000000000000000000000000000000000
+进程 ID: 608
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+identity pin: explicit -ExpectedZipSha256 override
+zip sha256: 7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415
+FAIL [zip-identity] sha256 mismatch: got 7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415 expected 0000000000000000000000000000000000000000000000000000000000000000
+PS>TerminatingError():“fail-closed: zip-identity”
+FAIL-CLOSED: fail-closed: zip-identity
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261029074115
+**********************

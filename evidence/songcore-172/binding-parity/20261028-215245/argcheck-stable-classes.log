@@ -1,0 +1,5 @@
+CASE ac.null-handle PASS
+CASE ac.pre-probe-not-open PASS
+CASE ac.invalid-argument PASS
+CASE ac.diag-contract PASS
+MODE argcheck CASES=4 FAILED=0 RESULT=PASS

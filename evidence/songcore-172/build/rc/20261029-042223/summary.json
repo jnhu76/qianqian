@@ -1,0 +1,70 @@
+{
+    "script":  "ops/build-rc.ps1",
+    "started":  "20261029-042223",
+    "project":  "C:\\Users\\fred1\\source\\qianqian-172",
+    "wsl_distro":  "Ubuntu-24.04",
+    "wsl_work_root":  "/home/hoo/q172rc",
+    "build_dir":  "/home/hoo/q172rc-r2",
+    "closure_source":  "/home/hoo/q172d2-verify/closure",
+    "git_branch":  "songcore-172/pr-b-windows-release-lane",
+    "source":  {
+                   "commit":  "2c84d0f4990e46cdc76c0ab7d8f26b707a2b244c",
+                   "native_tracked_clean":  true,
+                   "recipe_sha256":  "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d",
+                   "abi_header_sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+               },
+    "steps":  {
+                  "preflight":  "ok",
+                  "wsl_tools":  "ok (exit 0)",
+                  "closure_prepare":  "ok (exit 0)",
+                  "build_and_validate":  "ok (exit 0)",
+                  "summarize":  "ok",
+                  "second_root_build":  "ok (exit 0)",
+                  "second_root_summarize":  "ok"
+              },
+    "artifacts":  {
+                      "libsongcore_a_sha256":  "1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402",
+                      "libsongcore_a_size":  "3309710",
+                      "pe_members":  "280",
+                      "elf_members":  "0",
+                      "song_abi_symbols":  "15",
+                      "ar_magic":  "ok",
+                      "abi_header_sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+                      "negative_shared_exit":  "nonzero (fail-closed verified)",
+                      "sha256_crosscheck":  "WSL sha256sum == Windows Get-FileHash"
+                  },
+    "ffmpeg_provenance":  {
+                              "tag":  "n9.0.1",
+                              "commit":  "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+                              "source_sha256":  "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+                              "profile":  "codec-base",
+                              "profile_sha256":  "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+                              "recipe_sha256":  "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d",
+                              "closure_manifest_sha256":  "0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14",
+                              "closure_units":  "279",
+                              "closure_toolchain":  {
+                                                        "system":  "linux",
+                                                        "machine":  "x86_64",
+                                                        "cc":  "x86_64-w64-mingw32-gcc",
+                                                        "cc_ident":  "gcc 13-win32 (GCC)"
+                                                    }
+                          },
+    "toolchain":  {
+                      "xmake":  "xmake v2.9.7+20250101, A cross-platform build utility based on Lua",
+                      "cc":  "x86_64-w64-mingw32-gcc (GCC) 13-win32",
+                      "ar":  "GNU ar (GNU Binutils) 2.45.90.20260125",
+                      "ld":  "GNU ld (GNU Binutils) 2.45.90.20260125",
+                      "python":  "Python 3.14.4"
+                  },
+    "second_root":  {
+                        "root":  "/home/hoo/q172rc-r2",
+                        "artifact_sha256":  "b45226317172f96873406d55ccc6b8ddc0cc213ced16653d24abc56fe4f8c1ac",
+                        "artifact_size":  "3309742",
+                        "pe_members":  "280",
+                        "song_abi_symbols":  "15",
+                        "sha256_crosscheck":  "WSL sha256sum == Windows Get-FileHash",
+                        "byte_comparison":  "reported only; equal-hash judgment and member-wise classification are contract 搂12 T1鈥揟6 (S3) work, not judged here",
+                        "consumption_path":  "untouched: the second root\u0027s artifact is evidence-only (C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\build\\rc\\20261029-042223\\r2-artifacts\\libsongcore.a), not copied into native/build/artifacts"
+                    },
+    "ok":  true
+}

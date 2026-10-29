@@ -1,0 +1,3 @@
+closure manifest r1=0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14
+closure manifest r2=0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14
+CLOSURE_IDENTITY=BYTE_IDENTICAL

@@ -1,0 +1,40 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261029071806
+用户名: WUJIE\fred1
+RunAs 用户: WUJIE\fred1
+配置名称: 
+计算机: WUJIE (Microsoft Windows NT 10.0.26300.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File ops/verify-external.ps1
+进程 ID: 20948
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+extracted to: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261029-071806 (root: songcore-v0.2.0-rc.1-windows-x86_64)
+in-package checksums: 13 entries OK
+consumer source: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261029-071806\s2-external-consumer.c
+
+media input: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261029-071806\sample10s.flac
+link contract: gcc -O2 -Iinclude C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261029-071806\s2-external-consumer.c -Llib -lsongcore -lbcrypt -o C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261029-071806\s2-external-consumer.exe
+
+compile+link: OK (exact README link list -lsongcore -lbcrypt)
+  consumer: probe: codec=flac container=flac rate=44100 ch=2 duration_us=10000000
+  consumer: decode: 441000 frames to SONG_EOF
+  consumer: seek: target_us=5000000 landing_us=4911020
+  consumer: eof: clean SONG_EOF after 224424 post-seek frames
+  consumer: S2-CONSUMER PASS
+sequence open->probe->decode->seek(50%)->EOF->close: PASS (exit 0)
+import table: bcrypt.dll, KERNEL32.dll, msvcrt.dll
+runtime deps: all imports inside README-declared allowlist (bcrypt declared; kernel32/msvcrt = toolchain CRT + Win32 system imports)
+
+EXTERNAL-CONSUMER ACCEPTANCE: PASS
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261029071808
+**********************

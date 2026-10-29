@@ -1,0 +1,3 @@
+2a4a9daf6610ea7872e08cda615ade61fef4d7a732b2698c231446e0c37650b9  build/artifacts/libqianqian_av.a
+2b4dd91dc7b23d894e4ca9ca11e7f5b31a4fdc76f9b62ceee61daa2c09f58625  build/artifacts/libsongcore.a
+1b9a7e2bddd98b5243dca827375f6e6f02183d9dc5b8b538d1b2ce02b5294f13  build/artifacts/shared/libsongcore.so

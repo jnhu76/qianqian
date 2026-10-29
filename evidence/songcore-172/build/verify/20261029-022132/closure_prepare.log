@@ -1,0 +1,5 @@
+closure: importing (one-time oracle cost)
+closure: 279 translation units (0 generated)
+toolchain: {'system': 'linux', 'machine': 'x86_64', 'cc': 'x86_64-w64-mingw32-gcc', 'cc_ident': 'gcc 13-win32 (GCC)', 'arch': 'x86', 'target_os': None}
+normal builds may now run: xmake build qianqian_av
+PREPARE_OK

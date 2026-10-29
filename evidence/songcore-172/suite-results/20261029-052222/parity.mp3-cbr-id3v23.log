@@ -1,0 +1,43 @@
+exit=0
+--- stdout ---
+CASE s01.abi-version PASS
+CASE s02.open PASS
+CASE s02.diag-null-after-ok PASS
+CASE s03.not-open-class PASS
+CASE s03.probe-facts PASS
+INFO probe rate=44100 channels=2 mask=0x3 duration=4000000 bps=0 codec=mp3 container=mp3 streams=1 selected=0
+CASE s03.probe-idempotent PASS
+CASE s04.streams-default PASS
+INFO streams count=1
+CASE s05.metadata PASS
+INFO metadata raw_count=5 has_title=1 has_artist=1 has_album=1
+META[0] scope=0 key=title value=千千测试 CBR
+META[1] scope=0 key=artist value=Qianqian Lab
+META[2] scope=0 key=album value=Corpus Alpha
+META[3] scope=0 key=encoder value=Lavf62.3.100
+META[4] scope=1 key=encoder value=Lavc62.11
+CASE s06.artwork PASS
+INFO artwork count=0
+CASE s07.full-decode PASS
+INFO drain frames=176400 terminal=1 pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926
+CASE s11.eof-stable PASS
+CASE s08.seek-25 PASS
+INFO seek pct=25 target=1000000 landing=992653 status=0
+INFO post-seek-record-only lossy=0 landing=992653 frames=133729
+CASE s08.seek-25.lands PASS
+CASE s08.seek-25.unchanged PASS
+CASE s09.seek-50 PASS
+INFO seek pct=50 target=2000000 landing=1985306 status=0
+INFO post-seek-record-only lossy=0 landing=1985306 frames=89953
+CASE s09.seek-50.lands PASS
+CASE s09.seek-50.unchanged PASS
+CASE s10.seek-75 PASS
+INFO seek pct=75 target=3000000 landing=2977959 status=0
+INFO post-seek-record-only lossy=0 landing=2977959 frames=46177
+CASE s10.seek-75.lands PASS
+CASE s10.seek-75.unchanged PASS
+CASE s13.reopen-stable PASS
+CASE s13.close-null-noop PASS
+MODE parity CASES=22 FAILED=0 RESULT=PASS
+
+--- stderr ---

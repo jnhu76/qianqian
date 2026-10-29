@@ -1,0 +1,7 @@
+{
+  "id": "fake-x86_64",
+  "artifacts": {
+    "static": true,
+    "shared": false
+  }
+}

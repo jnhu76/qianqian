@@ -1,0 +1,3 @@
+songcore_ffmpeg.c.obj r1=5cbbad719b62615b82d764a1f2f5822438905ffad41bed9db24b5997fad17307
+songcore_ffmpeg.c.obj r2=5cbbad719b62615b82d764a1f2f5822438905ffad41bed9db24b5997fad17307
+SONGCORE_C_OBJECT=BYTE_IDENTICAL

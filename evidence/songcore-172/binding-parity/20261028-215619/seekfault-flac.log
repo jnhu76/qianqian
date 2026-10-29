@@ -1,0 +1,7 @@
+CASE sf.open-probe PASS
+CASE sf.prefix-clean PASS
+CASE sf.seek-typed PASS
+CASE sf.seek-diagnostic PASS
+CASE sf.post-read-108 PASS
+INFO seekfault prefix=32768 seek=110 landing=-1 read=108 native=-1094995529
+MODE seekfault CASES=5 FAILED=0 RESULT=PASS

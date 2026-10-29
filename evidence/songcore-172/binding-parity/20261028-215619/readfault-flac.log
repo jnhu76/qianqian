@@ -1,0 +1,7 @@
+CASE rf.open-probe PASS
+CASE rf.prefix-frames PASS
+CASE rf.terminal-108 PASS
+CASE rf.native-code PASS
+CASE rf.error-stable PASS
+INFO readfault frames_before=82944 terminal=108 native=-1094995529 msg=pending decode error
+MODE readfault CASES=5 FAILED=0 RESULT=PASS

@@ -1,0 +1,6 @@
+R1=/mnt/c/Users/fred1/source/qianqian-172/native/build/artifacts/libsongcore.a
+1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402  /mnt/c/Users/fred1/source/qianqian-172/native/build/artifacts/libsongcore.a
+R1_bytes=3309710
+R2=/mnt/c/Users/fred1/source/qianqian-172/evidence/songcore-172/build/rc/20261029-062848/r2-artifacts/libsongcore.a
+059eb84e4417a30791f8be41e7cee1e57ed293b962965406c7083034b830dab6  /mnt/c/Users/fred1/source/qianqian-172/evidence/songcore-172/build/rc/20261029-062848/r2-artifacts/libsongcore.a
+R2_bytes=3309822

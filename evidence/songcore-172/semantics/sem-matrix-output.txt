@@ -1,0 +1,33 @@
+===== p1 =====
+--- xmake f -p linux -a x86_64 -m release -y
+exit=0
+--- xmake build tphony
+exit=0
+libtstatic.a
+--- xmake build tstatic
+exit=0
+--- xmake build tshared
+exit=255
+=== p1 C full output ===
+[ol] tphony: add dep tstatic
+[0m[1;38;5;1;1merror: [0mTSHARED-BEFOREBUILD-SENTINEL[0m
+===== p2 =====
+--- xmake f -p linux -a x86_64 -m release -y
+exit=255
+--- xmake build tstatic
+exit=255
+--- xmake build tshared
+exit=255
+=== p2 D full output ===
+[0mchecking for platform ... [38;5;2;1mlinux[0m
+[0mchecking for architecture ... [38;5;2;1mx86_64[0m
+[ol] tshared reached
+[0m[1;38;5;1;1merror: [0mTSHARED-ONLOAD-SENTINEL[0m
+=== p2 F: xmake build nonexistent ===
+--- xmake build no-such-target
+exit=255
+=== p2 F full output ===
+[0mchecking for architecture ... [38;5;2;1mx86_64[0m
+[ol] tshared reached
+[0m[1;38;5;1;1merror: [0mTSHARED-ONLOAD-SENTINEL[0m
+MATRIX_DONE

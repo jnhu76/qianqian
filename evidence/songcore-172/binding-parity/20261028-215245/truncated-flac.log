@@ -1,0 +1,5 @@
+CASE tr.typed-open PASS
+CASE tr.typed-terminal PASS
+CASE tr.terminal-stable PASS
+INFO truncated frames=115200 terminal=108
+MODE truncated CASES=3 FAILED=0 RESULT=PASS
