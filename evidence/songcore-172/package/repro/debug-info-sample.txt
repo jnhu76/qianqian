@@ -1,0 +1,21 @@
+sample differing member: flac_picture.c.obj
+-- differing byte count (cmp -l): 295
+-- size: r1=3850 r2=3850
+-- /home/hoo path strings in r1 copy:
+/home/hoo/q172rc/win/native/build/ffmpeg-src/libavcodec/bytestream.h
+-- /home/hoo path strings in r2 copy:
+/home/hoo/q172rc-s2pkg/win/native/build/ffmpeg-src/libavcodec/bytestream.h
+-- r1 sections (.text/.rdata/.debug*):
+.text 00000500
+.rdata 000001a0
+.rdata$zzz 00000020
+.rdata$.refptr.ff_id3v2_picture_types 00000010
+.rdata$.refptr.av_buffer_default_free 00000010
+.rdata$.refptr.ff_id3v2_mime_tags 00000010
+-- r2 sections (.text/.rdata/.debug*):
+.text 00000500
+.rdata 000001a0
+.rdata$zzz 00000020
+.rdata$.refptr.ff_id3v2_picture_types 00000010
+.rdata$.refptr.av_buffer_default_free 00000010
+.rdata$.refptr.ff_id3v2_mime_tags 00000010

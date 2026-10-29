@@ -1,0 +1,3 @@
+rw-r--r-- 0/0  25310 Jan  1 08:00 1970 songcore_ffmpeg.c.obj
+rw-r--r-- 0/0   1983 Jan  1 08:00 1970 version.c.obj
+rw-r--r-- 0/0   2933 Jan  1 08:00 1970 swresample_frame.c.obj

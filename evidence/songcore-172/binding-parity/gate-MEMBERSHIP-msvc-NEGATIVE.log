@@ -1,0 +1,76 @@
+warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
+  |
+  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+    Updating `ustc` index
+     Locking 2 packages to latest Rust 1.96.0 compatible versions
+      Adding serde_json v1.0.154
+      Adding zmij v1.0.23
+   Compiling qianqian-songcore-sys v0.1.0 (C:\Users\fred1\source\qianqian-172\crates\qianqian-songcore-sys)
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling memchr v2.8.3
+   Compiling qianqian-decode-songcore v0.1.0 (C:\Users\fred1\source\qianqian-172\crates\qianqian-decode-songcore)
+error: linking with `link.exe` failed: exit code: 1120
+  |
+  = note: "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\link.exe" "/NOLOGO" "C:\\Users\\fred1\\source\\qianqian-172\\target\\debug\\deps\\rustc00NytT\\symbols.o" "<150 object files omitted>" "C:\\Users\\fred1\\source\\qianqian-172\\target\\debug\\deps/{libserde_json-488f5e435d162660,libmemchr-85a7902eb33c4c5d,libitoa-a8758a9001f01135,libzmij-a825a2c509402988,libserde_core-f78b8879c26d21af}.rlib" "<sysroot>\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*}.rlib" "C:\\Users\\fred1\\source\\qianqian-172\\target\\debug\\deps/{libqianqian_app-49c54e1563d5a087,libqianqian_songcore_sys-b2d6a85c87649cf3,libqianqian_diagnostics-2077f638058bfb23,libqianqian_audio_api-1f8bb91d20227ecb,libqianqian_composition-72f0e4b1ca8d2b98}.rlib" "<sysroot>\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib/{libstd-*,libpanic_unwind-*,libcfg_if-*,libwindows_link-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libunwind-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "kernel32.lib" "kernel32.lib" "kernel32.lib" "kernel32.lib" "ntdll.lib" "userenv.lib" "ws2_32.lib" "dbghelp.lib" "/defaultlib:msvcrt" "/NXCOMPAT" "/LIBPATH:C:\\Users\\fred1\\source\\qianqian-172\\native\\build\\artifacts" "/OUT:C:\\Users\\fred1\\source\\qianqian-172\\target\\debug\\deps\\qianqian_decode_songcore-771babdcd9c73f2c.exe" "/OPT:REF,NOICF" "/DEBUG" "/PDBALTPATH:%_PDB%" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\intrinsic.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\liballoc.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\libcore.natvis" "/NATVIS:<sysroot>\\lib\\rustlib\\etc\\libstd.natvis"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(log.c.obj) : error LNK2019: 无法解析的外部符号 __mingw_fprintf，函数 colored_fputs 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(vlc.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(kbdwin.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(celt.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(aacps_float.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(log.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(aacdec.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(tx.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(silk.c.obj) : error LNK2001: 无法解析的外部符号 ___chkstk_ms
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(timecode.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(file_open.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(vorbiscomment.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(timestamp.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(url.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(mov.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(wavdec.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(pixdesc.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(samplefmt.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(error.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(id3v2.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(seek.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(pthread_frame.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(opt.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(utils.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(log.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(songcore_ffmpeg.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(demux.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(dict.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_snprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(log.c.obj) : error LNK2019: 无法解析的外部符号 isatty，函数 av_log_default_callback 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(bprint.c.obj) : error LNK2019: 无法解析的外部符号 __mingw_vsnprintf，函数 av_vbprintf 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(avstring.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_vsnprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(url.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_vsnprintf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(time.c.obj) : error LNK2019: 无法解析的外部符号 gettimeofday，函数 av_gettime 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(time.c.obj) : error LNK2019: 无法解析的外部符号 usleep，函数 av_usleep 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(mov.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(oggparsevorbis.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(timecode.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(opt.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(id3v2.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(aacdec.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(parseutils.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_sscanf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(eval.c.obj) : error LNK2019: 无法解析的外部符号 __mingw_strtod，函数 av_strtod 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(parseutils.c.obj) : error LNK2001: 无法解析的外部符号 __mingw_strtod
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(aacps_float.c.obj) : error LNK2001: 无法解析的外部符号 sincos
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(display.c.obj) : error LNK2001: 无法解析的外部符号 sincos
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(tx_float.c.obj) : error LNK2001: 无法解析的外部符号 sincos
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(tx_double.c.obj) : error LNK2001: 无法解析的外部符号 sincos
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(tx_int32.c.obj) : error LNK2001: 无法解析的外部符号 sincos
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(random_seed.c.obj) : error LNK2019: 无法解析的外部符号 BCryptOpenAlgorithmProvider，函数 av_random_bytes 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(random_seed.c.obj) : error LNK2019: 无法解析的外部符号 BCryptGenRandom，函数 av_random_bytes 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(random_seed.c.obj) : error LNK2019: 无法解析的外部符号 BCryptCloseAlgorithmProvider，函数 av_random_bytes 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(pvq.c.obj) : error LNK2019: 无法解析的外部符号 sincosf，函数 pvq_decode_band 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(aacps_float.c.obj) : error LNK2001: 无法解析的外部符号 sincosf
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(file_open.c.obj) : error LNK2019: 无法解析的外部符号 mkstemp，函数 avpriv_tempfile 中引用了该符号
+          libqianqian_songcore_sys-b2d6a85c87649cf3.rlib(file_open.c.obj) : error LNK2019: 无法解析的外部符号 fdopen，函数 avpriv_fopen_utf8 中引用了该符号
+          C:\Users\fred1\source\qianqian-172\target\debug\deps\qianqian_decode_songcore-771babdcd9c73f2c.exe : fatal error LNK1120: 16 个无法解析的外部命令
+          
+
+error: could not compile `qianqian-decode-songcore` (lib test) due to 1 previous error

@@ -1,0 +1,35 @@
+{
+    "script":  "ops/build-rc.ps1",
+    "started":  "20261029-042537",
+    "project":  "C:\\Users\\fred1\\source\\qianqian-172",
+    "wsl_distro":  "Ubuntu-24.04",
+    "wsl_work_root":  "/home/hoo/q172rc",
+    "build_dir":  "",
+    "closure_source":  "/home/hoo/q172d2-verify/closure",
+    "git_branch":  "songcore-172/pr-b-windows-release-lane",
+    "source":  {
+                   "commit":  "8788eddabf27b18eef9133540033f4c589d2e18b",
+                   "native_tracked_clean":  true,
+                   "recipe_sha256":  "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d",
+                   "abi_header_sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+               },
+    "steps":  {
+                  "preflight":  "ok",
+                  "wsl_tools":  "FAIL: xmake \u0027\u001b[0m\u001b[1mxmake v2.9.7+20250101, A cross-platform build utility based on Lua\u001b[0m\u001b[0m\u0027 is outside the pinned v2.9.7 route. The RC lane productizes the D2-proven route; a different xmake needs its own route re-proof (override -ExpectedXmakeVersion only with that evidence)."
+              },
+    "artifacts":  {
+
+                  },
+    "ffmpeg_provenance":  {
+                              "tag":  "n9.0.1",
+                              "commit":  "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+                              "source_sha256":  "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746"
+                          },
+    "toolchain":  {
+
+                  },
+    "second_root":  {
+
+                    },
+    "ok":  false
+}

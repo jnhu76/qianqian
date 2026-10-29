@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "<string>", line 4, in <module>
+    test_release.main()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\fred1\source\qianqian-172\tools\test_release.py", line 122, in main
+    checker('native', ['--native', native], 2, 'POLICY_RED: R3 native archive target mismatch', 'E14-real-ELF')
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\fred1\source\qianqian-172\tools\test_release.py", line 54, in checker
+    return call([sys.executable, str(ROOT / 'tools/check_release.py'), op,
+                 *(common if args is None else args), *map(str, tail)], repo,
+                expected, message, env=env, label=label)
+  File "C:\Users\fred1\source\qianqian-172\tools\test_release.py", line 29, in call
+    raise AssertionError(f'{label}: expected {expected} {message!r}; got {p.returncode}\n{text}')
+AssertionError: E14-real-ELF: expected 2 'POLICY_RED: R3 native archive target mismatch'; got 2
+POLICY_RED: R3 native archive/receipt drift
+

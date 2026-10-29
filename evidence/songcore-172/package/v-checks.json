@@ -1,0 +1,13 @@
+{
+    "V1_files_rehash":  true,
+    "V1_sets":  true,
+    "V2_header_sha":  true,
+    "V3_pin_carry_dups":  true,
+    "V4_symbols":  true,
+    "V5_license_args":  true,
+    "V6_repro_receipt":  true,
+    "V7_tools":  true,
+    "O1_license_texts":  true,
+    "B4_component_licenses":  true,
+    "manifest_roundtrip":  true
+}

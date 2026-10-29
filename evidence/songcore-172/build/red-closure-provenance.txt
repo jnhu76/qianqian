@@ -1,0 +1,4 @@
+== reused closure provenance ==
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172d2/win/native/build/ffmpeg-xmake/manifest.json
+3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d  /home/hoo/q172d2/win/native/ffmpeg/targets/windows-x86_64.json
+3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d  /home/hoo/q324/native/ffmpeg/targets/windows-x86_64.json

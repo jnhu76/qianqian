@@ -1,0 +1,8 @@
+flac_picture.c.obj r1root_hits=1 r2root_hits=1
+hdr_dynamic_metadata.c.obj r1root_hits=1 r2root_hits=1
+iamf_parse.c.obj r1root_hits=2 r2root_hits=2
+iamf_reader.c.obj r1root_hits=1 r2root_hits=1
+lcevc.c.obj r1root_hits=1 r2root_hits=1
+oggparseflac.c.obj r1root_hits=1 r2root_hits=1
+oggparseogm.c.obj r1root_hits=1 r2root_hits=1
+oggparsevorbis.c.obj r1root_hits=1 r2root_hits=1

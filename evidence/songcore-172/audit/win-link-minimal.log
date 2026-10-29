@@ -1,0 +1,4 @@
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x24): undefined reference to `BCryptOpenAlgorithmProvider'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x3b): undefined reference to `BCryptGenRandom'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x49): undefined reference to `BCryptCloseAlgorithmProvider'
+collect2: error: ld returned 1 exit status

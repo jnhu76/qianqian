@@ -1,0 +1,18 @@
+{
+    "script":  "ops/verify-build.ps1",
+    "started":  "20261029-023816",
+    "project":  "C:\\Users\\fred1\\source\\qianqian-172",
+    "wsl_distro":  "Ubuntu-24.04",
+    "git_branch":  "songcore-172/pr-a-build-fixes",
+    "git_commit":  "bf23516b5851174dc63fb5058997fa5478751713",
+    "steps":  {
+                  "preflight":  "ok",
+                  "wsl_tools":  "ok (exit 0)",
+                  "closure_prepare":  "ok (exit 0)",
+                  "build_and_validate":  "FAIL: wsl stage exited 255; see evidence log build_and_validate.log"
+              },
+    "artifacts":  {
+
+                  },
+    "ok":  false
+}

@@ -1,0 +1,8 @@
+tool ok: xmake -> /home/hoo/.local/bin/xmake
+tool ok: python3 -> /usr/bin/python3
+tool ok: x86_64-w64-mingw32-gcc -> /usr/bin/x86_64-w64-mingw32-gcc
+tool ok: x86_64-w64-mingw32-objdump -> /usr/bin/x86_64-w64-mingw32-objdump
+tool ok: x86_64-w64-mingw32-nm -> /usr/bin/x86_64-w64-mingw32-nm
+tool ok: tar -> /usr/bin/tar
+tool ok: unzip -> /usr/bin/unzip
+tool ok: sha256sum -> /usr/bin/sha256sum

@@ -1,0 +1,25 @@
+{
+    "script":  "ops/verify-build.ps1",
+    "started":  "20261029-022132",
+    "project":  "C:\\Users\\fred1\\source\\qianqian-172",
+    "wsl_distro":  "Ubuntu-24.04",
+    "git_branch":  "songcore-172/pr-a-build-fixes",
+    "git_commit":  "40ae32a1aaca0511c18d8f82b40bdd19e35a6949",
+    "steps":  {
+                  "preflight":  "ok",
+                  "wsl_tools":  "ok (exit 0)",
+                  "closure_prepare":  "ok (exit 0)",
+                  "build_and_validate":  "ok (exit 0)",
+                  "summarize":  "ok"
+              },
+    "artifacts":  {
+                      "libsongcore_a_sha256":  "b64e8a2160950ce7b20b6d675abd5fd705ff08e616f65b5a7deb760534c39d29",
+                      "libsongcore_a_size":  "3309822",
+                      "pe_members":  "280",
+                      "elf_members":  0,
+                      "song_abi_symbols":  "15",
+                      "ar_magic":  "ok",
+                      "negative_shared_exit":  "nonzero (fail-closed verified)"
+                  },
+    "ok":  true
+}

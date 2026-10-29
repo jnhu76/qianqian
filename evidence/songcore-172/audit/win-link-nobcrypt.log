@@ -1,0 +1,6 @@
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x24): undefined reference to `BCryptOpenAlgorithmProvider'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x3b): undefined reference to `BCryptGenRandom'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /home/hoo/q172d2/win/native/build/artifacts/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x49): undefined reference to `BCryptCloseAlgorithmProvider'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /usr/lib/gcc/x86_64-w64-mingw32/13-win32/../../../../x86_64-w64-mingw32/lib/libmingw32.a(lib64_libmingw32_a-crtexewin.o): in function `main':
+/usr/src/mingw-w64-13.0.0-2ubuntu1/mingw-w64-crt/crt/crtexewin.c:66:(.text.startup+0xb3): undefined reference to `WinMain'
+collect2: error: ld returned 1 exit status

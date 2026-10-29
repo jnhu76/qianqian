@@ -1,0 +1,14 @@
+=== A: no matching recipe (targets: windows only; session: linux) ===
+F_EXIT=0
+BUILD_EXIT=255 (expect 255)
+[0m[1;38;5;1;1merror: [0msongcore: no target recipe in ffmpeg/targets/ matches this session (plat 'linux', arch 'x86_64'); no SongCore artifact form can be built. Target provenance is fail-closed, mirroring the FFmpeg closure gate.[0m
+=== B: positive control — add linux-x86_64 recipe, same session ===
+F_EXIT=0
+BUILD_EXIT=255 (expect 255: qianqian_av closure gate — sandbox has no manifest)
+[0m[1;38;5;1;1merror: [0mFFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.[0m
+STATIC_EXIT=255 (expect 255 too: closure gate)
+[0m[1;38;5;1;1merror: [0mFFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.[0m
+=== C: recipe-policy gate still enforces shared in sandbox? build songcore_shared ===
+SHARED_EXIT=255
+[0m[1;38;5;1;1merror: [0mFFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.[0m
+SEM9_DONE

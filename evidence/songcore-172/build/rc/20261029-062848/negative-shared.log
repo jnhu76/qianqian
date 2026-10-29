@@ -1,0 +1,1 @@
+[0m[1;38;5;1;1merror: [0msongcore_shared is not supported by this session's target recipe 'windows-x86_64' (ffmpeg/targets/windows-x86_64.json declares artifacts.shared=false; this recipe enables: static). The unsupported form is rejected here instead of being linked into a half-configured artifact.[0m

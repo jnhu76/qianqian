@@ -1,0 +1,10 @@
+== undefined import audit (runtime-dependency surface, contract S9) ==
+-- R1 BCrypt*:
+                 U BCryptCloseAlgorithmProvider
+                 U BCryptGenRandom
+                 U BCryptOpenAlgorithmProvider
+-- R2 BCrypt*:
+                 U BCryptCloseAlgorithmProvider
+                 U BCryptGenRandom
+                 U BCryptOpenAlgorithmProvider
+UNDEFINED_SET=IDENTICAL (1185 symbols)

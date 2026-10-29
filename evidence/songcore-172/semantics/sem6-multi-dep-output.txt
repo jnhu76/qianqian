@@ -1,0 +1,9 @@
+--- SEM6_MODE=multi: build tphony (expect exit 0, both artifacts)
+multi_exit=0
+libtshared.so
+libtstatic.a
+--- SEM6_MODE=zero: build tphony (expect exit 255 via gate)
+[ol] zero forms -> gate
+[0m[1;38;5;1;1merror: [0mGATE-SENTINEL: no supported artifact form[0m
+zero_exit=255
+SEM6_DONE

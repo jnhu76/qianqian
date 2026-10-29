@@ -1,0 +1,192 @@
+/usr/bin/x86_64-linux-gnu-ld.bfd: /usr/lib/gcc/x86_64-linux-gnu/15/../../../x86_64-linux-gnu/Scrt1.o: in function `_start':
+(.text+0x1b): undefined reference to `main'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(vorbisdec.c.o): in function `vorbis_floor0_decode':
+vorbisdec.c:(.text+0xc1f): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: vorbisdec.c:(.text+0xc94): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: vorbisdec.c:(.text+0xdbd): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(vorbisdec.c.o): in function `vorbis_parse_setup_hdr':
+vorbisdec.c:(.text+0x1ee7): undefined reference to `atan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: vorbisdec.c:(.text+0x1f0b): undefined reference to `atan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: vorbisdec.c:(.text+0x1fa8): undefined reference to `atan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: vorbisdec.c:(.text+0x1fcc): undefined reference to `atan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(dec.c.o): in function `opus_decode_init':
+dec.c:(.text.unlikely+0x194): undefined reference to `exp2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(mpegaudiodec_float.c.o): in function `decode_init_static':
+mpegaudiodec_float.c:(.text.unlikely+0x181): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: mpegaudiodec_float.c:(.text.unlikely+0x252): undefined reference to `exp2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: mpegaudiodec_float.c:(.text.unlikely+0x288): undefined reference to `exp2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(mpegaudiodec_common.c.o): in function `mpegaudiodec_common_init_static':
+mpegaudiodec_common.c:(.text.unlikely+0x2fb): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacdec_float.c.o): in function `decode_spectrum_and_dequant':
+aacdec_float.c:(.text+0x4f77): undefined reference to `cbrtf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacdec_float.c.o): in function `decode_cce':
+aacdec_float.c:(.text+0x5429): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacdec_float.c:(.text+0x550b): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(dither.c.o): in function `swri_dither_init':
+dither.c:(.text.unlikely+0x1d1): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_mdct_naive_inv_int32_c':
+tx_int32.c:(.text+0xa05a): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_int32.c:(.text+0xa075): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_mdct_naive_fwd_int32_c':
+tx_int32.c:(.text+0xa21c): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_fft_naive_int32_c':
+tx_int32.c:(.text+0xa367): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_mdct_gen_exp_int32':
+tx_int32.c:(.text+0x127ed): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_init_tab_131072_int32':
+tx_int32.c:(.text.unlikely+0xb2): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_init_tab_65536_int32':
+tx_int32.c:(.text.unlikely+0x11a): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_init_tab_32768_int32':
+tx_int32.c:(.text.unlikely+0x182): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_init_tab_16384_int32':
+tx_int32.c:(.text.unlikely+0x1ea): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_init_tab_8192_int32':
+tx_int32.c:(.text.unlikely+0x252): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o):tx_int32.c:(.text.unlikely+0x2ba): more undefined references to `cos' follow
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_dct_init_int32_c':
+tx_int32.c:(.text.unlikely+0xc1b): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_int32.c:(.text.unlikely+0xc72): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_int32.c.o): in function `ff_tx_fft_init_naive_small_int32_c':
+tx_int32.c:(.text.unlikely+0xda6): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_mdct_naive_inv_float_c':
+tx_float.c:(.text+0xb17a): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_float.c:(.text+0xb195): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_mdct_naive_fwd_float_c':
+tx_float.c:(.text+0xb2dc): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_fft_naive_float_c':
+tx_float.c:(.text+0xb3ec): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_mdct_gen_exp_float':
+tx_float.c:(.text+0x165fd): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_init_tab_131072_float':
+tx_float.c:(.text.unlikely+0xb2): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_init_tab_65536_float':
+tx_float.c:(.text.unlikely+0xf7): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_init_tab_32768_float':
+tx_float.c:(.text.unlikely+0x13c): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_init_tab_16384_float':
+tx_float.c:(.text.unlikely+0x181): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_init_tab_8192_float':
+tx_float.c:(.text.unlikely+0x1c6): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o):tx_float.c:(.text.unlikely+0x20b): more undefined references to `cos' follow
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_dct_init_float_c':
+tx_float.c:(.text.unlikely+0x89e): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_float.c:(.text.unlikely+0x8d2): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_float.c.o): in function `ff_tx_fft_init_naive_small_float_c':
+tx_float.c:(.text.unlikely+0x9c7): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_mdct_naive_inv_double_c':
+tx_double.c:(.text+0xa17a): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_double.c:(.text+0xa195): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_mdct_naive_fwd_double_c':
+tx_double.c:(.text+0xa2dc): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_fft_naive_double_c':
+tx_double.c:(.text+0xa3e4): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_mdct_gen_exp_double':
+tx_double.c:(.text+0x15e5f): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_init_tab_131072_double':
+tx_double.c:(.text.unlikely+0x11f): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_init_tab_65536_double':
+tx_double.c:(.text.unlikely+0x161): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_init_tab_32768_double':
+tx_double.c:(.text.unlikely+0x1a3): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_init_tab_16384_double':
+tx_double.c:(.text.unlikely+0x1e5): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_init_tab_8192_double':
+tx_double.c:(.text.unlikely+0x227): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o):tx_double.c:(.text.unlikely+0x269): more undefined references to `cos' follow
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_dct_init_double_c':
+tx_double.c:(.text.unlikely+0x8c2): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: tx_double.c:(.text.unlikely+0x8f2): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(tx_double.c.o): in function `ff_tx_fft_init_naive_small_double_c':
+tx_double.c:(.text.unlikely+0x9e2): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(sinewin.c.o): in function `ff_sine_window_init':
+sinewin.c:(.text.unlikely+0x3f): undefined reference to `sinf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(mpegaudiodsp.c.o): in function `mpadsp_init_tabs':
+mpegaudiodsp.c:(.text.unlikely+0x7e): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: mpegaudiodsp.c:(.text.unlikely+0xd4): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: mpegaudiodsp.c:(.text.unlikely+0x10f): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacsbr.c.o): in function `sbr_make_f_master':
+aacsbr.c:(.text+0x447f): undefined reference to `log2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacsbr.c:(.text+0x44f6): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacsbr.c:(.text+0x4844): undefined reference to `log2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacsbr.c:(.text+0x48ac): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacsbr.c:(.text+0x52d7): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacsbr.c.o): in function `sbr_reset':
+aacsbr.c:(.text+0x5c46): undefined reference to `log2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacps_float.c.o): in function `make_filters_from_proto':
+aacps_float.c:(.text.unlikely+0x59): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacps_float.c.o): in function `ff_ps_init':
+aacps_float.c:(.text.unlikely+0x199): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x30c): undefined reference to `sincosf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x340): undefined reference to `sincosf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x3c6): undefined reference to `atan2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x428): undefined reference to `atanf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x459): undefined reference to `sincosf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x484): undefined reference to `sincosf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x57c): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x5c5): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x65f): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacps_float.c:(.text.unlikely+0x6a1): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(pvq.c.o): in function `pvq_decode_band':
+pvq.c:(.text+0x18fa): undefined reference to `sincosf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(cbrt_tablegen_common.c.o): in function `ff_cbrt_dbl_tableinit':
+cbrt_tablegen_common.c:(.text.unlikely+0x53): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: cbrt_tablegen_common.c:(.text.unlikely+0xc0): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(mathematics.c.o): in function `av_bessel_i0':
+mathematics.c:(.text+0x903): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(timestamp.c.o): in function `av_ts_make_time_string2':
+timestamp.c:(.text+0x127): undefined reference to `log10'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(rational.c.o): in function `av_d2q':
+rational.c:(.text+0x3fa): undefined reference to `floor'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(eval.c.o): in function `eval_expr':
+eval.c:(.text+0x52c): undefined reference to `round'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x717): undefined reference to `pow'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x982): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x9bc): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0xc97): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0xde5): undefined reference to `atan2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0xec5): undefined reference to `pow'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(eval.c.o): in function `av_strtod':
+eval.c:(.text+0x17d6): undefined reference to `exp2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(eval.c.o): in function `parse_primary':
+eval.c:(.text+0x27db): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x27eb): undefined reference to `sinh'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2879): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x295f): undefined reference to `acos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2973): undefined reference to `cosh'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x29e6): undefined reference to `tanh'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x29f6): undefined reference to `tan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2a90): undefined reference to `asin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2b20): undefined reference to `exp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2b3c): undefined reference to `atan'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2b5f): undefined reference to `log'
+/usr/bin/x86_64-linux-gnu-ld.bfd: eval.c:(.text+0x2b82): undefined reference to `fabs'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(mov.c.o): in function `mov_read_tkhd':
+mov.c:(.text+0x98ef): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: mov.c:(.text+0x991b): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(iamf_parse.c.o): in function `ff_iamfdec_read_descriptors':
+iamf_parse.c:(.text+0x2b38): undefined reference to `trunc'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacdec_usac.c.o): in function `spectrum_decode':
+aacdec_usac.c:(.text+0x108a): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacdec_usac.c.o): in function `decode_spectrum_ac.isra.0':
+aacdec_usac.c:(.text+0x2788): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: aacdec_usac.c:(.text+0x27b9): undefined reference to `cbrt'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(aacdec_usac.c.o): in function `ff_aac_usac_decode_frame':
+aacdec_usac.c:(.text+0x79d3): undefined reference to `powf'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(resample.c.o): in function `build_filter':
+resample.c:(.text+0x835): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: resample.c:(.text+0x964): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: resample.c:(.text+0xc5f): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: resample.c:(.text+0xe7a): undefined reference to `cos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: resample.c:(.text+0xf53): undefined reference to `sin'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(display.c.o): in function `av_display_rotation_get':
+display.c:(.text+0x38): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: display.c:(.text+0x6f): undefined reference to `hypot'
+/usr/bin/x86_64-linux-gnu-ld.bfd: display.c:(.text+0xbf): undefined reference to `atan2'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(display.c.o): in function `av_display_rotation_set':
+display.c:(.text+0x125): undefined reference to `sincos'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /home/hoo/q172d2/lin/native/build/artifacts/libsongcore.a(dec_celt.c.o): in function `ff_celt_decode_frame':
+dec_celt.c:(.text+0x112b): undefined reference to `exp2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: dec_celt.c:(.text+0x18d8): undefined reference to `exp2f'
+/usr/bin/x86_64-linux-gnu-ld.bfd: dec_celt.c:(.text+0x1978): undefined reference to `exp2f'
+collect2: error: ld returned 1 exit status

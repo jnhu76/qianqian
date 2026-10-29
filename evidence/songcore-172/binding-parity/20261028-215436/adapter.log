@@ -1,0 +1,107 @@
+CASE a01.open PASS
+CASE a03.facts PASS
+INFO adapter-probe fixture=mp3-cbr-id3v23 rate=44100 channels=2 mask=0x3 duration=4000000
+CASE a07.full-decode PASS
+INFO adapter-drain fixture=mp3-cbr-id3v23 frames=176400 terminal=eof pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926
+CASE a11.eof-stable PASS
+CASE a08.seek-25 PASS
+INFO adapter-seek fixture=mp3-cbr-id3v23 pct=25 target=1000000 landing=43776
+INFO adapter-post-seek-record-only lossy=1 landing=43776 frames=133729
+CASE a08.seek-25.lands PASS
+CASE a08.seek-25.unchanged PASS
+CASE a09.seek-50 PASS
+INFO adapter-seek fixture=mp3-cbr-id3v23 pct=50 target=2000000 landing=87552
+INFO adapter-post-seek-record-only lossy=1 landing=87552 frames=89953
+CASE a09.seek-50.lands PASS
+CASE a09.seek-50.unchanged PASS
+CASE a10.seek-75 PASS
+INFO adapter-seek fixture=mp3-cbr-id3v23 pct=75 target=3000000 landing=131328
+INFO adapter-post-seek-record-only lossy=1 landing=131328 frames=46177
+CASE a10.seek-75.lands PASS
+CASE a10.seek-75.unchanged PASS
+CASE a13.reopen-stable PASS
+MODE adapter.parity.mp3-cbr-id3v23 CASES=14 FAILED=0 RESULT=PASS
+CASE a01.open PASS
+CASE a03.facts PASS
+INFO adapter-probe fixture=flac-16-44-stereo rate=44100 channels=2 mask=0x3 duration=4000000
+CASE a07.full-decode PASS
+INFO adapter-drain fixture=flac-16-44-stereo frames=176400 terminal=eof pcm_sha256=3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc
+CASE a11.eof-stable PASS
+CASE a08.seek-25 PASS
+INFO adapter-seek fixture=flac-16-44-stereo pct=25 target=1000000 landing=41472
+CASE a08.seek-25.lands PASS
+CASE a08.seek-25.unchanged PASS
+CASE a09.seek-50 PASS
+INFO adapter-seek fixture=flac-16-44-stereo pct=50 target=2000000 landing=87552
+CASE a09.seek-50.lands PASS
+CASE a09.seek-50.unchanged PASS
+CASE a10.seek-75 PASS
+INFO adapter-seek fixture=flac-16-44-stereo pct=75 target=3000000 landing=129024
+CASE a10.seek-75.lands PASS
+CASE a10.seek-75.unchanged PASS
+CASE a13.reopen-stable PASS
+MODE adapter.parity.flac-16-44-stereo CASES=14 FAILED=0 RESULT=PASS
+CASE a01.open PASS
+CASE a03.facts PASS
+INFO adapter-probe fixture=alac-16-44-stereo rate=44100 channels=2 mask=0x3 duration=4000000
+CASE a07.full-decode PASS
+INFO adapter-drain fixture=alac-16-44-stereo frames=176400 terminal=eof pcm_sha256=431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46
+CASE a11.eof-stable PASS
+CASE a08.seek-25 PASS
+INFO adapter-seek fixture=alac-16-44-stereo pct=25 target=1000000 landing=40960
+CASE a08.seek-25.lands PASS
+CASE a08.seek-25.unchanged PASS
+CASE a09.seek-50 PASS
+INFO adapter-seek fixture=alac-16-44-stereo pct=50 target=2000000 landing=86016
+CASE a09.seek-50.lands PASS
+CASE a09.seek-50.unchanged PASS
+CASE a10.seek-75 PASS
+INFO adapter-seek fixture=alac-16-44-stereo pct=75 target=3000000 landing=131072
+CASE a10.seek-75.lands PASS
+CASE a10.seek-75.unchanged PASS
+CASE a13.reopen-stable PASS
+MODE adapter.parity.alac-16-44-stereo CASES=14 FAILED=0 RESULT=PASS
+CASE a01.open PASS
+CASE a03.facts PASS
+INFO adapter-probe fixture=alac-long rate=44100 channels=2 mask=0x3 duration=6000000
+CASE a07.full-decode PASS
+INFO adapter-drain fixture=alac-long frames=264600 terminal=eof pcm_sha256=e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612
+CASE a11.eof-stable PASS
+CASE a08.seek-25 PASS
+INFO adapter-seek fixture=alac-long pct=25 target=1500000 landing=65536
+CASE a08.seek-25.lands PASS
+CASE a08.seek-25.unchanged PASS
+CASE a09.seek-50 PASS
+INFO adapter-seek fixture=alac-long pct=50 target=3000000 landing=131072
+CASE a09.seek-50.lands PASS
+CASE a09.seek-50.unchanged PASS
+CASE a10.seek-75 PASS
+INFO adapter-seek fixture=alac-long pct=75 target=4500000 landing=196608
+CASE a10.seek-75.lands PASS
+CASE a10.seek-75.unchanged PASS
+CASE a13.reopen-stable PASS
+MODE adapter.parity.alac-long CASES=14 FAILED=0 RESULT=PASS
+CASE ar.prefix-frames PASS
+CASE ar.message-parity PASS
+CASE ar.error-stable PASS
+INFO adapter-readfault frames_before=82944 message=pending decode error
+MODE adapter.readfault CASES=3 FAILED=0 RESULT=PASS
+CASE as.prefix-clean PASS
+CASE as.seek-typed-diagnostic PASS
+CASE as.post-read-fails PASS
+INFO adapter-seekfault prefix=32768
+MODE adapter.seekfault CASES=3 FAILED=0 RESULT=PASS
+CASE ao.garbage-nomedia-refused PASS
+INFO adapter-open-error input=garbage-nomedia message=cannot open this file: C:\Users\fred1\source\qianqian-172\evidence/songcore-172/binding-parity\20261028-215436\media/garbage-nomedia.bin (decoder status 104)
+CASE ao.garbage-empty-refused PASS
+INFO adapter-open-error input=garbage-empty message=cannot open this file: C:\Users\fred1\source\qianqian-172\evidence/songcore-172/binding-parity\20261028-215436\media/empty.bin (decoder status 104)
+MODE adapter.open-errors CASES=2 FAILED=0 RESULT=PASS
+CASE ap.facts.mp3-cbr-id3v23 PASS
+INFO adapter-probe-media fixture=mp3-cbr-id3v23 rate=44100 channels=2 duration=4000000
+CASE ap.facts.flac-16-44-stereo PASS
+INFO adapter-probe-media fixture=flac-16-44-stereo rate=44100 channels=2 duration=4000000
+CASE ap.facts.alac-16-44-stereo PASS
+INFO adapter-probe-media fixture=alac-16-44-stereo rate=44100 channels=2 duration=4000000
+CASE ap.facts.alac-long PASS
+INFO adapter-probe-media fixture=alac-long rate=44100 channels=2 duration=6000000
+MODE adapter.probe-facts CASES=4 FAILED=0 RESULT=PASS

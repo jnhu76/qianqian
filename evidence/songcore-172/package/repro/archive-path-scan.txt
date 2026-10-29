@@ -1,0 +1,7 @@
+== archive-level absolute-path scan (grep -aoc counts) ==
+R1 /home/hoo/q172rc/       : 9
+R1 /home/hoo/q172rc-s2pkg/ : 0
+R1 /home/hoo/Source/ (old) : 0
+R2 /home/hoo/q172rc/       : 0
+R2 /home/hoo/q172rc-s2pkg/ : 9
+R2 /home/hoo/Source/ (old) : 0

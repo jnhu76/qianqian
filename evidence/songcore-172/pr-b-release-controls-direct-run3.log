@@ -1,0 +1,3 @@
+TOOLING_FAIL: control harness: E14-real-ELF: expected 2 'POLICY_RED: R3 native archive target mismatch'; got 2
+POLICY_RED: R3 native archive/receipt drift
+

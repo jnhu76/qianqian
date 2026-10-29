@@ -1,0 +1,1 @@
+[0m[1;38;5;1;1merror: [0msongcore: no SongCore artifact form to build for this session (recipe 'windows-x86_64' enables: static). songcore_artifact_gate is the fail-closed terminal the songcore phony depends on only when no form is enabled; build 'songcore' or 'songcore_static' instead.[0m
