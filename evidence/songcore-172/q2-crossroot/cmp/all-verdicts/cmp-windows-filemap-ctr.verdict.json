@@ -1,0 +1,20 @@
+{
+  "target": "windows",
+  "cmp_dir": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-windows-filemap-ctr",
+  "static": {
+    "artifact": "static",
+    "exit": 1,
+    "identical": false,
+    "identical_occurrences": 273,
+    "differing_occurrences": 9,
+    "order_identical": "yes",
+    "duplicate_names": 9,
+    "leak_r1": "{'/home/hoo/qq329/win-r1': 0, '/home/': 0, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "leak_r2": "{'/home/hoo/qq329/windows-root-two': 0, '/home/': 0, 'C:\\\\': 0, '/mnt/': 0, '/tmp/': 1}",
+    "cmp_file": "/mnt/c/Users/fred1/AppData/Local/Temp/qq329/evidence/cmp-windows-filemap-ctr/static-cmp.txt"
+  },
+  "shared": null,
+  "static_sha_r1": "d8c8e688bc0e50d5d7b022b486cf29af0e905ffb1ca325387e1e57148bd8ca29",
+  "static_sha_r2": "29c299438b005bf3f19bd58eb93df2fea6d4de8b67e2354f590c5d090ccf4a92",
+  "all_identical": false
+}

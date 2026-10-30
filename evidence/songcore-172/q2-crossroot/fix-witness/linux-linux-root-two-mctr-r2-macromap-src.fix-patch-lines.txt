@@ -1,0 +1,1 @@
+144:        target:add("cflags", "-fmacro-prefix-map=" .. srcroot .. "=src", {force = true})

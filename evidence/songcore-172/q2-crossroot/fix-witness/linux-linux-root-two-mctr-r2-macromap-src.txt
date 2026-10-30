@@ -1,0 +1,7 @@
+compile_commands_entries=281
+ffile_prefix_map_entries=0
+fmacro_prefix_map_entries=279
+ffmpeg_src_entries=560
+sample_flag_entries:
+  "arguments": ["/usr/bin/gcc", "-c", "-m64", "-fvisibility=hidden", "-std=c11", "-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src", "-fmacro-prefix-map=/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src=src", "-DNDEBUG", "-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-xmake/oracle", "-Isrc/", "-D_ISOC11_SOURCE", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-D_PO
+  "arguments": ["/usr/bin/gcc", "-c", "-m64", "-fvisibility=hidden", "-std=c11", "-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src", "-fmacro-prefix-map=/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src=src", "-DNDEBUG", "-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-xmake/oracle", "-Isrc/", "-D_ISOC11_SOURCE", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-D_PO

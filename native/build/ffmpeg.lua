@@ -141,6 +141,7 @@ target("qianqian_av")
 
         -- Generated config headers must win over the pristine source tree.
         target:add("includedirs", buildroot, srcroot, {public = true})
+        target:add("cflags", "-fmacro-prefix-map=" .. srcroot .. "=.", {force = true})
 
         for _, unit in ipairs(m.units) do
             local root = unit.origin == "generated" and buildroot or srcroot

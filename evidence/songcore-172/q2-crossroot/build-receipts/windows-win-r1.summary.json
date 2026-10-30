@@ -1,0 +1,33 @@
+{
+  "entry": "b329-build.sh",
+  "campaign": "songcore-172 #329 Q2",
+  "target": "windows",
+  "root": "/home/hoo/qq329/win-r1",
+  "attempt_stamp": "w-r1-macromap-.",
+  "fixmode": "macromap",
+  "mapto": ".",
+  "clone": "reuse",
+  "closure": "reuse",
+  "head": "b49b18cd68ae1a353cd3396efb3977b8590cc4d1",
+  "tree": "c868f35f8edf3eaac60c31e7d92fa518da30ed3d",
+  "toolchain": {
+    "uname": "Linux 6.18.54.1-microsoft-standard-WSL2",
+    "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+  },
+  "artifacts": {
+    "static": {
+      "path": "/home/hoo/qq329/win-r1/src/native/build/artifacts/libsongcore.a",
+      "bytes": 3309454,
+      "sha256": "d8c8e688bc0e50d5d7b022b486cf29af0e905ffb1ca325387e1e57148bd8ca29"
+    }
+  },
+  "static_members": 280,
+  "abi_symbols": 15,
+  "witness": "compile_commands_entries=281\nffile_prefix_map_entries=0\nfmacro_prefix_map_entries=279\nffmpeg_src_entries=560\nsample_flag_entries:\n  \"arguments\": [\"/usr/bin/x86_64-w64-mingw32-gcc\", \"-c\", \"-m64\", \"-fvisibility=hidden\", \"-std=c11\", \"-I/home/hoo/qq329/win-r1/src/native/build/ffmpeg-src\", \"-fmacro-prefix-map=/home/hoo/qq329/win-r1/src/native/build/ffmpeg-src=.\", \"-DNDEBUG\", \"-I/home/hoo/qq329/win-r1/src/native/build/ffmpeg-xmake/oracle\", \"-Isrc/\", \"-D_ISOC11_SOURCE\", \"-D_FILE_OFFSET_BITS=64\", \"-D_LARGEFILE_SOURCE\", \"-DWIN32_LEAN\n  \"arguments\": [\"/usr/bin/x86_64-w64-mingw32-gcc\", \"-c\", \"-m64\", \"-fvisibility=hidden\", \"-std=c11\", \"-I/home/hoo/qq329/win-r1/src/native/build/ffmpeg-src\", \"-fmacro-prefix-map=/home/hoo/qq329/win-r1/src/native/build/ffmpeg-src=.\", \"-DNDEBUG\", \"-I/home/hoo/qq329/win-r1/src/native/build/ffmpeg-xmake/oracle\", \"-Isrc/\", \"-D_ISOC11_SOURCE\", \"-D_FILE_OFFSET_BITS=64\", \"-D_LARGEFILE_SOURCE\", \"-DWIN32_LEAN\n",
+  "checks": {
+    "build": "PASS",
+    "member_formats": "PASS",
+    "abi_export_set": "PASS"
+  },
+  "verdict": "PASS"
+}

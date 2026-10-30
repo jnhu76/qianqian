@@ -1,0 +1,330 @@
+{
+  "schema": "songcore-172-q2-crossroot-gate-summary/1",
+  "generated_from": "gates/receipts/*/gate-*-receipt.json (copied byte-for-byte)",
+  "roots": [
+    {
+      "root_key": "linux-lin-r1",
+      "target": "linux",
+      "receipt": "gates/receipts/linux-lin-r1/gate-linux-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:14Z",
+      "commands_count": 53,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/linux-lin-r1",
+      "environment": {
+        "compiler": [
+          "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static and shared consumers each execute the full S-BIND \u00a77.1 steps 01-13 suite on the WSL real ELF runtime against the canonical corpus",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": true,
+        "export_count": 15
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      }
+    },
+    {
+      "root_key": "linux-linux-root-two",
+      "target": "linux",
+      "receipt": "gates/receipts/linux-linux-root-two/gate-linux-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:21Z",
+      "commands_count": 53,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/linux-linux-root-two",
+      "environment": {
+        "compiler": [
+          "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static and shared consumers each execute the full S-BIND \u00a77.1 steps 01-13 suite on the WSL real ELF runtime against the canonical corpus",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": true,
+        "export_count": 15
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      }
+    },
+    {
+      "root_key": "linux-lin-l1-route",
+      "target": "linux",
+      "receipt": "gates/receipts/linux-lin-l1-route/gate-linux-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:27Z",
+      "commands_count": 53,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/linux-lin-l1-route",
+      "environment": {
+        "compiler": [
+          "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static and shared consumers each execute the full S-BIND \u00a77.1 steps 01-13 suite on the WSL real ELF runtime against the canonical corpus",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": true,
+        "export_count": 15
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      }
+    },
+    {
+      "root_key": "windows-win-r1",
+      "target": "windows",
+      "receipt": "gates/receipts/windows-win-r1/gate-windows-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:36Z",
+      "commands_count": 30,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/windows-win-r1",
+      "environment": {
+        "compiler": [
+          "x86_64-w64-mingw32-gcc (GCC) 13-win32"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static form only (contract \u00a76: windows ships static-only this round); the consumer PE executes on the real Windows host via cmd.exe interop",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": null,
+        "export_count": null
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": null
+    },
+    {
+      "root_key": "windows-windows-root-two",
+      "target": "windows",
+      "receipt": "gates/receipts/windows-windows-root-two/gate-windows-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:45Z",
+      "commands_count": 30,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/windows-windows-root-two",
+      "environment": {
+        "compiler": [
+          "x86_64-w64-mingw32-gcc (GCC) 13-win32"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static form only (contract \u00a76: windows ships static-only this round); the consumer PE executes on the real Windows host via cmd.exe interop",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": null,
+        "export_count": null
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": null
+    },
+    {
+      "root_key": "windows-win-l1-route",
+      "target": "windows",
+      "receipt": "gates/receipts/windows-win-l1-route/gate-windows-receipt.json",
+      "schema": "songcore-release-gate-g1g2/1",
+      "gate": "G1_LINK+G2_CORE_RUNTIME",
+      "verdict": "PASS",
+      "generated_utc": "2026-10-29T18:42:53Z",
+      "commands_count": 30,
+      "consumer_source_sha256": "edfed90c4e05a37d6e98f64b68817baac3f4f33086ffb471413573f221607fd6",
+      "artifact_header": {
+        "frozen_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "match": true,
+        "observed_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+      },
+      "artifact_root": "/home/hoo/qq329/stage/windows-win-l1-route",
+      "environment": {
+        "compiler": [
+          "x86_64-w64-mingw32-gcc (GCC) 13-win32"
+        ],
+        "uname": [
+          "Linux 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 GNU/Linux"
+        ]
+      },
+      "g2_forms_note": "static form only (contract \u00a76: windows ships static-only this round); the consumer PE executes on the real Windows host via cmd.exe interop",
+      "failures": [],
+      "g1_static": {
+        "member_format_ok": true,
+        "symbol_audit_ok": true,
+        "symbols_found": 15,
+        "symbols_required": 15
+      },
+      "g1_shared": {
+        "export_audit_ok": null,
+        "export_count": null
+      },
+      "g2_static": {
+        "all_fixtures_pass": true,
+        "fixture_count": 5,
+        "fixtures": {
+          "alac-16-44-stereo": true,
+          "alac-long": true,
+          "flac-16-44-stereo": true,
+          "misc": true,
+          "mp3-cbr-id3v23": true
+        }
+      },
+      "g2_shared": null
+    }
+  ]
+}
