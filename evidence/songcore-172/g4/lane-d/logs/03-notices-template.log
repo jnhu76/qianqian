@@ -1,0 +1,21 @@
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+  template_sha256 96e92571de19c0002fd045c7b26ed34d438778d4e18e28fccee615c2093c8e00
+  shipped_sha256  5da8e9f8a2d64d4252b13381e75add78f3bcd27423ce7f0e8e310037476653c0
+  byte_identical False
+  bom False crlf False cr_only False
+  bytes 1541
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+  template_sha256 4208489ee64528be1f73612abeb5ad25edc36b4710c9d0c63a5e229657444ee9
+  shipped_sha256  9477759492876ab14059efe5fdad079eebabe04d00c570d1618997f3e424046e
+  byte_identical False
+  bom False crlf False cr_only False
+  bytes 1545
+template_check_exit=0
+== FFmpeg section byte-identity (v0.1.0 vs shipped, up to Qianqian) ==
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64/LICENSES ffmpeg_body_identical True v010_sha cfd96c47e5ac3e8a shipped_sha cfd96c47e5ac3e8a
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/LICENSES ffmpeg_body_identical True v010_sha cfd96c47e5ac3e8a shipped_sha cfd96c47e5ac3e8a
+ffmpeg_section_exit=0
+
+----
+script=check-notices-template.sh
+exit_code=0

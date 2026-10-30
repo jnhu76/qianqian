@@ -1,0 +1,160 @@
+{
+  "checks": {
+    "T1_traversal": true,
+    "T2_duplicate": true,
+    "T3_links": true,
+    "T4_oversize": true,
+    "T5_toplevel": true,
+    "sha256_expected": true
+  },
+  "findings": [],
+  "identity": {
+    "bytes": 2588376,
+    "container": "tar",
+    "expected_root": "songcore-v0.1.0-linux-x86_64",
+    "expected_sha256": "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+    "file_members": 13,
+    "hardlink_members": 0,
+    "max_member_bytes": 4066924,
+    "member_count": 19,
+    "member_manifest_sha256": "bc6590ca0f29260afeb9c9fc5396f2e465d2e5d8ca74601f84e41d1ea21c0dd4",
+    "path": "/home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz",
+    "sha256": "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+    "sha256_matches_expected": true,
+    "symlink_members": 0,
+    "top_level": {
+      "songcore-v0.1.0-linux-x86_64": 19
+    },
+    "total_uncompressed_bytes": 6472191
+  },
+  "members": [
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64",
+      "size": 0
+    },
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/include",
+      "size": 0
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/include/songcore.h",
+      "sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+      "size": 18666
+    },
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/metadata",
+      "size": 0
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/metadata/manifest.json",
+      "sha256": "245c8c9636643d19932896632a631af5e70ceada21a0b4b060fc64b519874ead",
+      "size": 1612
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/metadata/symbols.txt",
+      "sha256": "dd92bef58e43fb17bae0ba7df377d173fa9de494caa4325024d62a54db6f3806",
+      "size": 270
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/metadata/checksums.txt",
+      "sha256": "bbd8e6e0950159e15eefb04ee7b7690d5b2a952814ccb61ed0893cb8de307da9",
+      "size": 1075
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/metadata/external-consumer-example.c",
+      "sha256": "d230609b3e6c3f3312d8dc2efb4abb7e2b7edc3b48a07b7d49e65481cd8a6c1f",
+      "size": 3846
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/README.md",
+      "sha256": "addadb161aa56ddd971b186c8a88e4497410f2e606dab10e0180718ca38f6d0b",
+      "size": 2521
+    },
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES",
+      "size": 0
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv2.1",
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+      "size": 26517
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv3",
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+      "size": 7651
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv3",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt",
+      "sha256": "5d20798cca032a69275359fc5ebb2f0c8593897b00b28748532e9423519fa7c7",
+      "size": 1334
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv2",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "size": 18092
+    },
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/lib",
+      "size": 0
+    },
+    {
+      "kind": "dir",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/lib/shared",
+      "size": 0
+    },
+    {
+      "kind": "file",
+      "mode": "0o755",
+      "name": "songcore-v0.1.0-linux-x86_64/lib/shared/libsongcore.so",
+      "sha256": "110e8dd3698698694ceea519494bb2f9a2f18430f4436717d333ceeaa7bcd3fc",
+      "size": 2288536
+    },
+    {
+      "kind": "file",
+      "mode": "0o644",
+      "name": "songcore-v0.1.0-linux-x86_64/lib/libsongcore.a",
+      "sha256": "6b4cf24300f1ebaf2c2aee8ac24aac70195107864af8d40603af4cc32532fef3",
+      "size": 4066924
+    }
+  ],
+  "schema": 1
+}

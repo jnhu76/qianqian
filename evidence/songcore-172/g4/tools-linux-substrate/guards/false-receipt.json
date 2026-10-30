@@ -1,0 +1,3 @@
+{"entry":"ops/build-linux.sh","verdict":"PASS","head":"69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+ "artifacts":{"static":{"sha256":"408d7d6ea4c9d1707283104366725c3deda47d5a4cebee5102c170fdf86d404b"},
+              "shared":{"sha256":"5e9c56972bc063e0020750d562225dcb8a3ac3c10df3957688bb86ebd9a12843"}}}

@@ -1,0 +1,18 @@
+total 16
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 04:20 .
+drwxr-x--- 91 hoo hoo 4096 Oct 30 20:32 ..
+drwxr-xr-x  4 hoo hoo 4096 Oct 30 20:30 closure
+drwxr-xr-x  3 hoo hoo 4096 Oct 29 04:20 win
+---
+artifacts
+artifacts-mingw
+ffmpeg-src
+ffmpeg-xmake
+ffmpeg.lua
+songcore.lua
+---closure---
+ffmpeg-src
+ffmpeg-xmake
+---prepare-log---
+closure: persistent build root (reused, pin-validated)
+PREPARE_OK

@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+CASE gb.typed-open-no-handle PASS
+INFO garbage C:\Users\fred1\source\qianqian\evidence\songcore-172\g4\p0-entries\csuite-results-override\20261030-203510\media\empty.bin status=104
+MODE garbage CASES=1 FAILED=0 RESULT=PASS
+
+--- stderr ---

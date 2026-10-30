@@ -1,0 +1,78 @@
+{"stage":"abi","songcore_abi_version":1,"ok":1}
+{"loaded_songcore_paths":["/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so","/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so","/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so","/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so","/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"]}
+{"stage":"open","status":0,"ok":1}
+{"stage":"probe","status":0,"codec":"flac","container":"flac","sample_rate":44100,"channels":2,"channel_mask":"0x0000000000000003","duration_us":4000000,"bits_per_sample":16,"audio_stream_count":1,"selected_audio_index":0,"ok":1}
+{"check":"probe","ok":1}
+{"stage":"lossless_class","lossless":1,"codec":"flac"}
+{"stage":"audio_stream_count","status":0,"count":1}
+{"check":"audio_stream_count","ok":1}
+{"stage":"audio_stream_info","status":0,"audio_index":0,"stream_index":0,"rate":44100,"channels":2,"default":0,"codec":"flac"}
+{"stage":"get_metadata","status":0,"ok":1}
+{"check":"get_metadata","ok":1}
+{"meta":"title","has":1,"len":22,"value":"Flac Sixteen Fortyfour"}
+{"meta":"artist","has":1,"len":12,"value":"Qianqian Lab"}
+{"meta":"album","has":1,"len":12,"value":"Corpus Gamma"}
+{"meta":"album_artist","has":0,"len":0,"value":null}
+{"meta":"genre","has":0,"len":0,"value":null}
+{"meta":"composer","has":0,"len":0,"value":null}
+{"meta":"date","has":0,"len":0,"value":null}
+{"meta":"comment","has":0,"len":0,"value":null}
+{"stage":"metadata_numbers","track_number":0,"has_track_number":0,"track_total":0,"has_track_total":0,"disc_number":0,"has_disc_number":0,"disc_total":0,"has_disc_total":0,"track_gain_mb":0,"has_track_gain":0,"track_peak":0,"has_track_peak":0,"album_gain_mb":0,"has_album_gain":0,"album_peak":0,"has_album_peak":0}
+{"stage":"metadata_count","status":0,"count":4}
+{"check":"metadata_count","ok":1}
+{"stage":"metadata_entry","status":0,"index":0,"scope":0,"key":"ALBUM","value":"Corpus Gamma"}
+{"stage":"metadata_entry","status":0,"index":1,"scope":0,"key":"TITLE","value":"Flac Sixteen Fortyfour"}
+{"stage":"metadata_entry","status":0,"index":2,"scope":0,"key":"ARTIST","value":"Qianqian Lab"}
+{"stage":"metadata_entry","status":0,"index":3,"scope":0,"key":"encoder","value":"Lavf62.3.100"}
+{"stage":"artwork_count","status":0,"count":0}
+{"check":"full_decode_eof_produced_zero","ok":1}
+{"stage":"full_decode","status":"done","frames":176400,"pcm_sha256":"3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc","terminal":"SONG_EOF"}
+{"stage":"eof_repeat","status":1,"produced":0,"is_error":0,"ok":1}
+{"check":"eof_repeat_song_eof_zero","ok":1}
+{"check":"eof_not_an_error_code","ok":1}
+{"stage":"seek","pct":25,"target_us":1000000,"status":0,"status_class":0,"landing_us":940408,"landing_not_after_target":1}
+{"check":"seek_status_ok","ok":1}
+{"check":"seek_landing_known","ok":1}
+{"check":"seek_landing_at_or_before_target","ok":1}
+{"stage":"seek_next_read","pct":25,"status":0,"produced":4096,"at_landing":1}
+{"check":"seek_next_read_frames","ok":1}
+{"stage":"seek_views_unchanged","pct":25,"format_unchanged":1,"metadata_unchanged":1,"artwork_count":0,"artwork_unchanged":1}
+{"check":"seek_format_unchanged","ok":1}
+{"check":"seek_metadata_unchanged","ok":1}
+{"check":"seek_artwork_unchanged","ok":1}
+{"stage":"seek_lossless_landing_check","pct":25,"reported_frame_idx":41472,"compared_frames":4096,"mismatched_frames":0,"exact_match":1,"true_landing_delta_frames":-9223372036854775808}
+{"check":"seek_landing_frame_exact_lossless","ok":1}
+{"stage":"seek","pct":50,"target_us":2000000,"status":0,"status_class":0,"landing_us":1985306,"landing_not_after_target":1}
+{"check":"seek_status_ok","ok":1}
+{"check":"seek_landing_known","ok":1}
+{"check":"seek_landing_at_or_before_target","ok":1}
+{"stage":"seek_next_read","pct":50,"status":0,"produced":4096,"at_landing":1}
+{"check":"seek_next_read_frames","ok":1}
+{"stage":"seek_views_unchanged","pct":50,"format_unchanged":1,"metadata_unchanged":1,"artwork_count":0,"artwork_unchanged":1}
+{"check":"seek_format_unchanged","ok":1}
+{"check":"seek_metadata_unchanged","ok":1}
+{"check":"seek_artwork_unchanged","ok":1}
+{"stage":"seek_lossless_landing_check","pct":50,"reported_frame_idx":87552,"compared_frames":4096,"mismatched_frames":0,"exact_match":1,"true_landing_delta_frames":-9223372036854775808}
+{"check":"seek_landing_frame_exact_lossless","ok":1}
+{"stage":"seek","pct":75,"target_us":3000000,"status":0,"status_class":0,"landing_us":2925714,"landing_not_after_target":1}
+{"check":"seek_status_ok","ok":1}
+{"check":"seek_landing_known","ok":1}
+{"check":"seek_landing_at_or_before_target","ok":1}
+{"stage":"seek_next_read","pct":75,"status":0,"produced":4096,"at_landing":1}
+{"check":"seek_next_read_frames","ok":1}
+{"stage":"seek_views_unchanged","pct":75,"format_unchanged":1,"metadata_unchanged":1,"artwork_count":0,"artwork_unchanged":1}
+{"check":"seek_format_unchanged","ok":1}
+{"check":"seek_metadata_unchanged","ok":1}
+{"check":"seek_artwork_unchanged","ok":1}
+{"stage":"seek_lossless_landing_check","pct":75,"reported_frame_idx":129024,"compared_frames":4096,"mismatched_frames":0,"exact_match":1,"true_landing_delta_frames":-9223372036854775808}
+{"check":"seek_landing_frame_exact_lossless","ok":1}
+{"stage":"drain_seek","attempt":0,"target_us":3800000,"status":110,"landing_us":-1,"gated":0}
+{"stage":"drain_seek","attempt":1,"target_us":2000000,"status":0,"landing_us":1985306,"gated":0}
+{"stage":"drain","terminal":"SONG_EOF","status":1,"produced_at_eof":0,"frames_after_seek":88848,"is_error":0,"terminal_distinguishable_from_error":1}
+{"check":"drain_eof_zero","ok":1}
+{"check":"drain_terminal_is_song_eof","ok":1}
+{"stage":"read_pcm_zero_capacity","status":100,"note":"header line 369 expects SONG_ERR_INVALID_ARGUMENT"}
+{"stage":"close","ok":1}
+{"stage":"reopen_after_midstream_close","eof_clean":1,"frames":176400,"frames_equal_pass1":1,"pcm_sha256":"3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc","pcm_equal_pass1":1}
+{"check":"reopen_after_midstream_close_stable","ok":1}
+{"stage":"verdict","ok":1,"gated_failures":0}

@@ -1,0 +1,198 @@
+
+/home/hoo/d3probe/lib/libsongcore.so:     file format elf64-x86-64
+
+
+Disassembly of section .init:
+
+Disassembly of section .plt:
+
+Disassembly of section .plt.got:
+
+Disassembly of section .plt.sec:
+
+Disassembly of section .text:
+
+00000000000359f0 <song_read_pcm@@Base>:
+   359f0:	endbr64
+   359f4:	push   %r15
+   359f6:	push   %r14
+   359f8:	push   %r13
+   359fa:	push   %r12
+   359fc:	push   %rbp
+   359fd:	push   %rbx
+   359fe:	sub    $0x18,%rsp
+   35a02:	test   %rdi,%rdi
+   35a05:	je     35b67 <song_read_pcm@@Base+0x177>
+   35a0b:	mov    %rsi,0x8(%rsp)
+   35a10:	mov    %rcx,%r13
+   35a13:	mov    %rdx,%rbp
+   35a16:	mov    %rdi,%rbx
+   35a19:	test   %rsi,%rsi
+   35a1c:	je     35b30 <song_read_pcm@@Base+0x140>
+   35a22:	test   %rcx,%rcx
+   35a25:	je     35b30 <song_read_pcm@@Base+0x140>
+   35a2b:	movq   $0x0,(%rcx)
+   35a32:	test   %rdx,%rdx
+   35a35:	je     35b30 <song_read_pcm@@Base+0x140>
+   35a3b:	mov    0x50(%rdi),%edx
+   35a3e:	test   %edx,%edx
+   35a40:	je     35c38 <song_read_pcm@@Base+0x248>
+   35a46:	cmpq   $0x0,0x30(%rdi)
+   35a4b:	je     35c38 <song_read_pcm@@Base+0x248>
+   35a51:	mov    0x64(%rdi),%r15d
+   35a55:	xor    %r12d,%r12d
+   35a58:	test   %r15d,%r15d
+   35a5b:	je     35ac1 <song_read_pcm@@Base+0xd1>
+   35a5d:	jmp    35cb8 <song_read_pcm@@Base+0x2c8>
+   35a62:	nopw   0x0(%rax,%rax,1)
+   35a68:	mov    0x60(%rbx),%eax
+   35a6b:	pxor   %xmm1,%xmm1
+   35a6f:	movups %xmm1,0x2c8(%rbx)
+   35a76:	test   %eax,%eax
+   35a78:	jne    35bf0 <song_read_pcm@@Base+0x200>
+   35a7e:	mov    %rbx,%rdi
+   35a81:	call   31ee0 <mkdir@plt+0xd290>
+   35a86:	test   %eax,%eax
+   35a88:	je     35bf0 <song_read_pcm@@Base+0x200>
+   35a8e:	mov    0x48(%rbx),%rsi
+   35a92:	cmp    $0xffffffff,%eax
+   35a95:	je     35b80 <song_read_pcm@@Base+0x190>
+   35a9b:	mov    %rbx,%rdi
+   35a9e:	call   32da0 <mkdir@plt+0xe150>
+   35aa3:	mov    0x48(%rbx),%rdi
+   35aa7:	mov    %eax,%r14d
+   35aaa:	call   39ce0 <song_close@@Base+0x3b80>
+   35aaf:	test   %r14d,%r14d
+   35ab2:	jne    35d08 <song_read_pcm@@Base+0x318>
+   35ab8:	cmp    %rbp,%r12
+   35abb:	jae    35c88 <song_read_pcm@@Base+0x298>
+   35ac1:	mov    0x2d0(%rbx),%rax
+   35ac8:	mov    0x2c8(%rbx),%rdx
+   35acf:	cmp    %rdx,%rax
+   35ad2:	jae    35a68 <song_read_pcm@@Base+0x78>
+   35ad4:	mov    %rbp,%rcx
+   35ad7:	sub    %rax,%rdx
+   35ada:	movslq 0x80(%rbx),%rsi
+   35ae1:	sub    %r12,%rcx
+   35ae4:	cmp    %rcx,%rdx
+   35ae7:	cmovbe %rdx,%rcx
+   35aeb:	imul   %rsi,%rax
+   35aef:	lea    0x0(,%rsi,4),%rdx
+   35af7:	mov    0x2b8(%rbx),%rsi
+   35afe:	mov    %rdx,%rdi
+   35b01:	imul   %rcx,%rdx
+   35b05:	mov    %rcx,%r14
+   35b08:	imul   %r12,%rdi
+   35b0c:	lea    (%rsi,%rax,4),%rsi
+   35b10:	add    0x8(%rsp),%rdi
+   35b15:	add    %r14,%r12
+   35b18:	call   24c20 <memcpy@plt>
+   35b1d:	add    %r14,0x2d0(%rbx)
+   35b24:	jmp    35ab8 <song_read_pcm@@Base+0xc8>
+   35b26:	cs nopw 0x0(%rax,%rax,1)
+   35b30:	movdqa 0x182fb8(%rip),%xmm0        # 1b8af0 <song_close@@Base+0x182990>
+   35b38:	lea    0x1b8(%rbx),%rdi
+   35b3f:	movq   $0x0,0x1ac(%rbx)
+   35b4a:	movups %xmm0,0x1b8(%rbx)
+   35b51:	movb   $0x0,0x10(%rdi)
+   35b55:	mov    %rdi,0x1a0(%rbx)
+   35b5c:	call   24890 <strlen@plt>
+   35b61:	mov    %eax,0x1a8(%rbx)
+   35b67:	mov    $0x64,%r15d
+   35b6d:	add    $0x18,%rsp
+   35b71:	mov    %r15d,%eax
+   35b74:	pop    %rbx
+   35b75:	pop    %rbp
+   35b76:	pop    %r12
+   35b78:	pop    %r13
+   35b7a:	pop    %r14
+   35b7c:	pop    %r15
+   35b7e:	ret
+   35b7f:	nop
+   35b80:	mov    0x68(%rbx),%eax
+   35b83:	mov    $0x70,%ebp
+   35b88:	cmp    $0xfffffff4,%eax
+   35b8b:	je     35b9a <song_read_pcm@@Base+0x1aa>
+   35b8d:	xor    %ebp,%ebp
+   35b8f:	cmp    $0xfffffffb,%eax
+   35b92:	setne  %bpl
+   35b96:	lea    0x67(%rbp,%rbp,4),%ebp
+   35b9a:	mov    %rsi,%rdi
+   35b9d:	call   39ce0 <song_close@@Base+0x3b80>
+   35ba2:	mov    0x68(%rbx),%eax
+   35ba5:	lea    0x1b8(%rbx),%rdi
+   35bac:	mov    %ebp,0x64(%rbx)
+   35baf:	movl   $0x0,0x1b0(%rbx)
+   35bb9:	mov    %eax,0x1ac(%rbx)
+   35bbf:	movabs $0x652065646f636564,%rax
+   35bc9:	mov    %rax,0x1b8(%rbx)
+   35bd0:	movabs $0x726f7272652065,%rax
+   35bda:	mov    %rax,0x5(%rdi)
+   35bde:	mov    %rdi,0x1a0(%rbx)
+   35be5:	call   24890 <strlen@plt>
+   35bea:	mov    %eax,0x1a8(%rbx)
+   35bf0:	mov    %r12,0x0(%r13)
+   35bf4:	test   %r12,%r12
+   35bf7:	jne    35c8c <song_read_pcm@@Base+0x29c>
+   35bfd:	mov    0x64(%rbx),%r15d
+   35c01:	test   %r15d,%r15d
+   35c04:	jne    35b6d <song_read_pcm@@Base+0x17d>
+   35c0a:	movl   $0x0,0x1b0(%rbx)
+   35c14:	mov    $0x1,%r15d
+   35c1a:	movq   $0x0,0x1a0(%rbx)
+   35c25:	movq   $0x0,0x1a8(%rbx)
+   35c30:	jmp    35b6d <song_read_pcm@@Base+0x17d>
+   35c35:	nopl   (%rax)
+   35c38:	movdqa 0x182ec0(%rip),%xmm0        # 1b8b00 <song_close@@Base+0x1829a0>
+   35c40:	lea    0x1b8(%rbx),%rdi
+   35c47:	movabs $0x6465626f727020,%rax
+   35c51:	movq   $0x0,0x1ac(%rbx)
+   35c5c:	mov    $0x66,%r15d
+   35c62:	movups %xmm0,0x1b8(%rbx)
+   35c69:	mov    %rax,0xd(%rdi)
+   35c6d:	mov    %rdi,0x1a0(%rbx)
+   35c74:	call   24890 <strlen@plt>
+   35c79:	mov    %eax,0x1a8(%rbx)
+   35c7f:	jmp    35b6d <song_read_pcm@@Base+0x17d>
+   35c84:	nopl   0x0(%rax)
+   35c88:	mov    %r12,0x0(%r13)
+   35c8c:	movq   $0x0,0x1a0(%rbx)
+   35c97:	movq   $0x0,0x1a8(%rbx)
+   35ca2:	movl   $0x0,0x1b0(%rbx)
+   35cac:	jmp    35b6d <song_read_pcm@@Base+0x17d>
+   35cb1:	nopl   0x0(%rax)
+   35cb8:	mov    0x68(%rdi),%eax
+   35cbb:	movdqa 0x182f0d(%rip),%xmm0        # 1b8bd0 <song_close@@Base+0x182a70>
+   35cc3:	movl   $0x0,0x1b0(%rdi)
+   35ccd:	lea    0x1b8(%rdi),%rdi
+   35cd4:	mov    %eax,-0xc(%rdi)
+   35cd7:	movabs $0x726f7272652065,%rax
+   35ce1:	movups %xmm0,0x1b8(%rbx)
+   35ce8:	mov    %rax,0xd(%rdi)
+   35cec:	mov    %rdi,0x1a0(%rbx)
+   35cf3:	call   24890 <strlen@plt>
+   35cf8:	mov    %eax,0x1a8(%rbx)
+   35cfe:	jmp    35b6d <song_read_pcm@@Base+0x17d>
+   35d03:	nopl   0x0(%rax,%rax,1)
+   35d08:	cmp    $0xfffffffe,%r14d
+   35d0c:	mov    $0x6f,%eax
+   35d11:	mov    $0x6c,%edx
+   35d16:	movq   $0x0,0x1ac(%rbx)
+   35d21:	cmove  %eax,%edx
+   35d24:	lea    0x17272d(%rip),%rcx        # 1a8458 <song_close@@Base+0x1722f8>
+   35d2b:	mov    $0x100,%esi
+   35d30:	lea    0x1726f9(%rip),%rax        # 1a8430 <song_close@@Base+0x1722d0>
+   35d37:	lea    0x1b8(%rbx),%rbp
+   35d3e:	mov    %edx,0x64(%rbx)
+   35d41:	cmove  %rax,%rcx
+   35d45:	mov    %rbp,%rdi
+   35d48:	xor    %eax,%eax
+   35d4a:	lea    0x16b999(%rip),%rdx        # 1a16ea <song_close@@Base+0x16b58a>
+   35d51:	call   24700 <snprintf@plt>
+   35d56:	mov    %rbp,0x1a0(%rbx)
+   35d5d:	mov    %rbp,%rdi
+   35d60:	call   24890 <strlen@plt>
+   35d65:	mov    %eax,0x1a8(%rbx)
+   35d6b:	jmp    35bf0 <song_read_pcm@@Base+0x200>
+
+Disassembly of section .fini:

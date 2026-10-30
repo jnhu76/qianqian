@@ -1,0 +1,3 @@
+files_keys=12 checksums_rows=13
+files_keys_minus_expected=[]
+checksums_minus_files_keys=['metadata/manifest.json']

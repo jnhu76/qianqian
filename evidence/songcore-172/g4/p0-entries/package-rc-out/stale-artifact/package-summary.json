@@ -1,0 +1,49 @@
+{
+    "script":  "ops/package-rc.ps1",
+    "started":  "20261030-204023",
+    "version":  "0.2.0-rc.1",
+    "version_status":  "provisional (contract section 14 Q1 owner-reserved)",
+    "package_root":  "songcore-v0.2.0-rc.1-windows-x86_64",
+    "project":  "C:\\Users\\fred1\\source\\qianqian",
+    "artifact":  "C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts-mingw\\libsongcore.a",
+    "out_dir":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\stale-artifact",
+    "source":  {
+                   "commit":  "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+                   "native_tracked_clean":  true,
+                   "abi_header_sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+               },
+    "audits":  {
+                   "pinned_zip_sha256":  "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+                   "v010_tarball_sha256":  "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+                   "third_party_notices_sha256":  "01af9a0214228acd656bd6b54e94f2e96c0615d3aed6643177499d327376640c",
+                   "pe_members":  "280",
+                   "elf_members":  "0",
+                   "member_count":  "280",
+                   "song_symbols":  "15",
+                   "undefined_bcrypt":  "BCryptCloseAlgorithmProvider,BCryptGenRandom,BCryptOpenAlgorithmProvider",
+                   "undefined_count":  "1185"
+               },
+    "checks":  {
+                   "R3_archive_target_identity":  "PASS (objdump -f: 280 pe-x86-64, 0 elf)",
+                   "V2_header_identity":  "PASS (packaged == source == frozen cf509a5c...78536)",
+                   "V4_symbols_static_audit":  "PASS (15/15 defined \u0027 T song\u0027 symbols == contract section 3 set)",
+                   "O1_license_texts":  "PASS (4 FFmpeg COPYING texts extracted from the pin-verified source zip; staged shas == extraction shas)",
+                   "O2_B3_notices":  "PASS (THIRD_PARTY_NOTICES.txt extracted from the sha-verified v0.1.0 asset, then #330 P3 wording-refreshed: identity header + component-license paragraph; hashed in checksums.txt/files{} below)",
+                   "B4_component_licenses":  "PASS (LICENSE-MIT + LICENSE-APACHE byte-identical to repo-root texts)",
+                   "manifest_roundtrip":  "PASS (semantic re-parse of the written manifest.json on 5.1.26100.9818)",
+                   "V1_sets":  "PASS (14 packaged files; checksums.txt 13 entries = all except itself, v0.1.0 shape; files{} 12 entries = checksums set minus manifest.json)",
+                   "V1_V7_O1_B4":  "PASS (all machine checks; see v-checks.json)",
+                   "R4_zip_exact_set":  "PASS (14 entries == contract section 7 set; no duplicate/backslash/traversal/symlink)",
+                   "R5_zip_hash_readback":  "PASS (every entry re-hashed from the container against files{}/checksums)"
+               },
+    "container":  {
+                      "zip":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\stale-artifact\\songcore-v0.2.0-rc.1-windows-x86_64.zip",
+                      "zip_sha256":  "c3983bfb0215d771b6343fed576d649a975662b1adcf90b85c52ed50e9ee1604",
+                      "zip_bytes":  1449931,
+                      "entry_count":  14,
+                      "sha256sums_sidecar":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\stale-artifact\\SHA256SUMS"
+                  },
+    "ok":  true,
+    "artifact_sha256":  "408d7d6ea4c9d1707283104366725c3deda47d5a4cebee5102c170fdf86d404b",
+    "artifact_bytes":  3309982
+}

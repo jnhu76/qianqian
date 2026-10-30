@@ -1,0 +1,121 @@
+### HEAD
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+exit=0
+### status
+?? evidence/songcore-172/build/rc/20261030-203045/
+?? evidence/songcore-172/g4/
+exit=0
+
+### [G1] local tag inventory
+songcore-v0.1.0
+exit=0
+### [G1] count
+1
+### [G2] cat-file -t songcore-v0.1.0
+tag
+exit=0
+### [G3] rev-parse songcore-v0.1.0^{commit}
+522c16d283f024c01d1ef56fa96e587b286ca3b8
+exit=0
+### [G4] rev-parse songcore-v0.1.0 (tag object)
+a1b6c996fcb5d6c7dfea965a11bf3f05b94943fb
+exit=0
+### [G5] tag object body
+object 522c16d283f024c01d1ef56fa96e587b286ca3b8
+type commit
+tag songcore-v0.1.0
+tagger jnhu <me@hoooo.org> 1788354425 +0800
+
+SongCore ABI v1 frozen.
+Minimal FFmpeg-backed local audio decode core.
+Static artifact is the primary supported consumption path.
+exit=0
+
+### [H1] header blob at tag == blob at HEAD
+tag_blob=3055ca5cdff7c4d40def9e99883cb3bead94c417
+head_blob=3055ca5cdff7c4d40def9e99883cb3bead94c417
+diff_exit=0
+### [H2] sha256 of working-tree header
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 *native/include/songcore.h
+exit=0
+### [H3] last commits touching the header
+858f724 feat(native): restore SongCore media-to-PCM mechanism
+c210c9a chore: reset main for Rust Architecture v2
+59321af PHYS-IA-2: physical migration + xmake module split (closes #28) (#29)
+### [H4] last commits touching the C implementation
+61d834a fix(native): align the ffmpeg log gate with rust
+9995f6b fix(player): bound stream-info probes and quiet the console
+858f724 feat(native): restore SongCore media-to-PCM mechanism
+### [H5] blame of D1/D3 cited lines
+858f724a (jnhu 2026-09-12 02:11:33 +0800 218)  * *out_handle is then untouched. No diagnostic is available for song_open
+858f724a (jnhu 2026-09-12 02:11:33 +0800 219)  * failures (no handle exists). */
+858f724a (jnhu 2026-09-12 02:11:33 +0800 357)  *   SONG_EOF -> *out_frames_produced == 0 (end of stream, not an error)
+858f724a (jnhu 2026-09-12 02:11:33 +0800 358)  *   other    -> typed error; *out_frames_produced == 0 in that call
+858f724a (jnhu 2026-09-12 02:11:33 +0800 823)     if (!io || !out_handle || !io->read || !io->seek || !io->size)
+858f724a (jnhu 2026-09-12 02:11:33 +0800 824)         return SONG_ERR_INVALID_ARGUMENT;
+858f724a (jnhu 2026-09-12 02:11:33 +0800 825)     *out_handle = NULL;
+858f724a (jnhu 2026-09-12 02:11:33 +0800 1111)     if (!h) return SONG_ERR_INVALID_ARGUMENT;
+858f724a (jnhu 2026-09-12 02:11:33 +0800 1112)     if (!dst || !out_frames_produced) return fail_arg(h);
+858f724a (jnhu 2026-09-12 02:11:33 +0800 1113)     *out_frames_produced = 0;
+858f724a (jnhu 2026-09-12 02:11:33 +0800 1114)     if (frame_capacity == 0) return fail_arg(h);
+### [H6] did #331 (0b7c5e3) touch native/ ?
+0
+grep_exit=1 (1 = no match => no native/ file touched)
+### [H7] did #332 (69ba1ce) touch native/include or native/src ?
+grep_exit=1 (1 = no match)
+
+### [M1] ancestry of issue commits in main
+43d5e96 ANCESTOR_OF_HEAD=yes
+742abf8 ANCESTOR_OF_HEAD=yes
+b49b18c ANCESTOR_OF_HEAD=yes
+0b7c5e3 ANCESTOR_OF_HEAD=yes
+69ba1ce ANCESTOR_OF_HEAD=yes
+### [M2] commit subjects
+43d5e96a8d685db142be63be1648f60f6355a529 2026-10-29 11:35:26 +0800 fix(songcore): correct Windows static target builds and provenance hashing (#326)
+742abf87ef2a832b653b17760d8c2a55008cb1c1 2026-10-29 11:36:31 +0800 build(songcore): establish Windows x86_64 release-candidate lane (#327)
+b49b18cd68ae1a353cd3396efb3977b8590cc4d1 2026-10-29 22:25:59 +0800 build(songcore): archive Linux S3 reference evidence (#328)
+0b7c5e3b451a950554c886a9017ef50eeb66dd4e 2026-10-30 03:04:19 +0800 docs(release): ratify S1 contract and resolve #330 governance lanes (#331)
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500 2026-10-30 09:33:05 +0800 build(native): map ffmpeg macro roots via -fmacro-prefix-map (#332)
+
+### [L1] git log --oneline --no-merges 69ba1ce -40
+69ba1ce build(native): map ffmpeg macro roots via -fmacro-prefix-map (#332)
+0b7c5e3 docs(release): ratify S1 contract and resolve #330 governance lanes (#331)
+b49b18c build(songcore): archive Linux S3 reference evidence (#328)
+742abf8 build(songcore): establish Windows x86_64 release-candidate lane (#327)
+43d5e96 fix(songcore): correct Windows static target builds and provenance hashing (#326)
+05f5fef test(diagnostics): archive Windows native Tier-2 verification (#325)
+9ffcaba docs(native): archive Linux Tier-2 12-cell verification evidence (#323)
+3e60901 fix(playback): register the observation analyst as class-alpha
+61d834a fix(native): align the ffmpeg log gate with rust
+bf5a0fb test(wasapi): normalize line endings in the order oracle
+9f182b7 test(diagnostics): verify scoped Tier-2 outlet inertness
+52378d3 fix(tui): escape the picker target note at measure and paint
+09ac0a5 fix(tui): show the newest error and escape status before layout
+a34c3cd chore(wasapi): satisfy the current clippy toolchain
+b2c3a48 test(tui): drive error recovery through the real dispatch boundary
+cc43f34 feat(tui): route every Open through one B1 boundary and gate fail-stop
+c7c853d feat(tui): present playback errors and expose the error-details overlay
+1367bfa feat(headless): extend the B1 error contract with display-safe helpers
+43c9c23 chore(git): ignore local .mimosa directory (#314)
+911d251 feat(headless): add error presentation contract
+0ab8ce2 test(research): record the L5 replay and the owner's listening verdict
+6a2e8d5 test(research): listening rounds on the owner's real corpus
+762a95b test(tui): observe the armed deadline in the n/p wiring test
+5f81597 test(research): real-Windows production acceptance for PR #311
+0884b55 test(research): synchronize spaced burst steps on committed witnesses
+0d36643 test(research): retarget burst driver needles to the coalesced shell
+02901f4 docs(research): bind REV-P2 mutation meta and correct its wording
+fdf3385 fix(player): cancel the pending burst on direct manual steps
+cea2b5c fix(player): cancel the pending burst on the R-key order toggle
+4374a40 docs(player): record #170 production closeout
+ded130c fix(tui): commit pending navigation from event-loop deadline
+211c828 fix(player): coalesce relative navigation intents before open
+ca9c3c8 feat(player): pure from-position playlist navigation preview
+bf30a86 fix(r2): unique ExecutorExited publisher on abort path (#308)
+e9e8cf2 fix(r2): hoist format arg for newer clippy lint (#308)
+67eb6e1 docs(r2): archive h0 campaign round-3 receipts, clean witness (#308)
+35722dd docs(r2): final-head receipts - campaigns r3 + dual matrices (#308)
+c901b1a fix(r2): delta review - sound abort partition formulation (#308)
+4b8535d fix(r2): review round: injection replaces send, partition (#308)
+fb484b0 docs(r2): review C P3-2, qualify the migration wording (#308)
+exit=0

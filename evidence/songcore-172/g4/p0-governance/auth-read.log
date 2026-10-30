@@ -1,0 +1,14 @@
+cfg_written=yes
+### B1 /user (identity of the authenticated account)
+rest-auth-user.json http=200 bytes=1332
+### B2 repo permissions
+rest-auth-repo.json http=200 bytes=6371
+### B3 releases?per_page=100 (includes drafts when authenticated)
+rest-auth-releases-list.json http=200 bytes=10178
+### B4 release by tag (authenticated, compare with anonymous)
+rest-auth-release-v0.1.0.json http=200 bytes=4783
+### B5 repos/{}/releases?per_page=100&page=2 (prove the list is complete)
+rest-auth-releases-page2.json http=200 bytes=5
+### B6 matching-refs songcore-v* (authenticated)
+rest-auth-matching-refs.json http=200 bytes=418
+cleanup cfg_exists=removed token_exists=removed

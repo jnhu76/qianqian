@@ -1,0 +1,189 @@
+===== containers =====
+5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip
+bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790  /home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip 1449803 bytes
+/home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz 2575536 bytes
+----- linux SHA256SUMS sidecar -----
+bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790  songcore-v0.0.0-preflight-linux-x86_64.tar.gz
+----- windows SHA256SUMS sidecar -----
+5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3  songcore-v0.0.0-preflight-windows-x86_64.zip
+===== linux v-checks.json =====
+{
+  "checks": {
+    "V1_files_rehash": true,
+    "V1_checksums_set": true,
+    "V1_files_set": true,
+    "V1_no_self_hash": true,
+    "V1_checksums_match_bytes": true,
+    "V2_header_sha": true,
+    "V3_pin_binding": true,
+    "V4_symbols": true,
+    "V5_license_args": true,
+    "V6_reproducibility": true,
+    "V7_tools": true,
+    "O1_license_texts": true,
+    "O2_B3_notices": true,
+    "B4_component_licenses": true,
+    "L_relative_paths": true
+  },
+  "details": {
+    "V1_files_rehash": "files{} entries re-hash to the packaged bytes; bad=none",
+    "V1_checksums_set": "checksums.txt entries (14) == packaged files minus itself (14)",
+    "V1_files_set": "files{} keys (13) == checksums.txt entries minus manifest.json (13)",
+    "V1_no_self_hash": "checksums.txt does not hash itself; files{} hashes neither checksums.txt nor manifest.json",
+    "V1_checksums_match_bytes": "every checksums.txt entry equals the sha256 of the packaged bytes",
+    "V2_header_sha": "packaged header cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 == manifest == work root == contract section 3",
+    "V3_pin_binding": "pin.*/closure.* agree with the source-commit inputs; mismatch=none",
+    "V4_symbols": "public_symbols == symbols.txt == static defined == shared exported == header set (15 symbols)",
+    "V5_license_args": "no gpl/version3/nonfree/lib* configure arg; license flags false; forbidden=none",
+    "V6_reproducibility": "no reproducibility level is claimed beyond its receipt; values={'recipe': 'NOT_ESTABLISHED', 'semantic_abi': 'NOT_ESTABLISHED', 'byte': 'NOT_ESTABLISHED'}",
+    "V7_tools": "tools{} carries exact cc/ar/xmake versions; sdk_ndk disposition stated; target_identity.toolchain == recipe",
+    "O1_license_texts": "the four FFmpeg COPYING texts are staged, hashed and bound in license_files; bad=none",
+    "O2_B3_notices": "THIRD_PARTY_NOTICES.txt present and hashed in checksums.txt",
+    "B4_component_licenses": "LICENSE-MIT/LICENSE-APACHE byte-identical to the repo-root texts at the source commit; bad=none",
+    "L_relative_paths": "every staged path is relative and traversal-free"
+  },
+  "package_root": "songcore-v0.0.0-preflight-linux-x86_64",
+  "packaged_files": 15,
+  "checksums_entries": 14,
+  "files_entries": 13,
+  "passed": 15,
+  "failed": 0,
+  "verdict": "PASS"
+}
+===== linux package-summary.json (head) =====
+{
+ "entry": "ops/package-linux.sh",
+ "argv": [
+  "--version",
+  "0.0.0-preflight",
+  "--source-commit",
+  "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "--work-root",
+  "/home/hoo/g4-172/linux-root",
+  "--out-dir",
+  "/home/hoo/g4-172/laneB-packages/linux",
+  "--build-receipt",
+  "/home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json"
+ ],
+ "version": "0.0.0-preflight",
+ "version_status": "caller-supplied; the next release number is owner-reserved (contract section 14 Q1); not a release",
+ "package_root": "songcore-v0.0.0-preflight-linux-x86_64",
+ "source_commit": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+ "tar": "/home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz",
+ "tar_sha256": "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+ "tar_bytes": 2575536,
+ "packaged_files": 15,
+ "checksums_entries": 14,
+ "files_entries": 13,
+ "artifact_provenance_attested": true,
+ "build_receipt_sha256": "1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832",
+ "artifact_static_sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+ "artifact_shared_sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+ "v_checks": {
+  "verdict": "PASS",
+  "passed": 15,
+  "failed": 0
+ },
+ "not_run": [
+  "runtime/device smoke of the packaged consumer example (no media input in this lane)",
+  "two-root reproducibility rebuild (contract section 12 levels stay NOT_ESTABLISHED)"
+ ],
+ "ok": true
+}
+--- checks ---
+null
+===== sha256sum -c (contract README verify recipe) =====
+--- windows tree ---
+include/songcore.h: OK
+lib/libsongcore.a: OK
+LICENSES/COPYING.GPLv2: OK
+LICENSES/COPYING.GPLv3: OK
+LICENSES/COPYING.LGPLv2.1: OK
+LICENSES/COPYING.LGPLv3: OK
+LICENSES/LICENSE-APACHE: OK
+LICENSES/LICENSE-MIT: OK
+LICENSES/THIRD_PARTY_NOTICES.txt: OK
+metadata/external-consumer-example.c: OK
+metadata/manifest.json: OK
+metadata/symbols.txt: OK
+README.md: OK
+win_rc=0
+--- linux tree ---
+LICENSES/COPYING.GPLv2: OK
+LICENSES/COPYING.GPLv3: OK
+LICENSES/COPYING.LGPLv2.1: OK
+LICENSES/COPYING.LGPLv3: OK
+LICENSES/LICENSE-APACHE: OK
+LICENSES/LICENSE-MIT: OK
+LICENSES/THIRD_PARTY_NOTICES.txt: OK
+README.md: OK
+include/songcore.h: OK
+lib/libsongcore.a: OK
+lib/shared/libsongcore.so: OK
+metadata/external-consumer-example.c: OK
+metadata/manifest.json: OK
+metadata/symbols.txt: OK
+linux_rc=0
+===== tool versions recorded vs actual =====
+-- windows manifest tools{} --
+{
+ "manifest_songcore_version": "0.0.0-preflight",
+ "tools": {
+  "cc": "x86_64-w64-mingw32-gcc (GCC) 13-win32",
+  "ar": "GNU ar (GNU Binutils) 2.45.90.20260125",
+  "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"
+ },
+ "target_identity.toolchain": {
+  "family": "mingw-w64",
+  "identity": "x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts"
+ },
+ "triple": "x86_64-pc-windows-gnu",
+ "sdk_ndk": "not applicable this round -- windows-x86_64: mingw-w64 cross, no MSVC/SDK (target recipe toolchain identity, contract section 8)",
+ "reproducibility": {
+  "recipe": "NOT_ESTABLISHED",
+  "semantic_abi": "NOT_ESTABLISHED",
+  "byte": "NOT_ESTABLISHED",
+  "evidence": "evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, member-order.verdict, member-diff.verdict, differing-members.txt, rootcause-strings.txt, archive-path-scan.txt, debug-info-sample.txt, songcore-c-object.txt, undefined-imports.txt, closure-identity.txt)"
+ },
+ "artifact_shared": false,
+ "notes_head": "songcore_version 0.0.0-preflight is PROVISIONAL: the concrete next release number is owner-reserved (contract section 14 Q1); this is a release-candidate verification archive, not a release (contract section 11: a produced archive is not a release), and must never be published under the songcore-v* "
+}
+-- linux manifest tools{} --
+{
+ "manifest_songcore_version": "0.0.0-preflight",
+ "tools": {
+  "cc": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "ar": "GNU ar (GNU Binutils for Ubuntu) 2.46",
+  "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"
+ },
+ "target_identity.toolchain": {
+  "family": "host-native",
+  "identity": "system gcc/clang; no SDK or cross prefix"
+ },
+ "triple": "x86_64-unknown-linux-gnu",
+ "sdk_ndk": "not applicable this round \u2014 linux-x86_64: host-native, no SDK/NDK (target recipe toolchain identity, contract section 8)",
+ "reproducibility": {
+  "recipe": "NOT_ESTABLISHED",
+  "semantic_abi": "NOT_ESTABLISHED",
+  "byte": "NOT_ESTABLISHED",
+  "evidence": "none this pack: ops/package-linux.sh performs no two-root rebuild, so no reproducibility receipt exists and every level is reported NOT_ESTABLISHED (contract section 8 V6 / section 12). A positive level must name an existing receipt."
+ },
+ "artifact_shared": "lib/shared/libsongcore.so",
+ "notes_head": "songcore_version 0.0.0-preflight was supplied by the packaging caller; the concrete next release number is owner-reserved (contract section 14 Q1), this is a release-substrate verification archive, not a release, and nothing here is published. Artifact provenance IS attested: --build-receipt (sha256 1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832) reports head 69ba1ce05a2772f5aa07"
+}
+-- actual host tool versions --
+x86_64-w64-mingw32-gcc (GCC) 13-win32
+GNU ar (GNU Binutils) 2.45.90.20260125
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+GNU ar (GNU Binutils for Ubuntu) 2.46
+xmake v2.9.7+20250101, A cross-platform build utility based on Lua
+===== README release-claim scan =====
+9:This is a release-candidate verification archive (#172), NOT a release: the
+10:concrete version number is provisional -- the next release tag is
+51:codified in tools/check_release.py (SYSTEM_DLLS incl. bcrypt,
+---
+9:**This container is a release-substrate verification archive, not a release.**
+11:release number is owner-reserved (contract section 14 Q1); packaging creates no
+12:tag, no GitHub Release and no other published asset.

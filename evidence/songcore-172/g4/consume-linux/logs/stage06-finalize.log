@@ -1,0 +1,237 @@
+$ gcc -H -fsyntax-only -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c
+. /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h
+[exit] 0
+--- expected: /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h ---
+--- repo header (NOT used; recorded for contrast) ---
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /mnt/c/Users/fred1/source/qianqian/native/include/songcore.h
+--- package header ---
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h
+--- are they byte-identical? ---
+IDENTICAL_TO_REPO_HEADER
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+
+$ python3 /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/scripts/05-compare.py /home/hoo/g4-172/consume-linux /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/comparison.json
+{
+  "mp3-cbr-id3v23": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "flac-16-44-stereo": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "alac-16-44-stereo": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "alac-long": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 264600,
+      "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 264600,
+      "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  }
+}
+[exit] 0
+--- copied outputs ---
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared:
+total 52
+-rwxrwxrwx 1 hoo hoo    0 Oct 30 21:23 corpus-alac-16-44-stereo.err
+-rwxrwxrwx 1 hoo hoo 5087 Oct 30 21:23 corpus-alac-16-44-stereo.jsonl
+-rwxrwxrwx 1 hoo hoo    0 Oct 30 21:23 corpus-alac-long.err
+-rwxrwxrwx 1 hoo hoo 5089 Oct 30 21:23 corpus-alac-long.jsonl
+-rwxrwxrwx 1 hoo hoo    0 Oct 30 21:23 corpus-flac-16-44-stereo.err
+-rwxrwxrwx 1 hoo hoo 5016 Oct 30 21:23 corpus-flac-16-44-stereo.jsonl
+-rwxrwxrwx 1 hoo hoo    0 Oct 30 21:23 corpus-mp3-cbr-id3v23.err
+-rwxrwxrwx 1 hoo hoo 4341 Oct 30 21:23 corpus-mp3-cbr-id3v23.jsonl
+-rwxrwxrwx 1 hoo hoo  346 Oct 30 21:23 example-alac-16-44-stereo.out
+-rwxrwxrwx 1 hoo hoo  346 Oct 30 21:23 example-alac-long.out
+-rwxrwxrwx 1 hoo hoo  345 Oct 30 21:23 example-flac-16-44-stereo.out
+-rwxrwxrwx 1 hoo hoo  337 Oct 30 21:23 example-mp3-cbr-id3v23.out
+-rwxrwxrwx 1 hoo hoo 2918 Oct 30 21:23 lddebug-mp3.err
+-rwxrwxrwx 1 hoo hoo 4341 Oct 30 21:23 lddebug-mp3.out
+-rwxrwxrwx 1 hoo hoo  170 Oct 30 21:23 nolibpath.out
+-rwxrwxrwx 1 hoo hoo    0 Oct 30 21:23 rpath-flac.err
+-rwxrwxrwx 1 hoo hoo 5016 Oct 30 21:23 rpath-flac.jsonl
+
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static:
+total 28
+-rwxrwxrwx 1 hoo hoo 4578 Oct 30 21:23 corpus-alac-16-44-stereo.jsonl
+-rwxrwxrwx 1 hoo hoo 4580 Oct 30 21:23 corpus-alac-long.jsonl
+-rwxrwxrwx 1 hoo hoo 4507 Oct 30 21:23 corpus-flac-16-44-stereo.jsonl
+-rwxrwxrwx 1 hoo hoo 3832 Oct 30 21:23 corpus-mp3-cbr-id3v23.jsonl
+-rwxrwxrwx 1 hoo hoo  346 Oct 30 21:23 example-alac-16-44-stereo.out
+-rwxrwxrwx 1 hoo hoo  346 Oct 30 21:23 example-alac-long.out
+-rwxrwxrwx 1 hoo hoo  345 Oct 30 21:23 example-flac-16-44-stereo.out
+-rwxrwxrwx 1 hoo hoo  337 Oct 30 21:23 example-mp3-cbr-id3v23.out
+--- sha256 of copied outputs ---
+80348cb8458e366052283640dd3ae9ff9de155cc03caa7a41d05c2564be491de  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/corpus-alac-16-44-stereo.jsonl
+66ac1c39dd1fc811657fedb77fba1c0f7587ec8158fa0e15c5eb7d86e10c0b61  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/corpus-alac-long.jsonl
+a4a3069725ccccf9416850c7cd39a0c1eb08571cfaa39b7820842fc1c831c171  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/corpus-flac-16-44-stereo.jsonl
+3854b10c52d486cd6da18e2ff78db3d225f752e508ce69f7a64bd07ecff52d26  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/corpus-mp3-cbr-id3v23.jsonl
+90a21a53459726ff20fdafb324cac97a59e525be24472b13015643f024769514  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/example-alac-16-44-stereo.out
+d05906538752d71afb69a68f725ef904660fb7ed26cee38c7b6932e8959b6a94  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/example-alac-long.out
+ebe7254319fddc5d5fc03fac043c3f37744bb60672d1ffccfc689fa4d9071fdf  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/example-flac-16-44-stereo.out
+3ff0d167aa4071cc7f0e67252ca400db22cce5e063614a79bc7329bdffd6e134  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/static/example-mp3-cbr-id3v23.out
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-alac-16-44-stereo.err
+e4f37ec4732885c5f2d9673a801508c0565838404c9a0ec1937f0ffebf598278  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-alac-16-44-stereo.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-alac-long.err
+d4d6f1b3c0a8101da1efb570cf9e280c4cee4989575c6a4b039310d27363c09c  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-alac-long.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-flac-16-44-stereo.err
+c6351789b0ba780b094727c34892c21e72758707e5a5696f6f038a19fed36b8a  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-flac-16-44-stereo.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-mp3-cbr-id3v23.err
+f0d8c901b57691fc2a7411d99cf26eacb3997dc1f7f38f1bdf53c22bf23ab0b5  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/corpus-mp3-cbr-id3v23.jsonl
+90a21a53459726ff20fdafb324cac97a59e525be24472b13015643f024769514  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/example-alac-16-44-stereo.out
+d05906538752d71afb69a68f725ef904660fb7ed26cee38c7b6932e8959b6a94  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/example-alac-long.out
+ebe7254319fddc5d5fc03fac043c3f37744bb60672d1ffccfc689fa4d9071fdf  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/example-flac-16-44-stereo.out
+3ff0d167aa4071cc7f0e67252ca400db22cce5e063614a79bc7329bdffd6e134  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/example-mp3-cbr-id3v23.out
+c324971a2e018abbff2e5ec9556ce4c71370dee52477310328ecc27865ec8567  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/lddebug-mp3.err
+f0d8c901b57691fc2a7411d99cf26eacb3997dc1f7f38f1bdf53c22bf23ab0b5  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/lddebug-mp3.out
+374882f8c3da0f9ea21d103cf1b4cb7df7a5e82eda1bb101d41c5cdfaede6fb6  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/nolibpath.out
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/rpath-flac.err
+c6351789b0ba780b094727c34892c21e72758707e5a5696f6f038a19fed36b8a  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/shared/rpath-flac.jsonl
+6f878bfb2474306acf7afbed3fdad953bb56e1bf4a9a61ca824151ea7052a732  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/comparison.json
+--- workdir tree ---
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+/home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+/home/hoo/g4-172/consume-linux/bin/consumer-example-static
+/home/hoo/g4-172/consume-linux/bin/op-probe-static
+/home/hoo/g4-172/consume-linux/bin/seek-probe-static
+/home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+/home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+/home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+/home/hoo/g4-172/consume-linux/reference.json
+/home/hoo/g4-172/consume-linux/src/consume_corpus.c
+/home/hoo/g4-172/consume-linux/src/external-consumer-example.c
+/home/hoo/g4-172/consume-linux/src/op_probe.c
+/home/hoo/g4-172/consume-linux/src/seek_probe.c
+--- any repo build-tree reference in the consumer binaries? ---
+(scan done)
+--- source sha256 ---
+b8447960d9112228e8c40fe8b8311e4133cc7c3fda533a1bc098a4ec2acd34a7  /home/hoo/g4-172/consume-linux/src/consume_corpus.c
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/g4-172/consume-linux/src/external-consumer-example.c
+9c760d952abc05ce188a01665033a040f3b2974063bb15704c2969381a4d01c4  /home/hoo/g4-172/consume-linux/src/op_probe.c
+4ce339849de57e7ecdc77b9be1445f193887826e2642f06e9884b29482792c8a  /home/hoo/g4-172/consume-linux/src/seek_probe.c
+--- reference.json in the workdir ---
+8113ff6e07b32db03de0f73c4c6cf39179b347913de6002a6ab2d4e4274026f8  /home/hoo/g4-172/consume-linux/reference.json

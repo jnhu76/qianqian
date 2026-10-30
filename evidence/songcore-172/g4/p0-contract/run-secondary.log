@@ -1,0 +1,65 @@
+
+########## D1 imported closure manifests: target.recipe_sha256 ##########
+-- /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake/manifest.json
+  schema=2 target.id=linux-x86_64 target.platform=linux target.arch=x86_64
+  target.target_os=linux target.cross_prefix=None target.recipe_sha256=79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d
+  recipe_sha256_matches_measured_windows_json=False
+  recipe_sha256_matches_measured_linux_json=True
+  exit=0
+-- /home/hoo/q172rc/closure/manifest.json
+  ABSENT
+-- /home/hoo/q172d2-verify/closure/manifest.json
+  ABSENT
+
+########## D2 measured recipe sha256 vs those manifests ##########
+79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d  native/ffmpeg/targets/linux-x86_64.json
+3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d  native/ffmpeg/targets/windows-x86_64.json
+exit=0
+
+########## D3 §2 equality tooling: who reads the xmake project version ##########
+ops/build-rc.ps1:156:foreach ($f in @("native\xmake.lua", "native\build\songcore.lua",
+ops/build-rc.ps1:285:       "$W/native/xmake.lua" "$W/native/README.md" \
+native/xmake.lua:2:set_version("0.1.0")
+exit(grep)=0
+-- tools/test_release.py context for songcore-v0.1.0 literal
+                         *(common if args is None else args), *map(str, tail)], repo,
+                        expected, message, env=env, label=label)
+        # Valid inputs cause each exact release-policy refusal; private changes are committed later.
+        wrong = common.copy(); wrong[3] = 'qianqian-v99.99.99'
+        checker('source', expected=2, message='POLICY_RED: R1 tag/workspace', label='E01', args=wrong)
+        old = (repo / 'CHANGELOG.md').read_bytes()
+        (repo / 'CHANGELOG.md').write_text('# no releases\n')
+        call(['git', 'add', 'CHANGELOG.md'], repo)
+        call(['git', '-c', 'user.name=Control', '-c', 'user.email=c@invalid', 'commit', '-qm', 'missing history'], repo)
+        args = common.copy(); args[5] = call(['git', 'rev-parse', 'HEAD'], repo)
+        checker('source', expected=2, message='POLICY_RED: R1 CHANGELOG', label='E02', args=args)
+        call(['git', 'reset', '--hard', sha], repo)
+        for bad in ('songcore-v0.1.0', 'qianqian-v01.1.0', '../bad'):
+            args = common.copy(); args[3] = bad
+            checker('source', expected=2, message='POLICY_RED: R1 invalid', label='E03', args=args)
+        (repo / 'QUICKSTART.md').write_text('dirty')
+        checker('source', expected=2, message='POLICY_RED: R2 dirty', label='E04-tracked')
+        call(['git', 'add', 'QUICKSTART.md'], repo)
+        checker('source', expected=2, message='POLICY_RED: R2 dirty', label='E04-staged')
+        call(['git', 'reset', '--hard', sha], repo)
+        (repo / 'unexpected-source').write_text('untracked')
+        checker('source', expected=2, message='POLICY_RED: R2 dirty', label='E05')
+        (repo / 'unexpected-source').unlink()
+        checker('source', label='source-baseline')
+        # Source checker must select --repo even under hook-exported Git context.
+        polluted = dict(os.environ, GIT_DIR=str(ROOT / '.git'), GIT_WORK_TREE=str(ROOT),
+exit=0
+
+########## D4 §8 V1 receipt shape (existing archive, read-only) ##########
+4eb91f481eadff7ecde7bc8bd183156eeebd6ed9af31256f7def8f9ee85adc01  /home/hoo/Source/qianqian/evidence/songcore-172/package/package-summary.json
+top_keys=artifact,artifact_bytes,artifact_sha256,audits,checks,container,ok,out_dir,package_root,project,script,source,started,version,version_status
+exit=0
+
+########## D5 contract §2/§4/§6/§8 exact lines of record (source-text citations) ##########
+99:version identity    manifest.songcore_version == tag == package directory
+100:                    name == Xmake project version (native/xmake.lua:2 pins
+exit=0
+260:optional shared form: linux target json `shared: true`, windows target json
+261:`shared: false, status: provisional` (S-TGT) — so this round windows ships
+exit=0
+########## DONE ##########

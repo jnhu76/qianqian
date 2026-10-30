@@ -1,0 +1,113 @@
+{
+  "stage_id": "g4-reviewer-b-abi-consumer",
+  "lane": "Reviewer B (ABI and consumers) — read-only review of the G4 owner decision packet",
+  "source_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "source_sha_evidence": "git rev-parse HEAD (Windows workspace, Git Bash) -> 69ba1ce05a2772f5aa077c6ece3365c40f6e0500; git status --porcelain -> only untracked evidence/songcore-172/** paths",
+  "input_sha": {
+    "native/include/songcore.h": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "docs/release/songcore-release-contract.md": "c26611f72bdbe510fb0baf1f8dd331f71fb12e52962df456ef81dda26b9559a4",
+    "native/xmake.lua": "b420fc6c792fafd434309c70dc1cc0f2b4cf69b4e8701d65b28d9cc752708e63",
+    "native/src/songcore_ffmpeg.c": "55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6",
+    "native/experiments/songcore-equivalence/reference.json": "8113ff6e07b32db03de0f73c4c6cf39179b347913de6002a6ab2d4e4274026f8",
+    "package/win include/songcore.h": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "package/linux include/songcore.h": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "package/win lib/libsongcore.a": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+    "package/linux lib/libsongcore.a": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+    "package/linux lib/shared/libsongcore.so": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+    "package/win zip": "5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3",
+    "package/linux tar.gz": "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+    "lane-c-windows-pe build/pe-consumer.exe": "3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d",
+    "fixtures": {
+      "mp3-cbr-id3v23.mp3": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
+      "flac-16-44-stereo.flac": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "alac-16-44-stereo.m4a": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3",
+      "alac-long.m4a": "2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c"
+    }
+  },
+  "target_toolchain": {
+    "windows_host": "real Windows 11 10.0.26300 x64, Git Bash MINGW64_NT-10.0-26300 (uname -a re-run this session); no gcc/ar/objdump/readelf/gh on this side",
+    "linux_side": "WSL2 Ubuntu-24.04, gcc 15.2.0-16ubuntu1, GNU binutils (nm/readelf), x86_64-w64-mingw32-gcc 13-win32 available for the Windows cross checks"
+  },
+  "argv": [
+    "git rev-parse HEAD; git status --porcelain",
+    "sha256sum native/include/songcore.h docs/release/songcore-release-contract.md native/xmake.lua native/src/songcore_ffmpeg.c native/experiments/songcore-equivalence/reference.json",
+    "sha256sum <both packaged include/songcore.h> <lane-c-windows-pe/build/pe-consumer.exe>",
+    "sha256sum <package win lib/libsongcore.a> <package linux lib/libsongcore.a> <package linux lib/shared/libsongcore.so> <package win zip> <package linux tar.gz>",
+    "sha256sum native/experiments/songcore-equivalence/fixtures/*",
+    "grep -n SONGCORE_API native/include/songcore.h; grep -c '^SONGCORE_API' native/include/songcore.h -> 15",
+    "grep -nE '^(uint32_t|song_status|void|int|const) .*\\);' native/include/songcore.h -> exit 1 (no non-API top-level function declaration)",
+    "(cd package/win/extract/<pkg> && sha256sum -c metadata/checksums.txt)  # 14 files / 13 entries, all OK",
+    "(cd package/linux/extract/<pkg> && sha256sum -c metadata/checksums.txt)  # 15 files / 14 entries, all OK",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../g4/reviewer-b/reviewer-b-probe.sh",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../g4/reviewer-b/reviewer-b-link.sh",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../g4/reviewer-b/reviewer-b-winlink.sh",
+    "./evidence/songcore-172/g4/reviewer-b/reviewer-b-all15.exe   (Windows, Git Bash)",
+    "./evidence/songcore-172/g4/lane-c-windows-pe/build/pe-consumer.exe --selftest   (Windows)",
+    "./evidence/songcore-172/g4/lane-c-windows-pe/build/pe-consumer.exe native/experiments/songcore-equivalence/fixtures/<4 fixtures>   (Windows)",
+    "grep -c MATCH evidence/songcore-172/g4/d1-out-handle/run.log -> 10; grep -c 'report(' d1_probe.c -> 11 occurrences = 1 definition + 10 call sites",
+    "sed/awk reads of docs/release/songcore-release-contract.md:130-147, 570-598, 855-881, 917-951",
+    "sed/awk reads of native/src/songcore_ffmpeg.c:822-880, 1109-1165, 1234-1245",
+    "read of evidence/songcore-172/g4/{consume-linux,lane-c-windows-pe,d1-out-handle,d3-readpcm-zero,p0-governance,release-policy,build-linux,build-windows}/stage.json and receipts"
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "checks_executed_this_session": {
+    "C1_15_entry_points_resolvable": {
+      "windows_static_archive": "15/15 PRESENT (x86_64-w64-mingw32-nm --defined-only -g, all ABI names present)",
+      "linux_static_archive": "15/15 PRESENT (nm --defined-only -g)",
+      "linux_shared_so": "exported dynsym global defined set == header 15-set, comm difference empty both ways; so_export_count=15",
+      "link_all_15_static_linux": "gcc ... libsongcore.a -lm -lpthread -> exit 0; runtime prints all15_addresses_ok abi=1 -> exit 0",
+      "link_all_15_shared_linux": "gcc ... -L lib/shared -lsongcore -> exit 0; runtime all15_addresses_ok abi=1 -> exit 0",
+      "link_all_15_windows": "no -lbcrypt -> exit 1 (3 undefined BCrypt* from random_seed.c.obj); with -lbcrypt -> exit 0",
+      "run_windows_pe_on_windows": "reviewer-b-all15.exe -> all15_addresses_ok abi=1 host=windows_pe, exit 0"
+    },
+    "C2_header_sha_vs_contract": "source and both packaged headers = cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 == docs/release/songcore-release-contract.md:135",
+    "C3_windows_pe_consumer_on_windows": "pe-consumer.exe (sha 3ec3c672..., same binary recorded in the lane) re-executed on this real Windows host: --selftest PASS; 4/4 fixtures RESULT=PASS with pcm_sha256 exactly equal to reference.json",
+    "C4_d1_d3_line_accuracy": "d1: header :216-220/:217/:218 and songcore_ffmpeg.c:822/:823-824/:825 confirmed; post-guard returns (103/104/112) all after the NULL store; only INVALID_ARGUMENT (:824) preserves the slot. d3: songcore_ffmpeg.c:1111 (!h), :1112 (!dst||!out_frames_produced), :1113 store, :1114 capacity guard confirmed; exactly two observable pre-store violating paths",
+    "C5_frozen_corpus_and_reference": "reference.json sha 8113ff6e... used by both consumer lanes; fixture shas and 4/4 PCM shas reproduced byte-exact on Windows this session; no substituted numbers found"
+  },
+  "evidence_paths": [
+    "evidence/songcore-172/g4/reviewer-b/reviewer-b-probe.sh",
+    "evidence/songcore-172/g4/reviewer-b/reviewer-b-link.sh",
+    "evidence/songcore-172/g4/reviewer-b/reviewer-b-winlink.sh",
+    "evidence/songcore-172/g4/reviewer-b/reviewer-b-all15.exe",
+    "evidence/songcore-172/g4/reviewer-b/stage.json"
+  ],
+  "evidence_sha256": [
+    "59cb688692f5e3c369b212dc4a8e1ad833e3733b39c8dc203079e1183849fb73",
+    "2a2e95759b7498d464be1726225006ea728643dbd26bbcac5b60fb514081df10",
+    "763c15116951822b5ae3fbba26bb426afac896ea35d4b9f9c2d6f958d9e90011",
+    "07f363d9d081255f7df1f73910b6af4a52b46f03de8e38509fbc340cd72b80d8",
+    "(this file)"
+  ],
+  "verdict": "REVISE",
+  "verdict_note": "All six checks the ask names were executed. The ABI/consumer substance holds: 15/15 entry points resolve and link in both packaged forms, the packaged header equals contract section 3, and the Windows PE consumer genuinely ran on a real Windows host (reproduced this session). Two accuracy defects must be fixed before the packet is used as an Owner decision input: (1) G2 CORE_RUNTIME windows is declared PASS although S-BIND 7.1 steps 12 (malformed/truncated) and the step-13 reopen arm were never executed on Windows and are not listed as not_run; (2) the ENVIRONMENT_BLOCKED narrative claims live GitHub release/tag state could not be read, which the packet's own p0-governance receipts contradict.",
+  "not_run": [
+    "Rebuilding the Linux or Windows library from source: not attempted here; the packaged bytes are hash-pinned and their sha256 values match the build-lane receipts, so the review used the packaged artifacts plus the existing lane receipts.",
+    "Executing the D1/D3 probes myself: not run. Their Linux execution receipts (d1-out-handle/run.log, d3-readpcm-zero/logs/run-force.log) were read and their numbers reconciled against the source; Windows runtime for D1/D3 remains NOT_RUN in those lanes and here.",
+    "G3 BINDING_RUNTIME: N/A (no binding ships in either package) and not executed.",
+    "E01–E18, O1–O4/B1–B4, package security T1–T5, docs-verify, lefthook, closure pin/recipe identity (V3/V7): not re-executed by this reviewer; read from the lane receipts only.",
+    "Creating a PR or any other GitHub mutation to test whether the environment could publish: deliberately not attempted (read-only lane; mutating action).",
+    "Re-running the Linux consumer binaries end to end: not run here; verified instead that (a) the packaged artifacts they used are byte-identical to the packaged bytes, and (b) the ABI surface they link against resolves (own link tests)."
+  ]
+}

@@ -1,0 +1,33 @@
+=== identities
+d8c8e688bc0e50d5d7b022b486cf29af0e905ffb1ca325387e1e57148bd8ca29  /home/hoo/qq329/win-l1-route/src/native/build/artifacts/libsongcore.a
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /home/hoo/q172rc/win/native/build/artifacts/libsongcore.a
+/home/hoo/qq329/win-l1-route/src/native/build/artifacts/libsongcore.a size=3309454
+/home/hoo/q172rc/win/native/build/artifacts/libsongcore.a size=3309294
+
+=== #329 closure manifest vs ours
+06e1a8d07c400bd43067c954e31ae9b347ba43dbfb5ab6265b78fa7f950736be  /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-xmake/manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172rc/win/native/build/ffmpeg-xmake/manifest.json
+
+=== member order / names
+267
+267
+member_name_lists=identical
+
+=== per-member sha256 comparison
+identical_members=266 differing_members=1
+-- differing member names:
+version.c.obj
+
+=== build-root literal census
+#329 abs-root hits: 0
+our  abs-root hits: 0
+our  '=.'-mapped rel hits sample:
+#329 mapped rel hits sample:
+
+=== first differing member: STT_FILE / FILE-symbol evidence
+member=version.c.obj
+-- #329 file symbols:
+-- ours file symbols:
+-- size delta of that member:
+/home/hoo/g4-cmp/a/version.c.obj 2011
+/home/hoo/g4-cmp/b/version.c.obj 1979

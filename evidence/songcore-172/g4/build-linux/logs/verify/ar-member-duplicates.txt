@@ -1,0 +1,9 @@
+aacdec.c.o
+cpu.c.o
+flacdec.c.o
+iamf.c.o
+mpegaudiodsp.c.o
+options.c.o
+pcm.c.o
+utils.c.o
+version.c.o

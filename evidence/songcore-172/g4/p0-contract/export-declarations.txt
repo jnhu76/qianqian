@@ -1,0 +1,15 @@
+65:SONGCORE_API uint32_t songcore_abi_version(void);
+112:SONGCORE_API song_status song_last_error(song_handle *handle, const song_error **out_error);
+220:SONGCORE_API song_status song_open(const song_io *io, song_handle **out_handle);
+229:SONGCORE_API song_status song_probe(song_handle *handle, song_info *out_info);
+233:SONGCORE_API song_status song_audio_stream_count(song_handle *handle, uint32_t *out_count);
+236:SONGCORE_API song_status song_audio_stream_info(song_handle *handle, uint32_t audio_index,
+250:SONGCORE_API song_status song_select_stream(song_handle *handle, uint32_t audio_index);
+291:SONGCORE_API song_status song_get_metadata(song_handle *handle, const song_metadata **out_meta);
+311:SONGCORE_API song_status song_get_metadata_count(song_handle *handle, uint32_t *out_count);
+312:SONGCORE_API song_status song_get_metadata_entry(song_handle *handle, uint32_t index,
+346:SONGCORE_API song_status song_get_artwork_count(song_handle *handle, uint32_t *out_count);
+347:SONGCORE_API song_status song_get_artwork_item(song_handle *handle, uint32_t index,
+372:SONGCORE_API song_status song_read_pcm(song_handle *handle, float *dst,
+404:SONGCORE_API song_status song_seek(song_handle *handle, int64_t requested_position_us,
+410:SONGCORE_API void song_close(song_handle *handle);

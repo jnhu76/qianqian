@@ -1,0 +1,43 @@
+{
+  "checks": {
+    "V1_files_rehash": true,
+    "V1_checksums_set": true,
+    "V1_files_set": true,
+    "V1_no_self_hash": true,
+    "V1_checksums_match_bytes": true,
+    "V2_header_sha": true,
+    "V3_pin_binding": true,
+    "V4_symbols": true,
+    "V5_license_args": true,
+    "V6_reproducibility": true,
+    "V7_tools": true,
+    "O1_license_texts": true,
+    "O2_B3_notices": true,
+    "B4_component_licenses": true,
+    "L_relative_paths": true
+  },
+  "details": {
+    "V1_files_rehash": "files{} entries re-hash to the packaged bytes; bad=none",
+    "V1_checksums_set": "checksums.txt entries (14) == packaged files minus itself (14)",
+    "V1_files_set": "files{} keys (13) == checksums.txt entries minus manifest.json (13)",
+    "V1_no_self_hash": "checksums.txt does not hash itself; files{} hashes neither checksums.txt nor manifest.json",
+    "V1_checksums_match_bytes": "every checksums.txt entry equals the sha256 of the packaged bytes",
+    "V2_header_sha": "packaged header cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 == manifest == work root == contract section 3",
+    "V3_pin_binding": "pin.*/closure.* agree with the source-commit inputs; mismatch=none",
+    "V4_symbols": "public_symbols == symbols.txt == static defined == shared exported == header set (15 symbols)",
+    "V5_license_args": "no gpl/version3/nonfree/lib* configure arg; license flags false; forbidden=none",
+    "V6_reproducibility": "no reproducibility level is claimed beyond its receipt; values={'recipe': 'NOT_ESTABLISHED', 'semantic_abi': 'NOT_ESTABLISHED', 'byte': 'NOT_ESTABLISHED'}",
+    "V7_tools": "tools{} carries exact cc/ar/xmake versions; sdk_ndk disposition stated; target_identity.toolchain == recipe",
+    "O1_license_texts": "the four FFmpeg COPYING texts are staged, hashed and bound in license_files; bad=none",
+    "O2_B3_notices": "THIRD_PARTY_NOTICES.txt present and hashed in checksums.txt",
+    "B4_component_licenses": "LICENSE-MIT/LICENSE-APACHE byte-identical to the repo-root texts at the source commit; bad=none",
+    "L_relative_paths": "every staged path is relative and traversal-free"
+  },
+  "package_root": "songcore-v0.2.0-rc.1-linux-x86_64",
+  "packaged_files": 15,
+  "checksums_entries": 14,
+  "files_entries": 13,
+  "passed": 15,
+  "failed": 0,
+  "verdict": "PASS"
+}

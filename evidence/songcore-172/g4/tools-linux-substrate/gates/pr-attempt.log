@@ -1,0 +1,21 @@
+== gh --version
+gh version 2.46.0 (2025-12-13 Ubuntu 2.46.0-4)
+https://github.com/cli/cli/releases/tag/v2.46.0
+== gh auth status
+github.com
+  X Failed to log in to github.com account jnhu76 (/home/hoo/.config/gh/hosts.yml)
+  - Active account: true
+  - The token in /home/hoo/.config/gh/hosts.yml is invalid.
+  - To re-authenticate, run: gh auth login -h github.com
+  - To forget about this account, run: gh auth logout -h github.com -u jnhu76
+== gh api user
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+== gh pr create (dry attempt, base main)
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+gh_pr_create_rc=1
+== network facts
+lo               UNKNOWN        127.0.0.1/8 10.255.255.254/32 ::1/128 
+nameserver 223.5.5.5
+nameserver 8.8.8.8

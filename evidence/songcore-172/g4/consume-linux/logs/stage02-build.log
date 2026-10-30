@@ -1,0 +1,81 @@
+=== stage02 build 2026-10-30T13:15:26Z ===
+PKG=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64
+W=/home/hoo/g4-172/consume-linux
+gcc: gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+uname: Linux WuJie 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux
+--- sha256 of consumer sources ---
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/g4-172/consume-linux/src/external-consumer-example.c
+c5df4df7bce3e4888a27aa7d4070778ed9d6d04f605c265b47c86b9d56394fae  /home/hoo/g4-172/consume-linux/src/consume_corpus.c
+--- sha256 of package example (must equal copied one) ---
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/metadata/external-consumer-example.c
+--- sha256 of header used by -I ---
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h
+--- sha256 of archives used by the link lines ---
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+--- sha256 of fixtures ---
+0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3  /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c  /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2  /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058  /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+--- reference.json ---
+8113ff6e07b32db03de0f73c4c6cf39179b347913de6002a6ab2d4e4274026f8  /home/hoo/g4-172/consume-linux/reference.json
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/external-consumer-example.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consumer-example-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/external-consumer-example.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -Wl,-rpath,/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+[exit] 0
+--- bin listing ---
+total 4880
+-rwxr-xr-x 1 hoo hoo   26240 Oct 30 21:15 consume-corpus-shared
+-rwxr-xr-x 1 hoo hoo   30336 Oct 30 21:15 consume-corpus-shared-rpath
+-rwxr-xr-x 1 hoo hoo 2459296 Oct 30 21:15 consume-corpus-static
+-rwxr-xr-x 1 hoo hoo   17040 Oct 30 21:15 consumer-example-shared
+-rwxr-xr-x 1 hoo hoo 2450640 Oct 30 21:15 consumer-example-static
+--- sha256 of built consumers ---
+cb7784faa016ee36b77fe3653bc4956da0ee70a8afacf31ccc02a032091ccc76  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+a4341c67beb948f09ef047bb44c4c4c9da2871e1d0ff46043ab90cf7e85319eb  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+5db1fabd1445f97d28f316698f6f6da5039b56ba271a9f090afc661c79a5672e  /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+653fe400349d895fab7c5b3d14e24db860e3b5b9621894989605d61d5f25c5c2  /home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+50e8dd9787238ee0a2dc809649a7504c3a511e098b226b2d527314a0151942db  /home/hoo/g4-172/consume-linux/bin/consumer-example-static
+--- file() ---
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-shared:       ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=fcc24067d46f92294ad8515224a974a8d927757c, for GNU/Linux 3.2.0, not stripped
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=d9940450c9e9bf213affbaa6c9dc518c4e2aba2f, for GNU/Linux 3.2.0, not stripped
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-static:       ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=9d3520e43377a9e52ee063658fbe232217e5bfe4, for GNU/Linux 3.2.0, not stripped
+/home/hoo/g4-172/consume-linux/bin/consumer-example-shared:     ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=63a6a5993c78924a3f3457db93f19c09de7aab62, for GNU/Linux 3.2.0, not stripped
+/home/hoo/g4-172/consume-linux/bin/consumer-example-static:     ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=2dc4c0fa96d8b30dc741fcefefa2227b3bb0cf3d, for GNU/Linux 3.2.0, not stripped
+--- ldd static (expect: NO libsongcore line) ---
+	linux-vdso.so.1 (0x000079603c099000)
+	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x000079603bada000)
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x000079603b800000)
+	/lib64/ld-linux-x86-64.so.2 (0x000079603c09b000)
+	linux-vdso.so.1 (0x00007e97df325000)
+	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007e97df1ec000)
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007e97dea00000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007e97df327000)
+--- readelf -d static bin: NEEDED ---
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+--- readelf -d shared bin: NEEDED/RPATH/RUNPATH ---
+ 0x0000000000000001 (NEEDED)             Shared library: [libsongcore.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+--- readelf -d shared-rpath bin: NEEDED/RPATH/RUNPATH ---
+ 0x0000000000000001 (NEEDED)             Shared library: [libsongcore.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000001d (RUNPATH)            Library runpath: [/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared]
+--- undef song* symbols in static bin (must be none) ---
+(none)
+--- any /home/hoo/Source (dev tree) baked into binaries? (must be empty) ---
+(dev-tree scan done)

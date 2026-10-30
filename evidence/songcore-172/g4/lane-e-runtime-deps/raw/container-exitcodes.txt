@@ -1,0 +1,3 @@
+docker version (WSL client) | argv: docker version | exit=0 | output=/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/lane-e-runtime-deps/raw/docker-version.txt
+alpine smoke | argv: docker run --rm alpine:latest echo ok | exit=0 | output=/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/lane-e-runtime-deps/raw/docker-smoke.txt
+mount visibility /mnt/c stage | argv: docker run --rm -v /mnt/c/Users/fred1/lane-e-container:/work alpine:latest ls -l /work | exit=0 | output=/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/lane-e-runtime-deps/raw/docker-mount-test.txt

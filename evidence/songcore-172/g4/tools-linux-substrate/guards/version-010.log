@@ -1,0 +1,1 @@
+package-linux: FAIL: refusing version '0.1.0': songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag

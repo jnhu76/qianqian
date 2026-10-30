@@ -1,0 +1,15 @@
+import json
+p = '/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-entries/package-rc-out/default/stage/songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json'
+m = json.load(open(p))
+print('schema_version', m['schema_version'])
+print('songcore_version', m['songcore_version'])
+print('git_sha', m['git_sha'])
+print('sha256', m['sha256'], 'bytes', m['artifact_bytes'], 'members', m['archive_members'])
+print('files_entries', len(m['files']))
+print('closure_manifest_sha256', m['closure']['manifest_sha256'])
+print('tools_cc', m['tools']['cc'])
+print('tools_ar', m['tools']['ar'])
+print('tools_xmake', m['tools']['xmake'])
+print('repro', m['reproducibility']['recipe'], m['reproducibility']['semantic_abi'], m['reproducibility']['byte'])
+print('repro_evidence', m['reproducibility']['evidence'])
+print('license_files', list(m['license']['license_files'].keys()))

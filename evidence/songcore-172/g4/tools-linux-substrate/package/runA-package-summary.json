@@ -1,0 +1,39 @@
+{
+  "entry": "ops/package-linux.sh",
+  "argv": [
+    "--version",
+    "0.2.0-rc.1",
+    "--source-commit",
+    "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+    "--work-root",
+    "/home/hoo/g4-172/linux-root",
+    "--out-dir",
+    "/home/hoo/g4-172/packages/runA",
+    "--build-receipt",
+    "/home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json"
+  ],
+  "version": "0.2.0-rc.1",
+  "version_status": "caller-supplied; the next release number is owner-reserved (contract section 14 Q1); not a release",
+  "package_root": "songcore-v0.2.0-rc.1-linux-x86_64",
+  "source_commit": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "tar": "/home/hoo/g4-172/packages/runA/songcore-v0.2.0-rc.1-linux-x86_64.tar.gz",
+  "tar_sha256": "3dc50510dde1b0e99969e0027f1c3b2bc11a2b62d90af499dce99cb755681131",
+  "tar_bytes": 2575417,
+  "packaged_files": 15,
+  "checksums_entries": 14,
+  "files_entries": 13,
+  "artifact_provenance_attested": true,
+  "build_receipt_sha256": "1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832",
+  "artifact_static_sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+  "artifact_shared_sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+  "v_checks": {
+    "verdict": "PASS",
+    "passed": 15,
+    "failed": 0
+  },
+  "not_run": [
+    "runtime/device smoke of the packaged consumer example (no media input in this lane)",
+    "two-root reproducibility rebuild (contract section 12 levels stay NOT_ESTABLISHED)"
+  ],
+  "ok": true
+}

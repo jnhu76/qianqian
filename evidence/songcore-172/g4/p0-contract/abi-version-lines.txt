@@ -1,0 +1,3 @@
+14: * functions; a layout/semantic break requires ABI v2 (SONGCORE_ABI_VERSION
+62:#define SONGCORE_ABI_VERSION 1u
+64:/* Returns SONGCORE_ABI_VERSION. Callable at any time. */

@@ -1,0 +1,13 @@
+LICENSES/COPYING.GPLv2
+LICENSES/COPYING.GPLv3
+LICENSES/COPYING.LGPLv2.1
+LICENSES/COPYING.LGPLv3
+LICENSES/LICENSE-APACHE
+LICENSES/LICENSE-MIT
+LICENSES/THIRD_PARTY_NOTICES.txt
+README.md
+include/songcore.h
+lib/libsongcore.a
+metadata/external-consumer-example.c
+metadata/manifest.json
+metadata/symbols.txt

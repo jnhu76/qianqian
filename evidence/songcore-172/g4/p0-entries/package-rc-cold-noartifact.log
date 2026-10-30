@@ -1,0 +1,1 @@
+package-rc.ps1 [preflight]: artifact missing: C:\Users\fred1\AppData\Local\Temp\qn-p0-clean\native\build\artifacts\libsongcore.a (run ops/build-rc.ps1 first)

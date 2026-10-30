@@ -1,0 +1,53 @@
+== README-documented verification command: sha256sum -c (linux) ==
+LICENSES/COPYING.GPLv2: OK
+LICENSES/COPYING.GPLv3: OK
+LICENSES/COPYING.LGPLv2.1: OK
+LICENSES/COPYING.LGPLv3: OK
+LICENSES/LICENSE-APACHE: OK
+LICENSES/LICENSE-MIT: OK
+LICENSES/THIRD_PARTY_NOTICES.txt: OK
+README.md: OK
+include/songcore.h: OK
+lib/libsongcore.a: OK
+lib/shared/libsongcore.so: OK
+metadata/external-consumer-example.c: OK
+metadata/manifest.json: OK
+metadata/symbols.txt: OK
+linux_sha256sum_c_exit=0
+== README-documented verification command: sha256sum -c (windows) ==
+include/songcore.h: OK
+lib/libsongcore.a: OK
+LICENSES/COPYING.GPLv2: OK
+LICENSES/COPYING.GPLv3: OK
+LICENSES/COPYING.LGPLv2.1: OK
+LICENSES/COPYING.LGPLv3: OK
+LICENSES/LICENSE-APACHE: OK
+LICENSES/LICENSE-MIT: OK
+LICENSES/THIRD_PARTY_NOTICES.txt: OK
+metadata/external-consumer-example.c: OK
+metadata/manifest.json: OK
+metadata/symbols.txt: OK
+README.md: OK
+win_sha256sum_c_exit=0
+== manifest files{}/license_files{} vs actual bytes (size + sha) ==
+songcore-v0.0.0-preflight-linux-x86_64 files_entries 13 files_bad [] license_files_entries 4 license_files_bad [] manifest_self_listed False checksums_listed_in_files False
+songcore-v0.0.0-preflight-windows-x86_64 files_entries 12 files_bad [] license_files_entries 4 license_files_bad [] manifest_self_listed False checksums_listed_in_files False
+manifest_files_exit=0
+== files on disk not covered by files{} (excluding manifest.json) ==
+songcore-v0.0.0-preflight-linux-x86_64 uncovered ['metadata/checksums.txt']
+songcore-v0.0.0-preflight-windows-x86_64 uncovered ['metadata/checksums.txt']
+coverage_exit=0
+== license text line endings / BOM ==
+COPYING.GPLv2 bom False crlf False bytes 18092
+COPYING.GPLv3 bom False crlf False bytes 35147
+COPYING.LGPLv2.1 bom False crlf False bytes 26517
+COPYING.LGPLv3 bom False crlf False bytes 7651
+COPYING.GPLv2 bom False crlf False bytes 18092
+COPYING.GPLv3 bom False crlf False bytes 35147
+COPYING.LGPLv2.1 bom False crlf False bytes 26517
+COPYING.LGPLv3 bom False crlf False bytes 7651
+eol_exit=0
+
+----
+script=verify-package-integrity.sh
+exit_code=0

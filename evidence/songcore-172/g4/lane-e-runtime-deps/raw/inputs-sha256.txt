@@ -1,0 +1,10 @@
+== consumer sources and header sha256 ==
+9cc3a605afdb9f752e998b8bae1d30c8c44255bb0ddddcae606b9ffa1dcab335  /home/hoo/lane-e-runtime/work/src/abi-complete-consumer.c
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/lane-e-runtime/work/src/external-consumer-example.c
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/lane-e-runtime/work/src/songcore.h
+
+== media fixtures ==
+-rw-r--r-- 1 hoo hoo  8673 Oct 23 22:07 /home/hoo/Source/qianqian/apps/headless/tests/fixtures/mp3-cbr-cover.mp3
+-rw-r--r-- 1 hoo hoo 65323 Oct 23 22:07 /home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/mp3-cbr-id3v23.mp3
+feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058  /home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/mp3-cbr-id3v23.mp3
+51cdddd26d8e52e7923818271a85e5e5762a8e347a1dc9e5094040489aa4d9d1  /home/hoo/Source/qianqian/apps/headless/tests/fixtures/mp3-cbr-cover.mp3

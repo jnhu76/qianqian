@@ -1,0 +1,145 @@
+{
+  "checks": {
+    "T1_traversal": true,
+    "T2_duplicate": true,
+    "T3_links": true,
+    "T4_oversize": true,
+    "T5_toplevel": true,
+    "sha256_expected": true
+  },
+  "findings": [],
+  "identity": {
+    "bytes": 1448965,
+    "container": "zip",
+    "expected_root": "songcore-v0.2.0-rc.1-windows-x86_64",
+    "expected_sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415",
+    "file_members": 14,
+    "hardlink_members": 0,
+    "max_member_bytes": 3309710,
+    "member_count": 14,
+    "member_manifest_sha256": "48f5cf203e08427c30b2aedf85e93218de526f20873c1f4e3d7b453bf20114ac",
+    "path": "/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/package/songcore-v0.2.0-rc.1-windows-x86_64.zip",
+    "sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415",
+    "sha256_matches_expected": true,
+    "symlink_members": 0,
+    "top_level": {
+      "songcore-v0.2.0-rc.1-windows-x86_64": 14
+    },
+    "total_uncompressed_bytes": 3454926
+  },
+  "members": [
+    {
+      "compressed": 5695,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/include/songcore.h",
+      "sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+      "size": 18666
+    },
+    {
+      "compressed": 1396142,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/lib/libsongcore.a",
+      "sha256": "1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402",
+      "size": 3309710
+    },
+    {
+      "compressed": 6811,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv2",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "size": 18092
+    },
+    {
+      "compressed": 12119,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv3",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "compressed": 9341,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv2.1",
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+      "size": 26517
+    },
+    {
+      "compressed": 2617,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv3",
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+      "size": 7651
+    },
+    {
+      "compressed": 776,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt",
+      "sha256": "5d20798cca032a69275359fc5ebb2f0c8593897b00b28748532e9423519fa7c7",
+      "size": 1334
+    },
+    {
+      "compressed": 633,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-MIT",
+      "sha256": "e31ce84df1ec2f133ce740b58935fca19cf6bdafa59454d56678e99bcaa5ace0",
+      "size": 1067
+    },
+    {
+      "compressed": 3922,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "size": 10847
+    },
+    {
+      "compressed": 1599,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/README.md",
+      "sha256": "30e72fe3074134e79628962cbe70a2e7eb5195358f77dddfbd82073e49a1e9c1",
+      "size": 3483
+    },
+    {
+      "compressed": 4008,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json",
+      "sha256": "a9021122b2b8993ccbd8783f324ff96ea4d8c152860cc8b2f4fdea92e8cfb548",
+      "size": 15932
+    },
+    {
+      "compressed": 120,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/metadata/symbols.txt",
+      "sha256": "dd92bef58e43fb17bae0ba7df377d173fa9de494caa4325024d62a54db6f3806",
+      "size": 270
+    },
+    {
+      "compressed": 1770,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/metadata/external-consumer-example.c",
+      "sha256": "d14547312c12e07fdaf1e826ed2236d3694808a5ba233181c07c6dbb71ce1552",
+      "size": 5050
+    },
+    {
+      "compressed": 696,
+      "kind": "file",
+      "mode": "0o0",
+      "name": "songcore-v0.2.0-rc.1-windows-x86_64/metadata/checksums.txt",
+      "sha256": "e0ae077c9c0ae8bdcca30d53bea3f2e1023fb9363388ff2871c562ac102becea",
+      "size": 1160
+    }
+  ],
+  "schema": 1
+}

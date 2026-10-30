@@ -1,0 +1,25 @@
+== full dynamic defined-export census of the shared artifact ==
+15
+-- non-song exports (expected: none) --
+== archive member name occurrence census ==
+      4 version.c.o
+      3 utils.c.o
+      3 options.c.o
+      2 pcm.c.o
+      2 mpegaudiodsp.c.o
+      2 iamf.c.o
+      2 flacdec.c.o
+      2 cpu.c.o
+      2 aacdec.c.o
+      1 xtea.c.o
+      1 xiph.c.o
+      1 xga_font_data.c.o
+== toolchain lines ==
+Linux 6.18.54.1-microsoft-standard-WSL2
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+xmake v2.9.7+20250101, A cross-platform build utility based on Lua
+== artifact stat ==
+4066980 bytes  /home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a
+2288536 bytes  /home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so

@@ -1,0 +1,104 @@
+
+########## H1 extract RC zip to scratch and re-hash every entry ##########
+extracted=14
+exit=0
+exit=0
+extracted_file_count=14
+LICENSES/COPYING.GPLv2
+LICENSES/COPYING.GPLv3
+LICENSES/COPYING.LGPLv2.1
+LICENSES/COPYING.LGPLv3
+LICENSES/LICENSE-APACHE
+LICENSES/LICENSE-MIT
+LICENSES/THIRD_PARTY_NOTICES.txt
+README.md
+include/songcore.h
+lib/libsongcore.a
+metadata/checksums.txt
+metadata/external-consumer-example.c
+metadata/manifest.json
+metadata/symbols.txt
+
+########## H2 V1 re-hash: every checksums row against extracted bytes ##########
+exit=0
+checksums_rows=13 mismatch=0
+files_keys=12 mismatch=0
+files_keys == checksums_minus_manifest = True
+checksums == all_files_minus_self = True
+manifest_has_self_or_checksums = False
+
+########## H3 V2: packaged header vs source header ##########
+exit=0
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/q172-g4-p0/rc/songcore-v0.2.0-rc.1-windows-x86_64/include/songcore.h
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/Source/qianqian/native/include/songcore.h
+
+########## H4 V3: RC manifest pin vs pin.json ##########
+exit=0
+manifest.ffmpeg_commit      =bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+manifest.pin.ffmpeg_commit_sha=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+pin.json.ffmpeg_commit_sha  =bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+manifest.ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+manifest.pin.ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+pin.json.source_sha256      =d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+V3_chain_1=True
+V3_chain_2=True
+V3_tag=True
+V3_pin_sha=True
+V3_profile_sha=True
+
+########## H5 §2 version plumbing in ops/ ##########
+7:#   section 8  PROVENANCE_SCHEMA (metadata/manifest.json, schema_version 2,
+82:# NOT assumed from the version number: the written manifest is verified by a
+88:# nested ordered dicts — so the version assumption was removed and replaced
+107:    "song_select_stream", "songcore_abi_version"
+141:    version = $Version
+142:    version_status = "provisional (contract section 14 Q1 owner-reserved)"
+165:    Fail "preflight" "refusing version '0.1.0': songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag."
+168:    Fail "preflight" "version '$Version' is not a songcore-vMAJOR.MINOR.PATCH[-suffix] identity (contract section 2 VERSION_RULE form)."
+452:concrete version number is provisional -- the next release tag is
+466:    metadata/manifest.json              provenance, schema_version 2
+504:LGPL-2.1-or-later: the codec-base profile keeps gpl/version3/nonfree off and
+519:    $_ -like "--enable-gpl*" -or $_ -like "--enable-version3*" -or
+526:    schema_version = 2
+527:    songcore_version = $Version
+534:    ffmpeg_version = $pin.ffmpeg_version
+600:        version3_enabled = $false
+615:    notes = ("songcore_version $Version is PROVISIONAL: the concrete next release number is owner-reserved " +
+623:             "header updated to this package's version/target and the stale component-license paragraph " +
+684:# version, is what the run's correctness rests on.
+687:    ($rt.schema_version -eq 2) -and
+696:    ($rt.license.version3_enabled -eq $false) -and
+728:                              -not $manifest.license.version3_enabled -and -not $manifest.license.nonfree_enabled)
+exit=0
+-- xmake.lua handling in ops/build-rc.ps1 around line 150-160
+    $rc = $LASTEXITCODE
+    $text = ($out | ForEach-Object { $_.ToString() }) -join "`n"
+    Write-LFText (Join-Path $evDir ($stepName + ".log")) $text
+    if ($rc -ne 0) {
+        Fail $stepName ("wsl stage exited $rc; see evidence log " + $stepName + ".log")
+    }
+    $summary.steps[$stepName] = "ok (exit 0)"
+    return $out
+}
+
+# ---------------------------------------------------------------- preflight
+foreach ($f in @("native\xmake.lua", "native\build\songcore.lua",
+                 "native\build\ffmpeg.lua", "native\ffmpeg\targets\windows-x86_64.json",
+                 "native\ffmpeg\pin.json", "native\ffmpeg\profiles\codec-base.json",
+                 "native\include\songcore.h", "native\src\songcore_ffmpeg.c")) {
+    if (-not (Test-Path (Join-Path $ProjectRoot $f))) {
+        Fail "preflight" "missing worktree file: $f"
+    }
+}
+$gitHead = & git -C $ProjectRoot rev-parse HEAD 2>&1
+if ($LASTEXITCODE -ne 0) { Fail "preflight" "git rev-parse failed: $gitHead" }
+$gitBranch = & git -C $ProjectRoot rev-parse --abbrev-ref HEAD 2>&1
+$summary.git_branch = $gitBranch
+$summary.source.commit = $gitHead
+
+# Pin the source SHA by refusing uncommitted tracked changes under native/
+exit=0
+
+########## H6 does any release/package script read the xmake project version? ##########
+exit=0
+########## DONE ##########

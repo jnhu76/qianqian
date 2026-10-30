@@ -1,0 +1,31 @@
+captured_utc=2026-10-30T12:40:13Z
+native/build/:
+total 28
+drwxr-xr-x 1 fred1 197609     0 2026-10-30 20:31:07.330495700 +0800 .
+drwxr-xr-x 1 fred1 197609     0 2026-10-06 23:40:34.906533700 +0800 ..
+drwxr-xr-x 1 fred1 197609     0 2026-10-06 16:35:56.434024000 +0800 artifacts
+drwxr-xr-x 1 fred1 197609     0 2026-10-06 23:09:32.834522700 +0800 artifacts-mingw
+drwxr-xr-x 1 fred1 197609     0 2026-10-30 20:31:07.425356600 +0800 ffmpeg-xmake
+-rw-r--r-- 1 fred1 197609  7493 2026-10-30 15:03:29.803339700 +0800 ffmpeg.lua
+-rw-r--r-- 1 fred1 197609 10001 2026-10-30 15:03:29.803339700 +0800 songcore.lua
+
+native/build/artifacts/:
+total 6444
+drwxr-xr-x 1 fred1 197609       0 2026-10-06 16:35:56.434024000 +0800 .
+drwxr-xr-x 1 fred1 197609       0 2026-10-30 20:31:07.330495700 +0800 ..
+-rw-r--r-- 1 fred1 197609 3283570 2026-10-30 20:31:07.416101200 +0800 libqianqian_av.a
+-rw-r--r-- 1 fred1 197609 3309294 2026-10-30 20:31:07.375309500 +0800 libsongcore.a
+
+native/build/ffmpeg-xmake/:
+total 416
+drwxr-xr-x 1 fred1 197609      0 2026-10-30 20:31:07.425356600 +0800 .
+drwxr-xr-x 1 fred1 197609      0 2026-10-30 20:31:07.330495700 +0800 ..
+-rw-r--r-- 1 fred1 197609 419517 2026-10-30 20:31:07.429744800 +0800 manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14 *native/build/ffmpeg-xmake/manifest.json
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 *native/build/artifacts/libsongcore.a
+tracked_under_native_build:
+native/build/ffmpeg.lua
+native/build/songcore.lua
+git_check_ignore:
+native/.gitignore:1:/build/*	native/build/ffmpeg-xmake/manifest.json
+git_status_native:

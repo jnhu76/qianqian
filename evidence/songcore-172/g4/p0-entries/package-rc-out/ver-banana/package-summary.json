@@ -1,0 +1,23 @@
+{
+    "script":  "ops/package-rc.ps1",
+    "started":  "20261030-203220",
+    "version":  "banana",
+    "version_status":  "provisional (contract section 14 Q1 owner-reserved)",
+    "package_root":  "songcore-vbanana-windows-x86_64",
+    "project":  "C:\\Users\\fred1\\source\\qianqian",
+    "artifact":  "C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a",
+    "out_dir":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\ver-banana",
+    "source":  {
+
+               },
+    "audits":  {
+
+               },
+    "checks":  {
+                   "preflight":  "FAIL: version \u0027banana\u0027 is not a songcore-vMAJOR.MINOR.PATCH[-suffix] identity (contract section 2 VERSION_RULE form)."
+               },
+    "container":  {
+
+                  },
+    "ok":  false
+}

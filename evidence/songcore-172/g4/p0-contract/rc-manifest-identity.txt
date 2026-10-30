@@ -1,0 +1,16 @@
+schema_version=2 songcore_version=0.2.0-rc.1 songcore_abi=1
+abi_header_sha256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+target='windows-x86_64' (type str)
+toolchain='mingw-w64' (type str)
+target_identity.id=windows-x86_64 triple=x86_64-pc-windows-gnu recipe_sha256=3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+target_identity.toolchain={"family": "mingw-w64", "identity": "x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts"}
+pin={"ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa", "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746", "ffmpeg_tag": "n9.0.1", "pin_sha256": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85"}
+ffmpeg_commit=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 ffmpeg_profile_sha256=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+carried_duplicates_equal=True
+tools={"ar": "GNU ar (GNU Binutils) 2.45.90.20260125", "cc": "x86_64-w64-mingw32-gcc (GCC) 13-win32", "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"}
+sdk_ndk='not applicable this round -- windows-x86_64: mingw-w64 cross, no MSVC/SDK (target recipe toolchain identity, contract section 8)'
+runtime_dependencies={"ffmpeg_runtime": "none -- the closure ships in object form inside the archive (contract section 9)", "static": {"bcrypt": "REQUIRED -- audited: nm undefined imports BCryptCloseAlgorithmProvider,BCryptGenRandom,BCryptOpenAlgorithmProvider (contract section 9)", "link_line": "gcc -O2 -Iinclude consumer.c -Llib -lsongcore -lbcrypt -o consumer.exe (nothing else observed required for the static archive)", "mingw_w64_runtime": "REQUIRED -- msvcrt-family CRT + Win32 system imports; system-DLL allowlist base tools/check_release.py SYSTEM_DLLS (bcrypt, bcryptprimitives, msvcrt, ...)"}}
+files_count=12
+public_symbols=song_audio_stream_count,song_audio_stream_info,song_close,song_get_artwork_count,song_get_artwork_item,song_get_metadata,song_get_metadata_count,song_get_metadata_entry,song_last_error,song_open,song_probe,song_read_pcm,song_seek,song_select_stream,songcore_abi_version
+reproducibility={"byte": "NOT_ESTABLISHED", "evidence": "evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, member-order.verdict, member-diff.verdict, differing-members.txt, rootcause-strings.txt, archive-path-scan.txt, debug-info-sample.txt, songcore-c-object.txt, undefined-imports.txt, closure-identity.txt)", "recipe": "NOT_ESTABLISHED", "semantic_abi": "NOT_ESTABLISHED"}
+package_root_dirname=songcore-v0.2.0-rc.1-windows-x86_64

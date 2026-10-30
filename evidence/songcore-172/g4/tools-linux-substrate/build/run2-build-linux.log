@@ -1,0 +1,6 @@
+[build-linux] pin: branch=main commit=69ba1ce05a2772f5aa077c6ece3365c40f6e0500 work-root=/home/hoo/g4-172/linux-root
+[build-linux] source repo: /home/hoo/g4-172/wt-tools
+[build-linux] evidence:    /home/hoo/g4-172/evidence/build-linux/20261030T125149Z
+[build-linux] stage1: reusing work root at 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+[build-linux] stage2: reusing imported FFmpeg closure (identity revalidated)
+{"verdict":"FAIL","failed_stage":"build","exit":255}

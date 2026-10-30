@@ -1,0 +1,33 @@
+=== #329 root closure oracle headers
+Makefile
+checkasm_config_generated.h
+checkasm_header_config_generated.h
+config.h
+config_components.h
+doc
+ffbuild
+libavcodec
+libavdevice
+libavfilter
+-- /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-xmake/oracle/ffversion.h
+cat: /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-xmake/oracle/ffversion.h: No such file or directory
+-- /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-src/ffbuild/version.h
+cat: /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-src/ffbuild/version.h: No such file or directory
+
+=== our root closure oracle headers
+-- /home/hoo/q172rc/win/native/build/ffmpeg-xmake/oracle/ffversion.h
+cat: /home/hoo/q172rc/win/native/build/ffmpeg-xmake/oracle/ffversion.h: No such file or directory
+-- /home/hoo/q172rc/win/native/build/ffmpeg-src/ffbuild/version.h
+cat: /home/hoo/q172rc/win/native/build/ffmpeg-src/ffbuild/version.h: No such file or directory
+
+=== locate any ffversion.h under both roots
+/home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-xmake/oracle/libavutil/ffversion.h
+/home/hoo/q172rc/win/native/build/ffmpeg-xmake/oracle/libavutil/ffversion.h
+
+=== version.sh provenance decision (does .git exist in either ffmpeg-src?)
+-- /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-src
+ls: cannot access '/home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-src/.git': No such file or directory
+qianqian-v0.1.0-316-gb49b18c
+-- /home/hoo/q172rc/win/native/build/ffmpeg-src
+ls: cannot access '/home/hoo/q172rc/win/native/build/ffmpeg-src/.git': No such file or directory
+fatal: not a git repository (or any of the parent directories): .git

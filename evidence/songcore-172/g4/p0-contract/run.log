@@ -1,0 +1,179 @@
+
+########## A0 git identity of the measured tree ##########
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+exit=0
+?? .xmake/
+exit_git_status=0
+
+########## A1 sha256sum all contract inputs (WSL source tree) ##########
+exit=0
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  native/include/songcore.h
+224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85  native/ffmpeg/pin.json
+57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa  native/ffmpeg/profiles/codec-base.json
+79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d  native/ffmpeg/targets/linux-x86_64.json
+3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d  native/ffmpeg/targets/windows-x86_64.json
+b420fc6c792fafd434309c70dc1cc0f2b4cf69b4e8701d65b28d9cc752708e63  native/xmake.lua
+1f65f771f21b00030fdd83431458539d27100d9662143304d58e8342b89d36fa  native/build/songcore.lua
+c7ffd138aefbc528269fa1b462b7a6c1d80b933f527298bd51e0d7202829b184  native/build/ffmpeg.lua
+c26611f72bdbe510fb0baf1f8dd331f71fb12e52962df456ef81dda26b9559a4  docs/release/songcore-release-contract.md
+c1a601cff9f0f10e0568ecb7ad14954b5b9eb74ae7625c9462c1d6987372c5cb  docs/architecture/songcore-binding-architecture.md
+
+########## A2 same header through the Windows worktree mount ##########
+exit=0
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /mnt/c/Users/fred1/source/qianqian/native/include/songcore.h
+
+########## C1 contract 3 header sha256 equality ##########
+measured=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+contract=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+C1=MATCH
+
+########## C2a SONGCORE_ABI_VERSION define lines ##########
+exit=0
+14: * functions; a layout/semantic break requires ABI v2 (SONGCORE_ABI_VERSION
+62:#define SONGCORE_ABI_VERSION 1u
+64:/* Returns SONGCORE_ABI_VERSION. Callable at any time. */
+
+########## C2b SONGCORE_API top-level declarations (grep, line-numbered) ##########
+exit=0
+65:SONGCORE_API uint32_t songcore_abi_version(void);
+112:SONGCORE_API song_status song_last_error(song_handle *handle, const song_error **out_error);
+220:SONGCORE_API song_status song_open(const song_io *io, song_handle **out_handle);
+229:SONGCORE_API song_status song_probe(song_handle *handle, song_info *out_info);
+233:SONGCORE_API song_status song_audio_stream_count(song_handle *handle, uint32_t *out_count);
+236:SONGCORE_API song_status song_audio_stream_info(song_handle *handle, uint32_t audio_index,
+250:SONGCORE_API song_status song_select_stream(song_handle *handle, uint32_t audio_index);
+291:SONGCORE_API song_status song_get_metadata(song_handle *handle, const song_metadata **out_meta);
+311:SONGCORE_API song_status song_get_metadata_count(song_handle *handle, uint32_t *out_count);
+312:SONGCORE_API song_status song_get_metadata_entry(song_handle *handle, uint32_t index,
+346:SONGCORE_API song_status song_get_artwork_count(song_handle *handle, uint32_t *out_count);
+347:SONGCORE_API song_status song_get_artwork_item(song_handle *handle, uint32_t index,
+372:SONGCORE_API song_status song_read_pcm(song_handle *handle, float *dst,
+404:SONGCORE_API song_status song_seek(song_handle *handle, int64_t requested_position_us,
+410:SONGCORE_API void song_close(song_handle *handle);
+
+########## C2c grep declaration count ##########
+exit=0
+15
+
+########## C2d python parse of the export set (names + non-API top-level decls) ##########
+exit=0
+decl_count=15
+01 songcore_abi_version
+02 song_last_error
+03 song_open
+04 song_probe
+05 song_audio_stream_count
+06 song_audio_stream_info
+07 song_select_stream
+08 song_get_metadata
+09 song_get_metadata_count
+10 song_get_metadata_entry
+11 song_get_artwork_count
+12 song_get_artwork_item
+13 song_read_pcm
+14 song_seek
+15 song_close
+unique=15
+non_api_top_level_fn_decls=0
+
+########## C2e extracted names vs contract 3 list ##########
+exit=0
+exit=0
+contract_list_count=15
+header_list_count=15
+C2e=IDENTICAL_SETS
+
+########## C3 pin.json fields ##########
+exit=0
+ffmpeg_tag=n9.0.1
+ffmpeg_commit_sha=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+ffmpeg_version=9.0.1
+source_url=https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip
+source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+has_verification_block=True
+pin_keys=ffmpeg_commit_sha,ffmpeg_tag,ffmpeg_version,source_sha256,source_url,verification
+
+########## C4 profile codec-base.json fields ##########
+exit=0
+profile=codec-base
+component_base=everything-disabled
+libraries.enable=avformat,avcodec,swresample
+libraries.disable=avdevice,avfilter,swscale
+disable=programs,doc,debug,autodetect,x86asm,network,protocols,devices
+components.demuxer=aac,flac,mov,mp3,ogg,wav
+components.decoder=aac,alac,flac,mp3float,opus,vorbis,pcm_u8,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le
+components.parser=mpegaudio
+provenance_keys=lib:swresample
+
+########## C5 profile sha256 vs contract 5 ##########
+measured=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+contract=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+C5=MATCH
+
+########## C6 pin.json file sha256 vs contract 15 abbreviated record ##########
+measured=224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85
+contract_abbrev=224ad3d5...ff85
+C6=ABBREV_CONSISTENT
+pin_source_sha256_measured=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+pinned_zip_expected=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+
+########## C7 target recipe artifacts/status (contract 4 and 6) ##########
+exit=0
+file=native/ffmpeg/targets/linux-x86_64.json
+  id=linux-x86_64 platform=linux arch=x86_64
+  artifacts={"shared": true, "static": true, "wasm": false}
+  status=proven
+  toolchain.family=host-native
+  ffmpeg.target_os=linux cross=False cross_prefix=None
+file=native/ffmpeg/targets/windows-x86_64.json
+  id=windows-x86_64 platform=windows arch=x86_64
+  artifacts={"shared": false, "static": true, "wasm": false}
+  status=provisional
+  toolchain.family=mingw-w64
+  ffmpeg.target_os=mingw32 cross=True cross_prefix=x86_64-w64-mingw32-
+
+########## C8 windows recipe sha256 vs contract 15 abbreviated record ##########
+measured=3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+contract_abbrev=3ba0a9e6...8492d
+C8=ABBREV_CONSISTENT
+
+########## C9 xmake project/version lines ##########
+exit=0
+1:set_project("qianqian-native")
+2:set_version("0.1.0")
+
+########## C10 repo-wide songcore version strings (what 2 equality would bind) ##########
+exit=0
+1
+tools/test_release.py:67:        for bad in ('songcore-v0.1.0', 'qianqian-v01.1.0', '../bad'):
+
+########## C11 v0.1.0 historical tarball cross-check (3 and 5 'byte-identical since v0.1.0') ##########
+exit=0
+018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815  /home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz
+tar_exit=0
+songcore-v0.1.0-linux-x86_64
+exit=0
+top_entries=['songcore-v0.1.0-linux-x86_64']
+manifest_path=/home/hoo/q172-g4-p0/v010/songcore-v0.1.0-linux-x86_64/metadata/manifest.json
+schema_version=1
+songcore_version=0.1.0
+songcore_abi=1
+abi_header_sha256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+target=linux-x86_64
+platform=linux
+arch=x86_64
+toolchain=host-native
+ffmpeg_version=9.0.1
+ffmpeg_commit=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+ffmpeg_profile=codec-base
+ffmpeg_profile_sha256=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+archive_members=280
+
+########## C12 v0.1.0 shipped header bytes vs source header ##########
+shipped_header=/home/hoo/q172-g4-p0/v010/songcore-v0.1.0-linux-x86_64/include/songcore.h
+exit=0
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/q172-g4-p0/v010/songcore-v0.1.0-linux-x86_64/include/songcore.h
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/Source/qianqian/native/include/songcore.h
+
+########## DONE ##########

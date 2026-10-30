@@ -1,0 +1,23 @@
+{
+    "script":  "ops/package-rc.ps1",
+    "started":  "20261030-203459",
+    "version":  "0.2.0-rc.1",
+    "version_status":  "provisional (contract section 14 Q1 owner-reserved)",
+    "package_root":  "songcore-v0.2.0-rc.1-windows-x86_64",
+    "project":  "C:\\Users\\fred1\\AppData\\Local\\Temp\\qn-p0-clean",
+    "artifact":  "C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a",
+    "out_dir":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\cold",
+    "source":  {
+
+               },
+    "audits":  {
+
+               },
+    "checks":  {
+                   "preflight":  "FAIL: missing input: native\\build\\ffmpeg-xmake\\manifest.json"
+               },
+    "container":  {
+
+                  },
+    "ok":  false
+}

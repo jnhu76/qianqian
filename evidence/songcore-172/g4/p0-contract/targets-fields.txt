@@ -1,0 +1,12 @@
+file=native/ffmpeg/targets/linux-x86_64.json
+  id=linux-x86_64 platform=linux arch=x86_64
+  artifacts={"shared": true, "static": true, "wasm": false}
+  status=proven
+  toolchain.family=host-native
+  ffmpeg.target_os=linux cross=False cross_prefix=None
+file=native/ffmpeg/targets/windows-x86_64.json
+  id=windows-x86_64 platform=windows arch=x86_64
+  artifacts={"shared": false, "static": true, "wasm": false}
+  status=provisional
+  toolchain.family=mingw-w64
+  ffmpeg.target_os=mingw32 cross=True cross_prefix=x86_64-w64-mingw32-

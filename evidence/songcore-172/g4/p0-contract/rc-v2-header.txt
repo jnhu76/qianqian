@@ -1,0 +1,2 @@
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/q172-g4-p0/rc/songcore-v0.2.0-rc.1-windows-x86_64/include/songcore.h
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/Source/qianqian/native/include/songcore.h

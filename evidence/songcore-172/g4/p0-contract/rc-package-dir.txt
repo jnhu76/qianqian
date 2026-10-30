@@ -1,0 +1,13 @@
+total 1560
+drwxr-xr-x  4 hoo hoo    4096 Oct 30 15:02 .
+drwxr-xr-x 15 hoo hoo    4096 Oct 30 15:02 ..
+-rw-r--r--  1 hoo hoo     106 Oct 30 15:02 SHA256SUMS
+-rw-r--r--  1 hoo hoo    3660 Oct 30 15:02 package-summary.json
+-rw-r--r--  1 hoo hoo  101921 Oct 30 15:02 pr-b2-lefthook.log
+drwxr-xr-x  2 hoo hoo    4096 Oct 30 15:02 repro
+-rw-r--r--  1 hoo hoo 1448965 Oct 30 15:02 songcore-v0.2.0-rc.1-windows-x86_64.zip
+drwxr-xr-x  3 hoo hoo    4096 Oct 30 15:02 stage
+-rw-r--r--  1 hoo hoo    1207 Oct 30 15:02 stage-audit.log
+-rw-r--r--  1 hoo hoo    4300 Oct 30 15:02 stage-audit.sh
+-rw-r--r--  1 hoo hoo     159 Oct 30 15:02 test-release-direct-run.log
+-rw-r--r--  1 hoo hoo     323 Oct 30 15:02 v-checks.json

@@ -1,0 +1,26 @@
+NOTE: gcc not on PATH; using documented WinLibs host install
+GCC gcc.exe (MinGW-W64 x86_64-msvcrt-posix-seh, built by Brecht Sanders, r1) 16.2.0
+ARTIFACT sha256 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97
+HEADER   sha256 cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+COMPILE OK (link contract: libsongcore.a -lbcrypt)
+[PASS] abi-layout-frozen
+CORPUS mp3-cbr-id3v23.mp3 sha256 feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058
+CORPUS flac-16-44-stereo.flac sha256 d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2
+CORPUS alac-16-44-stereo.m4a sha256 0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3
+CORPUS alac-long.m4a sha256 2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c
+CONSTRUCTED truncated-100000.flac sha256 0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f (== frozen)
+[PASS] parity.mp3-cbr-id3v23
+[PASS] parity.flac-16-44-stereo
+[PASS] parity.alac-16-44-stereo
+[PASS] parity.alac-long
+[PASS] readfault-flac
+[PASS] seekfault-flac
+[PASS] truncated-flac
+[PASS] garbage-nomedia
+[PASS] garbage-empty
+[PASS] argcheck-stable-classes
+[PASS] closecheck-reopen-stable
+
+SUITE PASS cases=12 passed=12 failed=0
+SUMMARY C:\Users\fred1\source\qianqian\evidence\songcore-172\g4\p0-entries\csuite-results-override\20261030-203510\summary.json
+STDOUT-SUMMARY-BYTES ~802 (< 65536)

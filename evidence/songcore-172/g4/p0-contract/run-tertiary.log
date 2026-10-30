@@ -1,0 +1,57 @@
+
+########## E1 windows closure candidates ##########
+-- /home/hoo/q172rc/closure
+total 16
+drwxr-xr-x  4 hoo hoo 4096 Oct 30 20:30 .
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 04:20 ..
+drwxr-xr-x 17 hoo hoo 4096 Oct 29 02:41 ffmpeg-src
+drwxr-xr-x  3 hoo hoo 4096 Oct 29 02:42 ffmpeg-xmake
+-- /home/hoo/q172d2-verify/closure
+total 16
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 02:46 .
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 02:46 ..
+drwxr-xr-x 17 hoo hoo 4096 Oct 29 02:41 ffmpeg-src
+drwxr-xr-x  3 hoo hoo 4096 Oct 29 02:42 ffmpeg-xmake
+-- find manifest.json under those roots
+/home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json
+/home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json
+exit=0
+
+########## E2 any windows closure manifest: target.recipe_sha256 ##########
+-- /home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json
+  schema=2 target.id=windows-x86_64 target.target_os=mingw32 target.cross_prefix=x86_64-w64-mingw32-
+  recipe_sha256=3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+  eq_windows_json=True
+  exit=0
+-- /home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json
+  schema=2 target.id=windows-x86_64 target.target_os=mingw32 target.cross_prefix=x86_64-w64-mingw32-
+  recipe_sha256=3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+  eq_windows_json=True
+  exit=0
+
+########## E3 §8 V1 receipt 'checks' contents ##########
+version=0.2.0-rc.1 version_status=provisional (contract section 14 Q1 owner-reserved) ok=True
+checks_type=dict
+{
+  "B4_component_licenses": "PASS (LICENSE-MIT + LICENSE-APACHE byte-identical to repo-root texts)",
+  "O1_license_texts": "PASS (4 FFmpeg COPYING texts extracted from the pin-verified source zip; staged shas == extraction shas)",
+  "O2_B3_notices": "PASS (THIRD_PARTY_NOTICES.txt extracted from the sha-verified v0.1.0 asset; hashed in checksums.txt/files{} below)",
+  "R3_archive_target_identity": "PASS (objdump -f: 280 pe-x86-64, 0 elf)",
+  "R4_zip_exact_set": "PASS (14 entries == contract section 7 set; no duplicate/backslash/traversal/symlink)",
+  "R5_zip_hash_readback": "PASS (every entry re-hashed from the container against files{}/checksums)",
+  "V1_V7_O1_B4": "PASS (all machine checks; see v-checks.json)",
+  "V1_sets": "PASS (14 packaged files; checksums.txt 13 entries = all except itself, v0.1.0 shape; files{} 12 entries = checksums set minus manifest.json)",
+  "V2_header_identity": "PASS (packaged == source == frozen cf509a5c...78536)",
+  "V4_symbols_static_audit": "PASS (15/15 defined ' T song' symbols == contract section 3 set)",
+  "manifest_roundtrip": "PASS (semantic re-parse of the written manifest.json on 5.1.26100.9711)"
+}
+exit=0
+
+########## E4 contract V1 wording vs measured receipt ##########
+429:    entries; windows RC 14 package files / 13 checksum entries / 12
+431:    package-summary.json "V1_sets")
+893:                package-summary.json check "V1_sets" (14 packaged files;
+exit=0
+########## DONE ##########

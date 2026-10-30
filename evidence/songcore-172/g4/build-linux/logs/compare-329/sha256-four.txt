@@ -1,0 +1,4 @@
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a
+7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a  /home/hoo/qq329/lin-r1/src/native/build/artifacts/libsongcore.a
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/qq329/lin-r1/src/native/build/artifacts/shared/libsongcore.so

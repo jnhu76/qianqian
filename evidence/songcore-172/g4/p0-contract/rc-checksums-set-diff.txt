@@ -1,0 +1,10 @@
+--- /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-contract/rc-staged-files-minus-checksums.txt	2026-10-30 20:32:08.381064000 +0800
++++ /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-contract/rc-checksums-paths.txt	2026-10-30 20:32:08.372418700 +0800
+@@ -7,6 +7,7 @@
+ LICENSES/THIRD_PARTY_NOTICES.txt
+ README.md
+ include/songcore.h
++lib/libsongcore.a
+ metadata/external-consumer-example.c
+ metadata/manifest.json
+ metadata/symbols.txt

@@ -1,0 +1,12 @@
+schema_version 2
+songcore_version 0.2.0-rc.1
+git_sha 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+sha256 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 bytes 3309294 members 280
+files_entries 12
+closure_manifest_sha256 0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14
+tools_cc x86_64-w64-mingw32-gcc (GCC) 13-win32
+tools_ar GNU ar (GNU Binutils) 2.45.90.20260125
+tools_xmake xmake v2.9.7+20250101, A cross-platform build utility based on Lua
+repro NOT_ESTABLISHED NOT_ESTABLISHED NOT_ESTABLISHED
+repro_evidence evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, member-order.verdict, member-diff.verdict, differing-members.txt, rootcause-strings.txt, archive-path-scan.txt, debug-info-sample.txt, songcore-c-object.txt, undefined-imports.txt, closure-identity.txt)
+license_files ['COPYING.GPLv2', 'COPYING.GPLv3', 'COPYING.LGPLv2.1', 'COPYING.LGPLv3']

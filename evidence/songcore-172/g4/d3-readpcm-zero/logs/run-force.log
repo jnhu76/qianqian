@@ -1,0 +1,9 @@
+ABI_VERSION 1
+song_open status=0 handle=0x5d3c4524b200
+song_probe status=0 rate=44100 channels=2 codec=flac container=flac
+CONTROL valid-call status=0 produced=256
+PROBE NULL handle                  status=100 produced=0xffffffffffffffff (dec 18446744073709551615) capacity=1 -> VIOLATION
+PROBE NULL dst                     status=100 produced=0xffffffffffffffff (dec 18446744073709551615) capacity=1 -> VIOLATION
+PROBE capacity==0                  status=100 produced=0x0000000000000000 (dec 0) capacity=0 -> zeroed
+PROBE NULL dst + capacity==0       status=100 produced=0xffffffffffffffff (dec 18446744073709551615) capacity=0 -> VIOLATION
+VIOLATIONS 3

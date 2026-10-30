@@ -1,0 +1,11 @@
+version="0.2.0-rc.1"
+version_status="provisional (contract section 14 Q1 owner-reserved)"
+container={"previous_zip_sha256": "339c798d56f7de6a7e5f888f56e2fde83d75df0790364eea985edd5830f78400", "rebuilt": true, "zip": "C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package\\songcore-v0.2.0-rc.1-windows-x86_64.zip", "zip_sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415", "zip_bytes": 1448965, "entry_count": 14, "sha256sums_sidecar": "C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package\\SHA256SUMS"}
+out_dir="C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package"
+package_root="songcore-v0.2.0-rc.1-windows-x86_64"
+artifact="C:\\Users\\fred1\\source\\qianqian-172\\native\\build\\artifacts\\libsongcore.a"
+artifact_sha256="1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402"
+artifact_bytes=3309710
+source={"commit": "6c5268777cd2ab79faa4980f69c7e0c8c2cc33c3", "native_tracked_clean": true, "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"}
+project="C:\\Users\\fred1\\source\\qianqian-172"
+script="ops/package-rc.ps1"

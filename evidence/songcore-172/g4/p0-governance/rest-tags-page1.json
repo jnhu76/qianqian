@@ -1,0 +1,42 @@
+[
+  {
+    "name": "songcore-v0.1.0",
+    "zipball_url": "https://api.github.com/repos/jnhu76/qianqian/zipball/refs/tags/songcore-v0.1.0",
+    "tarball_url": "https://api.github.com/repos/jnhu76/qianqian/tarball/refs/tags/songcore-v0.1.0",
+    "commit": {
+      "sha": "522c16d283f024c01d1ef56fa96e587b286ca3b8",
+      "url": "https://api.github.com/repos/jnhu76/qianqian/commits/522c16d283f024c01d1ef56fa96e587b286ca3b8"
+    },
+    "node_id": "REF_kwDOUH78vLlyZWZzL3RhZ3Mvc29uZ2NvcmUtdjAuMS4w"
+  },
+  {
+    "name": "qianqian-v0.1.0",
+    "zipball_url": "https://api.github.com/repos/jnhu76/qianqian/zipball/refs/tags/qianqian-v0.1.0",
+    "tarball_url": "https://api.github.com/repos/jnhu76/qianqian/tarball/refs/tags/qianqian-v0.1.0",
+    "commit": {
+      "sha": "b7a526c77173f69ba8efd14897a3c57e1a806bd4",
+      "url": "https://api.github.com/repos/jnhu76/qianqian/commits/b7a526c77173f69ba8efd14897a3c57e1a806bd4"
+    },
+    "node_id": "REF_kwDOUH78vLlyZWZzL3RhZ3MvcWlhbnFpYW4tdjAuMS4w"
+  },
+  {
+    "name": "pre-rust-v2",
+    "zipball_url": "https://api.github.com/repos/jnhu76/qianqian/zipball/refs/tags/pre-rust-v2",
+    "tarball_url": "https://api.github.com/repos/jnhu76/qianqian/tarball/refs/tags/pre-rust-v2",
+    "commit": {
+      "sha": "f0ed39f543ba546a1e2eb9f75ed399bae73fbaad",
+      "url": "https://api.github.com/repos/jnhu76/qianqian/commits/f0ed39f543ba546a1e2eb9f75ed399bae73fbaad"
+    },
+    "node_id": "REF_kwDOUH78vLVyZWZzL3RhZ3MvcHJlLXJ1c3QtdjI"
+  },
+  {
+    "name": "playback-reference-v1",
+    "zipball_url": "https://api.github.com/repos/jnhu76/qianqian/zipball/refs/tags/playback-reference-v1",
+    "tarball_url": "https://api.github.com/repos/jnhu76/qianqian/tarball/refs/tags/playback-reference-v1",
+    "commit": {
+      "sha": "f0ed39f543ba546a1e2eb9f75ed399bae73fbaad",
+      "url": "https://api.github.com/repos/jnhu76/qianqian/commits/f0ed39f543ba546a1e2eb9f75ed399bae73fbaad"
+    },
+    "node_id": "REF_kwDOUH78vL9yZWZzL3RhZ3MvcGxheWJhY2stcmVmZXJlbmNlLXYx"
+  }
+]

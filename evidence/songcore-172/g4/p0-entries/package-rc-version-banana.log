@@ -1,0 +1,1 @@
+package-rc.ps1 [preflight]: version 'banana' is not a songcore-vMAJOR.MINOR.PATCH[-suffix] identity (contract section 2 VERSION_RULE form).

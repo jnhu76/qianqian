@@ -1,0 +1,52 @@
+=== [1] WSL-side sha256/size
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /home/hoo/q172rc/win/native/build/artifacts/libsongcore.a
+size=3309294
+
+=== [2] copy WSL artifact into /mnt/c lane dir for a local Windows re-hash
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/build-windows/libsongcore.a.wsl-copy
+
+=== [3] member census (objdump -f, per member)
+ar_members=280
+objdump_format_lines=0
+pe_x86_64=280
+elf=0
+foreign_non_pe=0
+
+=== [4] 15/15 ABI entry points defined in the archive (nm T)
+defined: songcore_abi_version
+defined: song_last_error
+defined: song_open
+defined: song_probe
+defined: song_audio_stream_count
+defined: song_audio_stream_info
+defined: song_select_stream
+defined: song_get_metadata
+defined: song_get_metadata_count
+defined: song_get_metadata_entry
+defined: song_get_artwork_count
+defined: song_get_artwork_item
+defined: song_read_pcm
+defined: song_seek
+defined: song_close
+expected_count=15 missing_count=0
+
+=== [5] bcrypt contract-9 undefined imports
+PRESENT: BCryptOpenAlgorithmProvider
+                 U BCryptOpenAlgorithmProvider
+PRESENT: BCryptGenRandom
+                 U BCryptGenRandom
+PRESENT: BCryptCloseAlgorithmProvider
+                 U BCryptCloseAlgorithmProvider
+-- all BCrypt* nm lines:
+BCryptCloseAlgorithmProvider
+BCryptGenRandom
+BCryptOpenAlgorithmProvider
+
+=== [6] closed closure manifest (Windows worktree consumption path)
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /mnt/c/Users/fred1/source/qianqian/native/build/ffmpeg-xmake/manifest.json
+size=419517
+manifest_identical_to_wsl_root=yes
+
+=== [7] Windows copy-back artifact
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /mnt/c/Users/fred1/source/qianqian/native/build/artifacts/libsongcore.a
+size=3309294

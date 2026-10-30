@@ -1,0 +1,23 @@
+== tool identities ==
+8d36f443da328c06ac7d291ecb41416e5351e0335bc67f0a998961cc8af527e0  /home/hoo/g4-172/laneB-tools/package-linux.sh
+/home/hoo/.local/bin/xmake
+[0m[1mxmake v2.9.7+20250101, A cross-platform build utility based on Lua[0m[0m
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+GNU ar (GNU Binutils for Ubuntu) 2.46
+== run packager ==
+[package-linux] version 0.0.0-preflight (caller-supplied; not a release)
+[package-linux] source  69ba1ce05a2772f5aa077c6ece3365c40f6e0500 @ /home/hoo/g4-172/linux-root
+[package-linux] stage1: binutils audits
+[package-linux] stage2: license texts from the pinned source zip (O1) + component texts (B4)
+[package-linux] stage3: staging the section 7 tree
+[package-linux] stage4: writing metadata/manifest.json (schema 2), symbols.txt, checksums.txt
+BOUND files=13 checksums=14
+[package-linux] stage5: V1-V7 + O1/O2/B4 re-verification of the written files
+V-CHECKS PASS (15/15)
+[package-linux] stage6: writing songcore-v0.0.0-preflight-linux-x86_64.tar.gz (deterministic)
+WROTE /home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz members=21 bytes=2575536
+[package-linux] stage7: re-opening the container, verifying every entry, then sha256sum -c
+CONTAINER VERIFIED files=15 entries=21
+[package-linux] stage7: sha256sum -c OK (14 entries) on the extracted container
+[package-linux] PASS: /home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz sha256=bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790 bytes=2575536
+PACKAGE_OK tar=/home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz sha256=bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790 bytes=2575536 files=15 checksums=14 files_entries=13 provenance_attested=true

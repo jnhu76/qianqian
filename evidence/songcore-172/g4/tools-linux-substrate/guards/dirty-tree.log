@@ -1,0 +1,16 @@
+[package-linux] version 0.2.0-rc.1 (caller-supplied; not a release)
+[package-linux] source  69ba1ce05a2772f5aa077c6ece3365c40f6e0500 @ /home/hoo/g4-172/linux-root
+[package-linux] stage1: binutils audits
+[package-linux] stage2: license texts from the pinned source zip (O1) + component texts (B4)
+[package-linux] stage3: staging the section 7 tree
+[package-linux] stage4: writing metadata/manifest.json (schema 2), symbols.txt, checksums.txt
+BOUND files=13 checksums=14
+[package-linux] stage5: V1-V7 + O1/O2/B4 re-verification of the written files
+V-CHECKS PASS (15/15)
+[package-linux] stage6: writing songcore-v0.2.0-rc.1-linux-x86_64.tar.gz (deterministic)
+WROTE /home/hoo/g4-172/packages/guard/songcore-v0.2.0-rc.1-linux-x86_64.tar.gz members=21 bytes=2575392
+[package-linux] stage7: re-opening the container, verifying every entry, then sha256sum -c
+CONTAINER VERIFIED files=15 entries=21
+[package-linux] stage7: sha256sum -c OK (14 entries) on the extracted container
+[package-linux] PASS: /home/hoo/g4-172/packages/guard/songcore-v0.2.0-rc.1-linux-x86_64.tar.gz sha256=7b980096a8f297082d1318c2cf035b5f6302c63b7fb10061b223dd5fddaff721 bytes=2575392
+PACKAGE_OK tar=/home/hoo/g4-172/packages/guard/songcore-v0.2.0-rc.1-linux-x86_64.tar.gz sha256=7b980096a8f297082d1318c2cf035b5f6302c63b7fb10061b223dd5fddaff721 bytes=2575392 files=15 checksums=14 files_entries=13 provenance_attested=false

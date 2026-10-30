@@ -1,0 +1,29 @@
+Third-party notices — SongCore v0.0.0-preflight (linux-x86_64)
+==============================================================
+
+FFmpeg
+  version : 9.0.1 (tag n9.0.1)
+  commit  : bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+  source  : https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip
+  sha256  : d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+  profile : codec-base (machine-derived minimal closure; sha256
+            57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa)
+  effective license: LGPL-2.1-or-later (FFmpeg default, all copylibs disabled)
+  external libraries that alter licensing: none
+
+  The FFmpeg closure is statically linked inside libsongcore.a /
+  libsongcore.so. Under LGPL-2.1-or-later static distribution, the object
+  files of the application may be provided together with the means
+  (source or relink instructions) to re-link a modified FFmpeg. This
+  package contains the complete FFmpeg license texts (LICENSES/COPYING.*)
+  and the closure identity above; the exact source tree is reconstructible
+  from the pinned URL + sha256.
+
+Qianqian
+  The Qianqian sources (songcore.h and the SongCore implementation) are
+  dual-licensed: MIT or Apache-2.0, at the recipient's option. The
+  complete license texts ship in this package as LICENSES/LICENSE-MIT
+  and LICENSES/LICENSE-APACHE and are sha256-bound in
+  metadata/checksums.txt. This is an engineering statement, not legal
+  advice; each release's license block is owner-reviewed before
+  publication (contract section 10).

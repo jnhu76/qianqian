@@ -1,0 +1,7 @@
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=6000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 264600 frames to EOF
+seek: landing_us=2972154 (target 3000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS

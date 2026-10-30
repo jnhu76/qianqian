@@ -1,0 +1,60 @@
+
+=== [static] consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 ===
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+[exit] 0
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [static] consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 ===
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+[exit] 0
+
+=== [static] consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac ===
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+[exit] 0
+probe: codec=flac container=flac rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=Flac Sixteen Fortyfour artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [static] consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac ===
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+[exit] 0
+
+=== [static] consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a ===
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+[exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 176400 frames to EOF
+seek: landing_us=1950476 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [static] consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a ===
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+[exit] 0
+
+=== [static] consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a ===
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+[exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=6000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 264600 frames to EOF
+seek: landing_us=2972154 (target 3000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [static] consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a ===
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+[exit] 0

@@ -1,0 +1,86 @@
+=== /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64 ===
+-- ar t count --
+ar_exit=0
+280
+-- distinct top prefixes --
+      4 version.c.o
+      3 utils.c.o
+      3 options.c.o
+      2 pcm.c.o
+      2 mpegaudiodsp.c.o
+      2 iamf.c.o
+      2 flacdec.c.o
+      2 cpu.c.o
+      2 aacdec.c.o
+      1 xtea.c.o
+      1 xiph.c.o
+      1 xga_font_data.c.o
+      1 wavdec.c.o
+      1 vpcc.c.o
+      1 vorbisdsp.c.o
+      1 vorbisdec.c.o
+      1 vorbiscomment.c.o
+      1 vorbis_parser.c.o
+      1 vorbis_data.c.o
+      1 vorbis.c.o
+-- ffmpeg-looking members (libav*/libsw*) --
+0
+-- sample --
+-- songcore members --
+songcore_ffmpeg.c.o
+-- member extension histogram --
+    280 o
+-- ar stderr --
+=== /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64 ===
+-- ar t count --
+ar_exit=0
+280
+-- distinct top prefixes --
+      4 version.c.obj
+      3 utils.c.obj
+      3 options.c.obj
+      2 pcm.c.obj
+      2 mpegaudiodsp.c.obj
+      2 iamf.c.obj
+      2 flacdec.c.obj
+      2 cpu.c.obj
+      2 aacdec.c.obj
+      1 xtea.c.obj
+      1 xiph.c.obj
+      1 xga_font_data.c.obj
+      1 wavdec.c.obj
+      1 vpcc.c.obj
+      1 vorbisdsp.c.obj
+      1 vorbisdec.c.obj
+      1 vorbiscomment.c.obj
+      1 vorbis_parser.c.obj
+      1 vorbis_data.c.obj
+      1 vorbis.c.obj
+-- ffmpeg-looking members (libav*/libsw*) --
+0
+-- sample --
+-- songcore members --
+songcore_ffmpeg.c.obj
+-- member extension histogram --
+    280 obj
+-- ar stderr --
+== checksums.txt self-consistency (linux) ==
+listed 14 actual_excl_checksums 14
+missing_from_checksums []
+extra_in_checksums []
+hash_mismatch []
+linux_checksum_exit=0
+== checksums.txt self-consistency (windows) ==
+listed 13 actual_excl_checksums 13
+missing_from_checksums []
+extra_in_checksums []
+hash_mismatch []
+win_checksum_exit=0
+== O4 forbidden configure args scan ==
+songcore-v0.0.0-preflight-linux-x86_64 nargs 37 forbidden [] license LGPL-2.1-or-later gpl False v3 False nonfree False external_libs []
+songcore-v0.0.0-preflight-windows-x86_64 nargs 39 forbidden [] license LGPL-2.1-or-later gpl False v3 False nonfree False external_libs []
+o4_scan_exit=0
+
+----
+script=audit-archives.sh
+exit_code=0

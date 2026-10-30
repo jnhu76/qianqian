@@ -1,0 +1,31 @@
+consumer_argv1=media/alac-long.m4a
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=8fbecba8fff290e5f8ff3fd0a04d67744d73a9c7cd0b13d8f59e7389eb5919a9
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/alac-long.m4a media_size=890903
+stage=open status=0
+stage=probe status=0 codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=24 duration_us=6000000 streams=1 selected=0
+stage=audio_stream_count status=0 count=1
+stream[0] status=0 stream_index=0 rate=44100 channels=2 mask=0x0000000000000003 bits=24 duration_us=6000000 codec=alac default=1
+stage=metadata status=0 title=(absent) artist=(absent) album=(absent) genre=(absent) date=(absent) track_number=0 has_track=0
+stage=metadata_count status=0 count=6
+meta[0] status=0 scope=0 key=major_brand value=M4A 
+meta[1] status=0 scope=0 key=minor_version value=512
+meta[2] status=0 scope=0 key=compatible_brands value=M4A isomiso2
+meta[3] status=0 scope=0 key=encoder value=Lavf62.3.100
+meta[4] status=0 scope=1 key=language value=und
+meta[5] status=0 scope=1 key=handler_name value=SoundHandler
+stage=artwork_count status=0 count=0
+stage=decode status=0 frames=264600 pcm_sha256=e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612 terminal=SONG_EOF bytes_hashed=2116800 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=3000000 landing_us=2972154
+stage=post_seek_decode status=0 frames=133528 pcm_sha256=3ab36acf594871a7b1187429771b738012b4026bb10a2311520bca119402bb57 terminal=SONG_EOF
+stage=last_error status=0 has_message=0
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS

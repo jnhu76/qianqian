@@ -1,0 +1,17 @@
+== head ==
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+== closure link ==
+symlinked ffmpeg-src -> /home/hoo/qianqian-172-linux/native/build/ffmpeg-src
+manifest sha256: d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525
+== xmake f (cwd=/home/hoo/Source/qianqian/native) ==
+configure_exit=0
+== xmake build songcore_static ==
+build_exit=0
+total 7920
+drwxr-xr-x 2 hoo hoo    4096 Oct 30 20:31 .
+drwxr-xr-x 7 hoo hoo    4096 Oct 30 20:31 ..
+-rw-r--r-- 1 hoo hoo 4032392 Oct 30 20:31 libqianqian_av.a
+-rw-r--r-- 1 hoo hoo 4066980 Oct 30 20:31 libsongcore.a
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/Source/qianqian/native/build/artifacts/libsongcore.a
+== songcore_ffmpeg.c sha256 ==
+55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6  /home/hoo/Source/qianqian/native/src/songcore_ffmpeg.c

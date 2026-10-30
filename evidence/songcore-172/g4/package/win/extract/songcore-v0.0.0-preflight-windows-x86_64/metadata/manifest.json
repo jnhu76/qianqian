@@ -1,0 +1,225 @@
+{
+    "schema_version":  2,
+    "songcore_version":  "0.0.0-preflight",
+    "songcore_abi":  1,
+    "abi_header_sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "target":  "windows-x86_64",
+    "platform":  "windows",
+    "arch":  "x86_64",
+    "toolchain":  "mingw-w64",
+    "ffmpeg_version":  "9.0.1",
+    "ffmpeg_commit":  "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "ffmpeg_source_sha256":  "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "ffmpeg_profile":  "codec-base",
+    "ffmpeg_profile_sha256":  "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+    "artifact":  "lib/libsongcore.a",
+    "sha256":  "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+    "artifact_bytes":  3309294,
+    "archive_members":  280,
+    "artifact_shared":  false,
+    "shared_sha256":  null,
+    "public_symbols":  [
+                           "song_audio_stream_count",
+                           "song_audio_stream_info",
+                           "song_close",
+                           "song_get_artwork_count",
+                           "song_get_artwork_item",
+                           "song_get_metadata",
+                           "song_get_metadata_count",
+                           "song_get_metadata_entry",
+                           "song_last_error",
+                           "song_open",
+                           "song_probe",
+                           "song_read_pcm",
+                           "song_seek",
+                           "song_select_stream",
+                           "songcore_abi_version"
+                       ],
+    "git_sha":  "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+    "target_identity":  {
+                            "id":  "windows-x86_64",
+                            "platform":  "windows",
+                            "arch":  "x86_64",
+                            "triple":  "x86_64-pc-windows-gnu",
+                            "target_os":  "mingw32",
+                            "cross_prefix":  "x86_64-w64-mingw32-",
+                            "toolchain":  {
+                                              "family":  "mingw-w64",
+                                              "identity":  "x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts"
+                                          },
+                            "recipe_sha256":  "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d"
+                        },
+    "tools":  {
+                  "cc":  "x86_64-w64-mingw32-gcc (GCC) 13-win32",
+                  "ar":  "GNU ar (GNU Binutils) 2.45.90.20260125",
+                  "xmake":  "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"
+              },
+    "sdk_ndk":  "not applicable this round -- windows-x86_64: mingw-w64 cross, no MSVC/SDK (target recipe toolchain identity, contract section 8)",
+    "source":  {
+                   "commit":  "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+                   "status":  "clean"
+               },
+    "pin":  {
+                "ffmpeg_tag":  "n9.0.1",
+                "ffmpeg_commit_sha":  "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+                "ffmpeg_source_sha256":  "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+                "pin_sha256":  "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85"
+            },
+    "closure":  {
+                    "manifest_sha256":  "0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14",
+                    "toolchain":  {
+                                      "system":  "linux",
+                                      "machine":  "x86_64",
+                                      "cc":  "x86_64-w64-mingw32-gcc",
+                                      "cc_ident":  "gcc 13-win32 (GCC)",
+                                      "arch":  "x86",
+                                      "target_os":  null
+                                  },
+                    "configure_args":  [
+                                           "--prefix=install",
+                                           "--disable-everything",
+                                           "--disable-programs",
+                                           "--disable-doc",
+                                           "--disable-debug",
+                                           "--disable-autodetect",
+                                           "--disable-x86asm",
+                                           "--disable-network",
+                                           "--disable-protocols",
+                                           "--disable-devices",
+                                           "--disable-avdevice",
+                                           "--disable-avfilter",
+                                           "--disable-swscale",
+                                           "--enable-avformat",
+                                           "--enable-avcodec",
+                                           "--enable-swresample",
+                                           "--enable-demuxer=aac",
+                                           "--enable-demuxer=flac",
+                                           "--enable-demuxer=mov",
+                                           "--enable-demuxer=mp3",
+                                           "--enable-demuxer=ogg",
+                                           "--enable-demuxer=wav",
+                                           "--enable-decoder=aac",
+                                           "--enable-decoder=alac",
+                                           "--enable-decoder=flac",
+                                           "--enable-decoder=mp3float",
+                                           "--enable-decoder=opus",
+                                           "--enable-decoder=pcm_f32le",
+                                           "--enable-decoder=pcm_f64le",
+                                           "--enable-decoder=pcm_s16le",
+                                           "--enable-decoder=pcm_s24le",
+                                           "--enable-decoder=pcm_s32le",
+                                           "--enable-decoder=pcm_u8",
+                                           "--enable-decoder=vorbis",
+                                           "--enable-parser=mpegaudio",
+                                           "--enable-cross-compile",
+                                           "--target-os=mingw32",
+                                           "--arch=x86_64",
+                                           "--cross-prefix=x86_64-w64-mingw32-"
+                                       ],
+                    "units":  {
+                                  "translation_units":  279,
+                                  "upstream_sources":  279,
+                                  "generated_sources":  0
+                              },
+                    "reference_archives":  {
+                                               "libavcodec/libavcodec.a":  {
+                                                                               "bytes":  1359188,
+                                                                               "sha256":  "6cdbb559ec4026fec46f15e10a4b16b288c77fc88696404180f99191a48f7718"
+                                                                           },
+                                               "libavformat/libavformat.a":  {
+                                                                                 "bytes":  729742,
+                                                                                 "sha256":  "8b5535c39bc5caaed324fdf3a42cdbc1735a5fdb30b3fa102b6cd68ca3036955"
+                                                                             },
+                                               "libavutil/libavutil.a":  {
+                                                                             "bytes":  1069474,
+                                                                             "sha256":  "82db6473b72b3e961b5e9b744887133e260cdf8e2c0415e57071c7eaa6575a36"
+                                                                         },
+                                               "libswresample/libswresample.a":  {
+                                                                                     "bytes":  123236,
+                                                                                     "sha256":  "40b250976071f4e5b3b9f20c164a9035d82125290fbbc81fe1281d4dde15353d"
+                                                                                 }
+                                           }
+                },
+    "files":  {
+                  "include/songcore.h":  {
+                                             "sha256":  "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+                                             "bytes":  18666
+                                         },
+                  "lib/libsongcore.a":  {
+                                            "sha256":  "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+                                            "bytes":  3309294
+                                        },
+                  "LICENSES/COPYING.GPLv2":  {
+                                                 "sha256":  "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+                                                 "bytes":  18092
+                                             },
+                  "LICENSES/COPYING.GPLv3":  {
+                                                 "sha256":  "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+                                                 "bytes":  35147
+                                             },
+                  "LICENSES/COPYING.LGPLv2.1":  {
+                                                    "sha256":  "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+                                                    "bytes":  26517
+                                                },
+                  "LICENSES/COPYING.LGPLv3":  {
+                                                  "sha256":  "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+                                                  "bytes":  7651
+                                              },
+                  "LICENSES/LICENSE-APACHE":  {
+                                                  "sha256":  "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+                                                  "bytes":  10847
+                                              },
+                  "LICENSES/LICENSE-MIT":  {
+                                               "sha256":  "e31ce84df1ec2f133ce740b58935fca19cf6bdafa59454d56678e99bcaa5ace0",
+                                               "bytes":  1067
+                                           },
+                  "LICENSES/THIRD_PARTY_NOTICES.txt":  {
+                                                           "sha256":  "9477759492876ab14059efe5fdad079eebabe04d00c570d1618997f3e424046e",
+                                                           "bytes":  1545
+                                                       },
+                  "metadata/external-consumer-example.c":  {
+                                                               "sha256":  "36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56",
+                                                               "bytes":  6281
+                                                           },
+                  "metadata/symbols.txt":  {
+                                               "sha256":  "dd92bef58e43fb17bae0ba7df377d173fa9de494caa4325024d62a54db6f3806",
+                                               "bytes":  270
+                                           },
+                  "README.md":  {
+                                    "sha256":  "f792f496cee21571d4fcc632aca392ca2e248fd6b8fed9c26010b9f5d57ed9df",
+                                    "bytes":  3488
+                                }
+              },
+    "runtime_dependencies":  {
+                                 "static":  {
+                                                "bcrypt":  "REQUIRED -- audited: nm undefined imports BCryptCloseAlgorithmProvider,BCryptGenRandom,BCryptOpenAlgorithmProvider (contract section 9)",
+                                                "mingw_w64_runtime":  "REQUIRED -- msvcrt-family CRT + Win32 system imports; system-DLL allowlist base tools/check_release.py SYSTEM_DLLS (bcrypt, bcryptprimitives, msvcrt, ...)",
+                                                "link_line":  "gcc -O2 -Iinclude consumer.c -Llib -lsongcore -lbcrypt -o consumer.exe (nothing else observed required for the static archive)"
+                                            },
+                                 "ffmpeg_runtime":  "none -- the closure ships in object form inside the archive (contract section 9)"
+                             },
+    "license":  {
+                    "ffmpeg_effective":  "LGPL-2.1-or-later",
+                    "gpl_enabled":  false,
+                    "version3_enabled":  false,
+                    "nonfree_enabled":  false,
+                    "external_libs":  [
+
+                                      ],
+                    "license_files":  {
+                                          "COPYING.GPLv2":  "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+                                          "COPYING.GPLv3":  "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+                                          "COPYING.LGPLv2.1":  "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+                                          "COPYING.LGPLv3":  "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+                                      }
+                },
+    "reproducibility":  {
+                            "recipe":  "NOT_ESTABLISHED",
+                            "semantic_abi":  "NOT_ESTABLISHED",
+                            "byte":  "NOT_ESTABLISHED",
+                            "evidence":  "evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, member-order.verdict, member-diff.verdict, differing-members.txt, rootcause-strings.txt, archive-path-scan.txt, debug-info-sample.txt, songcore-c-object.txt, undefined-imports.txt, closure-identity.txt)"
+                        },
+    "built_utc":  "2026-10-30T13:08:49Z",
+    "packer":  "release-substrate songcore-172 S2 windows package lane (ops/package-rc.ps1; pwsh 5.1.26100.9818; WSL2 Ubuntu-24.04 audits: x86_64-w64-mingw32 binutils, xmake v2.9.7; artifact built by x86_64-w64-mingw32-gcc 13-win32)",
+    "notes":  "songcore_version 0.0.0-preflight is PROVISIONAL: the concrete next release number is owner-reserved (contract section 14 Q1); this is a release-candidate verification archive, not a release (contract section 11: a produced archive is not a release), and must never be published under the songcore-v* namespace without owner ratification. files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; the set arithmetic contract section 8 V1 states since the Issue #330 differential disposition). LICENSES/THIRD_PARTY_NOTICES.txt was extracted from the sha256-verified published songcore-v0.1.0 asset (018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815) and then wording-refreshed per the Issue #330 P3 disposition: identity header updated to this package\u0027s version/target and the stale component-license paragraph replaced by the dual-license statement (LICENSE-MIT/LICENSE-APACHE ship alongside, B4); the FFmpeg section stays byte-identical to the v0.1.0 asset. The FFmpeg COPYING texts were extracted from the pinned n9.0.1 source zip re-verified against pin.json source_sha256 on this run (O1). Machine license checks verify presence, hash identity and configure-arg provenance only; they cannot certify legal sufficiency (contract section 10 limit)."
+}

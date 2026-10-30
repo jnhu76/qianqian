@@ -1,0 +1,35 @@
+=== occurrence-index comparison
+occurrences_a=281 occurrences_b=281
+identical_occurrences=276 differing_occurrences=5
+  idx=0 a= size=56924 sha=4d8e6043e376e768
+          b= size=56924 sha=2d8ae9a127f8ab33
+  idx=2 a=version.c.obj size=2015 sha=7b32ead6c445d4aa
+          b=version.c.obj size=1983 sha=ac9f362124a140c2
+  idx=16 a=version.c.obj size=2163 sha=fc248fd3d07b91ad
+          b=version.c.obj size=2099 sha=f34e87e10780d287
+  idx=109 a=version.c.obj size=2015 sha=fb3a914a97715177
+          b=version.c.obj size=1983 sha=8e90fcf3b89532d1
+  idx=180 a=version.c.obj size=2011 sha=7ff24fdbb976eb68
+          b=version.c.obj size=1979 sha=f5022832a40d6129
+name_sequence_equal = True
+
+=== version.c.obj forensics
+-rw-r--r-- 1 hoo hoo 2015 Oct 30 20:36 /home/hoo/g4-cmp/ver-329.o
+-rw-r--r-- 1 hoo hoo 1983 Oct 30 20:36 /home/hoo/g4-cmp/ver-our.o
+-- strings only in #329 member:
+FFmpeg version qianqian-v0.1.0-316-gb49b18c
+`@/4
+-- strings only in our member:
+FFmpeg version 9.0.1
+P@/4
+
+=== version unit source identity (closure vs reused closure)
+bb250eb79a9904a2cea08161d5a41f1315a6ad57d90b28cb7810ab09754fcc44  /home/hoo/qq329/win-l1-route/src/native/build/ffmpeg-src/libavutil/version.c
+bb250eb79a9904a2cea08161d5a41f1315a6ad57d90b28cb7810ab09754fcc44  /home/hoo/q172rc/win/native/build/ffmpeg-src/libavutil/version.c
+-- version_major/minor/micro
+#define LIBAVUTIL_VERSION_MAJOR  61
+#define LIBAVUTIL_VERSION_MINOR   1
+#define LIBAVUTIL_VERSION_MICRO 101
+#define LIBAVUTIL_VERSION_MAJOR  61
+#define LIBAVUTIL_VERSION_MINOR   1
+#define LIBAVUTIL_VERSION_MICRO 101

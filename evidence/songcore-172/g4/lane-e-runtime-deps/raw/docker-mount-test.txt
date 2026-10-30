@@ -1,0 +1,7 @@
+total 7076
+-rwxrwxrwx    1 1000     1000         15976 Oct 30 12:50 abi-complete-shared
+-rwxrwxrwx    1 1000     1000         16016 Oct 30 12:50 abi-sizeof-probe-shared
+-rwxrwxrwx    1 1000     1000         17040 Oct 30 12:50 external-consumer-shared
+-rwxrwxrwx    1 1000     1000       2450640 Oct 30 12:50 external-consumer-static
+-rwxrwxrwx    1 1000     1000       2288536 Oct 30 12:50 libsongcore.so
+-rwxrwxrwx    1 1000     1000       2446248 Oct 30 12:50 minimal-libs

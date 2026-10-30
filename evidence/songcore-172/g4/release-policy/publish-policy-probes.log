@@ -1,0 +1,5 @@
+A_songcore_tag | argv: check_release.py publish-policy --event push --ref refs/tags/songcore-v0.1.0 --tag songcore-v0.1.0 | exit=2 | output: POLICY_RED: R1 invalid product tag (SongCore tags are separate)
+B_existing_010 | argv: check_release.py publish-policy --event push --ref refs/tags/qianqian-v0.1.0 --tag qianqian-v0.1.0 --existing | exit=2 | output: POLICY_RED: R7 existing/historical release cannot be replaced
+C_dispatch | argv: check_release.py publish-policy --event workflow_dispatch --ref refs/tags/qianqian-v9.9.9 --tag qianqian-v9.9.9 | exit=2 | output: POLICY_RED: R7 publication requires actual tag push
+D_new_tag_ok | argv: check_release.py publish-policy --event push --ref refs/tags/qianqian-v9.9.9 --tag qianqian-v9.9.9 | exit=0 | output: PASS: publish-policy
+E_partial_tag | argv: check_release.py publish-policy --event push --ref refs/tags/songcore-v0.2.0-rc.1 --tag songcore-v0.2.0-rc.1 | exit=2 | output: POLICY_RED: R1 invalid product tag (SongCore tags are separate)

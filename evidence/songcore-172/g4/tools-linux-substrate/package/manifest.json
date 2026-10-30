@@ -1,0 +1,234 @@
+{
+  "schema_version": 2,
+  "songcore_version": "0.2.0-rc.1",
+  "songcore_abi": 1,
+  "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+  "target": "linux-x86_64",
+  "platform": "linux",
+  "arch": "x86_64",
+  "toolchain": "host-native",
+  "ffmpeg_version": "9.0.1",
+  "ffmpeg_commit": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+  "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+  "ffmpeg_profile": "codec-base",
+  "ffmpeg_profile_sha256": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+  "artifact": "lib/libsongcore.a",
+  "sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+  "artifact_bytes": 4066980,
+  "archive_members": 280,
+  "artifact_shared": "lib/shared/libsongcore.so",
+  "shared_sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+  "public_symbols": [
+    "song_audio_stream_count",
+    "song_audio_stream_info",
+    "song_close",
+    "song_get_artwork_count",
+    "song_get_artwork_item",
+    "song_get_metadata",
+    "song_get_metadata_count",
+    "song_get_metadata_entry",
+    "song_last_error",
+    "song_open",
+    "song_probe",
+    "song_read_pcm",
+    "song_seek",
+    "song_select_stream",
+    "songcore_abi_version"
+  ],
+  "git_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "target_identity": {
+    "id": "linux-x86_64",
+    "platform": "linux",
+    "arch": "x86_64",
+    "triple": "x86_64-unknown-linux-gnu",
+    "target_os": "linux",
+    "cross_prefix": null,
+    "toolchain": {
+      "family": "host-native",
+      "identity": "system gcc/clang; no SDK or cross prefix"
+    },
+    "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d"
+  },
+  "tools": {
+    "cc": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "ar": "GNU ar (GNU Binutils for Ubuntu) 2.46",
+    "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"
+  },
+  "sdk_ndk": "not applicable this round — linux-x86_64: host-native, no SDK/NDK (target recipe toolchain identity, contract section 8)",
+  "source": {
+    "commit": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+    "status": "clean"
+  },
+  "pin": {
+    "ffmpeg_tag": "n9.0.1",
+    "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "pin_sha256": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85"
+  },
+  "closure": {
+    "manifest_sha256": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+    "toolchain": {
+      "system": "linux",
+      "machine": "x86_64",
+      "cc": "gcc",
+      "cc_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+      "arch": "x86",
+      "target_os": null
+    },
+    "configure_args": [
+      "--prefix=install",
+      "--disable-everything",
+      "--disable-programs",
+      "--disable-doc",
+      "--disable-debug",
+      "--disable-autodetect",
+      "--disable-x86asm",
+      "--disable-network",
+      "--disable-protocols",
+      "--disable-devices",
+      "--disable-avdevice",
+      "--disable-avfilter",
+      "--disable-swscale",
+      "--enable-avformat",
+      "--enable-avcodec",
+      "--enable-swresample",
+      "--enable-demuxer=aac",
+      "--enable-demuxer=flac",
+      "--enable-demuxer=mov",
+      "--enable-demuxer=mp3",
+      "--enable-demuxer=ogg",
+      "--enable-demuxer=wav",
+      "--enable-decoder=aac",
+      "--enable-decoder=alac",
+      "--enable-decoder=flac",
+      "--enable-decoder=mp3float",
+      "--enable-decoder=opus",
+      "--enable-decoder=pcm_f32le",
+      "--enable-decoder=pcm_f64le",
+      "--enable-decoder=pcm_s16le",
+      "--enable-decoder=pcm_s24le",
+      "--enable-decoder=pcm_s32le",
+      "--enable-decoder=pcm_u8",
+      "--enable-decoder=vorbis",
+      "--enable-parser=mpegaudio",
+      "--target-os=linux",
+      "--arch=x86_64"
+    ],
+    "units": {
+      "translation_units": 279,
+      "upstream_sources": 279,
+      "generated_sources": 0
+    },
+    "reference_archives": {
+      "libavcodec/libavcodec.a": {
+        "bytes": 1524572,
+        "sha256": "93bcbece97113afedf31af6da548a9cf92fcfbc714b32a3b902de2671e22224c"
+      },
+      "libavformat/libavformat.a": {
+        "bytes": 927118,
+        "sha256": "fd16aee26a49a3aa6b96cbbc4b98e742c907c0fae176c67a348183de19ab601a"
+      },
+      "libavutil/libavutil.a": {
+        "bytes": 1273556,
+        "sha256": "e748a4e38f869ad216e14653cead6815c660d73ca61ccb5901535128c4445fcf"
+      },
+      "libswresample/libswresample.a": {
+        "bytes": 192586,
+        "sha256": "59ed64785e39442df67f96bf3ef5ca6e965bf6ccde31dcfeb0fa0190ed9e5144"
+      }
+    }
+  },
+  "files": {
+    "LICENSES/COPYING.GPLv2": {
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "bytes": 18092
+    },
+    "LICENSES/COPYING.GPLv3": {
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "bytes": 35147
+    },
+    "LICENSES/COPYING.LGPLv2.1": {
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+      "bytes": 26517
+    },
+    "LICENSES/COPYING.LGPLv3": {
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+      "bytes": 7651
+    },
+    "LICENSES/LICENSE-APACHE": {
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "bytes": 10847
+    },
+    "LICENSES/LICENSE-MIT": {
+      "sha256": "e31ce84df1ec2f133ce740b58935fca19cf6bdafa59454d56678e99bcaa5ace0",
+      "bytes": 1067
+    },
+    "LICENSES/THIRD_PARTY_NOTICES.txt": {
+      "sha256": "c56e98e226fdb7a508ea7344a80de198c2153c72a49b600507f21c4a2166e09d",
+      "bytes": 1531
+    },
+    "README.md": {
+      "sha256": "6526c882cd40e3dbc5db245ad3c649e6957d69a31ce11d8b6411bff33f446a44",
+      "bytes": 4095
+    },
+    "include/songcore.h": {
+      "sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+      "bytes": 18666
+    },
+    "lib/libsongcore.a": {
+      "sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+      "bytes": 4066980
+    },
+    "lib/shared/libsongcore.so": {
+      "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+      "bytes": 2288536
+    },
+    "metadata/external-consumer-example.c": {
+      "sha256": "36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56",
+      "bytes": 6281
+    },
+    "metadata/symbols.txt": {
+      "sha256": "dd92bef58e43fb17bae0ba7df377d173fa9de494caa4325024d62a54db6f3806",
+      "bytes": 270
+    }
+  },
+  "runtime_dependencies": {
+    "static": {
+      "libc": "REQUIRED (glibc) — consumer link-time requirement of the shipped archive (contract section 9)",
+      "libm_libpthread": "REQUIRED — native/build/songcore.lua add_syslinks(\"m\", \"pthread\"); the link line records it",
+      "link_line": "gcc -O2 -Iinclude consumer.c -Llib -lsongcore -lm -lpthread -o consumer",
+      "unresolved_symbols": "114 host symbols remain undefined after the merged closure resolves itself; no av*/sw* FFmpeg symbol is left unresolved"
+    },
+    "shared": {
+      "needed_libs": [
+        "libm.so.6",
+        "libc.so.6"
+      ],
+      "glibc_symbol_version_floor": "GLIBC_2.43 (readelf --dyn-syms; the supported distro family is an owner decision, contract section 14)",
+      "link_line": "gcc -O2 -Iinclude consumer.c -Llib/shared -lsongcore -lm -lpthread -Wl,-rpath,$ORIGIN -o consumer"
+    },
+    "ffmpeg_runtime": "none — the closure ships in object form inside the archive (contract section 9)"
+  },
+  "license": {
+    "ffmpeg_effective": "LGPL-2.1-or-later",
+    "gpl_enabled": false,
+    "version3_enabled": false,
+    "nonfree_enabled": false,
+    "external_libs": [],
+    "license_files": {
+      "COPYING.GPLv2": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "COPYING.GPLv3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "COPYING.LGPLv2.1": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+      "COPYING.LGPLv3": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    }
+  },
+  "reproducibility": {
+    "recipe": "NOT_ESTABLISHED",
+    "semantic_abi": "NOT_ESTABLISHED",
+    "byte": "NOT_ESTABLISHED",
+    "evidence": "none this pack: ops/package-linux.sh performs no two-root rebuild, so no reproducibility receipt exists and every level is reported NOT_ESTABLISHED (contract section 8 V6 / section 12). A positive level must name an existing receipt."
+  },
+  "built_utc": "2026-10-26T07:33:20Z",
+  "packer": "release-substrate songcore-172 G4 linux package lane (ops/package-linux.sh, deterministic tar container)",
+  "notes": "songcore_version 0.2.0-rc.1 was supplied by the packaging caller; the concrete next release number is owner-reserved (contract section 14 Q1), this is a release-substrate verification archive, not a release, and nothing here is published. Artifact provenance IS attested: --build-receipt (sha256 1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832) reports head 69ba1ce05a2772f5aa077c6ece3365c40f6e0500 and both artifact sha256 values were re-verified against the packaged bytes at packing time. files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; the set arithmetic contract section 8 V1 states after the Issue #330 D2 disposition). LICENSES/COPYING.* were extracted from the pinned n9.0.1 source zip re-verified against pin.json source_sha256 on this run (O1); LICENSES/LICENSE-MIT and LICENSES/LICENSE-APACHE are byte-identical to the repo-root texts at the source commit (B4); THIRD_PARTY_NOTICES.txt uses the Issue #330 P3 wording. Machine license checks verify presence, hash identity and configure-arg provenance only; they cannot certify legal sufficiency (contract section 10 limit)."
+}

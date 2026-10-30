@@ -1,0 +1,7 @@
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS

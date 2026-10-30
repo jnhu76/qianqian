@@ -1,0 +1,18 @@
+
+  [32m[1mvitepress[22m v1.6.4[39m
+
+- building client + server bundles...
+[31mx[39m Build failed in 14.68s
+[31m✖[0m building client + server bundles...
+[31mbuild error:[39m
+[31m[vite:esbuild-transpile] remove C:\Users\fred1\AppData\Local\Temp\esbuild-3acac89417814acb0da2e91bda1d9d326f3202425f6057ae6c9b235a54f38b10: Access is denied.[39m
+[31m[vite:esbuild-transpile] remove C:\Users\fred1\AppData\Local\Temp\esbuild-3acac89417814acb0da2e91bda1d9d326f3202425f6057ae6c9b235a54f38b10: Access is denied.[39m
+    at C:\Users\fred1\source\qianqian\website\node_modules\esbuild\lib\main.js:737:38
+    at responseCallbacks.<computed> (C:\Users\fred1\source\qianqian\website\node_modules\esbuild\lib\main.js:622:9)
+    at handleIncomingPacket (C:\Users\fred1\source\qianqian\website\node_modules\esbuild\lib\main.js:676:31)
+    at Socket.readFromStdout (C:\Users\fred1\source\qianqian\website\node_modules\esbuild\lib\main.js:600:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

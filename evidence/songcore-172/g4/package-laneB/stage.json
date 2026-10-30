@@ -1,0 +1,290 @@
+{
+  "stage_id": "g4-package-laneB",
+  "source_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "input_sha": {
+    "windows_static_artifact": {
+      "path": "/home/hoo/q172rc/win/native/build/artifacts/libsongcore.a (also C:/Users/fred1/source/qianqian/native/build/artifacts/libsongcore.a)",
+      "sha256": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+      "bytes": 3309294
+    },
+    "linux_static_artifact": {
+      "path": "/home/hoo/g4-172/linux-root/native/build/artifacts/libsongcore.a (ask named .../linux-root/src/native/...; that path does not exist, see notes)",
+      "sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+      "bytes": 4066980
+    },
+    "linux_shared_artifact": {
+      "path": "/home/hoo/g4-172/linux-root/native/build/artifacts/shared/libsongcore.so",
+      "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+      "bytes": 2288536
+    },
+    "windows_closure_manifest": {
+      "path": "native/build/ffmpeg-xmake/manifest.json (== /home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json)",
+      "sha256": "0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14"
+    },
+    "linux_closure_manifest": {
+      "path": "/home/hoo/g4-172/linux-root/native/build/ffmpeg-xmake/manifest.json",
+      "sha256": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525"
+    },
+    "pin_json": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+    "recipe_windows_x86_64": "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d",
+    "recipe_linux_x86_64": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+    "profile_codec_base": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+    "abi_header": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "pinned_ffmpeg_zip": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "linux_packager_ops_package_linux_sh": {
+      "path": "ops/package-linux.sh @ ops/songcore-linux-release-substrate 6df6c429cc6fb7b16cf566d8bb2e7d72e235ad74 (no PR opened: PR '-')",
+      "sha256": "8d36f443da328c06ac7d291ecb41416e5351e0335bc67f0a998961cc8af527e0"
+    },
+    "windows_packager_ops_package_rc_ps1": "19697431b729bef5e1b4bc08709e3052f08bed764652d429a63a0d57e8e1ba86",
+    "linux_build_receipt": {
+      "path": "/home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json",
+      "sha256": "1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832"
+    }
+  },
+  "target_toolchain": {
+    "windows-x86_64": {
+      "recipe": "native/ffmpeg/targets/windows-x86_64.json",
+      "recipe_sha256": "3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d",
+      "cc": "x86_64-w64-mingw32-gcc (GCC) 13-win32",
+      "ar": "GNU ar (GNU Binutils) 2.45.90.20260125",
+      "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua",
+      "triple": "x86_64-pc-windows-gnu",
+      "member_census": "280/280 pe-x86-64, 0 elf"
+    },
+    "linux-x86_64": {
+      "recipe": "native/ffmpeg/targets/linux-x86_64.json",
+      "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+      "cc": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+      "ar": "GNU ar (GNU Binutils for Ubuntu) 2.46",
+      "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua",
+      "triple": "x86_64-unknown-linux-gnu",
+      "member_census": "280/280 elf64-x86-64, 0 foreign"
+    }
+  },
+  "argv": [
+    "MSYS_NO_PATHCONV=1 powershell -ExecutionPolicy Bypass -File ops/package-rc.ps1 -ArtifactPath C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a -OutDir C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\package\\win -Version 0.0.0-preflight",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../package-laneB/run-linux-package.sh",
+    "  -> /home/hoo/g4-172/laneB-tools/package-linux.sh --version 0.0.0-preflight --source-commit 69ba1ce05a2772f5aa077c6ece3365c40f6e0500 --work-root /home/hoo/g4-172/linux-root --out-dir /home/hoo/g4-172/laneB-packages/linux --build-receipt /home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../package-laneB/verify.py",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../package-laneB/collect-receipts.sh",
+    "MSYS_NO_PATHCONV=1 powershell -ExecutionPolicy Bypass -Command Expand-Archive -LiteralPath <win zip> -DestinationPath <win/extract> -Force",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../package-laneB/extract-stages.sh",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/.../package-laneB/final-crosschecks.sh"
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "evidence_paths": [
+    "evidence/songcore-172/g4/package-laneB/package-linux.sh.branch-sha",
+    "evidence/songcore-172/g4/package-laneB/run-linux-package.sh",
+    "evidence/songcore-172/g4/package-laneB/linux-package.log",
+    "evidence/songcore-172/g4/package-laneB/verify.py",
+    "evidence/songcore-172/g4/package-laneB/verify-run.log",
+    "evidence/songcore-172/g4/package-laneB/laneB-verify.json",
+    "evidence/songcore-172/g4/package-laneB/laneB-verify.log",
+    "evidence/songcore-172/g4/package-laneB/collect-receipts.sh",
+    "evidence/songcore-172/g4/package-laneB/receipts.log",
+    "evidence/songcore-172/g4/package-laneB/extract-stages.sh",
+    "evidence/songcore-172/g4/package-laneB/extract-stages.log",
+    "evidence/songcore-172/g4/package-laneB/final-crosschecks.sh",
+    "evidence/songcore-172/g4/package-laneB/final-crosschecks.log",
+    "evidence/songcore-172/g4/package-laneB/win-package.stdout.log",
+    "evidence/songcore-172/g4/package-laneB/win-package.stderr.log",
+    "evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip",
+    "evidence/songcore-172/g4/package/win/package-summary.json",
+    "evidence/songcore-172/g4/package/win/v-checks.json",
+    "evidence/songcore-172/g4/package/win/SHA256SUMS",
+    "evidence/songcore-172/g4/package/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz",
+    "evidence/songcore-172/g4/package/linux/package-summary.json",
+    "evidence/songcore-172/g4/package/linux/v-checks.json",
+    "evidence/songcore-172/g4/package/linux/SHA256SUMS"
+  ],
+  "evidence_sha256": [
+    "8d36f443da328c06ac7d291ecb41416e5351e0335bc67f0a998961cc8af527e0",
+    "9e766d2d6c447ba0db70fc2202285baf9f5bf5ca8df5fc9f081c7f0795033101",
+    "695359b81f2ea0d51571a5d40c36de9e79257a420ae8405f253ce9d574e1c784",
+    "fa38fa4d809f77489197cab51f495bc04dc7b2df927424f67aa5c54b9e2a4cf0",
+    "ed6254ce42298d646bc26cc581176e532871a613bc134ed12abc27e8eb622b29",
+    "96043c023e2d8cdb153151029a3e3895ac45c0b5f0584b5d783d9b75462a1899",
+    "d291716f32ab7968497c77bcc732dda8a06d960382f2138719956c50233b72ed",
+    "1c4866e2856bbf2042c8be56bb62a1aec3d41ce69b67b17302cb2a7eed30bf61",
+    "53bc95e655712948654d8035eb7aa1b967e12450ab0f98bb1c1aa6197f6db288",
+    "7d0472aeb01eff54ac133a7cb96a81fd6f32854a60689b065455aa94ca9facbd",
+    "2b07dc0f4ce2db68952d2f84056ebf7a687ddf8b701e71e9286a0f23d0c2af33",
+    "7a06c3257fad54a55eeceaa3be0b9f27d52aa20f300865d291b817bcea1b1913",
+    "ca31fcb5848cde6acc91664278a71e4bd6de224795c2e9cf3df10d7af365e8e9",
+    "734ca63a00a79aa920c2918b76cd0646a67a5d2bf13c29f1a3677e32e7119ee6",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3",
+    "57d2c5e8ad511139e86ac43d714441d7074d955bc97c9849a409e5c4b4b16bc2",
+    "f806544256797f42abf508458ddbd70de77e924585e8bd3cf4a78470136fb8c7",
+    "98f2d67e5dc4e4604c74a80fe719f30e4f31f51a7b7b84157aa775fef5a094fa",
+    "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+    "505f575506bc19fbceb162938b1d1f814e88a9625ca63efe8156f4e6a685c9c2",
+    "b16f18facd06dcf1064d94f92552eeb2c0385478a82e462b95c5dc77f3d9aad0",
+    "7ba86f8ba83ef5d6000b5da48bcd2a502913aeb9c47ca278c9328181aa365af2"
+  ],
+  "evidence_file_entries": [
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/package-linux.sh.branch-sha",
+      "sha256": "8d36f443da328c06ac7d291ecb41416e5351e0335bc67f0a998961cc8af527e0",
+      "bytes": 60854
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/run-linux-package.sh",
+      "sha256": "9e766d2d6c447ba0db70fc2202285baf9f5bf5ca8df5fc9f081c7f0795033101",
+      "bytes": 1051
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/linux-package.log",
+      "sha256": "695359b81f2ea0d51571a5d40c36de9e79257a420ae8405f253ce9d574e1c784",
+      "bytes": 1772
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/verify.py",
+      "sha256": "fa38fa4d809f77489197cab51f495bc04dc7b2df927424f67aa5c54b9e2a4cf0",
+      "bytes": 24199
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/verify-run.log",
+      "sha256": "ed6254ce42298d646bc26cc581176e532871a613bc134ed12abc27e8eb622b29",
+      "bytes": 9896
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/laneB-verify.json",
+      "sha256": "96043c023e2d8cdb153151029a3e3895ac45c0b5f0584b5d783d9b75462a1899",
+      "bytes": 13406
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/laneB-verify.log",
+      "sha256": "d291716f32ab7968497c77bcc732dda8a06d960382f2138719956c50233b72ed",
+      "bytes": 9841
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/collect-receipts.sh",
+      "sha256": "1c4866e2856bbf2042c8be56bb62a1aec3d41ce69b67b17302cb2a7eed30bf61",
+      "bytes": 3157
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/receipts.log",
+      "sha256": "53bc95e655712948654d8035eb7aa1b967e12450ab0f98bb1c1aa6197f6db288",
+      "bytes": 9307
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/extract-stages.sh",
+      "sha256": "7d0472aeb01eff54ac133a7cb96a81fd6f32854a60689b065455aa94ca9facbd",
+      "bytes": 2374
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/extract-stages.log",
+      "sha256": "2b07dc0f4ce2db68952d2f84056ebf7a687ddf8b701e71e9286a0f23d0c2af33",
+      "bytes": 1936
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/final-crosschecks.sh",
+      "sha256": "7a06c3257fad54a55eeceaa3be0b9f27d52aa20f300865d291b817bcea1b1913",
+      "bytes": 1867
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/final-crosschecks.log",
+      "sha256": "ca31fcb5848cde6acc91664278a71e4bd6de224795c2e9cf3df10d7af365e8e9",
+      "bytes": 4985
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/win-package.stdout.log",
+      "sha256": "734ca63a00a79aa920c2918b76cd0646a67a5d2bf13c29f1a3677e32e7119ee6",
+      "bytes": 215
+    },
+    {
+      "path": "evidence/songcore-172/g4/package-laneB/win-package.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip",
+      "sha256": "5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3",
+      "bytes": 1449803
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/win/package-summary.json",
+      "sha256": "57d2c5e8ad511139e86ac43d714441d7074d955bc97c9849a409e5c4b4b16bc2",
+      "bytes": 3607
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/win/v-checks.json",
+      "sha256": "f806544256797f42abf508458ddbd70de77e924585e8bd3cf4a78470136fb8c7",
+      "bytes": 323
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/win/SHA256SUMS",
+      "sha256": "98f2d67e5dc4e4604c74a80fe719f30e4f31f51a7b7b84157aa775fef5a094fa",
+      "bytes": 111
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz",
+      "sha256": "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+      "bytes": 2575536
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/linux/package-summary.json",
+      "sha256": "505f575506bc19fbceb162938b1d1f814e88a9625ca63efe8156f4e6a685c9c2",
+      "bytes": 1552
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/linux/v-checks.json",
+      "sha256": "b16f18facd06dcf1064d94f92552eeb2c0385478a82e462b95c5dc77f3d9aad0",
+      "bytes": 2320
+    },
+    {
+      "path": "evidence/songcore-172/g4/package/linux/SHA256SUMS",
+      "sha256": "7ba86f8ba83ef5d6000b5da48bcd2a502913aeb9c47ca278c9328181aa365af2",
+      "bytes": 112
+    }
+  ],
+  "packages": {
+    "windows": {
+      "container": "evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip",
+      "sha256": "5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3",
+      "bytes": 1449803,
+      "packaged_files": 14,
+      "checksums_entries": 13,
+      "files_entries": 12,
+      "stage": "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\package\\win\\extract\\songcore-v0.0.0-preflight-windows-x86_64"
+    },
+    "linux": {
+      "container": "/home/hoo/g4-172/laneB-packages/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz",
+      "sha256": "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+      "bytes": 2575536,
+      "packaged_files": 15,
+      "checksums_entries": 14,
+      "files_entries": 13,
+      "stage": "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64"
+    }
+  },
+  "prior_archive_reference": {
+    "path": "evidence/songcore-172/package/songcore-v0.2.0-rc.1-windows-x86_64.zip",
+    "sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415",
+    "bytes": 1448965
+  },
+  "verdict": "FIX_REQUIRED",
+  "notes": [
+    "All \u00a78 V1-V7 gates PASS on both targets (independent re-verification, see laneB-verify.json).",
+    "The ask's linux artifact paths (.../linux-root/src/native/build/artifacts/...) do not exist; the artifacts actually live at /home/hoo/g4-172/linux-root/native/build/artifacts/ and their sha256 match the ask's declared values exactly.",
+    "\u00a72 version identity is NOT machine-checked by either packager: manifest.songcore_version=0.0.0-preflight, package dir matches that manifest value, but native/xmake.lua:2 pins 0.1.0 (and the tag leg has no local existence). Neither script refused the synthetic version.",
+    "Reproducibility: both manifests report recipe/semantic_abi/byte = NOT_ESTABLISHED; no L1/L2/L3 claim is made anywhere in either package (preflight only, never RELEASE)."
+  ],
+  "not_run": [
+    "runtime/device smoke of the packaged consumer example (no media input, no audio device in this lane)",
+    "two-root reproducibility rebuild (contract \u00a712 L1/L2/L3) \u2014 hence NOT_ESTABLISHED",
+    "Windows-host linker smoke of metadata/external-consumer-example.c (no mingw gcc on the Windows host; not attempted)",
+    "tag creation / GitHub Release / publication (forbidden by this lane)",
+    "rebuild of the Windows artifact (consumed the build lane's artifact; provenance = matching sha256 + build-lane receipts)"
+  ]
+}

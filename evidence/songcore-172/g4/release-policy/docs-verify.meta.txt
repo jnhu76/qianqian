@@ -1,0 +1,9 @@
+source_sha: 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+node: v24.19.0  npm: 11.17.0
+node_modules_present: yes
+lockfile_package_entries: 292
+node_modules_top_level_dirs: 148
+start_utc: 2026-10-30T12:30:41Z
+argv1: node scripts/verify.mjs   (cwd=/c/Users/fred1/source/qianqian/website) exit_code=0
+argv2: npx vitepress build       (cwd=/c/Users/fred1/source/qianqian/website) exit_code=1
+end_utc: 2026-10-30T12:30:59Z

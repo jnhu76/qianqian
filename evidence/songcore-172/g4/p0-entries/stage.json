@@ -1,0 +1,234 @@
+{
+  "stage_id": "g4-p0-entries",
+  "source_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "source_sha_note": "workspace HEAD (Windows C:\\Users\\fred1\\source\\qianqian and WSL /home/hoo/Source/qianqian both at this SHA, tracked tree clean)",
+  "input_sha": {
+    "native_include_songcore_h": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "windows_artifact_libsongcore_a_at_audit": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+    "windows_artifact_pre_existing_artifacts_mingw": "408d7d6ea4c9d1707283104366725c3deda47d5a4cebee5102c170fdf86d404b",
+    "windows_closure_manifest_native_build_ffmpeg_xmake": "0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14",
+    "linux_closure_manifest_qianqian_172_linux": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+    "linux_artifact_static": "409ef3da505f94d559a5fb5cb042fccd225d52238a00bd50722dd5f2669dd0f3",
+    "linux_artifact_shared": "5e9c56972bc063e0020750d562225dcb8a3ac3c10df3957688bb86ebd9a12843",
+    "ffmpeg_pinned_zip": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "songcore_v0_1_0_tarball": "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+    "package_zip_produced_from_current_artifact": "e0c488a931d6f7bb0003d918eeee92f2202523e18319e617f26d264ae547084b",
+    "package_zip_produced_from_stale_artifact": "c3983bfb0215d771b6343fed576d649a975662b1adcf90b85c52ed50e9ee1604",
+    "legacy_frozen_rc_zip_7b4d0615": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415"
+  },
+  "target_toolchain": {
+    "host": "Windows 10.0.26300 x64 + WSL2 Ubuntu-24.04",
+    "linux_build": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, xmake v2.9.7+20250101, GNU ar/objdump/readelf/nm",
+    "windows_songcore_build": "closure manifest toolchain cc_ident 'gcc 13-win32 (GCC)' (x86_64-w64-mingw32), GNU Binutils 2.45.90.20260125, xmake v2.9.7",
+    "windows_consumer_link": "C:\\Users\\fred1\\tools\\mingw64\\bin\\gcc.exe -> MinGW-W64 x86_64-msvcrt-posix-seh r1, GCC 16.2.0",
+    "powershell": "Windows PowerShell 5.1.26100.9818"
+  },
+  "argv": [
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-entries/run-build-linux-real.sh   (wrapper: snapshots linux closure, then bash /mnt/c/Users/fred1/source/qianqian/ops/build-linux.sh with default HOME=/home/hoo)",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-entries/measure-build-linux-real.sh   (second real run; wrapper exits with the entry's status)",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-entries/measure-build-linux-exit.sh   (HOME=/home/hoo/q172-g4-audit5, QIANQIAN_S3_SOURCE=/nonexistent/src, QIANQIAN_S3_MAIN=/nonexistent/main -> clone path)",
+    "MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu-24.04 -- bash -lc 'HOME=/home/hoo/q172-g4-audit PATH=/home/hoo/.local/bin:$PATH bash /mnt/c/Users/fred1/source/qianqian/ops/build-linux.sh'   (copied clone; produces the same clone-stage failure)",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -OutDir <lane>\\package-rc-out\\default",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -Version 0.1.0 -OutDir <lane>\\package-rc-out\\ver-0.1.0",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -Version banana -OutDir <lane>\\package-rc-out\\ver-banana",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -Version 1.2 -OutDir <lane>\\package-rc-out\\ver-1.2",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -ProjectRoot C:\\Users\\fred1\\AppData\\Local\\Temp\\qn-p0-clean -ArtifactPath C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a -OutDir <lane>\\package-rc-out\\cold",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -ProjectRoot C:\\Users\\fred1\\AppData\\Local\\Temp\\qn-p0-clean -OutDir <lane>\\package-rc-out\\cold-noartifact",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -ArtifactPath C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts-mingw\\libsongcore.a -OutDir <lane>\\package-rc-out\\stale-artifact",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/run-csuite.ps1 -ResultsRoot <lane>\\csuite-results",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/run-csuite.ps1 -ExpectedArtifactSha256 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 -ResultsRoot <lane>\\csuite-results-override",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/verify-external.ps1 -LogRoot <lane>\\external-accept",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/verify-external.ps1 -ZipPath <lane>\\package-rc-out\\default\\songcore-v0.2.0-rc.1-windows-x86_64.zip -LogRoot <lane>\\external-accept",
+    "MSYS_NO_PATHCONV=1 powershell -NoProfile -ExecutionPolicy Bypass -File ops/package-rc.ps1 -Version 0.1.0-rc.1 -OutDir <lane>\\package-rc-out\\ver-0.1.0-rc.1"
+  ],
+  "exit_codes": [
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    11,
+    0,
+    0,
+    0,
+    0
+  ],
+  "checks": [
+    {
+      "id": "ops/build-linux.sh#source_pin",
+      "status": "FIX_REQUIRED",
+      "detail": "BRANCH=songcore-172/pr-a-build-fixes / PINNED_HEAD=bf23516b5851174dc63fb5058997fa5478751713 are file constants (ops/build-linux.sh:41-42); no argv parsing (no positional args) and no env override for the commit; QIANQIAN_S3_SOURCE/MAIN only change the clone source path (:39-40)."
+    },
+    {
+      "id": "ops/build-linux.sh#run_at_H",
+      "status": "FIX_REQUIRED",
+      "detail": "real run exit 0, summary verdict PASS but head=bf23516 (ops/build-linux.sh summary 'head'), clone=reuse, closure=reuse; xmake build was a cache no-op ('build ok, spent 0.267s', 0 compile lines) and reported linux artifact sha 409ef3da..., i.e. nothing was built from 69ba1ce."
+    },
+    {
+      "id": "ops/build-linux.sh#clone_path",
+      "status": "FIX_REQUIRED",
+      "detail": "fresh-clone path always fails: mkdir $EV at :49 then do_clone's rm -rf \"$DST\" at :79 deletes $EV, and :80 redirects clone output into the now-missing $EV; measured exit 1, failed_stage=clone, on a clean HOME (twice)."
+    },
+    {
+      "id": "linux_package_entry",
+      "status": "FIX_REQUIRED",
+      "detail": "no Linux packaging entry under ops/ or tools/: ops/ holds only build-linux.sh, build-rc.ps1, package-rc.ps1, run-binding-gate.ps1, run-csuite.ps1, verify-external.ps1; tools/package-windows.sh is the Qianqian product entry (TAG SOURCE_SHA formal|dry-run, tools/check_release.py). The only §7/§8 Linux packager is evidence/songcore-172/linux/verify/package/package_linux.py (campaign evidence, VERSION 0.0.0-s3-verify, V010_TAR=/tmp/s3-v010 absent today, CLONE=/home/hoo/qianqian-172-linux)."
+    },
+    {
+      "id": "ops/package-rc.ps1#version",
+      "status": "READY",
+      "detail": "default -Version 0.2.0-rc.1 (:64); refuses exactly '0.1.0' (:164) and anything not matching ^[0-9]+\\.[0-9]+\\.[0-9]+([-+.0-9A-Za-z]+)?$ (:167); measured exit 1 for 0.1.0, banana, 1.2. The immutability guard is exact-match: '0.1.0-rc.1' is NOT refused (measured exit 0, produced songcore-v0.1.0-rc.1-windows-x86_64.zip sha256 7e843c9a68477bd575298993eca1b961b027eceba88a3793c111423d436cb264)."
+    },
+    {
+      "id": "ops/package-rc.ps1#pinned_paths",
+      "status": "READY",
+      "detail": "PinnedZip (:72) exists sha d16837dd==pin; V010Tarball (:73) exists sha 018e0cbd==frozen; ConsumerExample default (:94) exists (tracked); ArtifactPath (:92) existed (89d0428d); repro receipt dir (:729) exists tracked (16 .txt); native/build/ffmpeg-xmake/manifest.json (:175) is the only build-product input."
+    },
+    {
+      "id": "ops/package-rc.ps1#cold_tree",
+      "status": "READY",
+      "detail": "on a clean clone of 69ba1ce it fails closed before any container: exit 1 'missing input: native\\build\\ffmpeg-xmake\\manifest.json' (with -ArtifactPath supplied), or exit 1 'artifact missing ... run ops/build-rc.ps1 first' without it. By design the packager is not standalone."
+    },
+    {
+      "id": "ops/package-rc.ps1#end_to_end",
+      "status": "READY",
+      "detail": "exit 0 at 69ba1ce: zip e0c488a9..., 1,449,651 B, 14 entries, checksums 13 entries, files{} 12 (matches #330 D2), header cf509a5c, artifact 89d0428d, all V1-V7/O1/B4/R3-R5 PASS; external consumer PASS on the produced container."
+    },
+    {
+      "id": "ops/package-rc.ps1#artifact_attribution",
+      "status": "FIX_REQUIRED",
+      "detail": "no binding between the artifact bytes and $gitHead: packaging the Oct-6 artifacts-mingw/libsongcore.a (408d7d6e..., predates 69ba1ce by 24 days) succeeded (exit 0) and its manifest records git_sha=69ba1ce. native/ tracked-clean (:187-191) proves source cleanliness, not artifact provenance."
+    },
+    {
+      "id": "ops/build-rc.ps1#cache_semantics",
+      "status": "READY",
+      "detail": "code-read only. Persistent work root /home/hoo/q172rc survives: win/native/build/{artifacts,artifacts-mingw,ffmpeg-src,ffmpeg-xmake} and native/.xmake (:283-295 excludes), plus $ROOT/closure (:313-355). Refreshed every run: native/{src,include,ffmpeg,tools,scripts,experiments,xmake.lua,README.md,build/*.lua}; xmake build runs without -r (:374); the artifact+closure manifest are copied back into the worktree (:436-439). Cache reuse/incremental continuation is NOT §12 L1 re-acquisition: L1 requires a fresh checkout/extract at the locked commit + pinned zip + recipe rebuilt with documented commands; the primary root is persistent, and the -BuildDir second root is fresh (:561) but still copies a pre-imported closure instead of fetch+ffmpeg_import (:595-604), and its T1-T6 judgment is explicitly out of scope (:30-34, :667-670)."
+    },
+    {
+      "id": "ops/build-rc.ps1#execution",
+      "status": "NOT_RUN",
+      "detail": "not executed by this lane (it writes native/build/artifacts and the shared /home/hoo/q172rc work root, colliding with a concurrent lane). A concurrent lane's run at the same SHA is archived at evidence/songcore-172/build/rc/20261030-203045/summary.json (read only, not mine)."
+    },
+    {
+      "id": "ops/build-rc.ps1#stale_reference",
+      "status": "FIX_REQUIRED",
+      "detail": "ops/build-rc.ps1:344 tells the operator to run 'ops/verify-build.ps1', which does not exist in ops/."
+    },
+    {
+      "id": "ops/run-csuite.ps1#default_pin",
+      "status": "FIX_REQUIRED",
+      "detail": "default -ExpectedArtifactSha256=1f5f8cf8... (:52) matches no artifact in the tree; measured exit 11 'artifact sha mismatch' against the current 89d0428d (also != pre-existing 408d7d6e). run-binding-gate.ps1:49 carries the same stale constant."
+    },
+    {
+      "id": "ops/run-csuite.ps1#with_override",
+      "status": "READY",
+      "detail": "with -ExpectedArtifactSha256 89d0428d: exit 0, SUITE PASS cases=12 passed=12 failed=0 (compile via documented WinLibs gcc 16.2.0, corpus hashes frozen, truncated construction 0aa66168 matches)."
+    },
+    {
+      "id": "ops/verify-external.ps1#run",
+      "status": "READY",
+      "detail": "exit 0 on the legacy frozen container 7b4d0615 (sidecar pin) and exit 0 on today's container e0c488a9; consumer PASS, in-package checksums 13/13, imports {bcrypt,kernel32,msvcrt} inside the allowlist."
+    },
+    {
+      "id": "ops/verify-external.ps1#stale_defaults",
+      "status": "FIX_REQUIRED",
+      "detail": "defaults point into the archived worktree C:\\Users\\fred1\\source\\qianqian-172 (:50,:56) and the header (:40-46) still states 7b4d0615 is the single current container and 'package-rc.ps1 is not to be re-run' — contradicted by the replayable packager today (new container e0c488a9)."
+    },
+    {
+      "id": "tools/package-windows.sh#scope",
+      "status": "READY",
+      "detail": "product-side entry (usage TAG SOURCE_SHA formal|dry-run, :25-29; tools/check_release.py source/native/manifest/verify); it packages the Qianqian player, not SongCore, and needs QIANQIAN_RELEASE_NATIVE_DIR (:35). Not a SongCore Linux packaging route."
+    },
+    {
+      "id": "lefthook.yml#coverage",
+      "status": "FIX_REQUIRED",
+      "detail": "release-policy globs (:154-162) cover tools/*release*, tools/package-windows.sh, native/**, lefthook.yml etc. but not ops/**; grep over .github/workflows finds no job invoking ops/ — no automated gate exercises these build/package entries."
+    }
+  ],
+  "verdict": "FIX_REQUIRED",
+  "not_run": [
+    "ops/build-rc.ps1 execution by this lane (side effects on native/build/artifacts and the shared /home/hoo/q172rc work root); sibling-lane receipt read at evidence/songcore-172/build/rc/20261030-203045/summary.json",
+    "evidence/songcore-172/linux/verify/package/package_linux.py not executed (writes into the campaign clone; its V010_TAR=/tmp/s3-v010 is absent today)",
+    "no Linux packaging entry exists to execute (that absence is the FIX_REQUIRED finding)",
+    "no real audio-device or publishing step was attempted (out of scope for an entry pre-check)"
+  ],
+  "concurrency_note": "During this audit a sibling lane ran ops/build-rc.ps1 at 20:30:45-20:31 and created the untracked native/build/ffmpeg-xmake/manifest.json (0d0f7af9, mtime 2026-10-30 20:31:07) plus native/build/artifacts/libsongcore.a (89d0428d). At the start of this audit (20:29) native/build/ffmpeg-xmake did not exist (observed) and a clean clone at 69ba1ce has only native/build/{ffmpeg.lua,songcore.lua} (clean-clone-native-build.txt).",
+  "evidence_paths": [
+    "evidence/songcore-172/g4/p0-entries/stage.json",
+    "evidence/songcore-172/g4/p0-entries/inspect-wsl.log",
+    "evidence/songcore-172/g4/p0-entries/inspect-clone.log",
+    "evidence/songcore-172/g4/p0-entries/workspace-state-at-audit.txt",
+    "evidence/songcore-172/g4/p0-entries/clean-clone-native-build.txt",
+    "evidence/songcore-172/g4/p0-entries/build-linux-real.log",
+    "evidence/songcore-172/g4/p0-entries/build-linux-real-rc-stdout.log",
+    "evidence/songcore-172/g4/p0-entries/build-linux-real-run2.log",
+    "evidence/songcore-172/g4/p0-entries/build-linux-real-run2-rc.txt",
+    "evidence/songcore-172/g4/p0-entries/build-linux-run2-summary.json",
+    "evidence/songcore-172/g4/p0-entries/build-linux-run-summary.json",
+    "evidence/songcore-172/g4/p0-entries/build-linux-build-times.log",
+    "evidence/songcore-172/g4/p0-entries/build-linux-clone-fail.log",
+    "evidence/songcore-172/g4/p0-entries/build-linux-clone-fail-rc.txt",
+    "evidence/songcore-172/g4/p0-entries/build-linux-clone-fail-xtrace.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-default.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-out/default/package-summary.json",
+    "evidence/songcore-172/g4/p0-entries/package-rc-out/default/SHA256SUMS",
+    "evidence/songcore-172/g4/p0-entries/package-rc-cold.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-cold-noartifact.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-stale-artifact.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-out/stale-artifact/package-summary.json",
+    "evidence/songcore-172/g4/p0-entries/package-manifest-fields.log",
+    "evidence/songcore-172/g4/p0-entries/run-csuite.log",
+    "evidence/songcore-172/g4/p0-entries/csuite-results/20261030-203226/summary.json",
+    "evidence/songcore-172/g4/p0-entries/run-csuite-override.log",
+    "evidence/songcore-172/g4/p0-entries/csuite-results-override/20261030-203510/summary.json",
+    "evidence/songcore-172/g4/p0-entries/verify-external.log",
+    "evidence/songcore-172/g4/p0-entries/external-accept/20261030-203522-external-log.txt",
+    "evidence/songcore-172/g4/p0-entries/verify-external-newpkg.log",
+    "evidence/songcore-172/g4/p0-entries/external-accept/20261030-203537-external-log.txt",
+    "evidence/songcore-172/g4/p0-entries/build-rc-workroot.log",
+    "evidence/songcore-172/g4/p0-entries/package-rc-version-0.1.0-rc.1.log",
+    "evidence/songcore-172/g4/p0-entries/entry-inventory.txt"
+  ],
+  "evidence_sha256": [
+    "0f53d2b1d10b425dd3782d32df88fe8bad3e48198e1fbce9a00a7566ed25b1c6",
+    "5f4bcbcf1a983b5f16ba044710437d29bbd82c7196b0d31a5d443e9a8b232c2c",
+    "d7bc28098c97af9d370001b2981b9d10045a84abe8141beb82db6dc7415a7309",
+    "d68fbb6abc1f3241a0aa6e40082cff71c3c26cfafe9611c244904e3156b3aae3",
+    "a899649982d51dae851d03b996ff5d4a150fec7c80e330b7cb250f0586330eac",
+    "7006cfe9d0f1f47fa9e7c3825f74993e3eaef1fa94440ddc480883e79ff3c20c",
+    "b88a1d32708c0cdf2824d5e3117d213bdf015fb83a7a39b908c866e496df1d8a",
+    "7006cfe9d0f1f47fa9e7c3825f74993e3eaef1fa94440ddc480883e79ff3c20c",
+    "e8e977b34adbb9459c2f96190eb99d599bee324da2fd1dafe8e7927b7b646a38",
+    "088f19cb4d6959f27b878a40ebb6ba2167986fc3a6e116ba1cea7fef10ef258a",
+    "963aee45fcade242544109c74c5007b443228df80bf4071c4f0b7110c51d6d41",
+    "429916e370b289389c151904bc9b1451e8c5c4338a9164b5071095c6bb2658c5",
+    "1bd5129dd175656347c0b153566de0eb650d5a2c9831bf8fd63754c7c79ad1ba",
+    "1a6d54b17708e8b4785f016da0db3495dfa60d7ae2c0cd36119906ca081073ed",
+    "4849621ecc635235ffa84e2a109112c011ef8f2eefc1ba569f86052da218e919",
+    "85d115f5dfca440a7b74bd659620296bbba2e42657e30838d06ad80259e9afad",
+    "e76b9cb0a9343c8fa09d8ba7c590fe94b98203848062816e8913d9f9f74683eb",
+    "e0c7dc8877b62622202058a20eb524fcfc6cd9341195d17af39b508c4b9d2d98",
+    "461a34d081fdd23b8b12d13fb9ae18afdb201a715f312d7486282e82a2b47af3",
+    "99d323c587496cbf8324b42f844c40e7591b9463317cf74fa4044c36f219ff18",
+    "4f8dbed84501dfb23af8100afbaef1efefb2e470c6ce662eadee464cac85906a",
+    "cfa8ab55ad9d8378f43104ce249d3ac8518efe277d37f0e26e8b54497af61de8",
+    "4f6620eaa81b89960ae274d061efd7a7163a385b5f55d5c974509e77a11171e9",
+    "4db3475c5fbe738ab64fd2b94ba7b6b448c6421216d31ac7ff8cff472c105e27",
+    "2eda427a8482bee46fb4fe224ad1337efbd704f1bdcf0d17227d01ac91d2048f",
+    "33264174db638f4f628ee036ee036caae6996a2f90ac6c5cd415d2daf45b57fd",
+    "53d5028829d8065a3b44f8c62cd6f4bb1638ac2118dad4b960daa65229cdc227",
+    "3bc9a19e875ba10e5b6704a0601aafdcc9692f7f1630ff841c93b3c1cfab6cc7",
+    "aab73fc2dcf49c9a6a781eb6d462a4c9ca4354c0a1173da15134817079f2e989",
+    "81dc7bdfd290c65df0f7f70695b531c21be84af537ed4a081620d71fa821c2d1",
+    "9965db84f72ece74eb703bd853108ecc15d4bf7384864cd6b6caf17d00add7ac",
+    "303570e0dca73de5bdf2d24565ab9d5b3a1cd9c349a5f2dfa726ee938416364e",
+    "1dde46c62282d315397fdc0196037d153be95bec000a380b3e95158810552631"
+  ],
+  "evidence_sha256_note": "one hash per evidence_paths entry except stage.json itself (self-referential, omitted); missing entries are prefixed MISSING:"
+}

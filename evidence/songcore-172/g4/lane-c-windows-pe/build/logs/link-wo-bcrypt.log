@@ -1,0 +1,4 @@
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x24): undefined reference to `BCryptOpenAlgorithmProvider'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x3b): undefined reference to `BCryptGenRandom'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x49): undefined reference to `BCryptCloseAlgorithmProvider'
+collect2: error: ld returned 1 exit status

@@ -1,0 +1,1 @@
+usage: C:\Users\fred1\lane-c-win-pe\pe-consumer.exe <media-file> | --selftest | --sha256-file <path>

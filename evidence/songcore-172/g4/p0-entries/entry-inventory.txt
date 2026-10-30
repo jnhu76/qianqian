@@ -1,0 +1,52 @@
+# entry inventory at 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+## ops/
+build-linux.sh
+build-rc.ps1
+package-rc.ps1
+run-binding-gate.ps1
+run-csuite.ps1
+verify-external.ps1
+## tools/
+__pycache__
+audio-api-surface
+check_architecture_vocabulary.py
+check_commit_convention.py
+check_plugin_boundaries.py
+check_plugin_boundary_triggers.py
+check_release.py
+package-windows.sh
+publish-qianqian.py
+release-fixtures
+release-qianqian.sh
+test-quality
+test_release.py
+## container-creation grep in ops/ tools/ (tar/zip/Compress-Archive/ZipFile)
+ops/\package-rc.ps1:40:#   5. write the .zip container (System.IO.Compression, forward-slash entry
+ops/\package-rc.ps1:72:    [string]$PinnedZip = "/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip",
+ops/\package-rc.ps1:73:    [string]$V010Tarball = "/home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz",
+ops/\package-rc.ps1:137:$zipPath = Join-Path $OutDir "$pkgRoot.zip"
+ops/\package-rc.ps1:251:z = zipfile.ZipFile(zip_path)
+ops/\package-rc.ps1:282:tar -xzf "$V010" -C "$TMPD" "$V010_MEMBER"
+ops/\package-rc.ps1:819:Write-LFText (Join-Path $OutDir "SHA256SUMS") ("$zipSha  $pkgRoot.zip`n")
+ops/\package-rc.ps1:820:$summary.container.zip = $zipPath
+ops/\package-rc.ps1:821:$summary.container.zip_sha256 = $zipSha
+ops/\package-rc.ps1:822:$summary.container.zip_bytes = (Get-Item $zipPath).Length
+ops/\build-rc.ps1:289:tar cf - \
+ops/\build-rc.ps1:564:tar cf - \
+ops/\verify-external.ps1:50:    [string]$ZipPath = "C:\Users\fred1\source\qianqian-172\evidence\songcore-172\package\songcore-v0.2.0-rc.1-windows-x86_64.zip",
+tools/\package-windows.sh:8:#   dist/qianqian-vVERSION-windows-x86_64.zip
+tools/\package-windows.sh:33:ZIP="$DIST/$PKG_NAME.zip"
+tools/\package-windows.sh:110:( cd "$DIST" && zip -r -X -q "$PKG_NAME.zip" "$PKG_NAME" )
+tools/\package-windows.sh:111:( cd "$DIST" && sha256sum "$PKG_NAME.zip" > "$PKG_NAME.zip.sha256" )
+tools/\publish-qianqian.py:37:                        '--tag', args.tag, '--source', args.source, '--mode', 'formal', '--zip', str(args.zip)])
+tools/\publish-qianqian.py:38:        notes_file = args.zip.parent / 'release-notes.md'
+tools/\publish-qianqian.py:41:        subprocess.run(['gh', 'release', 'create', args.tag, str(args.zip),
+tools/\publish-qianqian.py:42:                        str(args.zip) + '.sha256', str(args.zip) + '.provenance.json',
+tools/\release-qianqian.sh:32:git -C "$ROOT" archive "$SOURCE" native | tar -x -C "$BUILD_ROOT"
+## tracked native/build
+native/build/ffmpeg.lua
+native/build/songcore.lua
+## check-ignore
+native/.gitignore:1:/build/*	native/build/ffmpeg-xmake/manifest.json
+## CI references to ops/
+NONE

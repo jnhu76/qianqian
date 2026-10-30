@@ -1,0 +1,1 @@
+package-rc.ps1 [preflight]: missing input: native\build\ffmpeg-xmake\manifest.json

@@ -1,0 +1,6 @@
+stdout_json_equals_file_summary = True
+top_keys = ['script', 'started', 'project', 'wsl_distro', 'wsl_work_root', 'build_dir', 'closure_source', 'git_branch', 'source', 'steps', 'artifacts', 'ffmpeg_provenance', 'toolchain', 'second_root', 'ok']
+ok = True
+9fea249d3b6eac858840cd51fdbb63de181985472c84d9a56ffa06dff7d5c3c8  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/build-windows/build-rc-summary.json
+9fea249d3b6eac858840cd51fdbb63de181985472c84d9a56ffa06dff7d5c3c8  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/build/rc/20261030-203045/summary.json
+3289 /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/build-windows/build-rc-summary.json

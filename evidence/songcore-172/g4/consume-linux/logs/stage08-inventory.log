@@ -1,0 +1,24 @@
+
+$ (cd /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64 && sha256sum -c metadata/checksums.txt)
+LICENSES/COPYING.GPLv2: OK
+LICENSES/COPYING.GPLv3: OK
+LICENSES/COPYING.LGPLv2.1: OK
+LICENSES/COPYING.LGPLv3: OK
+LICENSES/LICENSE-APACHE: OK
+LICENSES/LICENSE-MIT: OK
+LICENSES/THIRD_PARTY_NOTICES.txt: OK
+README.md: OK
+include/songcore.h: OK
+lib/libsongcore.a: OK
+lib/shared/libsongcore.so: OK
+metadata/external-consumer-example.c: OK
+metadata/manifest.json: OK
+metadata/symbols.txt: OK
+[exit] 0
+on-disk file count: 15
+manifest files{} entries: 13
+checksums.txt lines: 14
+package include/songcore.h : cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+package lib/libsongcore.a : 0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308
+package lib/shared/libsongcore.so : 085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98
+workdir reference.json    : 8113ff6e07b32db03de0f73c4c6cf39179b347913de6002a6ab2d4e4274026f8

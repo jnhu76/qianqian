@@ -1,0 +1,17 @@
+== diff -r linux (wsl stage vs windows-visible mirror) ==
+diff_linux_exit=0
+== diff -r windows (wsl stage vs windows-visible mirror) ==
+diff_win_exit=0
+== tree digest linux_win (/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64) ==
+c401f449c98c1cffb253181dea227e20cbb36426a15ccd7ff460c8a83e62ada6  -
+files=15
+tree_digest_exit=0
+== tree digest win_win (/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64) ==
+90cbbd10fbed13bd101e04560038412d49c70e2a5042dbee0e73837eb5b5e880  -
+files=14
+tree_digest_exit=0
+== windows package: any .so / shared dir? ==
+find_shared_exit=0 (no output above = none)
+== file counts ==
+linux_win 15
+win_win 14

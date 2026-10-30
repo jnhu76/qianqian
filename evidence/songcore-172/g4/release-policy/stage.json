@@ -1,0 +1,107 @@
+{
+  "stage_id": "F-release-policy",
+  "source_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "input_sha": {
+    "windows_zip": {
+      "path": "evidence/songcore-172/package/songcore-v0.2.0-rc.1-windows-x86_64.zip",
+      "sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415",
+      "matches_sidecar": "evidence/songcore-172/package/SHA256SUMS (sha256 16a6bcde3335f36e17765c65c78c10dd409f52033352480bc422c1b59c6e12c7)"
+    },
+    "linux_targz": {
+      "path": "/home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz",
+      "sha256": "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+      "matches": "evidence/songcore-172/g4/p0-governance/release-summary.json asset digest (sha256 7b4094650a7c92c5143e809fcfb017cab4d6e45deacb555de9a636a5d390cec8) and package-summary.json audits.v010_tarball_sha256 (sha256 4eb91f481eadff7ecde7bc8bd183156eeebd6ed9af31256f7def8f9ee85adc01)"
+    },
+    "release_tooling": {
+      "tools/test_release.py": "2cc6f684f4ff1c478375639035fdae92f1f43675ccbb45d970ada309a59cdd83",
+      "tools/check_release.py": "bf8425387d2d786f09add3d351d226ad6769309f74e10dcd511f5f355188a0c9",
+      "tools/publish-qianqian.py": "5130fbd3accff4e92f0946305f86f3cfa6d58890b1b29267bb33fcb9a5a01a11",
+      "tools/release-qianqian.sh": "8f681e8820fe2195c8fd9c54bf4aa3c83999775b464bc62f8cc9a407afeefc28",
+      "tools/package-windows.sh": "db736119d9a5e4cd3810e9602b384cd8860d68b3d790c96f053a9147402789b7",
+      "note": "Windows worktree and WSL /home/hoo/Source/qianqian both at source_sha with byte-identical release tooling"
+    }
+  },
+  "target_toolchain": {
+    "e01e18_and_package_audit": "WSL Ubuntu-24.04: python3 3.14.4, gcc, x86_64-w64-mingw32-gcc, ar, objdump, xmake ~/.local/bin, gh (network unreachable during this run)",
+    "docs_verify": "Windows 10.0.26300 x64, Git Bash: node v24.19.0, npm 11.17.0, website/node_modules present (lockfile package entries 292, 148 top-level dirs)",
+    "windows_side_python3": "NOT USED (WindowsApps stub); all python ran in WSL"
+  },
+  "argv": [
+    "wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/release-policy/run-e01-e18.sh",
+    "  inner: python3 tools/test_release.py --report /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/release-policy/release-controls.json  (cwd /home/hoo/Source/qianqian)",
+    "cmd //c 'tools\\docs-verify.cmd .'  (cwd C:/Users/fred1/source/qianqian)",
+    "bash evidence/songcore-172/g4/release-policy/run-docs-verify.sh",
+    "  inner: node scripts/verify.mjs  (cwd C:/Users/fred1/source/qianqian/website)",
+    "  inner: npx vitepress build    (cwd C:/Users/fred1/source/qianqian/website)",
+    "  inner: TMP=C:\\Users\\fred1\\vpbuild-tmp TEMP=<same> npx vitepress build  (retry)",
+    "  inner: (sandbox disabled) TMP/TEMP=<same> npx vitepress build  (retry 2)",
+    "wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/release-policy/run-package-audit.sh",
+    "  inner: python3 check_package_security.py <windows zip> --expected-root songcore-v0.2.0-rc.1-windows-x86_64 --expected-sha256 7b4d0615...  --out package-audit-windows-zip.json",
+    "  inner: python3 check_package_security.py <linux targz> --expected-root songcore-v0.1.0-linux-x86_64 --expected-sha256 018e0cbd... --out package-audit-linux-targz.json",
+    "wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/release-policy/run-publish-policy-probes.sh",
+    "  inner: python3 tools/check_release.py publish-policy --event push --ref refs/tags/songcore-v0.1.0 --tag songcore-v0.1.0",
+    "  inner: python3 tools/check_release.py publish-policy --event push --ref refs/tags/qianqian-v0.1.0 --tag qianqian-v0.1.0 --existing",
+    "  inner: python3 tools/check_release.py publish-policy --event workflow_dispatch --ref refs/tags/qianqian-v9.9.9 --tag qianqian-v9.9.9",
+    "  inner: python3 tools/check_release.py publish-policy --event push --ref refs/tags/qianqian-v9.9.9 --tag qianqian-v9.9.9",
+    "  inner: python3 tools/check_release.py publish-policy --event push --ref refs/tags/songcore-v0.2.0-rc.1 --tag songcore-v0.2.0-rc.1"
+  ],
+  "exit_codes": [
+    "run-e01-e18.sh: 0 (inner test_release.py: 0, PASS)",
+    "cmd //c tools\\docs-verify.cmd: 1 (file does not exist in the tree at this SHA)",
+    "run-docs-verify.sh: 0 wrapper; node scripts/verify.mjs: 0; npx vitepress build: 1 (three attempts, same esbuild temp-removal error)",
+    "run-package-audit.sh: 0 (zip audit 0, targz audit 0)",
+    "publish-policy probes: songcore-v0.1.0=2, existing qianqian-v0.1.0=2, workflow_dispatch=2, new qianqian-v9.9.9=0, songcore-v0.2.0-rc.1=2"
+  ],
+  "evidence_paths": [
+    "evidence/songcore-172/g4/release-policy/e01-e18.exit.txt",
+    "evidence/songcore-172/g4/release-policy/e01-e18.log",
+    "evidence/songcore-172/g4/release-policy/release-controls.json",
+    "evidence/songcore-172/g4/release-policy/run-e01-e18.sh",
+    "evidence/songcore-172/g4/release-policy/docs-verify.meta.txt",
+    "evidence/songcore-172/g4/release-policy/docs-verify-verify.mjs.log",
+    "evidence/songcore-172/g4/release-policy/docs-verify-vitepress-build.log",
+    "evidence/songcore-172/g4/release-policy/docs-verify-vitepress-build-retry.log",
+    "evidence/songcore-172/g4/release-policy/docs-verify-vitepress-build-retry2-nosandbox.log",
+    "evidence/songcore-172/g4/release-policy/docs-verify-literal-route.log",
+    "evidence/songcore-172/g4/release-policy/run-docs-verify.sh",
+    "evidence/songcore-172/g4/release-policy/check_package_security.py",
+    "evidence/songcore-172/g4/release-policy/run-package-audit.sh",
+    "evidence/songcore-172/g4/release-policy/package-audit.meta.txt",
+    "evidence/songcore-172/g4/release-policy/package-audit-windows-zip.json",
+    "evidence/songcore-172/g4/release-policy/package-audit-windows-zip.log",
+    "evidence/songcore-172/g4/release-policy/package-audit-linux-targz.json",
+    "evidence/songcore-172/g4/release-policy/package-audit-linux-targz.log",
+    "evidence/songcore-172/g4/release-policy/run-publish-policy-probes.sh",
+    "evidence/songcore-172/g4/release-policy/publish-policy-probes.log"
+  ],
+  "evidence_sha256": {
+    "e01-e18.exit.txt": "f50c7fbcae715222b6d154cb5e2b3bebcb3cf367a03f4ee0a0b432954a4f42f5",
+    "e01-e18.log": "16a7d6d436e20c63ded5d4fb43b3d90f4f77931aacd40e38691af1218ebce413",
+    "release-controls.json": "4fac2b0e903a1f7236ad1bc7c1f4385762e4a9a9ab507090e3878375f9925224",
+    "run-e01-e18.sh": "f3a5bf6b6274813fe1c7afed74f01c8d6ba9b67fc937fdefb0882c84c49a7a7a",
+    "docs-verify.meta.txt": "9bc84f4d4c882c0bcc9a1f6f069185aed3c61e8c538a53a4b0abe9aa03994e15",
+    "docs-verify-verify.mjs.log": "fd5716d5b51db333bbb5ace54211d4fcf4864f8d24f5f35c0d1142d0ba4970cb",
+    "docs-verify-vitepress-build.log": "445fe747160c231ad1a6cbca6b01652f7bc4ffbbc6fa9334aae82c23463978dd",
+    "docs-verify-vitepress-build-retry.log": "87e0ed3d52f60569b102b4240ee176075e475414f4fdefc9a71ba06512615314",
+    "docs-verify-vitepress-build-retry2-nosandbox.log": "fb6ae58f043dae9369bb5f8a3b61428f7f37b2e58d943395d52ea6e1c12a5019",
+    "docs-verify-literal-route.log": "a580f56511334f72ad6854909dcb46529e4929c35a028521d6885ba86596d181",
+    "run-docs-verify.sh": "4c3d330d4f5f04f6f20c1103f4e334f2a248d66328727f3dbe426631e75f5c59",
+    "check_package_security.py": "3eeac040abe53a590559443a2f9c52125f82529fadaaf161a4b2435e10f9f11a",
+    "run-package-audit.sh": "b811ad0985064d9584938e510c5e282432f6546d3517091496751c29d25b4b84",
+    "package-audit.meta.txt": "785bce93848fb6407e9f9eef4d802a1d1f805becb0fa9b50defec8ab0be21ba0",
+    "package-audit-windows-zip.json": "1e674ca959ca0979805d8f7c0a90d1a48656baec10c10384865b5ba54b2f6805",
+    "package-audit-windows-zip.log": "3e43c116141a0f2510bacde5faeb7f4e5bb09f811230141e1d430c295f2067b6",
+    "package-audit-linux-targz.json": "76f89d85bbb6fe0ebf5c517da63b3a91f924a59b0b816bffb6f0e0126182e41c",
+    "package-audit-linux-targz.log": "97abeee6141079a85b2fd4ffb30f8dbe0440d14a40b878cf77bf732be01b71e7",
+    "run-publish-policy-probes.sh": "e73c301aca313ab35451c2c79177b36682f4a02dd27575c617ed3d005fab524d",
+    "publish-policy-probes.log": "354402eceb8262d67205eb31eb78ae51a030f1ef1de9f20319fc104134e9f8cb"
+  },
+  "verdict": "FIX_REQUIRED",
+  "not_run": [
+    "VitePress build (docs-verify second half): RUN but FAILED three times on the Windows host (esbuild '[vite:esbuild-transpile] remove <tmp>\\esbuild-<hash>: Access is denied'); the build never completed, so the docs-verify gate is NOT PASS. Missing: a host where the esbuild child can unlink its temp bundle (AV/file-handle interference suspected); needs rerun on CI or a clean host.",
+    "Literal documented route `cmd /c tools\\docs-verify.cmd <root>`: the file does not exist at 69ba1ce (git ls-files + worktree find return nothing); exit 1 'not recognized'. AGENTS.md:450 documents a wrapper this tree does not contain.",
+    "Live GitHub release/tag state: `gh release list` / `gh api ...` from WSL failed with 'error connecting to api.github.com' at 2026-10-30T12:36Z; current server-side state not verified this run. Cross-referenced prior archive instead: evidence/songcore-172/g4/p0-governance/release-summary.json (sha256 7b4094650a7c92c5143e809fcfb017cab4d6e45deacb555de9a636a5d390cec8).",
+    "Full local gate `lefthook run pre-push --all-files`: not run in this lane (out of scope; release-policy glob does not match evidence/** anyway).",
+    "WASAPI/device, real release artifact build, byte reproducibility: out of scope for this lane."
+  ]
+}

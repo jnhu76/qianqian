@@ -1,0 +1,6 @@
+argv: python3 tools/test_release.py --report /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/release-policy/release-controls.json
+cwd: /home/hoo/Source/qianqian
+source_sha: 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+start_utc: 2026-10-30T12:30:14Z
+end_utc: 2026-10-30T12:30:18Z
+exit_code: 0

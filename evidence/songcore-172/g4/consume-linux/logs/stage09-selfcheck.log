@@ -1,0 +1,5 @@
+evidence files hashed: 61
+SKIP(self-referential): evidence/songcore-172/g4/consume-linux/evidence-sha256.txt
+SKIP(self-referential): evidence/songcore-172/g4/consume-linux/stage.json
+stage.json evidence hashes: 14 verified, 0 mismatched
+verdict field: PASS | not_run: 3 | observations: 1

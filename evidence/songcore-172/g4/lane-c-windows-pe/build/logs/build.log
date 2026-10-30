@@ -1,0 +1,109 @@
+=== toolchain identity ===
+### CMD[tc1]: x86_64-w64-mingw32-gcc --version
+x86_64-w64-mingw32-gcc (GCC) 13-win32
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+### EXIT[tc1]=0
+### CMD[tc2]: x86_64-w64-mingw32-gcc -dumpmachine
+x86_64-w64-mingw32
+### EXIT[tc2]=0
+### CMD[tc3]: x86_64-w64-mingw32-ar --version
+GNU ar (GNU Binutils) 2.45.90.20260125
+Copyright (C) 2026 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
+### EXIT[tc3]=0
+### CMD[tc4]: x86_64-w64-mingw32-objdump --version
+GNU objdump (GNU Binutils) 2.45.90.20260125
+Copyright (C) 2026 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
+### EXIT[tc4]=0
+### CMD[tc5]: uname -a
+Linux WuJie 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux
+### EXIT[tc5]=0
+### CMD[tc6]: git -C /mnt/c/Users/fred1/source/qianqian rev-parse HEAD
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+### EXIT[tc6]=0
+=== package inputs (the exact files this consumer builds against) ===
+### CMD[in1]: sha256sum /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/include/songcore.h /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/include/songcore.h
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a
+### EXIT[in1]=0
+--- package contains no shared form (windows ships static-only) ---
+total 3232
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:11 .
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:11 ..
+-rwxrwxrwx 1 hoo hoo 3309294 Oct 30 20:31 libsongcore.a
+=== consumer source identity ===
+### CMD[src1]: sha256sum /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/lane-c-windows-pe/src/pe-consumer.c
+89aabb97c21d3e23067b535e0249f97bff8802593ce1236710fd4e28567164c2  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/lane-c-windows-pe/src/pe-consumer.c
+### EXIT[src1]=0
+=== contract section 9 archive audit: undefined BCrypt imports ===
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a:random_seed.c.obj:                 U BCryptCloseAlgorithmProvider
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a:random_seed.c.obj:                 U BCryptGenRandom
+/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a:random_seed.c.obj:                 U BCryptOpenAlgorithmProvider
+### EXIT[nm-bcrypt]=0
+
+=== NEGATIVE CONTROL: link WITHOUT -lbcrypt (expected to FAIL) ===
+### EXIT[link-wo-bcrypt]=1
+--- stderr (log: /home/hoo/lane-c-pe/logs/link-wo-bcrypt.log) ---
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x24): undefined reference to `BCryptOpenAlgorithmProvider'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x3b): undefined reference to `BCryptGenRandom'
+/usr/bin/x86_64-w64-mingw32-ld.bfd: /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/lib/libsongcore.a(random_seed.c.obj):random_seed.c:(.text+0x49): undefined reference to `BCryptCloseAlgorithmProvider'
+collect2: error: ld returned 1 exit status
+
+=== LINK: contract section 9 windows static link line (with -lbcrypt) ===
+### CMD[link]: x86_64-w64-mingw32-gcc -O2 -I<Pkg>/include pe-consumer.c -L<Pkg>/lib -lsongcore -lbcrypt -o /home/hoo/lane-c-pe/out/pe-consumer.exe
+### EXIT[link-with-bcrypt]=0
+
+=== artifact identity ===
+### CMD[exe_sha]: sha256sum /home/hoo/lane-c-pe/out/pe-consumer.exe
+3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d  /home/hoo/lane-c-pe/out/pe-consumer.exe
+### EXIT[exe_sha]=0
+### CMD[exe_file]: file /home/hoo/lane-c-pe/out/pe-consumer.exe
+/home/hoo/lane-c-pe/out/pe-consumer.exe: PE32+ executable for MS Windows 5.02 (console), x86-64, 18 sections
+### EXIT[exe_file]=0
+### CMD[exe_pefmt]: x86_64-w64-mingw32-objdump -f /home/hoo/lane-c-pe/out/pe-consumer.exe
+
+/home/hoo/lane-c-pe/out/pe-consumer.exe:     file format pei-x86-64
+architecture: i386:x86-64, flags 0x0000013b:
+HAS_RELOC, EXEC_P, HAS_DEBUG, HAS_SYMS, HAS_LOCALS, D_PAGED
+start address 0x0000000140001420
+
+### EXIT[exe_pefmt]=0
+
+=== consumer object: proves this source has NO static BCrypt reference ===
+### EXIT[compile-obj]=0
+--- nm -u pe-consumer.o | grep -i bcrypt (empty means none) ---
+### EXIT[obj-bcrypt-grep]=1 (1 = no matches = no consumer-side BCrypt import)
+
+=== PE import table: DLL names ===
+	DLL Name: KERNEL32.dll
+	DLL Name: bcrypt.dll
+	DLL Name: msvcrt.dll
+
+=== PE import table: bcrypt.dll entries (the contract section 9 dependency) ===
+	DLL Name: bcrypt.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	003834b0  <none>  0002  BCryptCloseAlgorithmProvider
+	003834b8  <none>  001d  BCryptGenRandom
+	003834c0  <none>  0027  BCryptOpenAlgorithmProvider
+
+ 00383014	00383070 00000000 00000000 0038417c 003834d0
+
+	DLL Name: KERNEL32.dll
+	vma:     Ordinal  Hint  Member-Name  Bound-To
+	003834d0  <none>  0000  AcquireSRWLockExclusive
+	003834d8  <none>  0097  CloseHandle
+	003834e0  <none>  0127  DeleteCriticalSection
+	003834e8  <none>  014d  EnterCriticalSection
+	003834f0  <none>  021c  GetConsoleMode
+	003834f8  <none>  0222  GetConsoleScreenBufferInfo
+	00383500  <none>  0238  GetCurrentProcess
+
+BUILD_RESULT=PASS

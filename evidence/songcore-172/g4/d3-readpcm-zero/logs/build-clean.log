@@ -1,0 +1,9 @@
+[0m[38;5;2;1m[ 97%]:[0m [38;5;5;1marchiving.release libqianqian_av.a[0m
+[0m[38;5;2;1m[ 98%]:[0m [38;5;5;1marchiving.release libsongcore.a[0m
+[0m[38;5;2;1m[ 98%]:[0m [38;5;5;1mmerging.release libsongcore.a[0m
+[0m[38;5;2;1m[ 99%]:[0m [38;5;5;1mlinking.release libsongcore.so[0m
+[0m[38;5;2;1m[100%]:[0m [38;5;2;1mbuild ok, spent 0.615s[0m
+
+real	0m1.017s
+user	0m0.719s
+sys	0m0.177s

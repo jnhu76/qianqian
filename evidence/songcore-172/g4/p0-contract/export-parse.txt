@@ -1,0 +1,18 @@
+decl_count=15
+01 songcore_abi_version
+02 song_last_error
+03 song_open
+04 song_probe
+05 song_audio_stream_count
+06 song_audio_stream_info
+07 song_select_stream
+08 song_get_metadata
+09 song_get_metadata_count
+10 song_get_metadata_entry
+11 song_get_artwork_count
+12 song_get_artwork_item
+13 song_read_pcm
+14 song_seek
+15 song_close
+unique=15
+non_api_top_level_fn_decls=0

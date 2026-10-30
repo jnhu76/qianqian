@@ -1,0 +1,29 @@
+consumer_argv1=media/flac-16-44-stereo.flac
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=ce0da1091ed6cecc4c6f60d619f882e52e6cc9cf6af1f5f548e746d047c0cb50
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/flac-16-44-stereo.flac media_size=146237
+stage=open status=0
+stage=probe status=0 codec=flac container=flac rate=44100 channels=2 channel_mask=0x0000000000000003 bits=16 duration_us=4000000 streams=1 selected=0
+stage=audio_stream_count status=0 count=1
+stream[0] status=0 stream_index=0 rate=44100 channels=2 mask=0x0000000000000003 bits=16 duration_us=4000000 codec=flac default=0
+stage=metadata status=0 title=Flac Sixteen Fortyfour artist=Qianqian Lab album=Corpus Gamma genre=(absent) date=(absent) track_number=0 has_track=0
+stage=metadata_count status=0 count=4
+meta[0] status=0 scope=0 key=ALBUM value=Corpus Gamma
+meta[1] status=0 scope=0 key=TITLE value=Flac Sixteen Fortyfour
+meta[2] status=0 scope=0 key=ARTIST value=Qianqian Lab
+meta[3] status=0 scope=0 key=encoder value=Lavf62.3.100
+stage=artwork_count status=0 count=0
+stage=decode status=0 frames=176400 pcm_sha256=3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=88848 pcm_sha256=fa58371ddd7150c2111e87132e3fcc31b7e540380883b033a895687f4f918706 terminal=SONG_EOF
+stage=last_error status=0 has_message=0
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS

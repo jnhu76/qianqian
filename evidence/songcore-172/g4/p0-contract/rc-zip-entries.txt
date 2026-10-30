@@ -1,0 +1,17 @@
+all_entries=14
+file_entries=14
+dir_entries=0
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv2
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv3
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv2.1
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv3
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-APACHE
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-MIT
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+  songcore-v0.2.0-rc.1-windows-x86_64/README.md
+  songcore-v0.2.0-rc.1-windows-x86_64/include/songcore.h
+  songcore-v0.2.0-rc.1-windows-x86_64/lib/libsongcore.a
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/checksums.txt
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/external-consumer-example.c
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/symbols.txt

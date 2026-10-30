@@ -1,0 +1,43 @@
+== source identity ==
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6  /home/hoo/Source/qianqian/native/src/songcore_ffmpeg.c
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/Source/qianqian/native/include/songcore.h
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/Source/qianqian/native/build/artifacts/libsongcore.a
+== library symbol ==
+00000000000021d0 T song_open
+== fixture ==
+0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f  /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/binding-parity/20261028-215245/media/truncated-100000.flac
+== path (b) window: songcore_ffmpeg.c:820-832 ==
+uint32_t songcore_abi_version(void) { return SONGCORE_ABI_VERSION; }
+
+song_status song_open(const song_io *io, song_handle **out_handle) {
+    if (!io || !out_handle || !io->read || !io->seek || !io->size)
+        return SONG_ERR_INVALID_ARGUMENT;
+    *out_handle = NULL;
+
+    songcore_quiet_ffmpeg_logging();
+
+    song_handle *h = (song_handle *)calloc(1, sizeof(*h));
+    if (!h) return SONG_ERR_OUT_OF_MEMORY;
+    h->io = *io;
+    h->selected = 0;
+== build probe ==
+compile_exit=0
+== run ==
+argv: /home/hoo/d1-out-handle-build/d1_probe --fixture /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/binding-parity/20261028-215245/media/truncated-100000.flac
+abi_version=1
+a1-null-io                   path=a status=100 out_handle=SENTINEL(0x5E27E1CAFE) expect=100 + untouched -> MATCH
+a2-null-out-handle           path=a status=100 out_handle=NULL                   expect=100 + no crash -> MATCH
+a3-missing-read              path=a status=100 out_handle=SENTINEL(0x5E27E1CAFE) expect=100 + untouched -> MATCH
+a4-missing-seek              path=a status=100 out_handle=SENTINEL(0x5E27E1CAFE) expect=100 + untouched -> MATCH
+a5-missing-size              path=a status=100 out_handle=SENTINEL(0x5E27E1CAFE) expect=100 + untouched -> MATCH
+c1-garbage-container         path=c status=104 out_handle=NULL                   expect=104 + NULL (clobbered) -> MATCH
+c2-host-io-error             path=c status=103 out_handle=NULL                   expect=any typed failure + NULL -> MATCH
+c3-out-of-memory             path=c status=112 out_handle=NULL                   expect=112 + NULL (clobbered) -> MATCH
+d1-open-real-fixture         status=0   out_handle=OTHER
+d1-failed-reopen             status=104 slot_after=NULL prior_copy=live
+d1-slot-clobbered            path=c status=104 out_handle=NULL                   expect=failed re-open leaves NULL, not prior -> MATCH
+d1-prior-still-valid         prior_handle_probe_status=0 (alive=1) sr=44100 ch=2
+d1-prior-alive-but-lost      path=c status=104 out_handle=NULL                   expect=prior handle alive yet unreachable -> MATCH
+D1_PROBE_FAILURES=0
+run_exit=0

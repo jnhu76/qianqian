@@ -1,0 +1,42 @@
+render_exit=0
+=== diff rendered(linux) vs shipped(linux) ===
+--- /home/hoo/g4-172/laneD-license/render/linux.txt	2026-10-30 21:17:27.556567428 +0800
++++ /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt	2026-10-30 09:33:05.000000000 +0800
+@@ -1,5 +1,5 @@
+-Third-party notices — SongCore 0.0.0-preflight (linux-x86_64)
+-=============================================================
++Third-party notices — SongCore v0.0.0-preflight (linux-x86_64)
++==============================================================
+ 
+ FFmpeg
+   version : 9.0.1 (tag n9.0.1)
+diff_linux_exit=1
+=== diff rendered(win) vs shipped(win) ===
+--- /home/hoo/g4-172/laneD-license/render/win.txt	2026-10-30 21:17:27.556650395 +0800
++++ /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt	2026-10-30 21:08:46.000000000 +0800
+@@ -1,5 +1,5 @@
+-Third-party notices — SongCore 0.0.0-preflight (windows-x86_64)
+-===============================================================
++Third-party notices — SongCore v0.0.0-preflight (windows-x86_64)
++================================================================
+ 
+ FFmpeg
+   version : 9.0.1 (tag n9.0.1)
+diff_win_exit=1
+=== cat -A shipped linux tail ===
+  package contains the complete FFmpeg license texts (LICENSES/COPYING.*)$
+  and the closure identity above; the exact source tree is reconstructible$
+  from the pinned URL + sha256.$
+$
+Qianqian$
+  The Qianqian sources (songcore.h and the SongCore implementation) are$
+  dual-licensed: MIT or Apache-2.0, at the recipient's option. The$
+  complete license texts ship in this package as LICENSES/LICENSE-MIT$
+  and LICENSES/LICENSE-APACHE and are sha256-bound in$
+  metadata/checksums.txt. This is an engineering statement, not legal$
+  advice; each release's license block is owner-reviewed before$
+  publication (contract section 10).$
+
+----
+script=diff-notices.sh
+exit_code=0

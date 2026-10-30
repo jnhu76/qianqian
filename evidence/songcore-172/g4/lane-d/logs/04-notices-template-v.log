@@ -1,0 +1,7 @@
+linux-x86_64 byte_identical_with_v_prefix True template 5da8e9f8a2d64d42 shipped 5da8e9f8a2d64d42
+windows-x86_64 byte_identical_with_v_prefix True template 9477759492876ab1 shipped 9477759492876ab1
+render_v_exit=0
+
+----
+script=render-v-version.sh
+exit_code=0

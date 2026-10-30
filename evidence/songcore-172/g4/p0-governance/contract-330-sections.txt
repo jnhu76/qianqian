@@ -1,0 +1,67 @@
+753:releases/tags/assets.
+754:
+755:## 14. Owner 待决 (openQuestions — OPEN is not agent-choice)
+756:
+757:```text
+758:Q1  Next release tag/version number. #172 §10 reserves this decision until
+759:    the supported matrix is frozen; this contract freezes only the RULE.
+760:Q2  Debug-info policy for shipped artifacts: keep debug info and pursue
+770:    itself is not).
+771:Q5  songcore-v* publication mechanism: v0.1.0 was published manually; the
+772:    product side has a tag-push publisher with R7 protections. Does
+773:    SongCore get a workflow with equivalent no-overwrite/refuse-history
+774:    protections, or stay manual with G4 as the written gate?
+775:```
+776:
+777:Differentials raised by the Issue #330 review that need an owner decision
+778:are recorded in §16 and are owner-reserved exactly like the questions
+779:above: they are recorded with their counterfactuals, not silently
+780:answered, and no code or `songcore.h` text was changed for them.
+781:
+782:## 15. Drafting-session evidence appendix (what was actually run/read)
+842:## 16. Differential dispositions — Issue #330 review (2026-10-30)
+843:
+844:Issue #330 lane 2 asked for three source/contract differentials to be
+845:independently recorded and decided, each classified as a code bug, a spec
+846:ambiguity, or an acceptable implementation within contract, with a precise
+847:counterfactual, and with no code fix merely to satisfy prose and no
+848:normative-ABI amendment without owner review. Each disposition below cites
+849:both sides as read in this repository. Items marked `needsOwnerDecision`
+850:are recorded only — deliberately NOT fixed in code or in `songcore.h`
+851:here; compiled-semantics changes require an authorized fix PR (Issue #330
+852:boundaries). No disposition promotes new lifecycle, vocabulary or
+853:authority (AGENTS.md verification-authority boundary).
+854:
+855:### D1 — `song_open` failure phrase vs implementation — needsOwnerDecision
+856:
+857:```text
+858:Differential    native/include/songcore.h:218 says of the listed
+859:                song_open failures: "*out_handle is then untouched";
+860:                native/src/songcore_ffmpeg.c:823–825 sets
+861:                *out_handle = NULL immediately after the argument guard,
+862:                so every post-guard failure (the three listed statuses)
+880:                Recorded only; neither side changed here.
+881:```
+882:
+883:### D2 — contract `files{}` wording vs package/matcher semantics — fixed in place
+884:
+885:```text
+886:Differential    §8's files{} comment and rule V1 said the set of files[]
+887:                keys equals the set of checksums.txt entries, while the
+888:                actual packaged/matcher semantics are: checksums.txt
+889:                covers every packaged file except itself, and files{}
+890:                covers that set MINUS manifest.json (the manifest never
+905:Counterfactual  a G4 verifier implementing the literal equality would
+906:                red-light every real package (its files{} can never
+907:                include manifest.json — that would be a self-hash); a
+908:                packager implementing the equality symmetrically would
+909:                emit exactly the circular self-hash the same sentence
+910:                forbids.
+911:Conclusion      spec ambiguity — fixed in place in §8 and V1 (this
+912:                commit) to state the verified set arithmetic; no code,
+913:                packaging or package-evidence change. The historical RC
+914:                container and its receipts stay untouched.
+915:```
+916:
+917:### D3 — `song_read_pcm` dual-invalid call leaves `produced` unchanged — needsOwnerDecision
+918:

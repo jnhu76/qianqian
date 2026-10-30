@@ -1,0 +1,180 @@
+{
+  "checks": [
+    {
+      "detail": "schema=2",
+      "id": "manifest_schema_2",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=n9.0.1 pin=n9.0.1",
+      "id": "manifest_tag_matches_pin",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+      "id": "manifest_commit_matches_pin",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 pin=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+      "id": "manifest_source_sha_matches_pin",
+      "status": "PASS"
+    },
+    {
+      "detail": "stamp=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa|d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 expected=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa|d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+      "id": "verified_stamp_matches_pin",
+      "status": "PASS"
+    },
+    {
+      "detail": "/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-xmake/oracle/ffbuild/config.mak exists=True bytes=89255",
+      "id": "oracle_config_mak_present",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=linux-x86_64 recipe=linux-x86_64",
+      "id": "manifest_target_id_matches_recipe",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=linux/x86_64 recipe=linux/x86_64",
+      "id": "manifest_platform_arch_match_recipe",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=linux recipe=linux",
+      "id": "manifest_target_os_matches_recipe",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=None recipe=None",
+      "id": "manifest_cross_prefix_matches_recipe",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d current_file=79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+      "id": "manifest_recipe_sha256_matches_current_recipe",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa current_file=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+      "id": "manifest_profile_sha256_matches_current_profile",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=codec-base profile_file=codec-base",
+      "id": "manifest_profile_identity_codec_base",
+      "status": "PASS"
+    },
+    {
+      "detail": "manifest=linux/x86_64 host=linux/x86_64",
+      "id": "toolchain_host_matches_manifest",
+      "status": "PASS"
+    },
+    {
+      "detail": "cc=gcc cc_ident=gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+      "id": "toolchain_cc_identity_gcc",
+      "status": "PASS"
+    },
+    {
+      "detail": "units=279 manifest.closure.translation_units=279",
+      "id": "closure_unit_count_consistent",
+      "status": "PASS"
+    },
+    {
+      "detail": "missing=0 generated_units=0 existing=279/279",
+      "id": "all_unit_sources_present",
+      "status": "PASS"
+    },
+    {
+      "detail": "source_root=/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-src is_dir=True config_root=/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-xmake/oracle is_dir=True",
+      "id": "source_root_and_config_root_present",
+      "status": "PASS"
+    },
+    {
+      "detail": "zip=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 pin=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 path=/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip",
+      "id": "pinned_zip_sha256_matches_pin",
+      "status": "PASS"
+    },
+    {
+      "detail": "identical=10422/10422 missing=0 mismatch=0 extras=['.qianqian-verified']",
+      "id": "zip_content_equals_copied_source_tree",
+      "status": "PASS"
+    }
+  ],
+  "identity": {
+    "manifest": {
+      "closure": {
+        "generated_sources": 0,
+        "translation_units": 279,
+        "upstream_sources": 279
+      },
+      "config_root": "build/ffmpeg-xmake/oracle",
+      "path": "/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-xmake/manifest.json",
+      "schema": 2,
+      "sha256": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+      "source_root": "build/ffmpeg-src",
+      "target": {
+        "arch": "x86_64",
+        "cross_prefix": null,
+        "id": "linux-x86_64",
+        "platform": "linux",
+        "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+        "target_os": "linux"
+      },
+      "toolchain": {
+        "arch": "x86",
+        "cc": "gcc",
+        "cc_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+        "machine": "x86_64",
+        "system": "linux",
+        "target_os": null
+      }
+    },
+    "pin_json": {
+      "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+      "ffmpeg_tag": "n9.0.1",
+      "path": "/home/hoo/g4-172/linux-root/src/native/ffmpeg/pin.json",
+      "sha256": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+      "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746"
+    },
+    "profile": {
+      "path": "/home/hoo/g4-172/linux-root/src/native/ffmpeg/profiles/codec-base.json",
+      "profile": "codec-base",
+      "sha256": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa"
+    },
+    "recipe": {
+      "arch": "x86_64",
+      "ffmpeg": {
+        "arch": "x86_64",
+        "cross": false,
+        "target_os": "linux"
+      },
+      "id": "linux-x86_64",
+      "path": "/home/hoo/g4-172/linux-root/src/native/ffmpeg/targets/linux-x86_64.json",
+      "platform": "linux",
+      "sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d"
+    },
+    "verified_stamp": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa|d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746"
+  },
+  "mandatory_failures": [],
+  "src": "/home/hoo/g4-172/linux-root/src",
+  "tool": "g4-closure-validate.py",
+  "verdict": "PASS",
+  "zip": {
+    "content_mismatch": 0,
+    "extras_in_src": 1,
+    "extras_samples": [
+      ".qianqian-verified"
+    ],
+    "files_identical": 10422,
+    "mismatch_samples": [],
+    "missing_in_src": 0,
+    "missing_samples": [],
+    "path": "/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip",
+    "sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "top_level": [
+      "FFmpeg-n9.0.1"
+    ],
+    "zip_file_entries": 10422
+  }
+}

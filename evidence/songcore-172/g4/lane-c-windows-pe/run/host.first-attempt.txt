@@ -1,0 +1,9 @@
+runner=Git Bash (native Windows process)
+host_hostname=WuJie
+host_uname=MINGW64_NT-10.0-26300 WuJie 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+host_windows=Binary file (standard input) matches
+host_exe_path_windows=C:\Users\fred1\lane-c-win-pe\pe-consumer.exe
+host_exe_path_unix=/c/Users/fred1/lane-c-win-pe/pe-consumer.exe
+host_build=b66cc6e1edec0a404744fbb27f444b084521a43c72775b61fef6f3449ba44e07
+host_cwd=/c/Users/fred1/lane-c-win-pe
+host_date_utc=2026-10-30T13:18:07Z

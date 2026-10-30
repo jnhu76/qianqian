@@ -1,0 +1,80 @@
+{
+  "stage_id": "D1-out-handle-differential",
+  "source_sha": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "input_sha": {
+    "native/include/songcore.h": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "native/src/songcore_ffmpeg.c": "55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6",
+    "native/build/artifacts/libsongcore.a (linux-x86_64)": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+    "libsongcore.a (windows-x86_64/mingw, from git archive HEAD)": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97",
+    "fixture evidence/songcore-172/binding-parity/20261028-215245/media/truncated-100000.flac": "0aa66168770d5d36072dccf7fec728647717290f96bf13335775144f3438b39f",
+    "ffmpeg closure manifest (linux-x86_64)": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+    "ffmpeg closure manifest (windows-x86_64)": "0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14"
+  },
+  "target_toolchain": {
+    "linux-x86_64": "xmake v2.9.7+20250101, gcc 15.2.0 (Ubuntu 15.2.0-16ubuntu1); closure recipe_sha256 79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+    "windows-x86_64": "xmake -p mingw, x86_64-w64-mingw32-gcc; closure recipe_sha256 3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d; built from git archive HEAD, no runtime execution"
+  },
+  "argv": [
+    "wsl.exe -d Ubuntu-24.04 -- bash /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/d1-out-handle/build.sh",
+    "xmake f -p linux -a x86_64 -m release -y   (cwd /home/hoo/Source/qianqian/native)",
+    "xmake build -y songcore_static",
+    "wsl.exe -d Ubuntu-24.04 -- bash .../run.sh",
+    "gcc -O1 -g -Wall -Wextra -std=c11 -I <repo>/native/include d1_probe.c <repo>/native/build/artifacts/libsongcore.a -Wl,--wrap=calloc -lm -lpthread -o $HOME/d1-out-handle-build/d1_probe",
+    "$HOME/d1-out-handle-build/d1_probe --fixture /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/binding-parity/20261028-215245/media/truncated-100000.flac",
+    "wsl.exe -d Ubuntu-24.04 -- bash .../win-build.sh",
+    "git -C /home/hoo/Source/qianqian archive HEAD | tar -x -C /home/hoo/d1-win-src",
+    "xmake f -p mingw -a x86_64 -m release -y   (cwd /home/hoo/d1-win-src/native)",
+    "xmake build -y songcore_static   (mingw)",
+    "objdump -d <linux libsongcore.a> | awk '/<song_open>:/{f=1} f{print} f&&/^$/{exit}'",
+    "x86_64-w64-mingw32-objdump -d <win libsongcore.a> | awk '/<song_open>:/{f=1} f{print} f&&/^$/{exit}'"
+  ],
+  "exit_codes": [
+    "build.sh: 0",
+    "xmake f (linux): 0",
+    "xmake build songcore_static (linux): 0",
+    "gcc probe compile: 0",
+    "d1_probe run: 0  (D1_PROBE_FAILURES=0; 12/12 cases MATCH)",
+    "win-build.sh: 0",
+    "xmake f (mingw): 0",
+    "xmake build songcore_static (mingw): 0",
+    "objdump (linux): 0",
+    "x86_64-w64-mingw32-objdump (windows): 0"
+  ],
+  "evidence_paths": [
+    "evidence/songcore-172/g4/d1-out-handle/d1_probe.c",
+    "evidence/songcore-172/g4/d1-out-handle/build.sh",
+    "evidence/songcore-172/g4/d1-out-handle/run.sh",
+    "evidence/songcore-172/g4/d1-out-handle/win-build.sh",
+    "evidence/songcore-172/g4/d1-out-handle/collect.sh",
+    "evidence/songcore-172/g4/d1-out-handle/disasm.sh",
+    "evidence/songcore-172/g4/d1-out-handle/disasm-linux.txt",
+    "evidence/songcore-172/g4/d1-out-handle/disasm-windows.txt",
+    "evidence/songcore-172/g4/d1-out-handle/build-driver.log",
+    "evidence/songcore-172/g4/d1-out-handle/build-wsl.log",
+    "evidence/songcore-172/g4/d1-out-handle/run.log",
+    "evidence/songcore-172/g4/d1-out-handle/win-build-driver.log",
+    "evidence/songcore-172/g4/d1-out-handle/win-build-wsl.log"
+  ],
+  "evidence_sha256": {
+    "d1_probe.c": "c1c3c0dedb5d978b81656d35375c5d73f426ad3fe75608837ec9c43467e65e29",
+    "build.sh": "4b84c26e19a766e53ffcbe8f07261d58cca7ebc02afd0e479a611ee0c7183e90",
+    "run.sh": "1c3b94851f19ce323538eaf3818e9d711054055ccbea8c2e5095f69e7db62d80",
+    "win-build.sh": "0491ea8c4fee8d17add237feb2e4fb877ad2078d42c33b81613bd914ecfad2c7",
+    "collect.sh": "e9d8222ff808770acd1bebf71d416b21df3049389fba3620bcbddc30e75927cf",
+    "disasm.sh": "fef9743c38ada0cc0797d596b5af527fde72556fc9f17670c23b2d61655cfc4f",
+    "disasm-linux.txt": "4d9095f903ca0a1a553503705c62d607f232acbd36e344deaec337908ea4db28",
+    "disasm-windows.txt": "d8223c975ea8b74575a0cc422094e4be1972e719139762217ed833314aae02eb",
+    "build-driver.log": "d881872a14faaae9c40dcccef06177293172c628e04ebad2787ee497785a220e",
+    "build-wsl.log": "46c35e716ab3db7e1ef7f65d5e66ca910f7ce4f40a228861a2b6b253dacc37d4",
+    "run.log": "188dae8631665cfde396dfd5cb102ba37c0fcccb92a16e3c876b8b2061ce6161",
+    "win-build-driver.log": "e0bc6ee13359a0d2f413fc489d64e18daa20d219314fc51ae553a349b8f6a947",
+    "win-build-wsl.log": "0e3058aa771930564a4d0d78027d25d7f4794114a65dc5ca42c45e6968877653"
+  },
+  "verdict": "D1 CONFIRMED as a header-text defect on one side and a defensive implementation on the other. Executed on linux-x86_64: pre-guard failures (a) leave *out_handle at the caller's sentinel and return 100 (5/5 cases); every post-guard failure (c) leaves NULL: 104 UNSUPPORTED_CONTAINER, 103 IO, 112 OUT_OF_MEMORY (calloc injected via -Wl,--wrap=calloc). A caller holding a live prior handle in that slot loses the only reference while the handle stays fully usable (song_probe on the saved copy: status 0, 44100 Hz, 2 ch). Path (b) is structurally empty: songcore_ffmpeg.c:823-824 is a returning guard and 825 is the deposit, with no statement between them. Compiled artifacts on BOTH release targets contain the post-guard NULL store (linux 221c 'movq $0x0,(%rsi)'; mingw 2100 'movq $0x0,(%rdx)'), so changing the implementation would change machine code on both targets, while re-wording the header changes no code at all. No in-repo production consumer depends on either reading.",
+  "not_run": [
+    "windows-x86_64 RUNTIME execution of the probe: NOT_RUN (no Windows runtime reachable from WSL; only static disassembly of the mingw artifact). Nothing here claims Windows runtime behaviour.",
+    "cargo test --workspace / decode-songcore test suite: NOT_RUN in this lane. The consumer analysis is by reading call sites (crates/qianqian-songcore-sys/src/lib.rs:182, crates/qianqian-decode-songcore/src/lib.rs:359-370, e1_abi_tests.rs:545-555, plugin_tax_tests.rs:48, decode_endpoint_tests.rs:305), not by executing the Rust suite.",
+    "macOS / other target compiled artifacts for song_open: NOT_RUN (no closure imported for those targets in this lane).",
+    "A build with the proposed fix applied: NOT_RUN by design — this lane is read-only; no product code or normative ABI text was changed."
+  ]
+}

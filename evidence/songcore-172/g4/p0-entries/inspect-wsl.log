@@ -1,0 +1,35 @@
+== repos ==
+repo=/home/hoo/Source/qianqian head=69ba1ce05a2772f5aa077c6ece3365c40f6e0500 branch=main
+repo=/home/hoo/qianqian-172-linux head=bf23516b5851174dc63fb5058997fa5478751713 branch=songcore-172/pr-a-build-fixes
+== branches matching songcore-172 (WSL repo) ==
+  remotes/origin/songcore-172/pr-a-build-fixes
+  remotes/origin/songcore-172/pr-b-windows-release-lane
+== build-linux.sh pinned branch/commit exists in WSL repo? ==
+pin_commit=PRESENT
+bf23516b5851174dc63fb5058997fa5478751713
+pin_branch_origin=PRESENT
+== package-rc.ps1 pinned inputs ==
+path=/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip exists sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 bytes=23005975
+path=/home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz exists sha256=018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815 bytes=2588376
+path=/tmp/s3-v010/songcore-v0.1.0-linux-x86_64.tar.gz ABSENT
+== closures / caches ==
+path=/home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake PRESENT
+path=/home/hoo/q172rc PRESENT
+path=/home/hoo/q172rc/closure PRESENT
+path=/home/hoo/q172d2-verify/closure PRESENT
+path=/home/hoo/qianqian-172-linux/native/build/ffmpeg-src PRESENT
+linux_closure_manifest target={"arch": "x86_64", "cross_prefix": null, "id": "linux-x86_64", "platform": "linux", "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d", "target_os": "linux"} recipe_sha256=79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d schema=2
+== tools ==
+tool=xmake path=/home/hoo/.local/bin/xmake
+tool=python3 path=/usr/bin/python3
+tool=gcc path=/usr/bin/gcc
+tool=x86_64-w64-mingw32-gcc path=/usr/bin/x86_64-w64-mingw32-gcc
+tool=ar path=/usr/bin/ar
+tool=objdump path=/usr/bin/objdump
+tool=readelf path=/usr/bin/readelf
+tool=nm path=/usr/bin/nm
+tool=git path=/usr/bin/git
+tool=wslpath path=/usr/bin/wslpath
+xmake_version=xmake v2.9.7+20250101, A cross-platform build utility based on Lua
+gcc_version=gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+HOME=/home/hoo

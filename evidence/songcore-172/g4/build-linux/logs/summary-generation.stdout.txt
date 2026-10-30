@@ -1,0 +1,15 @@
+{
+  "stage_json": "/home/hoo/g4-172/linux-root/receipts/g4-linux-build/stage.json",
+  "summary_json": "/home/hoo/g4-172/linux-root/receipts/g4-linux-build/summary.json",
+  "stage_json_sha256": "a4342c234c24cd5545762cea3db30e179e7b6e382def05993db4704812f14699",
+  "summary_json_sha256": "042d61d44efbc072b4b277a342068b0245e9926314a9740a178b0c37f12fc986",
+  "evidence_files": 64,
+  "argv_entries": 12,
+  "nonzero_exit_entries": [
+    {
+      "stage": "compile-commands",
+      "exit": 255,
+      "argv": "xmake project -k compile_commands -o /home/hoo/g4-172/linux-root/receipts/g4-linux-build/compile-commands"
+    }
+  ]
+}

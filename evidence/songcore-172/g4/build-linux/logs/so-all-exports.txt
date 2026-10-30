@@ -1,0 +1,15 @@
+T song_audio_stream_count
+T song_audio_stream_info
+T song_close
+T song_get_artwork_count
+T song_get_artwork_item
+T song_get_metadata
+T song_get_metadata_count
+T song_get_metadata_entry
+T song_last_error
+T song_open
+T song_probe
+T song_read_pcm
+T song_seek
+T song_select_stream
+T songcore_abi_version

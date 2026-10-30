@@ -1,0 +1,126 @@
+# windows-x86_64 (mingw) libsongcore.a  sha256 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97
+# built from: git archive 69ba1ce05a2772f5aa077c6ece3365c40f6e0500 | tar -x
+# argv: x86_64-w64-mingw32-objdump -d <lib> | awk '/<song_open>:/{f=1} f{print} f&&/^$/{exit}'
+00000000000020c0 <song_open>:
+    20c0:	57                   	push   %rdi
+    20c1:	56                   	push   %rsi
+    20c2:	53                   	push   %rbx
+    20c3:	48 83 ec 50          	sub    $0x50,%rsp
+    20c7:	48 89 cb             	mov    %rcx,%rbx
+    20ca:	48 89 d7             	mov    %rdx,%rdi
+    20cd:	48 85 c9             	test   %rcx,%rcx
+    20d0:	0f 84 3a 01 00 00    	je     2210 <song_open+0x150>
+    20d6:	48 85 d2             	test   %rdx,%rdx
+    20d9:	0f 84 31 01 00 00    	je     2210 <song_open+0x150>
+    20df:	48 83 79 08 00       	cmpq   $0x0,0x8(%rcx)
+    20e4:	0f 84 26 01 00 00    	je     2210 <song_open+0x150>
+    20ea:	48 83 79 10 00       	cmpq   $0x0,0x10(%rcx)
+    20ef:	0f 84 1b 01 00 00    	je     2210 <song_open+0x150>
+    20f5:	48 83 79 18 00       	cmpq   $0x0,0x18(%rcx)
+    20fa:	0f 84 10 01 00 00    	je     2210 <song_open+0x150>
+    2100:	48 c7 02 00 00 00 00 	movq   $0x0,(%rdx)
+    2107:	48 8d 0d 98 00 00 00 	lea    0x98(%rip),%rcx        # 21a6 <song_open+0xe6>
+    210e:	e8 00 00 00 00       	call   2113 <song_open+0x53>
+    2113:	48 85 c0             	test   %rax,%rax
+    2116:	74 0b                	je     2123 <song_open+0x63>
+    2118:	80 38 30             	cmpb   $0x30,(%rax)
+    211b:	75 12                	jne    212f <song_open+0x6f>
+    211d:	80 78 01 00          	cmpb   $0x0,0x1(%rax)
+    2121:	75 0c                	jne    212f <song_open+0x6f>
+    2123:	48 8d 0d d6 de ff ff 	lea    -0x212a(%rip),%rcx        # 0 <songcore_discard_av_log>
+    212a:	e8 00 00 00 00       	call   212f <song_open+0x6f>
+    212f:	ba d8 02 00 00       	mov    $0x2d8,%edx
+    2134:	b9 01 00 00 00       	mov    $0x1,%ecx
+    2139:	e8 00 00 00 00       	call   213e <song_open+0x7e>
+    213e:	48 89 c6             	mov    %rax,%rsi
+    2141:	48 85 c0             	test   %rax,%rax
+    2144:	0f 84 1e 01 00 00    	je     2268 <song_open+0x1a8>
+    214a:	f3 0f 6f 03          	movdqu (%rbx),%xmm0
+    214e:	f3 0f 6f 4b 10       	movdqu 0x10(%rbx),%xmm1
+    2153:	b9 00 80 00 00       	mov    $0x8000,%ecx
+    2158:	c7 40 78 00 00 00 00 	movl   $0x0,0x78(%rax)
+    215f:	0f 11 00             	movups %xmm0,(%rax)
+    2162:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+    2166:	e8 00 00 00 00       	call   216b <song_open+0xab>
+    216b:	48 89 c3             	mov    %rax,%rbx
+    216e:	48 85 c0             	test   %rax,%rax
+    2171:	0f 84 e9 00 00 00    	je     2260 <song_open+0x1a0>
+    2177:	48 8d 05 72 e0 ff ff 	lea    -0x1f8e(%rip),%rax        # 1f0 <io_seek>
+    217e:	49 89 f1             	mov    %rsi,%r9
+    2181:	45 31 c0             	xor    %r8d,%r8d
+    2184:	48 89 d9             	mov    %rbx,%rcx
+    2187:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+    218c:	48 8d 05 7d de ff ff 	lea    -0x2183(%rip),%rax        # 10 <io_read>
+    2193:	ba 00 80 00 00       	mov    $0x8000,%edx
+    2198:	48 c7 44 24 28 00 00 	movq   $0x0,0x28(%rsp)
+    219f:	00 00 
+    21a1:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+    21a6:	e8 00 00 00 00       	call   21ab <song_open+0xeb>
+    21ab:	48 89 46 38          	mov    %rax,0x38(%rsi)
+    21af:	48 85 c0             	test   %rax,%rax
+    21b2:	0f 84 a0 00 00 00    	je     2258 <song_open+0x198>
+    21b8:	e8 00 00 00 00       	call   21bd <song_open+0xfd>
+    21bd:	48 89 46 28          	mov    %rax,0x28(%rsi)
+    21c1:	48 85 c0             	test   %rax,%rax
+    21c4:	0f 84 a6 00 00 00    	je     2270 <song_open+0x1b0>
+    21ca:	48 8b 56 38          	mov    0x38(%rsi),%rdx
+    21ce:	48 8d 4e 28          	lea    0x28(%rsi),%rcx
+    21d2:	45 31 c9             	xor    %r9d,%r9d
+    21d5:	45 31 c0             	xor    %r8d,%r8d
+    21d8:	81 88 80 00 00 00 80 	orl    $0x80,0x80(%rax)
+    21df:	00 00 00 
+    21e2:	48 89 50 20          	mov    %rdx,0x20(%rax)
+    21e6:	48 8d 15 ac 00 00 00 	lea    0xac(%rip),%rdx        # 2299 <song_probe+0x9>
+    21ed:	48 c7 80 88 00 00 00 	movq   $0x100000,0x88(%rax)
+    21f4:	00 00 10 00 
+    21f8:	e8 00 00 00 00       	call   21fd <song_open+0x13d>
+    21fd:	89 c2                	mov    %eax,%edx
+    21ff:	85 c0                	test   %eax,%eax
+    2201:	78 1d                	js     2220 <song_open+0x160>
+    2203:	48 89 37             	mov    %rsi,(%rdi)
+    2206:	31 c0                	xor    %eax,%eax
+    2208:	48 83 c4 50          	add    $0x50,%rsp
+    220c:	5b                   	pop    %rbx
+    220d:	5e                   	pop    %rsi
+    220e:	5f                   	pop    %rdi
+    220f:	c3                   	ret
+    2210:	b8 64 00 00 00       	mov    $0x64,%eax
+    2215:	48 83 c4 50          	add    $0x50,%rsp
+    2219:	5b                   	pop    %rbx
+    221a:	5e                   	pop    %rsi
+    221b:	5f                   	pop    %rdi
+    221c:	c3                   	ret
+    221d:	0f 1f 00             	nopl   (%rax)
+    2220:	b8 67 00 00 00       	mov    $0x67,%eax
+    2225:	83 fa fb             	cmp    $0xfffffffb,%edx
+    2228:	74 0f                	je     2239 <song_open+0x179>
+    222a:	31 c0                	xor    %eax,%eax
+    222c:	83 fa f4             	cmp    $0xfffffff4,%edx
+    222f:	0f 94 c0             	sete   %al
+    2232:	8d 04 c5 68 00 00 00 	lea    0x68(,%rax,8),%eax
+    2239:	48 89 f1             	mov    %rsi,%rcx
+    223c:	89 44 24 4c          	mov    %eax,0x4c(%rsp)
+    2240:	e8 9b e0 ff ff       	call   2e0 <cleanup.part.0>
+    2245:	8b 44 24 4c          	mov    0x4c(%rsp),%eax
+    2249:	48 83 c4 50          	add    $0x50,%rsp
+    224d:	5b                   	pop    %rbx
+    224e:	5e                   	pop    %rsi
+    224f:	5f                   	pop    %rdi
+    2250:	c3                   	ret
+    2251:	0f 1f 80 00 00 00 00 	nopl   0x0(%rax)
+    2258:	48 89 d9             	mov    %rbx,%rcx
+    225b:	e8 00 00 00 00       	call   2260 <song_open+0x1a0>
+    2260:	48 89 f1             	mov    %rsi,%rcx
+    2263:	e8 00 00 00 00       	call   2268 <song_open+0x1a8>
+    2268:	b8 70 00 00 00       	mov    $0x70,%eax
+    226d:	eb 99                	jmp    2208 <song_open+0x148>
+    226f:	90                   	nop
+    2270:	48 8d 4e 38          	lea    0x38(%rsi),%rcx
+    2274:	e8 00 00 00 00       	call   2279 <song_open+0x1b9>
+    2279:	48 89 f1             	mov    %rsi,%rcx
+    227c:	e8 00 00 00 00       	call   2281 <song_open+0x1c1>
+    2281:	eb e5                	jmp    2268 <song_open+0x1a8>
+    2283:	66 90                	xchg   %ax,%ax
+    2285:	66 66 2e 0f 1f 84 00 	data16 cs nopw 0x0(%rax,%rax,1)
+    228c:	00 00 00 00 
+

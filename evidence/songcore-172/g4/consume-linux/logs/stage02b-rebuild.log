@@ -1,0 +1,56 @@
+b8447960d9112228e8c40fe8b8311e4133cc7c3fda533a1bc098a4ec2acd34a7  /home/hoo/g4-172/consume-linux/src/consume_corpus.c
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/g4-172/consume-linux/src/external-consumer-example.c
+4ce339849de57e7ecdc77b9be1445f193887826e2642f06e9884b29482792c8a  /home/hoo/g4-172/consume-linux/src/seek_probe.c
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -Wl,-rpath,/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/seek_probe.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/seek-probe-static
+[exit] 0
+1651711efb6bd922111abe21de21e7033a3c87d2c081aa0942fd0b5650dd51f6  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+612339df574762e69cfac7fbfbe281643573ab7bd1d9f1cf0e844822e738e932  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+8b3cb3c94b1b45da29e866838e84c1e0c6eeaeb023b17fd514b3068f62f450eb  /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+653fe400349d895fab7c5b3d14e24db860e3b5b9621894989605d61d5f25c5c2  /home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+50e8dd9787238ee0a2dc809649a7504c3a511e098b226b2d527314a0151942db  /home/hoo/g4-172/consume-linux/bin/consumer-example-static
+4187d6887837b2a07b8356c2b00d2981db771165346d7aa8f5f40896f29caf52  /home/hoo/g4-172/consume-linux/bin/seek-probe-static
+
+$ /home/hoo/g4-172/consume-linux/bin/seek-probe-static fresh /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac 1000000 2000000 3000000 3500000 3700000 3800000 3900000 3950000 3990000 4000000
+{"mode":"fresh","target_us":1000000,"seek_status":0,"landing_us":940408,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":130832}
+{"mode":"fresh","target_us":2000000,"seek_status":0,"landing_us":1985306,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":84752}
+{"mode":"fresh","target_us":3000000,"seek_status":0,"landing_us":2925714,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":43280}
+{"mode":"fresh","target_us":3500000,"seek_status":0,"landing_us":3448163,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":20240}
+{"mode":"fresh","target_us":3700000,"seek_status":0,"landing_us":3657143,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":11024}
+{"mode":"fresh","target_us":3800000,"seek_status":0,"landing_us":3761633,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6416}
+{"mode":"fresh","target_us":3900000,"seek_status":0,"landing_us":3761633,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6416}
+{"mode":"fresh","target_us":3950000,"seek_status":0,"landing_us":3761633,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6416}
+{"mode":"fresh","target_us":3990000,"seek_status":0,"landing_us":3761633,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6416}
+{"mode":"fresh","target_us":4000000,"seek_status":0,"landing_us":3761633,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6416}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/seek-probe-static same /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac 1000000 2000000 3000000 3800000
+{"same_handle":1,"codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"mode":"same","target_us":1000000,"seek_status":0,"landing_us":940408,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":130832}
+{"mode":"same","target_us":2000000,"seek_status":0,"landing_us":1985306,"read_status":100,"read_produced":0,"drain_terminal":"none","frames_after_landing":0}
+{"mode":"same","target_us":3000000,"seek_status":0,"landing_us":2925714,"read_status":100,"read_produced":0,"drain_terminal":"none","frames_after_landing":0}
+{"mode":"same","target_us":3800000,"seek_status":110,"landing_us":-1}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/seek-probe-static fresh /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 1000000 2000000 3000000 3800000
+{"mode":"fresh","target_us":1000000,"seek_status":0,"landing_us":992653,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":129633}
+{"mode":"fresh","target_us":2000000,"seek_status":0,"landing_us":1985306,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":85857}
+{"mode":"fresh","target_us":3000000,"seek_status":0,"landing_us":2977959,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":42081}
+{"mode":"fresh","target_us":3800000,"seek_status":0,"landing_us":3787755,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":6369}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/seek-probe-static fresh /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a 1000000 2000000 3000000 3800000
+{"mode":"fresh","target_us":1000000,"seek_status":0,"landing_us":928798,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":131344}
+{"mode":"fresh","target_us":2000000,"seek_status":0,"landing_us":1950476,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":86288}
+{"mode":"fresh","target_us":3000000,"seek_status":0,"landing_us":2972154,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":41232}
+{"mode":"fresh","target_us":3800000,"seek_status":0,"landing_us":3715193,"read_status":0,"read_produced":4096,"drain_terminal":"SONG_EOF","frames_after_landing":8464}
+[exit] 0

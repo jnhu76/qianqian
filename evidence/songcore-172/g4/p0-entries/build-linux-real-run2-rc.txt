@@ -1,0 +1,7 @@
+SCRIPT_RC=0
+workspace_head=69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+summary_head=bf23516b5851174dc63fb5058997fa5478751713
+summary_verdict=PASS
+summary_clone=reuse
+summary_closure=reuse
+summary_static_sha=409ef3da505f94d559a5fb5cb042fccd225d52238a00bd50722dd5f2669dd0f3

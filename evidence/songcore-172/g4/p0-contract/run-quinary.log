@@ -1,0 +1,81 @@
+
+########## G1 full staged file list ##########
+exit=0
+LICENSES/COPYING.GPLv2
+LICENSES/COPYING.GPLv3
+LICENSES/COPYING.LGPLv2.1
+LICENSES/COPYING.LGPLv3
+LICENSES/LICENSE-APACHE
+LICENSES/LICENSE-MIT
+LICENSES/THIRD_PARTY_NOTICES.txt
+README.md
+include/songcore.h
+metadata/checksums.txt
+metadata/external-consumer-example.c
+metadata/manifest.json
+metadata/symbols.txt
+count=13
+
+########## G2 zip entries (python zipfile: all entries vs file entries) ##########
+exit=0
+all_entries=14
+file_entries=14
+dir_entries=0
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv2
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.GPLv3
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv2.1
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/COPYING.LGPLv3
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-APACHE
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/LICENSE-MIT
+  songcore-v0.2.0-rc.1-windows-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+  songcore-v0.2.0-rc.1-windows-x86_64/README.md
+  songcore-v0.2.0-rc.1-windows-x86_64/include/songcore.h
+  songcore-v0.2.0-rc.1-windows-x86_64/lib/libsongcore.a
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/checksums.txt
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/external-consumer-example.c
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json
+  songcore-v0.2.0-rc.1-windows-x86_64/metadata/symbols.txt
+
+########## G3 checksums.txt raw lines ##########
+exit=0
+ 1: cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  include/songcore.h
+ 2: 1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402  lib/libsongcore.a
+ 3: 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  LICENSES/COPYING.GPLv2
+ 4: 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  LICENSES/COPYING.GPLv3
+ 5: 246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30  LICENSES/COPYING.LGPLv2.1
+ 6: da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768  LICENSES/COPYING.LGPLv3
+ 7: a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2  LICENSES/LICENSE-APACHE
+ 8: e31ce84df1ec2f133ce740b58935fca19cf6bdafa59454d56678e99bcaa5ace0  LICENSES/LICENSE-MIT
+ 9: 5d20798cca032a69275359fc5ebb2f0c8593897b00b28748532e9423519fa7c7  LICENSES/THIRD_PARTY_NOTICES.txt
+10: d14547312c12e07fdaf1e826ed2236d3694808a5ba233181c07c6dbb71ce1552  metadata/external-consumer-example.c
+11: a9021122b2b8993ccbd8783f324ff96ea4d8c152860cc8b2f4fdea92e8cfb548  metadata/manifest.json
+12: dd92bef58e43fb17bae0ba7df377d173fa9de494caa4325024d62a54db6f3806  metadata/symbols.txt
+13: 30e72fe3074134e79628962cbe70a2e7eb5195358f77dddfbd82073e49a1e9c1  README.md
+nonempty_lines=13
+sha256_rows=13
+
+########## G4 set equality: checksums rows == all files minus checksums.txt ##########
+checksums_paths=13
+staged_minus_checksums=12
+G4=SET_DIFF
+--- /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-contract/rc-staged-files-minus-checksums.txt	2026-10-30 20:32:08.381064000 +0800
++++ /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/p0-contract/rc-checksums-paths.txt	2026-10-30 20:32:08.372418700 +0800
+@@ -7,6 +7,7 @@
+ LICENSES/THIRD_PARTY_NOTICES.txt
+ README.md
+ include/songcore.h
++lib/libsongcore.a
+ metadata/external-consumer-example.c
+ metadata/manifest.json
+ metadata/symbols.txt
+
+########## G5 files{} keys vs checksums minus manifest.json ##########
+exit=0
+files_keys=12 checksums_rows=13
+files_keys_minus_expected=[]
+checksums_minus_files_keys=['metadata/manifest.json']
+
+########## G6 §8 V1 claim vs measured ##########
+429:    entries; windows RC 14 package files / 13 checksum entries / 12
+exit=0
+########## DONE ##########

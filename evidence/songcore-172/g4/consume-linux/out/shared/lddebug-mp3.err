@@ -1,0 +1,55 @@
+     34265:	find library=libsongcore.so [0]; searching
+     34265:	 search path=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v3:/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v2:/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared		(LD_LIBRARY_PATH)
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v3/libsongcore.so
+     34265:	    (no such file)
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v2/libsongcore.so
+     34265:	    (no such file)
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+     34265:	
+     34265:	find library=libc.so.6 [0]; searching
+     34265:	 search path=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared		(LD_LIBRARY_PATH)
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libc.so.6
+     34265:	    (no such file)
+     34265:	 search cache=/etc/ld.so.cache
+     34265:	  trying file=/usr/lib/x86_64-linux-gnu/libc.so.6
+     34265:	
+     34265:	find library=libm.so.6 [0]; searching
+     34265:	 search path=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared		(LD_LIBRARY_PATH)
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libm.so.6
+     34265:	    (no such file)
+     34265:	 search cache=/etc/ld.so.cache
+     34265:	  trying file=/usr/lib/x86_64-linux-gnu/libm.so.6
+     34265:	
+     34265:	
+     34265:	calling init: /lib64/ld-linux-x86-64.so.2
+     34265:	
+     34265:	
+     34265:	calling init: /usr/lib/x86_64-linux-gnu/libc.so.6
+     34265:	
+     34265:	
+     34265:	calling init: /usr/lib/x86_64-linux-gnu/libm.so.6
+     34265:	
+     34265:	
+     34265:	calling init: /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+     34265:	
+     34265:	
+     34265:	initialize program: /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+     34265:	
+     34265:	
+     34265:	transferring control: /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+     34265:	
+     34265:	
+     34265:	calling fini:  [0]
+     34265:	
+     34265:	
+     34265:	calling fini: /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so [0]
+     34265:	
+     34265:	
+     34265:	calling fini: /usr/lib/x86_64-linux-gnu/libm.so.6 [0]
+     34265:	
+     34265:	
+     34265:	calling fini: /usr/lib/x86_64-linux-gnu/libc.so.6 [0]
+     34265:	
+     34265:	
+     34265:	calling fini: /lib64/ld-linux-x86-64.so.2 [0]
+     34265:	

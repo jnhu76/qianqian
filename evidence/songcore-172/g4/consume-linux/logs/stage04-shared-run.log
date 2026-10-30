@@ -1,0 +1,142 @@
+=== stage04 shared run 2026-10-30T13:20:33Z ===
+PKG=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64
+the only libsongcore.so under PKG:
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+any system libsongcore.so? (ldconfig -p | grep songcore):
+(none in the dynamic-linker cache)
+any OTHER libsongcore.so on the host outside PKG (excluding our isolated dir):
+/home/hoo/lane-e-runtime/isolate/libsongcore.so
+/home/hoo/lane-e-runtime/work/shared/libsongcore.so
+/home/hoo/Source/qianqian/native/build/artifacts/shared/libsongcore.so
+/home/hoo/Source/qianqian/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/g4-172/laneB-packages/linux/stage/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/laneB-packages/linux/verify-extract/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/linux-root/native/build/artifacts/shared/libsongcore.so
+/home/hoo/g4-172/linux-root/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/g4-172/packages/runB/stage/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/packages/runB/verify-extract/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/packages/runA/stage/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/packages/runA/verify-extract/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/packages/guard/stage/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/g4-172/packages/guard/verify-extract/songcore-v0.2.0-rc.1-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/q172d2/lin/native/build/artifacts/shared/libsongcore.so
+/home/hoo/q172d2/lin/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qq329/stage/linux-linux-root-two/lib/shared/libsongcore.so
+/home/hoo/qq329/stage/linux-lin-l1-route/lib/shared/libsongcore.so
+/home/hoo/qq329/stage/linux-lin-r1/lib/shared/libsongcore.so
+/home/hoo/qq329/stage/linux-trial/lib/shared/libsongcore.so
+/home/hoo/qq329/lin-r1/src/native/build/artifacts/shared/libsongcore.so
+/home/hoo/qq329/lin-r1/src/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qq329/lin-l1-route/src/native/build/artifacts/shared/libsongcore.so
+/home/hoo/qq329/lin-l1-route/src/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qq329/linux-root-two/src/native/build/artifacts/shared/libsongcore.so
+/home/hoo/qq329/linux-root-two/src/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qianqian-172-linux-r2/native/build/artifacts/shared/libsongcore.so
+/home/hoo/qianqian-172-linux-r2/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qianqian-172-linux/native/build/artifacts/shared/libsongcore.so
+/home/hoo/qianqian-172-linux/native/build/.deps/songcore_shared/linux/x86_64/release/libsongcore.so.d
+/home/hoo/qianqian-172-linux/ops/package/stage/songcore-v0.0.0-s3-verify-linux-x86_64/lib/shared/libsongcore.so
+/home/hoo/d3probe/lib/libsongcore.so
+/home/hoo/q172-g4-p0/v010/songcore-v0.1.0-linux-x86_64/lib/shared/libsongcore.so
+
+$ env -u LD_LIBRARY_PATH ldd /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+	linux-vdso.so.1 (0x00007e37c2ff9000)
+	libsongcore.so => not found
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007e37c2c00000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007e37c2ffb000)
+[exit] 0
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared ldd /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+	linux-vdso.so.1 (0x000077b33597f000)
+	libsongcore.so => /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so (0x000077b335400000)
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x000077b335000000)
+	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x000077b33583f000)
+	/lib64/ld-linux-x86-64.so.2 (0x000077b335981000)
+[exit] 0
+
+$ env -u LD_LIBRARY_PATH ldd /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+	linux-vdso.so.1 (0x000071e453c59000)
+	libsongcore.so => /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so (0x000071e453800000)
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x000071e453400000)
+	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x000071e4536da000)
+	/lib64/ld-linux-x86-64.so.2 (0x000071e453c5b000)
+[exit] 0
+
+$ LD_DEBUG=libs LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared <mp3>
+[exit] 0
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v3/libsongcore.so
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/glibc-hwcaps/x86-64-v2/libsongcore.so
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libc.so.6
+     34265:	  trying file=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libm.so.6
+     34265:	calling init: /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+
+=== [shared] consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+[exit] 0
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [shared] consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3
+[exit] 0
+
+=== [shared] consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+[exit] 0
+probe: codec=flac container=flac rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=Flac Sixteen Fortyfour artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [shared] consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+[exit] 0
+
+=== [shared] consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+[exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 176400 frames to EOF
+seek: landing_us=1950476 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [shared] consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a
+[exit] 0
+
+=== [shared] consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+[exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=6000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 264600 frames to EOF
+seek: landing_us=2972154 (target 3000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+=== [shared] consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a ===
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a
+[exit] 0
+
+=== [shared-rpath] consume-corpus-shared-rpath (no LD_LIBRARY_PATH) flac ===
+$ env -u LD_LIBRARY_PATH /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac
+[exit] 0
+
+=== [shared] negative control: run WITHOUT LD_LIBRARY_PATH (expect loader failure 127) ===
+$ env -u LD_LIBRARY_PATH /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared <mp3>
+[exit] 127
+/home/hoo/g4-172/consume-linux/bin/consume-corpus-shared: error while loading shared libraries: libsongcore.so: cannot open shared object file: No such file or directory

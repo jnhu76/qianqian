@@ -1,0 +1,3 @@
+/usr/lib/python3.14/zipfile/__init__.py:1721: UserWarning: Duplicate name: 'qianqian-v0.1.0-windows-x86_64/qianqian.exe'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+PASS: E01–E18; real PE controls; original HEAD/status/tool bytes unchanged

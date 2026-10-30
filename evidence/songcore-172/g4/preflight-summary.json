@@ -1,0 +1,302 @@
+{
+  "BASE_SHA": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "CURRENT_MAIN_SHA": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "REVISION": {
+    "version": "v2",
+    "date": "2026-10-30",
+    "purpose": "absorb three independent reviews (A/B/C) into the decision packet; Owner decision fields unchanged",
+    "reviews": {
+      "A": "REVISE (8 issues: 2 high, 4 medium, 2 low)",
+      "B": "REVISE (7 issues: 2 medium, 5 low)",
+      "C": "REVISE (7 issues: 4 medium, 3 low)"
+    },
+    "dispositions": {
+      "high": 2,
+      "medium": 10,
+      "low": 10,
+      "accepted_and_corrected": 21,
+      "partially_accepted": 1,
+      "rejected": 0
+    },
+    "partial_acceptance": "C-3: the artifact_shared mismatch is accepted as fact, but 'violation of contract section 8' is downgraded to an unspecified-representation authority gap (section 8 says carried field names keep their meaning; only target/toolchain are explicitly frozen as to type)",
+    "scope_limitations": [
+      "A-1: the receipt-chain defect is accepted; the artifact identity remains re-hashable from package/linux/extract and from the clone=reuse build root",
+      "A-5: the static-archive version-string defect is accepted; the shared .so does not export av_version_info, so the shared form is NOT_RUN, not the same defect",
+      "C-1: the receipt-scope defect is accepted; the two preflight containers pass T1-T5 when re-run by the finalizer",
+      "B-1/C-5: G2 is PASS_WITH_GAPS (executed parts PASS, unexecuted parts NOT_RUN), not FAIL"
+    ],
+    "owner_decisions_changed": false,
+    "packet": "evidence/songcore-172/g4/G4-OWNER-DECISION-PACKET.md#8",
+    "receipt": "evidence/songcore-172/g4/receipt.md (verbatim, not edited)"
+  },
+  "CONTRACT_AUTHORITY": {
+    "path": "docs/release/songcore-release-contract.md",
+    "sha256": "c26611f72bdbe510fb0baf1f8dd331f71fb12e52962df456ef81dda26b9559a4",
+    "truth_class": "OWNER-RATIFIED repository authority (docs/README.md:17; contract header :4-16)",
+    "ratified": "2026-10-30 via the Issue #330 approval PR",
+    "reserved_owner_items": ["Q1", "Q2_formal_closeout", "Q3", "Q4", "Q5", "D1", "D3"]
+  },
+  "TARGETS_IN_SCOPE": {
+    "linux-x86_64": ["static", "shared"],
+    "windows-x86_64": ["static"],
+    "windows-x86_64_shared": "NOT_IN_SCOPE (native/ffmpeg/targets/windows-x86_64.json artifacts.shared=false; contract §6 gives static-only unless the owner amends §14 Q3)",
+    "out_of_scope_targets": ["linux-aarch64", "android-arm64-v8a", "macos-arm64", "ios-arm64", "windows-arm64", "wasm32-*"]
+  },
+  "WINDOWS_ARTIFACT_READINESS": {
+    "status": "PASS_G0_G1_STATIC_ONLY (artifact ready); G2 = PASS_WITH_GAPS (not satisfied)",
+    "artifact": "libsongcore.a sha256 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97, 3309294 B",
+    "member_census": "280/280 pe-x86-64, 0 foreign",
+    "abi_symbols": "15/15 defined T symbols",
+    "imports": ["BCryptOpenAlgorithmProvider", "BCryptGenRandom", "BCryptCloseAlgorithmProvider"],
+    "consumer_pe": "PASS on the real Windows host; 4/4 PCM fixtures match reference",
+    "g2_status": "PASS_WITH_GAPS (not satisfied: S-BIND section 7.1 step 12 and step 13 were not executed by lane-c-windows-pe; see CONSUMER_WINDOWS_PE.g2_gap)",
+    "build_scope_note": "the lane stage.json says 'cache-compiled all units'; measured 279/280 .obj files have mtime later than 2026-10-30 20:00 and only songcore_ffmpeg.c.obj was reused (2026-10-29 04:20). The description understates the rebuild; it does not overstate it.",
+    "l1_reearned": false,
+    "l1_detail": "ops/build-rc.ps1 reused the persistent /home/hoo/q172rc warm xmake cache and the already-imported closure; no fresh clone + fresh closure derivation",
+    "not_run": ["windows shared/DLL form", "MSVC/native-Windows-toolchain route", "FFmpeg av_get_random_seed entropy path at runtime (0 calls measured)", "32-bit/ARM64 Windows", "G2 S-BIND 7.1 step 12 (malformed/truncated) and step 13 (drop mid-stream then reopen / post-close view invalidation)"]
+  },
+  "LINUX_ARTIFACT_READINESS": {
+    "status": "PASS_G0_G1 (artifact ready); G2 = PASS_WITH_GAPS (not satisfied)",
+    "g2_status": "PASS_WITH_GAPS (not satisfied: step 06 artwork payload, step 13 post-close view invalidation and the step 12 truncated-MP3 typed-error branch were not fully exercised; see G4.partial)",
+    "static": "libsongcore.a sha256 0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308, 4066980 B, 280/280 elf64-x86-64",
+    "shared": "libsongcore.so sha256 085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98, 2288536 B, 15/15 song* dynamic exports",
+    "needed": ["libm.so.6", "libc.so.6"],
+    "l1_reearned": false,
+    "l1_detail": "The build-linux lane records a fresh clone into /home/hoo/g4-172/linux-root/src with a reused imported closure. That root and its receipts/g4-linux-build directory no longer exist at finalization (WSL ls -ld -> No such file or directory). The packaged artifact bytes are independently re-hashable from package/linux/extract (static 0d38f4b5..., shared 085425e5...) and from /home/hoo/g4-172/linux-root/native/build/artifacts (same hashes). No fresh closure derivation; L1 not re-earned.",
+    "artifact_provenance": "PASS for byte identity, FIX_REQUIRED for the receipt chain. package/linux/package-summary.json:26 build_receipt_sha256=1f574edb04fb1ff68ea9688411abc9abb98229a12729a9be72a048dfebce0832 resolves to /home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json, whose fields are entry=ops/build-linux.sh, clone=reuse, closure=reuse, source_repo=/home/hoo/g4-172/wt-tools, work_root=/home/hoo/g4-172/linux-root. That receipt does not record ops/build-linux.sh (measured blob 18dba8840a13bcac315d385960bf7a503c83a46860ccafeb057014c89ca5cd61). artifact_provenance_attested:true therefore attests a clone=reuse build, not the fresh-clone build.",
+    "build_lane_receipt": "build-linux/stage.json has 64 evidence_paths / 64 hashes. 42 paths are absolute WSL paths under /home/hoo/g4-172/linux-root/receipts/g4-linux-build that do not resolve as written (naive repo-root join resolves only 22); mapping the prefix to build-linux/logs/ gives 64/64 hash matches, 0 mismatches. The receipt is not self-contained.",
+    "compare_329": "shared byte-identical to #329 Archive (085425e5); static differs (0d38f4b5 vs 7b506922) only in 4 version.c.o FFMPEG_VERSION strings caused by a different closure-derivation git describe",
+    "not_run": ["L2/L3 this round", "two-root rebuild"]
+  },
+  "PACKAGE_LAYOUT": {
+    "scope": "the two preflight containers are the packages under review; RC-named containers produced by entry-audit/tooling lanes also exist but are not releases (see rc_named_containers)",
+    "windows_preflight": {
+      "container": "evidence/songcore-172/g4/package/win/songcore-v0.0.0-preflight-windows-x86_64.zip",
+      "sha256": "5d92b21d7092b8d84d1db955ddbd38d3dc8b66f9f0ad29de35593f496e6397d3",
+      "bytes": 1449803,
+      "packaged_files": 14,
+      "checksums_entries": 13,
+      "manifest_files_entries": 12,
+      "shared_form": "absent (artifact_shared=false, shared_sha256=null)"
+    },
+    "linux_preflight": {
+      "container": "evidence/songcore-172/g4/package/linux/songcore-v0.0.0-preflight-linux-x86_64.tar.gz",
+      "sha256": "bfe780c3bf65b43f8007f3cd48fe3cef39de8d3a17af81f9767280aa7a43d790",
+      "bytes": 2575536,
+      "packaged_files": 15,
+      "checksums_entries": 14,
+      "manifest_files_entries": 13,
+      "shared_form": "lib/shared/libsongcore.so"
+    },
+    "rc_named_containers": [
+      {
+        "path": "evidence/songcore-172/g4/p0-entries/package-rc-out/default/songcore-v0.2.0-rc.1-windows-x86_64.zip",
+        "sha256": "e0c488a931d6f7bb0003d918eeee92f2202523e18319e617f26d264ae547084b",
+        "version": "0.2.0-rc.1",
+        "started": "20261030-203142",
+        "artifact_sha256": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97"
+      },
+      {
+        "path": "evidence/songcore-172/g4/p0-entries/package-rc-out/ver-0.1.0-rc.1/songcore-v0.1.0-rc.1-windows-x86_64.zip",
+        "sha256": "7e843c9a68477bd575298993eca1b961b027eceba88a3793c111423d436cb264",
+        "version": "0.1.0-rc.1",
+        "artifact_sha256": "89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97"
+      },
+      {
+        "path": "evidence/songcore-172/g4/p0-entries/package-rc-out/stale-artifact/songcore-v0.2.0-rc.1-windows-x86_64.zip",
+        "sha256": "c3983bfb0215d771b6343fed576d649a975662b1adcf90b85c52ed50e9ee1604",
+        "version": "0.2.0-rc.1",
+        "note": "deliberate stale-artifact negative control"
+      },
+      {
+        "path": "evidence/songcore-172/g4/tools-linux-substrate/package/manifest.json",
+        "songcore_version": "0.2.0-rc.1",
+        "note": "Linux substrate package tree, not a container"
+      }
+    ],
+    "rc_status": "none of the RC-named artifacts has a tag, GitHub Release or publication path; NEW_RC remains NOT_CREATED and is not authorized",
+    "set_arithmetic": "independently re-walked by the v1 packet author and re-confirmed by the v2 finalizer: checksums == packaged files minus itself; files{} == checksums minus manifest.json; every entry re-hashes; win 14/13/12, linux 15/14/13, 0 mismatches; sha256sum -c OK inside both extracted roots (contract §8 V1 / §16 D2)",
+    "artifact_shared_representation": "FIX_REQUIRED / authority gap: windows manifest :19 is boolean false; linux manifest :19 is the string 'lib/shared/libsongcore.so'; the v0.1.0 manifest :19 is the same string. Contract §8:342 says carried v0.1.0 field names keep their meaning; §8:354-359 states type explicitly only for target/toolchain. No V-check covers this field (E16)."
+  },
+  "MANIFEST_V1_V7": {
+    "status": "PASS_ON_PREFLIGHT_PACKAGES_VERSION_IDENTITY_FIX_REQUIRED",
+    "V1_set_arithmetic": "PASS (win 14/13/12; linux 15/14/13)",
+    "V2_header_sha": "PASS (both packaged headers cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536)",
+    "V3_pin_closure": "PASS (pin 224ad3d5...; closure win 0d0f7af9... / linux d037e8b4...)",
+    "V4_symbols": "PASS (15/15; symbols.txt matches)",
+    "V5_license_flags": "PASS (gpl/version3/nonfree=false; external_libs=[])",
+    "V6_reproducibility": "PASS (all three levels honestly NOT_ESTABLISHED; no false claim)",
+    "V7_tools_target": "PASS (cc/ar/xmake exact versions; recipe_sha256 matches)",
+    "in_build_closure_staleness": "FIX_REQUIRED: native/build/ffmpeg.lua manifest_target_problem (:49-104) checks id/platform/arch/target_os/cross_prefix but never compares target.recipe_sha256 with the current recipe file; grep -n recipe_sha256 native/build/ffmpeg.lua has no match (exit 1) although the comment at :48 says an outdated recipe revision is stale. Lane drivers (ops/build-rc.ps1, g4-closure-validate.py, package-rc.ps1:741) do enforce it, so this round's artifacts were not affected (E14).",
+    "compiled_ffmpeg_version_string": "FIX_REQUIRED: the linux static archive embeds 'FFmpeg version qianqian-v0.1.0-315-gbf23516'; the windows static archive embeds '9.0.1'; both manifests declare ffmpeg_version 9.0.1; no packager/V-check compares the compiled string. The shared .so exports only the 15 song* symbols (av_version_info is not a dynamic export), so the defect faces static consumers; the shared form was not measured this round (NOT_RUN) (E15).",
+    "section_2_version_identity": "FIX_REQUIRED (manifest 0.0.0-preflight vs native/xmake.lua:2 set_version(\"0.1.0\"); tag absent; neither packager has the §2 equality check). Suffix grammar is also unenforced: ops/package-rc.ps1:167-168 accepts [-suffix] and calls it the §2 form, and the unmerged Linux packager ops/package-linux.sh:141-142 does the same; the frozen §2:96-98 has no suffix (E5 + Q1)."
+  },
+  "LICENSE_O1_O4": {
+    "O1_copying_texts": "PASS (4/4 byte-identical to the pinned FFmpeg n9.0.1 zip extraction; both packages)",
+    "O2_third_party_notices": "PASS (present, hashed in checksums.txt, both packages)",
+    "O3_relink_obligation": "PASS at the contract's literal level; FIX_REQUIRED against the stricter test: no executable rebuild/relink procedure, no repo URL, closure manifest is gitignored build output and is misdescribed as being in the repository",
+    "O4_profile_stability": "PASS (37/39 configure args; zero --enable-gpl/version3/nonfree/lib*)"
+  },
+  "LICENSE_B1_B4": {
+    "status": "NOT_TRIGGERED",
+    "B1_license_identity": "not triggered: every shipped text present and hash-identical to the pinned-source extraction",
+    "B2_profile_stability": "not triggered: V5 inputs clean on both manifests",
+    "B3_notices_presence": "not triggered: THIRD_PARTY_NOTICES.txt present and hashed",
+    "B4_component_licenses": "not triggered: LICENSES/LICENSE-MIT and LICENSE-APACHE byte-equal to the repo-root texts at 69ba1ce",
+    "not_run": ["FFmpeg tag->commit recheck (WSL has no network; git ls-remote exit 128)"],
+    "legal_caveat": "machine checks verify presence/hash/configure-arg provenance only; they cannot certify legal sufficiency; each release's license block remains owner-reviewed (contract §10)"
+  },
+  "RUNTIME_DEPENDENCIES": {
+    "linux_shared": "DT_NEEDED = libm.so.6 + libc.so.6 only; no FFmpeg dynamic dependency; no SONAME, no RPATH/RUNPATH; exactly 15 song* dynamic exports",
+    "linux_static_consumer_link": "gcc ... -lsongcore -lm -lpthread; -lm is mandatory; -lpthread is not link-required on glibc 2.43 (placeholder libpthread)",
+    "windows_static": "bcrypt.dll imports BCryptOpenAlgorithmProvider/BCryptGenRandom/BCryptCloseAlgorithmProvider; link line libsongcore.a -lbcrypt",
+    "windows_runtime_bcrypt_path": "instrumented but 0 calls from song_open through close on all four fixtures; NOT runtime-verified",
+    "old_glibc_link_behavior": "NOT_RUN"
+  },
+  "GLIBC_MEASURED_FLOOR": {
+    "value": "GLIBC_2.43",
+    "method": "objdump -T libsongcore.so | grep -o 'GLIBC_[0-9.]*' | sort -uV (highest GLIBC_2.43); readelf --version-info",
+    "full_required_set": ["GLIBC_2.2.5", "GLIBC_2.3.2", "GLIBC_2.3.4", "GLIBC_2.4", "GLIBC_2.6", "GLIBC_2.7", "GLIBC_2.14", "GLIBC_2.17", "GLIBC_2.27", "GLIBC_2.28", "GLIBC_2.29", "GLIBC_2.34", "GLIBC_2.35", "GLIBC_2.43"],
+    "non_glibc_versioned_deps": "NONE",
+    "old_distro_runs": {
+      "ubuntu_20.04_glibc_2.31": "exit 1 (missing GLIBC_2.34/2.35/2.43)",
+      "debian_12_glibc_2.36": "exit 1 (missing GLIBC_2.43)",
+      "ubuntu_24.04_glibc_2.39": "exit 1 (missing GLIBC_2.43)",
+      "alpine_musl": "exit 255 (no such file or directory)",
+      "build_host_glibc_2.43": "PASS"
+    },
+    "policy_status": "OPEN (Q4 owner-reserved; measurement is not policy; no distro family is certified, and no Ubuntu/Debian/Alpine version is declared supported)"
+  },
+  "CONSUMER_STATIC": {
+    "linux": "PASS: package include/ + lib/libsongcore.a; 4/4 fixtures exact match against reference.json (static == shared == reference); open/probe/streams/metadata/seek 25-50-75%/EOF/close; malformed inputs typed statuses",
+    "windows": "PASS: package include/ + lib/libsongcore.a linked with -lbcrypt; PE executed on the real Windows host; 4/4 fixtures exact PCM match",
+    "not_run": ["artwork payload (all fixtures artwork_count=0)", "song_select_stream / multi-stream", "post-close view invalidation assertion", "truncated-MP3 typed-error branch"]
+  },
+  "CONSUMER_SHARED_LINUX": {
+    "status": "PASS",
+    "detail": "package lib/shared/libsongcore.so; link exit 0; the .so carries NO SONAME, so LD_LIBRARY_PATH or RUNPATH is required; negative control without it exits 127; 4/4 fixtures exact match; 8 gated corpus runs (4 static + 4 shared) in out/comparison.json; the lane argv contains 10 consume_corpus invocations (including 1 RUNPATH run and 1 LD_DEBUG trace run that are not gated)",
+    "not_run": ["install-prefix/ldconfig run", "windows shared/DLL consumer"]
+  },
+  "CONSUMER_WINDOWS_PE": {
+    "status": "PASS",
+    "pe": "pe-consumer.exe sha256 3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d",
+    "host": "Windows 11 10.0.26300 x64; host identity captured in run/host.txt (run-all-windows.log:4 carries the Git Bash 'Binary file (standard input) matches' artifact for host_windows)",
+    "pcm": "4/4 fixtures match native/experiments/songcore-equivalence/reference.json",
+    "bcrypt": "link without -lbcrypt fails; with -lbcrypt succeeds; runtime entropy path made 0 calls (NOT runtime-verified)",
+    "g2_gap": "S-BIND section 7.1 step 12 (malformed/truncated) and step 13 (drop mid-stream then reopen / post-close view invalidation) were not executed by this lane; pe-consumer.c has no such arm and the lane's not_run does not declare it. Therefore G2 windows is PASS_WITH_GAPS, not satisfied.",
+    "not_run": ["shared/DLL consumer (package ships no shared form)", "MSVC", "lifecycle negatives", "audible/device output", "G2 step 12 (malformed/truncated)", "G2 step 13 (drop mid-stream then reopen / post-close view invalidation)"]
+  },
+  "RELEASE_POLICY": {
+    "songcore_publisher": "ABSENT (ops/ contains no gh release/gh api; the only release workflow triggers on tags: qianqian-v*)",
+    "product_publisher_refuses_songcore": "check_release.py:74-76 R1 rejects songcore-v* (measured exit 2)",
+    "no_overwrite_design": "check_release.py:221-224 R7 refuses existing releases; publish-qianqian.py:31-35 re-reads the remote peeled tag; :41-44 sole create path gh release create --verify-tag --target; no clobber/edit/upload/delete anywhere",
+    "publish_probes": "songcore-v0.1.0 -> R1 exit 2; songcore-v0.2.0-rc.1 -> R1 exit 2; existing qianqian-v0.1.0 -> R7 exit 2; workflow_dispatch -> R7 exit 2; unused qianqian-v9.9.9 push -> exit 0 (policy only)",
+    "v0_1_0_publication": "manual, 2026-09-02T13:07:42Z; annotated tag a1b6c99 -> commit 522c16d; asset 018e0cbd...; no re-upload",
+    "live_github_read": "READ SUCCEEDED from the Windows host with the jnhu76 token (p0-governance auth-read.log: 6 HTTP 200 responses for /user, repo, releases, release-by-tag, page2, matching-refs; auth-summary.log: permissions {'admin': True, ...}; releases total=2). WSL gh itself has no network (ip addr shows only lo). 'Live GitHub state cannot be read' is false; not publishing is a round rule, not unreachability.",
+    "status": "OWNER_BLOCKED (Q5)",
+    "environment": "Windows host has no gh binary but authenticated REST reads work (see live_github_read); WSL gh has no network; tag/Release creation is forbidden this round and no SongCore publisher exists"
+  },
+  "DOCS_VERIFY": {
+    "status": "FAIL_NOT_RUN",
+    "verify_mjs": "PASS (Errors: 0, Warnings: 0)",
+    "vitepress_build": "FAIL (exit 1 three times: [vite:esbuild-transpile] remove <tmp>\\esbuild-<hash>: Access is denied)",
+    "documented_route": "AGENTS.md:450 names tools\\docs-verify.cmd; the file does not exist at 69ba1ce (cmd //c exit 1; git ls-files and find empty)",
+    "ci_route": "NOT_RUN",
+    "conclusion": "docs-verify is not green on this host; must be rerun on CI or a clean host"
+  },
+  "E01_E18": {
+    "status": "PASS",
+    "command": "wsl.exe -d Ubuntu-24.04 -- bash <evidence>/release-policy/run-e01-e18.sh",
+    "inner": "python3 tools/test_release.py --report <evidence>/release-controls.json (cwd /home/hoo/Source/qianqian, HEAD 69ba1ce, clean)",
+    "exit_code": 0,
+    "stdout": "PASS: E01-E18; real PE controls; original HEAD/status/tool bytes unchanged",
+    "scope": "product release-policy negative controls; does not cover a SongCore publisher (none exists)",
+    "case_count": "69 recorded subprocess executions; 43 distinct non-empty id labels; 23 executions carry an empty id; 0 exit_code/expected mismatches"
+  },
+  "D1_DISPOSITION": {
+    "status": "UNDECIDED",
+    "classification": "spec/header-text defect (not an implementation bug)",
+    "measured": "linux probe 10/10 MATCH exit 0 (10 report() call sites; run.log has 10 MATCH lines; the lane stage.json's 12/12 is an overcount); 104/103/112 overwrite a caller sentinel with NULL; 100 preserves it but is undocumented at songcore.h:217; prior handle stays alive after its only reference is destroyed; windows disassembly only (runtime NOT_RUN)",
+    "second_header_gap": "song_probe's error list (native/include/songcore.h:226-228) also omits SONG_ERR_INVALID_ARGUMENT while native/src/songcore_ffmpeg.c:875 returns it via fail_arg(h); option A must amend both song_open and song_probe",
+    "adapter_comment": "crates/qianqian-decode-songcore/src/lib.rs:358-372 already states the fail-closed NULL as verified fact; consumers are behaviourally insensitive, but the comment documents one reading",
+    "options": ["A amend header text for BOTH song_open (:217-218) and song_probe (:226-228), adding SONG_ERR_INVALID_ARGUMENT to both error lists [recommended]", "B change compiled semantics on both targets", "C record only"],
+    "blocked_because": "editing native/include/songcore.h (normative ABI text, changes header sha256 and contract §3) or native/src/songcore_ffmpeg.c (compiled semantics on both targets) is owner-authorised; contract :855 marks needsOwnerDecision",
+    "not_run": ["windows runtime probe", "Rust workspace tests"]
+  },
+  "D3_DISPOSITION": {
+    "status": "UNDECIDED",
+    "classification": "code bug",
+    "measured": "linux forced rebuild + execution: NULL handle -> 100 and produced stays UINT64_MAX; NULL dst -> 100 and produced stays UINT64_MAX; capacity 0 -> 100 and produced 0; NULL dst + capacity 0 -> UINT64_MAX; control SONG_OK 256 frames; VIOLATIONS 3; disassembly confirms both pre-zeroing guard paths",
+    "options": ["D = A (fix code: zero before both guards) + make the promise total + promote the probe to the release gate [recommended]", "B amend the header promise (weakens v1; per songcore.h:13-15 an ABI-v2-class change)", "C fix only the dst guard (explicitly rejected: the NULL-handle path still violates)"],
+    "blocked_because": "native/src/songcore_ffmpeg.c:1111-1114 fix and any normative header amendment are owner-authorised; contract :917 marks needsOwnerDecision",
+    "not_run": ["windows runtime probe", "post-fix behavior (no source change authorized)"]
+  },
+  "PREFLIGHT_VERDICT": "ENVIRONMENT_BLOCKED",
+  "NEW_RC": {
+    "status": "NOT_CREATED",
+    "detail": "No release candidate is authorized, tagged or published. RC-named containers DO exist as this round's lane artifacts: p0-entries/package-rc-out/default/songcore-v0.2.0-rc.1-windows-x86_64.zip (sha256 e0c488a9..., artifact 89d0428d..., started 20261030-203142), p0-entries/package-rc-out/ver-0.1.0-rc.1/songcore-v0.1.0-rc.1-windows-x86_64.zip (sha256 7e843c9a...), p0-entries/package-rc-out/stale-artifact/songcore-v0.2.0-rc.1-windows-x86_64.zip (sha256 c3983bfb...), and tools-linux-substrate/package/manifest.json songcore_version=0.2.0-rc.1. All carry 'provisional (contract section 14 Q1 owner-reserved)' / 'not a release' status; the statement 'only preflight packages exist' was false and is corrected here."
+  },
+  "TAG": {
+    "status": "NOT_CREATED",
+    "existing_songcore_tags": ["songcore-v0.1.0"],
+    "detail": "0.1.0 is immutable history; the next tag is owner-reserved (Q1) and was not created"
+  },
+  "GITHUB_RELEASE": {
+    "status": "NOT_CREATED",
+    "detail": "songcore-v0.1.0 remains the only release and was not touched; live authenticated read (p0-governance) confirms total=2 releases (qianqian-v0.1.0, songcore-v0.1.0), no drafts; no SongCore publisher exists"
+  },
+  "G4": {
+    "status": "NOT_MET",
+    "open_decisions": 7,
+    "open_decisions_list": ["Q1", "Q2_formal_closeout", "Q3", "Q4", "Q5", "D1", "D3"],
+    "decision_status": {
+      "Q1": "UNDECIDED",
+      "Q2": "RECORDED_ACCEPTANCE_PENDING_FORMAL_CLOSEOUT",
+      "Q3": "UNDECIDED",
+      "Q4": "UNDECIDED",
+      "Q5": "UNDECIDED",
+      "D1": "UNDECIDED",
+      "D3": "UNDECIDED"
+    },
+    "satisfied": ["G0 linux", "G0 windows", "G1 linux", "G1 windows", "V1-V7 on preflight packages", "O1", "O2", "O4", "B1-B4 not triggered", "runtime dependency audits", "static/shared/PE consumers", "E01-E18", "package security T1-T5 on this round's preflight containers (re-run by the finalizer; the original receipt covered older archives)"],
+    "partial": ["G2 linux (PASS_WITH_GAPS: step 06 artwork payload, step 13 post-close view invalidation, step 12 truncated-MP3 typed-error branch not fully exercised)", "G2 windows (PASS_WITH_GAPS: step 12 and step 13 not executed; the lane's not_run does not declare them)"],
+    "not_satisfied": ["section 2 version identity", "Linux packaging entry on main", "build-linux pin/clone", "package-rc artifact provenance", "stale default pins", "O3 executable relink instructions", "Windows notices/README accuracy", "docs-verify", "L1/L2/L3 this round", "Linux fresh-clone receipt not preserved / package provenance attests a clone=reuse build", "in-build closure staleness check does not compare recipe_sha256", "compiled FFmpeg version string vs manifest.ffmpeg_version", "artifact_shared representation (windows boolean vs linux/v0.1.0 string) and missing V-check", "package lane has no stage.json", "S-BIND section 7.2 lossy tolerance/hash policy: no policy artifact found under docs/native/tools (only two prose mentions)", "G4 itself"],
+    "owner_blocked": ["Q1", "Q2 formal closeout", "Q3", "Q4", "Q5", "D1", "D3", "license block review", "tag/Release authorization"],
+    "note": "D1/D3 are not V1-V7 rows, but no legal RC may bypass them; G2 is PASS_WITH_GAPS and does not count as satisfied; G4 cannot close while any owner decision remains open"
+  },
+  "INDEPENDENT_REVIEW": {
+    "verdicts": {"A": "REVISE", "B": "REVISE", "C": "REVISE"},
+    "issue_counts": {"A": {"high": 2, "medium": 4, "low": 2}, "B": {"medium": 2, "low": 5}, "C": {"medium": 4, "low": 3}},
+    "high_issues": {
+      "A-1": "build-linux receipt/artifact path mismatch: ACCEPTED AND CORRECTED (packet section 2.2, 4.2; summary LINUX_ARTIFACT_READINESS). The fresh-clone root and receipts directory no longer exist; 42/64 absolute evidence paths do not resolve; 64/64 hash-match after mapping to build-linux/logs; the package receipt is a clone=reuse/closure=reuse ops/build-linux.sh run.",
+      "A-2": "NEW_RC.detail 'only preflight packages' false: ACCEPTED AND CORRECTED (packet section 2.3; summary NEW_RC). Three RC-named containers and one substrate manifest exist; none is tagged/released/published."
+    },
+    "medium_issue_ids": ["A-3", "A-4", "A-5", "A-6", "B-1", "B-2", "C-1", "C-2", "C-3", "C-4"],
+    "low_issue_ids": ["A-7", "A-8", "B-3", "B-4", "B-5", "B-6", "B-7", "C-5", "C-6", "C-7"],
+    "disposition_summary": "All 22 issues addressed: 21 accepted and corrected in the packet/summary; 1 partially accepted (C-3: fact accepted, 'contract violation' downgraded to an authority gap); 0 rejected. Full row-by-row record: packet section 8.",
+    "checks_executed_this_round": [
+      "find evidence/songcore-172/g4 -name '*.zip' -o -name '*.tar.gz' -> 5 containers incl. 3 RC-named",
+      "sha256sum of the RC-named containers -> e0c488a9... / 7e843c9a... / c3983bfb...",
+      "WSL ls -ld /home/hoo/g4-172/linux-root/src and receipts/g4-linux-build -> No such file or directory",
+      "WSL sha256sum of the surviving build-root artifacts -> 0d38f4b5... / 085425e5...",
+      "sha256sum package/linux/extract artifacts -> same hashes",
+      "WSL sha256sum of the build receipt -> 1f574edb...; fields entry/clone/closure/source_repo read",
+      "WSL sha256sum /home/hoo/g4-172/wt-tools/ops/build-linux.sh -> 18dba884...",
+      "WSL python stage.json path/hash check -> 64 pairs, 42 absolute, 22 naive-resolvable, 64 mapped, 0 mismatch",
+      "grep -a 'FFmpeg version' linux/windows static archives -> qianqian-v0.1.0-315-gbf23516 / 9.0.1",
+      "grep -n recipe_sha256 native/build/ffmpeg.lua -> no match (exit 1)",
+      "grep -c MATCH d1-out-handle/run.log -> 10; report() call sites -> 11 (1 definition + 10 calls)",
+      "WSL python over release-controls.json -> 69 executions, 43 non-empty ids, 23 empty ids, 0 exit mismatches",
+      "grep -o static/shared consume-linux/out/comparison.json -> 4/4; 10 consume_corpus argv invocations",
+      "cat p0-governance/auth-read.log and auth-summary.log -> 6 HTTP 200, admin=True, releases total=2",
+      "sed run-all-windows.log:1-10 and cat host.txt -> primary log binary-match artifact; host.txt correct",
+      "WSL find .objs -newermt -> 279/280 recompiled; songcore_ffmpeg.c.obj 2026-10-29 04:20",
+      "grep -n 'garbage|trunc|reopen' lane-c-windows-pe/src/pe-consumer.c -> no match",
+      "WSL python check_package_security.py on both preflight containers -> exit 0, findings=0, T1-T5 true",
+      "sha256sum of the archives named by the release-policy receipt -> 7b4d0615... (windows rc.1 zip) / 018e0cbd... (v0.1.0 tarball)",
+      "WSL git show of ops/package-linux.sh on the tools branch -> :141-142 suffix grammar",
+      "grep artifact_shared on both preflight manifests and the v0.1.0 manifest -> false / string / string",
+      "WSL python V1 re-walk of both preflight extract trees -> win 14/13/12, linux 15/14/13, sets equal, 0 hash mismatches; sha256sum -c -> 13 OK / 14 OK"
+    ]
+  }
+}

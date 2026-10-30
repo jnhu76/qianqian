@@ -1,0 +1,9 @@
+[build-linux] pin: branch=main commit=69ba1ce05a2772f5aa077c6ece3365c40f6e0500 work-root=/home/hoo/g4-172/linux-root
+[build-linux] source repo: /home/hoo/g4-172/wt-tools
+[build-linux] evidence:    /home/hoo/g4-172/evidence/build-linux/20261030T125134Z
+[build-linux] stage1: cloning /home/hoo/g4-172/wt-tools branch main (expect 69ba1ce05a2772f5aa077c6ece3365c40f6e0500)
+[build-linux] stage1: cloned 69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+[build-linux] stage2: deriving FFmpeg closure (fetch + import oracle)
+FATAL: fetch-ffmpeg failed
+warning: could not reach github for tag recheck; relying on zip sha256
+downloading https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip

@@ -1,0 +1,62 @@
+== zip sha256 ==
+d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746  /home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip
+zip_sha256_exit=0
+== zip top-level entry ==
+roots: ['FFmpeg-n9.0.1']
+match COPYING.GPLv2 ['FFmpeg-n9.0.1/COPYING.GPLv2']
+match COPYING.GPLv3 ['FFmpeg-n9.0.1/COPYING.GPLv3']
+match COPYING.LGPLv2.1 ['FFmpeg-n9.0.1/COPYING.LGPLv2.1']
+match COPYING.LGPLv3 ['FFmpeg-n9.0.1/COPYING.LGPLv3']
+total_entries 10548
+zip_list_exit=0
+== extract COPYING.* from zip ==
+COPYING.GPLv2 18092 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643 <- FFmpeg-n9.0.1/COPYING.GPLv2
+COPYING.GPLv3 35147 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903 <- FFmpeg-n9.0.1/COPYING.GPLv3
+COPYING.LGPLv2.1 26517 246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30 <- FFmpeg-n9.0.1/COPYING.LGPLv2.1
+COPYING.LGPLv3 7651 da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768 <- FFmpeg-n9.0.1/COPYING.LGPLv3
+zip_extract_exit=0
+== v0.1.0 asset ==
+018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815  /home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz
+tar_sha256_exit=0
+songcore-v0.1.0-linux-x86_64/
+songcore-v0.1.0-linux-x86_64/LICENSES/
+songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv2
+songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv3
+songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv2.1
+songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv3
+songcore-v0.1.0-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+songcore-v0.1.0-linux-x86_64/README.md
+songcore-v0.1.0-linux-x86_64/include/
+songcore-v0.1.0-linux-x86_64/include/songcore.h
+songcore-v0.1.0-linux-x86_64/lib/
+songcore-v0.1.0-linux-x86_64/lib/libsongcore.a
+songcore-v0.1.0-linux-x86_64/lib/shared/
+songcore-v0.1.0-linux-x86_64/lib/shared/libsongcore.so
+songcore-v0.1.0-linux-x86_64/metadata/
+songcore-v0.1.0-linux-x86_64/metadata/checksums.txt
+songcore-v0.1.0-linux-x86_64/metadata/external-consumer-example.c
+songcore-v0.1.0-linux-x86_64/metadata/manifest.json
+songcore-v0.1.0-linux-x86_64/metadata/symbols.txt
+tar_list_exit=0
+tar_extract_exit=0
+-- v0.1.0 LICENSES --
+total 96
+-rw-r--r-- 1 hoo hoo 18092 Aug 12 11:24 COPYING.GPLv2
+-rw-r--r-- 1 hoo hoo 35147 Aug 12 11:24 COPYING.GPLv3
+-rw-r--r-- 1 hoo hoo 26517 Aug 12 11:24 COPYING.LGPLv2.1
+-rw-r--r-- 1 hoo hoo  7651 Aug 12 11:24 COPYING.LGPLv3
+-rw-r--r-- 1 hoo hoo  1334 Sep  2 21:05 THIRD_PARTY_NOTICES.txt
+v010_ls_exit=0
+8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  /home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv2
+8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  /home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.GPLv3
+246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30  /home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv2.1
+da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768  /home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/LICENSES/COPYING.LGPLv3
+5d20798cca032a69275359fc5ebb2f0c8593897b00b28748532e9423519fa7c7  /home/hoo/g4-172/laneD-license/v010/songcore-v0.1.0-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+v010_sha_exit=0
+== profile sha256 ==
+57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa  /home/hoo/Source/qianqian/native/ffmpeg/profiles/codec-base.json
+profile_sha_exit=0
+
+----
+script=extract-license-sources.sh
+exit_code=0

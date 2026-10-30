@@ -1,0 +1,33 @@
+### shared abi-complete
+argv: (cd /home/hoo/lane-e-runtime/work/shared && ./abi-complete-shared)
+15
+exit=0
+
+### shared external-consumer-example mp3-cbr-id3v23
+argv: (cd /home/hoo/lane-e-runtime/work/shared && ./external-consumer-shared /home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/mp3-cbr-id3v23.mp3)
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+exit=0
+
+### shared sizeof probe
+argv: (cd /home/hoo/lane-e-runtime/work/shared && ./abi-sizeof-probe-shared)
+abi_version=1
+sizeof(song_status)=4
+sizeof(song_io)=32
+sizeof(song_info)=120
+sizeof(song_stream_info)=88
+sizeof(song_metadata)=192
+sizeof(song_handle*)=8
+off(song_info.codec)=28
+off(song_info.container)=60
+off(song_info.sample_rate)=0
+off(song_info.channels)=4
+off(song_info.duration_us)=16
+off(song_info.audio_stream_count)=96
+off(song_info.selected_audio_index)=92
+exit=0

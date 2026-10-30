@@ -1,0 +1,8 @@
+== toolchain ==
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+[0m[1mxmake v2.9.7+20250101, A cross-platform build utility based on Lua[0m[0m
+[0mCopyright (C) 2015-present Ruki Wang, [4mtboox.org[0m, [4mxmake.io[0m[0m
+Linux 6.18.54.1-microsoft-standard-WSL2 x86_64 GNU/Linux
+== artifact ==
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/d3probe/lib/libsongcore.so
+-rwxr-xr-x 1 hoo hoo 2288536 1793364210 /home/hoo/d3probe/lib/libsongcore.so

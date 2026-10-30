@@ -1,0 +1,17 @@
+AUTH_USER login=jnhu76 id=5766215 type=User
+REPO full_name=jnhu76/qianqian private=False default_branch=main
+REPO permissions: {'admin': True, 'maintain': True, 'push': True, 'triage': True, 'pull': True}
+
+AUTHENTICATED RELEASES total=2
+  qianqian-v0.1.0        draft=False pre=False published=2026-10-06T17:01:12Z assets=[('qianqian-v0.1.0-windows-x86_64.zip', 2742216, 'uploaded')]
+  songcore-v0.1.0        draft=False pre=False published=2026-09-02T13:07:42Z assets=[('songcore-v0.1.0-linux-x86_64.tar.gz', 2588376, 'uploaded')]
+DRAFTS: none
+songcore releases: ['songcore-v0.1.0']
+PAGE2 len=0 (0 proves the per_page=100 list is complete)
+
+ANON vs AUTH release object identical: True
+
+ASSET: [('songcore-v0.1.0-linux-x86_64.tar.gz', 2588376, 'sha256:018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815', '2026-09-02T13:07:40Z', '2026-09-02T13:07:41Z')]
+release updated_at=2026-09-02T13:07:42Z created_at=2026-09-02T13:07:05Z published_at=2026-09-02T13:07:42Z
+body_sha256=ba5b941e2e6eb7485979e0fc18fb71276c8dc9c5c805c2707eacccc0ff24e005
+target_commitish=main

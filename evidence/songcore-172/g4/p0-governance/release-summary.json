@@ -1,0 +1,64 @@
+{
+  "release": {
+    "tag_name": "songcore-v0.1.0",
+    "name": "SongCore v0.1.0",
+    "published_at": "2026-09-02T13:07:42Z",
+    "created_at": "2026-09-02T13:07:05Z",
+    "target_commitish": "main",
+    "draft": false,
+    "prerelease": false,
+    "id": 381268860,
+    "author": "jnhu76",
+    "html_url": "https://github.com/jnhu76/qianqian/releases/tag/songcore-v0.1.0",
+    "assets": [
+      {
+        "name": "songcore-v0.1.0-linux-x86_64.tar.gz",
+        "size": 2588376,
+        "state": "uploaded",
+        "digest": "sha256:018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815",
+        "content_type": "application/x-gtar",
+        "created_at": "2026-09-02T13:07:40Z",
+        "updated_at": "2026-09-02T13:07:41Z",
+        "download_count": 13
+      }
+    ]
+  },
+  "releases_total": 2,
+  "releases": [
+    {
+      "tag": "qianqian-v0.1.0",
+      "name": "Qianqian v0.1.0 — First-Class TUI",
+      "draft": false,
+      "prerelease": false,
+      "published_at": "2026-10-06T17:01:12Z",
+      "assets": [
+        "qianqian-v0.1.0-windows-x86_64.zip"
+      ]
+    },
+    {
+      "tag": "songcore-v0.1.0",
+      "name": "SongCore v0.1.0",
+      "draft": false,
+      "prerelease": false,
+      "published_at": "2026-09-02T13:07:42Z",
+      "assets": [
+        "songcore-v0.1.0-linux-x86_64.tar.gz"
+      ]
+    }
+  ],
+  "songcore_releases": [
+    "songcore-v0.1.0"
+  ],
+  "matching_refs": [
+    {
+      "ref": "refs/tags/songcore-v0.1.0",
+      "type": "tag",
+      "sha": "a1b6c996fcb5d6c7dfea965a11bf3f05b94943fb"
+    }
+  ],
+  "songcore_tags_total": 1,
+  "tags_page1_total": 4,
+  "tags_page1_songcore": [
+    "songcore-v0.1.0"
+  ]
+}

@@ -1,0 +1,5 @@
+checksums_rows=13 mismatch=0
+files_keys=12 mismatch=0
+files_keys == checksums_minus_manifest = True
+checksums == all_files_minus_self = True
+manifest_has_self_or_checksums = False

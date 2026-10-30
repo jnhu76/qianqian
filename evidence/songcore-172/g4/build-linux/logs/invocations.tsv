@@ -1,0 +1,12 @@
+clone	0	git clone --no-local file:///home/hoo/Source/qianqian /home/hoo/g4-172/linux-root/src 
+checkout	0	git -C /home/hoo/g4-172/linux-root/src checkout --quiet --detach 69ba1ce05a2772f5aa077c6ece3365c40f6e0500 
+closure-copy-ffmpeg-src	0	cp -a /home/hoo/qianqian-172-linux/native/build/ffmpeg-src /home/hoo/g4-172/linux-root/src/native/build/ 
+closure-copy-ffmpeg-xmake	0	cp -a /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake /home/hoo/g4-172/linux-root/src/native/build/ 
+closure-validate	0	python3 /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/build-linux/drivers/g4-closure-validate.py /home/hoo/g4-172/linux-root/src /home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip 
+configure	0	xmake f -p linux -a x86_64 -m release -y 
+build-songcore	0	xmake build songcore 
+build-static-explicit	0	xmake build songcore_static 
+build-shared-explicit	0	xmake build songcore_shared 
+compile-commands	255	xmake project -k compile_commands -o /home/hoo/g4-172/linux-root/receipts/g4-linux-build/compile-commands 
+compile-commands-retry	0	xmake project -k compile_commands /home/hoo/g4-172/linux-root/receipts/g4-linux-build/compile-commands 
+verify-measurements	0	bash g4-s3-verify.sh 

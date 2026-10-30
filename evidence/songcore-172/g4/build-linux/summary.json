@@ -1,0 +1,313 @@
+{
+  "lane": "g4-build-linux-x86_64",
+  "campaign": "SongCore #172 G4 \u2014 linux-x86_64 pre-check build (not a release)",
+  "source": {
+    "head": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+    "tree": "30d8c823b90845947341d978f77196dd8778a707",
+    "pinned_head": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+    "pinned_tree": "30d8c823b90845947341d978f77196dd8778a707",
+    "head_matches_pin": true,
+    "tree_matches_pin": true,
+    "clone": "fresh (--no-local)",
+    "clone_from": "file:///home/hoo/Source/qianqian",
+    "tracked_tree": "clean (git diff-index --quiet HEAD)"
+  },
+  "toolchain": {
+    "target": "linux-x86_64",
+    "recipe": "native/ffmpeg/targets/linux-x86_64.json",
+    "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+    "uname": "Linux 6.18.54.1-microsoft-standard-WSL2",
+    "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua",
+    "objdump": "GNU objdump (GNU Binutils for Ubuntu) 2.46",
+    "readelf": "GNU readelf (GNU Binutils for Ubuntu) 2.46",
+    "ar": "GNU ar (GNU Binutils for Ubuntu) 2.46",
+    "nm": "GNU nm (GNU Binutils for Ubuntu) 2.46",
+    "python3": "Python 3.14.4",
+    "nproc": "20",
+    "closure_manifest_target": {
+      "arch": "x86_64",
+      "cross_prefix": null,
+      "id": "linux-x86_64",
+      "platform": "linux",
+      "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+      "target_os": "linux"
+    },
+    "closure_manifest_toolchain": {
+      "arch": "x86",
+      "cc": "gcc",
+      "cc_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+      "machine": "x86_64",
+      "system": "linux",
+      "target_os": null
+    }
+  },
+  "closure": {
+    "mode": "reused imported closure, copied into the independent root; no download performed",
+    "source": "/home/hoo/qianqian-172-linux/native/build",
+    "manifest_sha256": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+    "manifest_target": {
+      "arch": "x86_64",
+      "cross_prefix": null,
+      "id": "linux-x86_64",
+      "platform": "linux",
+      "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d",
+      "target_os": "linux"
+    },
+    "manifest_toolchain": {
+      "arch": "x86",
+      "cc": "gcc",
+      "cc_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+      "machine": "x86_64",
+      "system": "linux",
+      "target_os": null
+    },
+    "units": 279,
+    "verified_stamp": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa|d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "revalidation_verdict": "PASS",
+    "revalidation_checks": 20,
+    "revalidation_failures": [],
+    "zip_content": {
+      "content_mismatch": 0,
+      "extras_in_src": 1,
+      "extras_samples": [
+        ".qianqian-verified"
+      ],
+      "files_identical": 10422,
+      "mismatch_samples": [],
+      "missing_in_src": 0,
+      "missing_samples": [],
+      "path": "/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip",
+      "sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+      "top_level": [
+        "FFmpeg-n9.0.1"
+      ],
+      "zip_file_entries": 10422
+    }
+  },
+  "xmake_cache": {
+    "incremental_cache_reused": false,
+    "evidence": [
+      "root is a fresh --no-local clone; native/build held only ffmpeg.lua/songcore.lua plus the copied closure before the build",
+      "xmake's local build cache native/build/.build_cache was created during this build: 284 files, all stamped 2026-10-30 20:33",
+      "all 281 .o files under native/build/.objs carry this build's timestamps (span 11.8 s)",
+      "find ~/.xmake -newermt '2026-10-30 12:00:00' => 0 files (no global cache activity)",
+      "build log has 281 'cache compiling.release' lines = 279 FFmpeg units + 2 songcore_ffmpeg.c variants (static/shared), all compiled here"
+    ]
+  },
+  "artifacts": {
+    "static": {
+      "path": "/home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a",
+      "bytes": 4066980,
+      "sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308"
+    },
+    "shared": {
+      "path": "/home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so",
+      "bytes": 2288536,
+      "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98"
+    }
+  },
+  "member_census": {
+    "census": "280/280 elf64-x86-64, 0 foreign",
+    "ar_t_members": 280,
+    "objdump_f_elf64": 280,
+    "objdump_f_foreign": 0,
+    "duplicate_member_names": 9,
+    "note": "ar container additionally holds the '/' symbol table and '//' long-name table (282 header entries for 280 data members)"
+  },
+  "abi": {
+    "songcore_h_entries": 15,
+    "shared_song_symbols": 15,
+    "static_song_symbols": 15,
+    "diff_so_bytes": 0,
+    "diff_a_bytes": 0,
+    "symbols": [
+      "song_audio_stream_count",
+      "song_audio_stream_info",
+      "song_close",
+      "song_get_artwork_count",
+      "song_get_artwork_item",
+      "song_get_metadata",
+      "song_get_metadata_count",
+      "song_get_metadata_entry",
+      "song_last_error",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek",
+      "song_select_stream",
+      "songcore_abi_version"
+    ]
+  },
+  "shared_needed": [
+    "libm.so.6",
+    "libc.so.6"
+  ],
+  "shared_needed_forbidden": 0,
+  "flag_witness": [
+    "compile_commands_entries=281",
+    "fmacro_prefix_map_entries=279",
+    "ffile_prefix_map_entries=0",
+    "ffmpeg_src_entries=281"
+  ],
+  "comparison_329": {
+    "archived_receipt": "/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/q2-crossroot/build-receipts/linux-lin-l1-route.summary.json",
+    "archived_receipt_sha256": "b67a8f59f3d846617c9b0f10ad996794aa052f8a15b0b86339b14d5ec47c6de3",
+    "archived_values": {
+      "static": {
+        "sha256": "7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a",
+        "bytes": 4066980
+      },
+      "shared": {
+        "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+        "bytes": 2288536
+      },
+      "head": "b49b18cd68ae1a353cd3396efb3977b8590cc4d1",
+      "attempt_stamp": "l1b-macromap-."
+    },
+    "static": {
+      "equal": false,
+      "this": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308",
+      "archived_329": "7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a"
+    },
+    "shared": {
+      "equal": true,
+      "this": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98",
+      "archived_329": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98"
+    },
+    "member_comparison_vs_329_root_archive": {
+      "compared_file": "/home/hoo/qq329/lin-r1/src/native/build/artifacts/libsongcore.a",
+      "members": "282/282",
+      "member_order_identical": true,
+      "occurrences_identical": 278,
+      "differing_occurrences": 4,
+      "header_differing_occurrences": 0,
+      "differing_members": [
+        {
+          "name": "version.c.o",
+          "size": 2688,
+          "sha_new": "e9bd4245ec3bca774dba0dda392ebcd35e9cb02851fd191f0aa8a71c946cc8d0",
+          "sha_329": "00b4aa3f2a85834d6f07bebba239098be837f5e4dcb2cef9e1c889f06d676704",
+          "strings_only_in_new": [
+            "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+          ],
+          "strings_only_in_329": [
+            "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+          ]
+        },
+        {
+          "name": "version.c.o",
+          "size": 2928,
+          "sha_new": "83d582ff945aad345c8034a3ea63c2bd6444230a3578ff6c422025dd1aca214d",
+          "sha_329": "8a3b7056b716fafc4427fe46c5eeeebec3e7e9b1d514542621b983a3cc92c220",
+          "strings_only_in_new": [
+            "qianqian-v0.1.0-315-gbf23516",
+            "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+          ],
+          "strings_only_in_329": [
+            "qianqian-v0.1.0-316-gb49b18c",
+            "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+          ]
+        },
+        {
+          "name": "version.c.o",
+          "size": 2680,
+          "sha_new": "eb821728a8f8dd6f65772e3d77f0c2db2f5a0b148c95d4595057dd03b1ef6187",
+          "sha_329": "1af815258f6a63d0ea5694a1717f25ade8373cea36ae35522cf2beabc928df65",
+          "strings_only_in_new": [
+            "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+          ],
+          "strings_only_in_329": [
+            "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+          ]
+        },
+        {
+          "name": "version.c.o",
+          "size": 2672,
+          "sha_new": "1d438d9bcd2635c9032ed1560e15db8807e05cb38f6b1773645026ba493e4ab9",
+          "sha_329": "1af6f90b5a0c85f751302ba142179e9d305e1670cff7bd69d5d3c944f65a7b34",
+          "strings_only_in_new": [
+            "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+          ],
+          "strings_only_in_329": [
+            "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+          ]
+        }
+      ],
+      "cause": "the four differing members are the per-library FFmpeg version.c.o objects; every differing byte lies inside the FFMPEG_VERSION literal (probe-version-bytes.py). This build replayed the imported closure whose oracle/libavutil/ffversion.h was generated by version.sh at closure-derivation time in /home/hoo/qianqian-172-linux (git describe = qianqian-v0.1.0-315-gbf23516); #329 derived its closure at b49b18c (qianqian-v0.1.0-316-gb49b18c). Not caused by xmake cache (none existed/reused), gcc version (identical 15.2.0) or build root (member order/headers identical)."
+    },
+    "shared_byte_identity_cmp": "identical (cmp -s) with /home/hoo/qq329/lin-r1 shared artifact"
+  },
+  "invocations": [
+    {
+      "stage": "clone",
+      "exit": 0,
+      "argv": "git clone --no-local file:///home/hoo/Source/qianqian /home/hoo/g4-172/linux-root/src"
+    },
+    {
+      "stage": "checkout",
+      "exit": 0,
+      "argv": "git -C /home/hoo/g4-172/linux-root/src checkout --quiet --detach 69ba1ce05a2772f5aa077c6ece3365c40f6e0500"
+    },
+    {
+      "stage": "closure-copy-ffmpeg-src",
+      "exit": 0,
+      "argv": "cp -a /home/hoo/qianqian-172-linux/native/build/ffmpeg-src /home/hoo/g4-172/linux-root/src/native/build/"
+    },
+    {
+      "stage": "closure-copy-ffmpeg-xmake",
+      "exit": 0,
+      "argv": "cp -a /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake /home/hoo/g4-172/linux-root/src/native/build/"
+    },
+    {
+      "stage": "closure-validate",
+      "exit": 0,
+      "argv": "python3 /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/build-linux/drivers/g4-closure-validate.py /home/hoo/g4-172/linux-root/src /home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip"
+    },
+    {
+      "stage": "configure",
+      "exit": 0,
+      "argv": "xmake f -p linux -a x86_64 -m release -y"
+    },
+    {
+      "stage": "build-songcore",
+      "exit": 0,
+      "argv": "xmake build songcore"
+    },
+    {
+      "stage": "build-static-explicit",
+      "exit": 0,
+      "argv": "xmake build songcore_static"
+    },
+    {
+      "stage": "build-shared-explicit",
+      "exit": 0,
+      "argv": "xmake build songcore_shared"
+    },
+    {
+      "stage": "compile-commands",
+      "exit": 255,
+      "argv": "xmake project -k compile_commands -o /home/hoo/g4-172/linux-root/receipts/g4-linux-build/compile-commands"
+    },
+    {
+      "stage": "compile-commands-retry",
+      "exit": 0,
+      "argv": "xmake project -k compile_commands /home/hoo/g4-172/linux-root/receipts/g4-linux-build/compile-commands"
+    },
+    {
+      "stage": "verify-measurements",
+      "exit": 0,
+      "argv": "bash g4-s3-verify.sh"
+    }
+  ],
+  "verdict": "PASS",
+  "not_run": [
+    "L1 re-earn (fresh FFmpeg closure derivation per target): NOT RUN \u2014 the imported closure was reused; see reproducibility statement.",
+    "L2 / G2 runtime smoke (real ELF consumer execution, PCM/seek/metadata/status parity): NOT RUN \u2014 belongs to the G2 gate, not this build lane.",
+    "L3 cross-root byte identity with an independently derived closure: NOT RUN for the static form (only the single reused-closure build exists here); the shared form is byte-identical to #329's archived artifact.",
+    "Windows x86_64 (mingw) build: NOT RUN \u2014 separate G4 lane.",
+    "packaging / G4 release ratification / license+docs gates: NOT RUN \u2014 out of scope; this lane is a pre-check only.",
+    "tag creation and GitHub Release publication: NOT RUN by design (forbidden for this lane)."
+  ],
+  "reproducibility_statement": "L1 NOT re-earned. L1 means a fresh clone AND a freshly derived FFmpeg closure per target. This run has a fresh --no-local clone of the pinned sha 69ba1ce05a2772f5aa077c6ece3365c40f6e0500, but it REUSED the already-imported linux closure (copied from /home/hoo/qianqian-172-linux/native/build, revalidated against pin.json and the linux-x86_64 recipe, 20/20 mandatory checks + full zip-content match). No local xmake incremental cache was reused (fresh root; cache was populated by this build), and no FFmpeg download occurred. Therefore this lane reuses existing records rather than re-earning L1."
+}

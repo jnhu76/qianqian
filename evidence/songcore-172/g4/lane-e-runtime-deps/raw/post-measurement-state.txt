@@ -1,0 +1,85 @@
+== preserved copies (made during measurement, before build root removal) ==
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/lane-e-runtime/work/shared/libsongcore.so
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /mnt/c/Users/fred1/lane-e-container/libsongcore.so
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/lane-e-runtime/work/src/songcore.h
+
+expected from task input:
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  libsongcore.so
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  libsongcore.a (not copied; measured in place)
+
+== build root state at end of lane ==
+total 20
+drwxr-xr-x  5 hoo hoo 4096 Oct 30 20:51 .
+drwxr-x--- 92 hoo hoo 4096 Oct 30 20:49 ..
+drwxr-xr-x  3 hoo hoo 4096 Oct 30 20:51 evidence
+drwxr-xr-x 18 hoo hoo 4096 Oct 30 20:51 linux-root
+drwxr-xr-x 17 hoo hoo 4096 Oct 30 20:45 wt-tools
+
+total 280
+drwxr-xr-x 18 hoo hoo  4096 Oct 30 20:51 .
+drwxr-xr-x  5 hoo hoo  4096 Oct 30 20:51 ..
+drwxr-xr-x  3 hoo hoo  4096 Oct 30 20:51 .ao-output
+drwxr-xr-x  2 hoo hoo  4096 Oct 30 20:51 .cargo
+drwxr-xr-x  7 hoo hoo  4096 Oct 30 20:51 .git
+drwxr-xr-x  3 hoo hoo  4096 Oct 30 20:51 .github
+-rw-r--r--  1 hoo hoo  1033 Oct 30 20:51 .gitignore
+drwxr-xr-x  2 hoo hoo  4096 Oct 30 20:51 .opencodereview
+-rw-r--r--  1 hoo hoo 28274 Oct 30 20:51 AGENTS.md
+-rw-r--r--  1 hoo hoo  2574 Oct 30 20:51 CHANGELOG.md
+-rw-r--r--  1 hoo hoo 37762 Oct 30 20:51 CONTEXT.md
+-rw-r--r--  1 hoo hoo  9972 Oct 30 20:51 CONTRIBUTING.md
+-rw-r--r--  1 hoo hoo 51868 Oct 30 20:51 Cargo.lock
+-rw-r--r--  1 hoo hoo   565 Oct 30 20:51 Cargo.toml
+-rw-r--r--  1 hoo hoo   540 Oct 30 20:51 LICENSE
+-rw-r--r--  1 hoo hoo 10847 Oct 30 20:51 LICENSE-APACHE
+-rw-r--r--  1 hoo hoo  1067 Oct 30 20:51 LICENSE-MIT
+-rw-r--r--  1 hoo hoo 12126 Oct 30 20:51 QUICKSTART.md
+-rw-r--r--  1 hoo hoo 12755 Oct 30 20:51 README.md
+-rw-r--r--  1 hoo hoo  4886 Oct 30 20:51 THIRD_PARTY_NOTICES.md
+drwxr-xr-x  3 hoo hoo  4096 Oct 30 20:51 apps
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 crates
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 docs
+drwxr-xr-x  9 hoo hoo  4096 Oct 30 20:51 evidence
+drwxr-xr-x  9 hoo hoo  4096 Oct 30 20:51 experiments
+-rw-r--r--  1 hoo hoo  6074 Oct 30 20:51 lefthook.yml
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 native
+drwxr-xr-x  2 hoo hoo  4096 Oct 30 20:51 ops
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 research
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 specs
+drwxr-xr-x  5 hoo hoo  4096 Oct 30 20:51 tools
+drwxr-xr-x 10 hoo hoo  4096 Oct 30 20:51 website
+
+== preserved work dir listing ==
+/home/hoo/lane-e-runtime/work:
+total 12
+drwxr-xr-x 2 hoo hoo 4096 Oct 30 20:47 shared
+drwxr-xr-x 2 hoo hoo 4096 Oct 30 20:47 src
+drwxr-xr-x 2 hoo hoo 4096 Oct 30 20:48 static
+
+/home/hoo/lane-e-runtime/work/shared:
+total 2288
+-rwxr-xr-x 1 hoo hoo   15976 Oct 30 20:47 abi-complete-shared
+-rwxr-xr-x 1 hoo hoo   16016 Oct 30 20:47 abi-sizeof-probe-shared
+-rwxr-xr-x 1 hoo hoo   17040 Oct 30 20:47 external-consumer-shared
+-rwxr-xr-x 1 hoo hoo 2288536 Oct 30 20:47 libsongcore.so
+
+/home/hoo/lane-e-runtime/work/src:
+total 40
+-rwxr-xr-x 1 hoo hoo   871 Oct 30 20:47 abi-complete-consumer.c
+-rw-r--r-- 1 hoo hoo  1156 Oct 30 20:47 abi-sizeof-probe.c
+-rwxr-xr-x 1 hoo hoo  6281 Oct 30 20:47 external-consumer-example.c
+-rw-r--r-- 1 hoo hoo   144 Oct 30 20:47 minimal-consumer.c
+-rw-r--r-- 1 hoo hoo 18666 Oct 30 20:47 songcore.h
+
+/home/hoo/lane-e-runtime/work/static:
+total 14424
+-rwxr-xr-x 1 hoo hoo 2446264 Oct 30 20:48 abi-O0-libs
+-rwxr-xr-x 1 hoo hoo 2446264 Oct 30 20:48 abi-O0-nopthread
+-rwxr-xr-x 1 hoo hoo   15976 Oct 30 20:47 abi-complete-libs
+-rwxr-xr-x 1 hoo hoo   15976 Oct 30 20:47 abi-complete-nolibs
+-rwxr-xr-x 1 hoo hoo   15976 Oct 30 20:47 abi-complete-nomath
+-rwxr-xr-x 1 hoo hoo   15976 Oct 30 20:47 abi-complete-nopthread
+-rwxr-xr-x 1 hoo hoo 2450344 Oct 30 20:47 abi-sizeof-probe-static
+-rwxr-xr-x 1 hoo hoo 2450640 Oct 30 20:47 external-consumer-static
+-rwxr-xr-x 1 hoo hoo 2446248 Oct 30 20:47 minimal-libs
+-rwxr-xr-x 1 hoo hoo 2446248 Oct 30 20:48 minimal-lm-only

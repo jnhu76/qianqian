@@ -1,0 +1,162 @@
+### EXIT[host.txt]=0
+runner=Git Bash (native Windows process)
+host_hostname=WuJie
+host_uname=MINGW64_NT-10.0-26300 WuJie 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+host_windows=Binary file (standard input) matches
+host_exe_path_windows=C:\Users\fred1\lane-c-win-pe\pe-consumer.exe
+host_exe_path_unix=/c/Users/fred1/lane-c-win-pe/pe-consumer.exe
+host_build=3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d
+host_cwd=/c/Users/fred1/lane-c-win-pe
+host_date_utc=2026-10-30T13:19:47Z
+
+=== A. sha256 selftest (validates the consumer's own hasher on this host) ===
+### CASE[selftest] exit=0 cmd=[./pe-consumer.exe --selftest]
+sha256_selftest[0] ok len=0 got=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 want=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sha256_selftest[1] ok len=3 got=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad want=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+sha256_selftest[2] ok len=56 got=248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1 want=248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1
+SHA256_SELFTEST=PASS
+
+=== B. full walk, all four reference fixtures (direct PE execution) ===
+### CASE[mp3-cbr-id3v23] exit=0 cmd=[./pe-consumer.exe media/mp3-cbr-id3v23.mp3]
+### CASE[flac-16-44-stereo] exit=0 cmd=[./pe-consumer.exe media/flac-16-44-stereo.flac]
+### CASE[alac-16-44-stereo] exit=0 cmd=[./pe-consumer.exe media/alac-16-44-stereo.m4a]
+### CASE[alac-long] exit=0 cmd=[./pe-consumer.exe media/alac-long.m4a]
+
+=== C. same mp3 case driven by cmd.exe (second Windows launcher) ===
+### CASE[cmd-mp3] exit=0
+
+=== D. negative-control: menu path with a missing file (usage/IO exit class) ===
+### CASE[usage-noargs] exit=2 cmd=[./pe-consumer.exe]
+
+=== summary ===
+alac-16-44-stereo                  exit=0
+alac-long                          exit=0
+cmd-mp3-cbr-id3v23                 exit=0
+flac-16-44-stereo                  exit=0
+mp3-cbr-id3v23                     exit=0
+pre-fix-mp3                        exit=EXIT=0
+selftest                           exit=0
+usage-noargs                       exit=2
+
+=== key lines from every case ===
+--- alac-16-44-stereo.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=f713d8b6c7809946bee8e4f35772a3af1d038fa49e5a71a70f74352411dff9f0
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/alac-16-44-stereo.m4a media_size=594196
+stage=probe status=0 codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=24 duration_us=4000000 streams=1 selected=0
+stage=decode status=0 frames=176400 pcm_sha256=431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46 terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1950476
+stage=post_seek_decode status=0 frames=90384 pcm_sha256=9afbdbaad80c18028aacaf63a1283e0d072932a965c6b27243e3d534bdec0e44 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- alac-long.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=8fbecba8fff290e5f8ff3fd0a04d67744d73a9c7cd0b13d8f59e7389eb5919a9
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/alac-long.m4a media_size=890903
+stage=probe status=0 codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=24 duration_us=6000000 streams=1 selected=0
+stage=decode status=0 frames=264600 pcm_sha256=e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612 terminal=SONG_EOF bytes_hashed=2116800 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=3000000 landing_us=2972154
+stage=post_seek_decode status=0 frames=133528 pcm_sha256=3ab36acf594871a7b1187429771b738012b4026bb10a2311520bca119402bb57 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- cmd-mp3-cbr-id3v23.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=c29695ae4e05b6bc0dd550e52b749484d3bdb83989efeb4ca0523ab8e31fde8d
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=C:\Users\fred1\lane-c-win-pe\media\mp3-cbr-id3v23.mp3 media_size=65323
+stage=probe status=0 codec=mp3 container=mp3 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=0 duration_us=4000000 streams=1 selected=0
+stage=decode status=0 frames=176400 pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926 terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=89953 pcm_sha256=097b7a54afb6e988ea04158986e46d42fa4328b0225694e8acb5ae6d931d3187 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- flac-16-44-stereo.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=ce0da1091ed6cecc4c6f60d619f882e52e6cc9cf6af1f5f548e746d047c0cb50
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/flac-16-44-stereo.flac media_size=146237
+stage=probe status=0 codec=flac container=flac rate=44100 channels=2 channel_mask=0x0000000000000003 bits=16 duration_us=4000000 streams=1 selected=0
+stage=decode status=0 frames=176400 pcm_sha256=3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=88848 pcm_sha256=fa58371ddd7150c2111e87132e3fcc31b7e540380883b033a895687f4f918706 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- mp3-cbr-id3v23.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0x00000000 close=0x00000000 sample32_sha256=62c76010288182c026d2323b8a484739665663750e9ef60a3277cd2dc6fccf9f
+bcrypt_runtime_probe_rc=0
+bcrypt_iat_counter: state=1 slot=00007ff7509534b8 orig=00007ffb527f6f60
+bcrypt_iat_positive_control: slot=00007ff7509534b8 entry=00007ff7505d1520 open=0x00000000 call_via_slot=0x00000000 close=0x00000000 calls_before=0 calls_after=1 delta=1 expect=1 PASS
+bcrypt_iat_positive_control_rc=0
+media_path=media/mp3-cbr-id3v23.mp3 media_size=65323
+stage=probe status=0 codec=mp3 container=mp3 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=0 duration_us=4000000 streams=1 selected=0
+stage=decode status=0 frames=176400 pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926 terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=89953 pcm_sha256=097b7a54afb6e988ea04158986e46d42fa4328b0225694e8acb5ae6d931d3187 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- pre-fix-mp3.stdout.txt ---
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0xc000000d close=0x00000000 sample32_sha256=66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925
+bcrypt_runtime_probe_rc=-3
+bcrypt_iat_counter: state=1 orig=00007ffb527f6f60
+media_path=media/mp3-cbr-id3v23.mp3 media_size=65323
+stage=probe status=0 codec=mp3 container=mp3 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=0 duration_us=4000000 streams=1 selected=0
+stage=decode status=0 frames=176400 pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926 terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=89953 pcm_sha256=097b7a54afb6e988ea04158986e46d42fa4328b0225694e8acb5ae6d931d3187 terminal=SONG_EOF
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS
+--- selftest.stdout.txt ---
+SHA256_SELFTEST=PASS
+--- usage-noargs.stdout.txt ---
+
+=== stderr byte counts (0 expected everywhere) ===
+  0 /c/Users/fred1/lane-c-win-pe/run/alac-16-44-stereo.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/alac-long.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/cmd-mp3-cbr-id3v23.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/flac-16-44-stereo.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/mp3-cbr-id3v23.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/pre-fix-mp3.stderr.txt
+  0 /c/Users/fred1/lane-c-win-pe/run/selftest.stderr.txt
+102 /c/Users/fred1/lane-c-win-pe/run/usage-noargs.stderr.txt
+102 total
+RUNALL_DONE

@@ -1,0 +1,49 @@
+### HOST
+Linux WuJie 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux
+### DATE
+2026-10-30T12:30:33Z
+### GH VERSION
+gh version 2.46.0 (2025-12-13 Ubuntu 2.46.0-4)
+https://github.com/cli/cli/releases/tag/v2.46.0
+### WSL REPO HEAD
+69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+### A1 gh release view (json)
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A1_EXIT=1
+### A1b asset table (name size digest)
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A1b_EXIT=1
+### A2 gh api release tag commit
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A2_EXIT=1
+### A3 git tag object / commit (WSL clone)
+tag
+A3a_EXIT=0
+522c16d283f024c01d1ef56fa96e587b286ca3b8
+A3b_EXIT=0
+a1b6c996fcb5d6c7dfea965a11bf3f05b94943fb
+A3c_EXIT=0
+### A4 git tag -l 'songcore-v*'
+songcore-v0.1.0
+A4_EXIT=0
+COUNT=
+1
+### A5 gh release list
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A5_EXIT=1
+### A5b release list json
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A5b_EXIT=1
+### A6 remote songcore-v* refs
+error connecting to api.github.com
+check your internet connection or https://githubstatus.com
+A6_EXIT=1
+### A7 remote tags list (git ls-remote, filtered)
+fatal: unable to access 'https://github.com/jnhu76/qianqian.git/': Could not resolve host: github.com
+A7_EXIT=128
+### DONE

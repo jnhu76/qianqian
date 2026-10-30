@@ -1,0 +1,15 @@
+0000000000034dd0 T song_audio_stream_count
+0000000000034ed0 T song_audio_stream_info
+0000000000036160 T song_close
+0000000000035780 T song_get_artwork_count
+0000000000035890 T song_get_artwork_item
+0000000000035430 T song_get_metadata
+0000000000035540 T song_get_metadata_count
+0000000000035650 T song_get_metadata_entry
+0000000000036130 T song_last_error
+0000000000034050 T song_open
+0000000000034220 T song_probe
+00000000000359f0 T song_read_pcm
+0000000000035d70 T song_seek
+0000000000035100 T song_select_stream
+0000000000034040 T songcore_abi_version

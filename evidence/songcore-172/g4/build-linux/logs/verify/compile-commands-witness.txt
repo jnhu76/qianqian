@@ -1,0 +1,5 @@
+compile_commands_entries=281
+fmacro_prefix_map_entries=279
+ffile_prefix_map_entries=0
+ffmpeg_src_entries=281
+sample_flag_entry=/usr/bin/gcc -c -m64 -fvisibility=hidden -std=c11 -I/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-src -fmacro-prefix-map=/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-src=. -DNDEBUG -I/home/hoo/g4-172/linux-root/src/native/build/ffmpeg-xmake/oracle -Isrc/ -D_ISOC11_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600 -DPIC -DHAVE_AV_CONFIG_H -std=c17 -fomit-frame-pointer -fPIC -pthread -Wall -Wdisabled-optimization -Wpointer-arith -Wredundant

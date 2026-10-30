@@ -1,0 +1,9 @@
+profile=codec-base
+component_base=everything-disabled
+libraries.enable=avformat,avcodec,swresample
+libraries.disable=avdevice,avfilter,swscale
+disable=programs,doc,debug,autodetect,x86asm,network,protocols,devices
+components.demuxer=aac,flac,mov,mp3,ogg,wav
+components.decoder=aac,alac,flac,mp3float,opus,vorbis,pcm_u8,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le
+components.parser=mpegaudio
+provenance_keys=lib:swresample

@@ -1,0 +1,98 @@
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/op_probe.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/op-probe-static
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3800000 e r:4096 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":1,"produced":0}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3000000 r:4096 s:3800000 e r:4096 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":0,"produced":512}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:1000000 r:4096 s:2000000 r:4096 s:3000000 r:4096 s:3800000 e r:4096 s:3800000 e r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":940408}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":0,"produced":512}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":1,"produced":0}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":0,"calls":1}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3900000 e r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3900000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":1,"produced":0}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":0,"calls":1}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:2000000 r:4096 s:3800000 e r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":0,"produced":512}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":0,"calls":1}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3800000 e r:4096 s:2000000 e r:4096 s:3800000 e r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":1,"produced":0}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"read","capacity":4096,"status":0,"produced":512}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":0,"calls":1}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a d s:1500000 r:4096 s:3000000 r:4096 s:4500000 r:4096 s:5800000 e r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a","codec":"alac","rate":44100,"channels":2,"duration_us":6000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":264600,"calls":66}
+{"op":"seek","target_us":1500000,"status":0,"landing_us":1486077}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2972154}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":4500000,"status":0,"landing_us":4458231}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":5800000,"status":0,"landing_us":5758549}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":6552,"calls":3}
+{"op":"close"}
+[exit] 0

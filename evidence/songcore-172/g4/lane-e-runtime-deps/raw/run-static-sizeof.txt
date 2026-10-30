@@ -1,0 +1,14 @@
+abi_version=1
+sizeof(song_status)=4
+sizeof(song_io)=32
+sizeof(song_info)=120
+sizeof(song_stream_info)=88
+sizeof(song_metadata)=192
+sizeof(song_handle*)=8
+off(song_info.codec)=28
+off(song_info.container)=60
+off(song_info.sample_rate)=0
+off(song_info.channels)=4
+off(song_info.duration_us)=16
+off(song_info.audio_stream_count)=96
+off(song_info.selected_audio_index)=92

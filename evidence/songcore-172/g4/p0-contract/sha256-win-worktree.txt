@@ -1,0 +1,1 @@
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /mnt/c/Users/fred1/source/qianqian/native/include/songcore.h

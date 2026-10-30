@@ -1,0 +1,3 @@
+NOTE: gcc not on PATH; using documented WinLibs host install
+GCC gcc.exe (MinGW-W64 x86_64-msvcrt-posix-seh, built by Brecht Sanders, r1) 16.2.0
+ABORT exit=11 artifact sha mismatch: got 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 want 1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402

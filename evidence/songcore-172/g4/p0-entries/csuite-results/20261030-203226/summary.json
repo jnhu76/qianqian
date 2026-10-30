@@ -1,0 +1,12 @@
+{
+    "schema":  "songcore-csuite-summary/1",
+    "stamp":  "20261030-203226",
+    "verdict":  "FAIL",
+    "abort":  "artifact sha mismatch: got 89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 want 1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402",
+    "exit_code":  11,
+    "artifact":  "C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a",
+    "artifact_sha256":  "1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402",
+    "cases":  [
+
+              ]
+}

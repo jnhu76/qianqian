@@ -1,0 +1,2 @@
+1:set_project("qianqian-native")
+2:set_version("0.1.0")

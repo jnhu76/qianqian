@@ -1,0 +1,1 @@
+tools/test_release.py:67:        for bad in ('songcore-v0.1.0', 'qianqian-v01.1.0', '../bad'):

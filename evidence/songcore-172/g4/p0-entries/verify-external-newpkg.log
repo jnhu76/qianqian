@@ -1,0 +1,19 @@
+identity pin: from SHA256SUMS sidecar -> e0c488a931d6f7bb0003d918eeee92f2202523e18319e617f26d264ae547084b (songcore-v0.2.0-rc.1-windows-x86_64.zip)
+zip sha256: e0c488a931d6f7bb0003d918eeee92f2202523e18319e617f26d264ae547084b
+extracted to: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261030-203537 (root: songcore-v0.2.0-rc.1-windows-x86_64)
+in-package checksums: 13 entries OK
+consumer source: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261030-203537\s2-external-consumer.c
+media input: C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261030-203537\sample10s.flac
+link contract: gcc -O2 -Iinclude C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261030-203537\s2-external-consumer.c -Llib -lsongcore -lbcrypt -o C:\Users\fred1\AppData\Local\Temp\songcore-external-verify-20261030-203537\s2-external-consumer.exe
+compile+link: OK (exact README link list -lsongcore -lbcrypt)
+  consumer: probe: codec=flac container=flac rate=44100 ch=2 duration_us=10000000
+  consumer: decode: 441000 frames to SONG_EOF
+  consumer: seek: target_us=5000000 landing_us=4911020
+  consumer: eof: clean SONG_EOF after 224424 post-seek frames
+  consumer: S2-CONSUMER PASS
+sequence open->probe->decode->seek(50%)->EOF->close: PASS (exit 0)
+import table: bcrypt.dll, KERNEL32.dll, msvcrt.dll
+runtime deps: all imports inside README-declared allowlist (bcrypt declared; kernel32/msvcrt = toolchain CRT + Win32 system imports)
+
+EXTERNAL-CONSUMER ACCEPTANCE: PASS
+{"check":"songcore-172 s2-external external-consumer acceptance","zip":"C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\default\\songcore-v0.2.0-rc.1-windows-x86_64.zip","zip_sha256":"e0c488a931d6f7bb0003d918eeee92f2202523e18319e617f26d264ae547084b","extract_dir":"C:\\Users\\fred1\\AppData\\Local\\Temp\\songcore-external-verify-20261030-203537","media":"C:\\Users\\fred1\\AppData\\Local\\Temp\\songcore-external-verify-20261030-203537\\sample10s.flac","sequence":"open=OK probe=OK decode=OK seek50=OK eof=OK close=OK (exit 0)","imports":["bcrypt.dll","KERNEL32.dll","msvcrt.dll"],"verdict":"PASS","log":"C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\external-accept\\20261030-203537-external-log.txt"}

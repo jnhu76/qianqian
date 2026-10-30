@@ -1,0 +1,1347 @@
+{
+  "executions": [
+    {
+      "command": [
+        "git",
+        "init",
+        "-q"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "add",
+        "."
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "-c",
+        "user.name=Release Control",
+        "-c",
+        "user.email=control@example.invalid",
+        "commit",
+        "-qm",
+        "fixture"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "f24783bde82fb13912db2dbb9f99408944ab93e3\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v99.99.99",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E01",
+      "stderr": "POLICY_RED: R1 tag/workspace version mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "add",
+        "CHANGELOG.md"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "-c",
+        "user.name=Control",
+        "-c",
+        "user.email=c@invalid",
+        "commit",
+        "-qm",
+        "missing history"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "6f2e67b3cd48043bef642e211e6cc4080e2c432e\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "6f2e67b3cd48043bef642e211e6cc4080e2c432e",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E02",
+      "stderr": "POLICY_RED: R1 CHANGELOG release missing\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "reset",
+        "--hard",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "HEAD is now at f24783b fixture\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "songcore-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E03",
+      "stderr": "POLICY_RED: R1 invalid product tag (SongCore tags are separate)\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v01.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E03",
+      "stderr": "POLICY_RED: R1 invalid product tag (SongCore tags are separate)\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "../bad",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E03",
+      "stderr": "POLICY_RED: R1 invalid product tag (SongCore tags are separate)\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E04-tracked",
+      "stderr": "POLICY_RED: R2 dirty source\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "add",
+        "QUICKSTART.md"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E04-staged",
+      "stderr": "POLICY_RED: R2 dirty source\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "reset",
+        "--hard",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "HEAD is now at f24783b fixture\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E05",
+      "stderr": "POLICY_RED: R2 dirty source\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "source-baseline",
+      "stderr": "",
+      "stdout": "PASS: source\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "E18-hook-repository-isolation",
+      "stderr": "",
+      "stdout": "PASS: source\n"
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "main.c",
+        "-o",
+        "good.exe"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "-shared",
+        "dll.c",
+        "-o",
+        "unshipped.dll",
+        "-Wl,--out-implib,libunshipped.a"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "bad.c",
+        "-L.",
+        "-lunshipped",
+        "-o",
+        "bad.exe"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "objdump",
+        "-p",
+        "bad.exe"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "\nbad.exe:     file format pei-x86-64\n\nCharacteristics 0x26\n\texecutable\n\tline numbers stripped\n\tlarge address aware\n\nTime/Date\t\tFri Oct 30 20:30:15 2026\nMagic\t\t\t020b\t(PE32+)\nMajorLinkerVersion\t2\nMinorLinkerVersion\t45\nSizeOfCode\t\t0000000000001800\nSizeOfInitializedData\t0000000000001c00\nSizeOfUninitializedData\t0000000000000200\nAddressOfEntryPoint\t0000000000001420\nBaseOfCode\t\t0000000000001000\nImageBase\t\t0000000140000000\nSectionAlignment\t00001000\nFileAlignment\t\t00000200\nMajorOSystemVersion\t4\nMinorOSystemVersion\t0\nMajorImageVersion\t0\nMinorImageVersion\t0\nMajorSubsystemVersion\t5\nMinorSubsystemVersion\t2\nWin32Version\t\t00000000\nSizeOfImage\t\t00023000\nSizeOfHeaders\t\t00000600\nCheckSum\t\t000255ce\nSubsystem\t\t00000003\t(Windows CUI)\nDllCharacteristics\t00000160\n\t\t\t\t\tHIGH_ENTROPY_VA\n\t\t\t\t\tDYNAMIC_BASE\n\t\t\t\t\tNX_COMPAT\nSizeOfStackReserve\t0000000000200000\nSizeOfStackCommit\t0000000000001000\nSizeOfHeapReserve\t0000000000100000\nSizeOfHeapCommit\t0000000000001000\nLoaderFlags\t\t00000000\nNumberOfRvaAndSizes\t00000010\n\nThe Data Directory\nEntry 0 0000000000000000 00000000 Export Directory [.edata (or where ever we found it)]\nEntry 1 0000000000008000 00000540 Import Directory [parts of .idata]\nEntry 2 0000000000000000 00000000 Resource Directory [.rsrc]\nEntry 3 0000000000005000 0000021c Exception Directory [.pdata]\nEntry 4 0000000000000000 00000000 Security Directory\nEntry 5 000000000000a000 0000006c Base Relocation Directory [.reloc]\nEntry 6 0000000000000000 00000000 Debug Directory\nEntry 7 0000000000000000 00000000 Description Directory\nEntry 8 0000000000000000 00000000 Special Directory\nEntry 9 0000000000004020 00000028 Thread Storage Directory [.tls]\nEntry a 0000000000000000 00000000 Load Configuration Directory\nEntry b 0000000000000000 00000000 Bound Import Directory\nEntry c 0000000000008178 00000128 Import Address Table Directory\nEntry d 0000000000000000 00000000 Delay Import Directory\nEntry e 0000000000000000 00000000 CLR Runtime Header\nEntry f 0000000000000000 00000000 Reserved\n\nThere is an import table in .idata at 0x140008000\n\nThe Import Tables (interpreted .idata section contents)\n vma:            Hint    Time      Forward  DLL       First\n                 Table   Stamp     Chain    Name      Thunk\n 00008000\t00008050 00000000 00000000 00008490 00008178\n\n\tDLL Name: unshipped.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t00008178  <none>  0000  foreign\n\n 00008014\t00008060 00000000 00000000 000084c8 00008188\n\n\tDLL Name: KERNEL32.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t00008188  <none>  0127  DeleteCriticalSection\n\t00008190  <none>  014d  EnterCriticalSection\n\t00008198  <none>  0288  GetLastError\n\t000081a0  <none>  0396  InitializeCriticalSection\n\t000081a8  <none>  03f4  LeaveCriticalSection\n\t000081b0  <none>  0599  SetUnhandledExceptionFilter\n\t000081b8  <none>  05a9  Sleep\n\t000081c0  <none>  05cd  TlsGetValue\n\t000081c8  <none>  05fd  VirtualProtect\n\t000081d0  <none>  05ff  VirtualQuery\n\n 00008028\t000080b8 00000000 00000000 00008534 000081e0\n\n\tDLL Name: msvcrt.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t000081e0  <none>  0059  __C_specific_handler\n\t000081e8  <none>  007f  __getmainargs\n\t000081f0  <none>  0080  __initenv\n\t000081f8  <none>  0081  __iob_func\n\t00008200  <none>  00a0  __set_app_type\n\t00008208  <none>  00a2  __setusermatherr\n\t00008210  <none>  00bf  _amsg_exit\n\t00008218  <none>  00d2  _cexit\n\t00008220  <none>  00e0  _commode\n\t00008228  <none>  012c  _fmode\n\t00008230  <none>  017b  _initterm\n\t00008238  <none>  03f8  abort\n\t00008240  <none>  03ff  atexit\n\t00008248  <none>  0409  calloc\n\t00008250  <none>  0416  exit\n\t00008258  <none>  0429  fprintf\n\t00008260  <none>  0430  free\n\t00008268  <none>  046a  malloc\n\t00008270  <none>  0473  memcpy\n\t00008278  <none>  0491  signal\n\t00008280  <none>  04a6  strlen\n\t00008288  <none>  04a9  strncmp\n\t00008290  <none>  04c8  vfprintf\n\n 0000803c\t00000000 00000000 00000000 00000000 00000000\n\nThe Function Table (interpreted .pdata section contents)\nvma:\t\t\tBeginAddress\t EndAddress\t  UnwindData\n 0000000140005000:\t0000000140001000 0000000140001001 0000000140006000\n 000000014000500c:\t0000000140001010 00000001400013ea 0000000140006004\n 0000000140005018:\t00000001400013f0 0000000140001412 000000014000601c\n 0000000140005024:\t0000000140001420 0000000140001442 0000000140006040\n 0000000140005030:\t0000000140001450 0000000140001455 0000000140006064\n 000000014000503c:\t0000000140001460 000000014000146c 0000000140006068\n 0000000140005048:\t0000000140001470 0000000140001471 000000014000606c\n 0000000140005054:\t0000000140001480 000000014000149c 0000000140006070\n 0000000140005060:\t00000001400014b0 00000001400014f3 000000014000607c\n 000000014000506c:\t0000000140001500 0000000140001582 0000000140006088\n 0000000140005078:\t0000000140001590 00000001400015af 0000000140006098\n 0000000140005084:\t00000001400015b0 00000001400015b3 000000014000609c\n 0000000140005090:\t00000001400015c0 00000001400015d5 00000001400060a0\n 000000014000509c:\t00000001400015e0 000000014000165c 00000001400060a4\n 00000001400050a8:\t0000000140001660 0000000140001663 00000001400060b4\n 00000001400050b4:\t0000000140001670 0000000140001768 00000001400060b8\n 00000001400050c0:\t0000000140001770 00000001400017ce 00000001400060d4\n 00000001400050cc:\t00000001400017d0 0000000140001932 00000001400060e4\n 00000001400050d8:\t0000000140001940 0000000140001cd0 00000001400060f4\n 00000001400050e4:\t0000000140001cd0 0000000140001d0a 000000014000610c\n 00000001400050f0:\t0000000140001d10 0000000140001d1c 0000000140006118\n 00000001400050fc:\t0000000140001d20 0000000140001edd 000000014000611c\n 0000000140005108:\t0000000140001ee0 0000000140001f5d 0000000140006128\n 0000000140005114:\t0000000140001f60 0000000140001fe8 000000014000613c\n 0000000140005120:\t0000000140001ff0 0000000140002089 0000000140006148\n 000000014000512c:\t0000000140002090 0000000140002192 0000000140006154\n 0000000140005138:\t00000001400021a0 00000001400021a3 0000000140006160\n 0000000140005144:\t00000001400021b0 00000001400021dc 0000000140006164\n 0000000140005150:\t00000001400021e0 0000000140002230 0000000140006168\n 000000014000515c:\t0000000140002230 00000001400022d8 000000014000616c\n 0000000140005168:\t00000001400022e0 0000000140002360 0000000140006180\n 0000000140005174:\t0000000140002360 0000000140002397 0000000140006184\n 0000000140005180:\t00000001400023a0 000000014000241b 0000000140006188\n 000000014000518c:\t0000000140002420 0000000140002456 000000014000618c\n 0000000140005198:\t0000000140002460 00000001400024e9 0000000140006190\n 00000001400051a4:\t00000001400024f0 00000001400025a6 0000000140006194\n 00000001400051b0:\t00000001400025f0 0000000140002631 0000000140006198\n 00000001400051bc:\t0000000140002640 000000014000264b 00000001400061a8\n 00000001400051c8:\t0000000140002650 000000014000265b 00000001400061ac\n 00000001400051d4:\t0000000140002660 000000014000266b 00000001400061b0\n 00000001400051e0:\t0000000140002670 0000000140002678 00000001400061b4\n 00000001400051ec:\t0000000140002680 000000014000268b 00000001400061b8\n 00000001400051f8:\t0000000140002690 00000001400026a6 00000001400061bc\n 0000000140005204:\t00000001400026b0 00000001400026d6 00000001400061c0\n 0000000140005210:\t00000001400027d0 00000001400027d5 00000001400061cc\n\nDump of .xdata\n 0000000140006000 (rva: 00006000): 0000000140001000 - 0000000140001001\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006004 (rva: 00006004): 0000000140001010 - 00000001400013ea\n\tVersion: 1, Flags: none\n\tNbr codes: 10, Prologue size: 0x15, Frame offset: 0x5, Frame reg: rbp\n\t  pc+0x15: FPReg: rbp = rsp + 0x50 (info = 0x0)\n\t  pc+0x10: alloc small area: rsp = rsp - 0x58\n\t  pc+0x0c: push rbx\n\t  pc+0x0b: push rsi\n\t  pc+0x0a: push rdi\n\t  pc+0x09: push r12\n\t  pc+0x07: push r13\n\t  pc+0x05: push r14\n\t  pc+0x03: push r15\n\t  pc+0x01: push rbp\n 000000014000601c (rva: 0000601c): 00000001400013f0 - 0000000140001412\n\tVersion: 1, Flags: UNW_FLAG_EHANDLER\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n\tHandler: 00000001400026e0.\n\tUser data:\n\t  000: 01 00 00 00 f8 13 00 00 0b 14 00 00 20 1d 00 00\n\t  010: 0b 14 00 00\n 0000000140006040 (rva: 00006040): 0000000140001420 - 0000000140001442\n\tVersion: 1, Flags: UNW_FLAG_EHANDLER\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n\tHandler: 00000001400026e0.\n\tUser data:\n\t  000: 01 00 00 00 28 14 00 00 3b 14 00 00 20 1d 00 00\n\t  010: 3b 14 00 00\n 0000000140006064 (rva: 00006064): 0000000140001450 - 0000000140001455\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006068 (rva: 00006068): 0000000140001460 - 000000014000146c\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000606c (rva: 0000606c): 0000000140001470 - 0000000140001471\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006070 (rva: 00006070): 0000000140001480 - 000000014000149c\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 000000014000607c (rva: 0000607c): 00000001400014b0 - 00000001400014f3\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006088 (rva: 00006088): 0000000140001500 - 0000000140001582\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 0000000140006098 (rva: 00006098): 0000000140001590 - 00000001400015af\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000609c (rva: 0000609c): 00000001400015b0 - 00000001400015b3\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060a0 (rva: 000060a0): 00000001400015c0 - 00000001400015d5\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060a4 (rva: 000060a4): 00000001400015e0 - 000000014000165c\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060b4 (rva: 000060b4): 0000000140001660 - 0000000140001663\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060b8 (rva: 000060b8): 0000000140001670 - 0000000140001768\n\tVersion: 1, Flags: none\n\tNbr codes: 11, Prologue size: 0x19, Frame offset: 0x4, Frame reg: rbp\n\t  pc+0x19: save xmm8 at rsp + 0x60\n\t  pc+0x14: save xmm7 at rsp + 0x50\n\t  pc+0x10: save xmm6 at rsp + 0x40\n\t  pc+0x0c: FPReg: rbp = rsp + 0x40 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x70\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060d4 (rva: 000060d4): 0000000140001770 - 00000001400017ce\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x3, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x30 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x30\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060e4 (rva: 000060e4): 00000001400017d0 - 0000000140001932\n\tVersion: 1, Flags: none\n\tNbr codes: 6, Prologue size: 0x0d, Frame offset: 0x5, Frame reg: rbp\n\t  pc+0x0d: FPReg: rbp = rsp + 0x50 (info = 0x0)\n\t  pc+0x08: alloc small area: rsp = rsp - 0x58\n\t  pc+0x04: push rbx\n\t  pc+0x03: push rsi\n\t  pc+0x02: push rdi\n\t  pc+0x01: push rbp\n 00000001400060f4 (rva: 000060f4): 0000000140001940 - 0000000140001cd0\n\tVersion: 1, Flags: none\n\tNbr codes: 10, Prologue size: 0x15, Frame offset: 0x4, Frame reg: rbp\n\t  pc+0x15: FPReg: rbp = rsp + 0x40 (info = 0x0)\n\t  pc+0x10: alloc small area: rsp = rsp - 0x48\n\t  pc+0x0c: push rbx\n\t  pc+0x0b: push rsi\n\t  pc+0x0a: push rdi\n\t  pc+0x09: push r12\n\t  pc+0x07: push r13\n\t  pc+0x05: push r14\n\t  pc+0x03: push r15\n\t  pc+0x01: push rbp\n 000000014000610c (rva: 0000610c): 0000000140001cd0 - 0000000140001d0a\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x50\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006118 (rva: 00006118): 0000000140001d10 - 0000000140001d1c\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000611c (rva: 0000611c): 0000000140001d20 - 0000000140001edd\n\tVersion: 1, Flags: none\n\tNbr codes: 4, Prologue size: 0x0b, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0b: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x06: alloc small area: rsp = rsp - 0x28\n\t  pc+0x02: push rbx\n\t  pc+0x01: push rbp\n 0000000140006128 (rva: 00006128): 0000000140001ee0 - 0000000140001f5d\n\tVersion: 1, Flags: none\n\tNbr codes: 7, Prologue size: 0x0f, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0f: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x0a: alloc small area: rsp = rsp - 0x20\n\t  pc+0x06: push rbx\n\t  pc+0x05: push rsi\n\t  pc+0x04: push rdi\n\t  pc+0x03: push r12\n\t  pc+0x01: push rbp\n 000000014000613c (rva: 0000613c): 0000000140001f60 - 0000000140001fe8\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x30\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006148 (rva: 00006148): 0000000140001ff0 - 0000000140002089\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006154 (rva: 00006154): 0000000140002090 - 0000000140002192\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x30\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006160 (rva: 00006160): 00000001400021a0 - 00000001400021a3\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006164 (rva: 00006164): 00000001400021b0 - 00000001400021dc\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006168 (rva: 00006168): 00000001400021e0 - 0000000140002230\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000616c (rva: 0000616c): 0000000140002230 - 00000001400022d8\n\tVersion: 1, Flags: none\n\tNbr codes: 7, Prologue size: 0x0f, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0f: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x0a: alloc small area: rsp = rsp - 0x20\n\t  pc+0x06: push rbx\n\t  pc+0x05: push rsi\n\t  pc+0x04: push rdi\n\t  pc+0x03: push r12\n\t  pc+0x01: push rbp\n 0000000140006180 (rva: 00006180): 00000001400022e0 - 0000000140002360\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006184 (rva: 00006184): 0000000140002360 - 0000000140002397\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006188 (rva: 00006188): 00000001400023a0 - 000000014000241b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000618c (rva: 0000618c): 0000000140002420 - 0000000140002456\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006190 (rva: 00006190): 0000000140002460 - 00000001400024e9\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006194 (rva: 00006194): 00000001400024f0 - 00000001400025a6\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006198 (rva: 00006198): 00000001400025f0 - 0000000140002631\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400061a8 (rva: 000061a8): 0000000140002640 - 000000014000264b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061ac (rva: 000061ac): 0000000140002650 - 000000014000265b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b0 (rva: 000061b0): 0000000140002660 - 000000014000266b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b4 (rva: 000061b4): 0000000140002670 - 0000000140002678\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b8 (rva: 000061b8): 0000000140002680 - 000000014000268b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061bc (rva: 000061bc): 0000000140002690 - 00000001400026a6\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061c0 (rva: 000061c0): 00000001400026b0 - 00000001400026d6\n\tVersion: 1, Flags: none\n\tNbr codes: 4, Prologue size: 0x0b, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0b: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x06: alloc small area: rsp = rsp - 0x28\n\t  pc+0x02: push rbx\n\t  pc+0x01: push rbp\n 00000001400061cc (rva: 000061cc): 00000001400027d0 - 00000001400027d5\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n\n\nPE File Base Relocations (interpreted .reloc section contents)\n\nVirtual Address: 00003000 Chunk size 28 (0x1c) Number of fixups 10\n\treloc    0 offset    0 [3000] DIR64\n\treloc    1 offset   50 [3050] DIR64\n\treloc    2 offset   60 [3060] DIR64\n\treloc    3 offset   70 [3070] DIR64\n\treloc    4 offset   80 [3080] DIR64\n\treloc    5 offset   90 [3090] DIR64\n\treloc    6 offset   98 [3098] DIR64\n\treloc    7 offset   a0 [30a0] DIR64\n\treloc    8 offset   b0 [30b0] DIR64\n\treloc    9 offset    0 [3000] ABSOLUTE\n\nVirtual Address: 00004000 Chunk size 80 (0x50) Number of fixups 36\n\treloc    0 offset    0 [4000] DIR64\n\treloc    1 offset   20 [4020] DIR64\n\treloc    2 offset   28 [4028] DIR64\n\treloc    3 offset   30 [4030] DIR64\n\treloc    4 offset   38 [4038] DIR64\n\treloc    5 offset  330 [4330] DIR64\n\treloc    6 offset  340 [4340] DIR64\n\treloc    7 offset  350 [4350] DIR64\n\treloc    8 offset  360 [4360] DIR64\n\treloc    9 offset  370 [4370] DIR64\n\treloc   10 offset  380 [4380] DIR64\n\treloc   11 offset  390 [4390] DIR64\n\treloc   12 offset  3a0 [43a0] DIR64\n\treloc   13 offset  3b0 [43b0] DIR64\n\treloc   14 offset  3c0 [43c0] DIR64\n\treloc   15 offset  3d0 [43d0] DIR64\n\treloc   16 offset  3e0 [43e0] DIR64\n\treloc   17 offset  3f0 [43f0] DIR64\n\treloc   18 offset  400 [4400] DIR64\n\treloc   19 offset  410 [4410] DIR64\n\treloc   20 offset  420 [4420] DIR64\n\treloc   21 offset  430 [4430] DIR64\n\treloc   22 offset  440 [4440] DIR64\n\treloc   23 offset  450 [4450] DIR64\n\treloc   24 offset  460 [4460] DIR64\n\treloc   25 offset  470 [4470] DIR64\n\treloc   26 offset  480 [4480] DIR64\n\treloc   27 offset  490 [4490] DIR64\n\treloc   28 offset  4a0 [44a0] DIR64\n\treloc   29 offset  4b0 [44b0] DIR64\n\treloc   30 offset  4c0 [44c0] DIR64\n\treloc   31 offset  4d0 [44d0] DIR64\n\treloc   32 offset  4e0 [44e0] DIR64\n\treloc   33 offset  918 [4918] DIR64\n\treloc   34 offset  960 [4960] DIR64\n\treloc   35 offset  968 [4968] DIR64\n\n"
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "-c",
+        "main.c",
+        "-o",
+        "sample.o"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-ar",
+        "rcs",
+        "/tmp/release-controls-y0sivfxf/native/build/artifacts/libsongcore.a",
+        "sample.o"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "native",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--native",
+        "/tmp/release-controls-y0sivfxf/native"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "native-synthetic-baseline",
+      "stderr": "",
+      "stdout": "PASS: native\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "native",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--native",
+        "/tmp/release-controls-y0sivfxf/native"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E14-hash",
+      "stderr": "POLICY_RED: R3 native archive/receipt drift\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "ar",
+        "rcs",
+        "/tmp/release-controls-y0sivfxf/native/build/artifacts/libsongcore.a",
+        "/home/hoo/Source/qianqian/tools/release-fixtures/elf64-x86-64-minimal.o"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "native",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--native",
+        "/tmp/release-controls-y0sivfxf/native"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E14-real-ELF",
+      "stderr": "POLICY_RED: R3 native archive target mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "native",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--native",
+        "/tmp/release-controls-y0sivfxf/native"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E14-target",
+      "stderr": "POLICY_RED: R3 compile closure target mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "manifest",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--native",
+        "/tmp/release-controls-y0sivfxf/native",
+        "--stage",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "manifest-baseline",
+      "stderr": "",
+      "stdout": "PASS: manifest\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E06",
+      "stderr": "POLICY_RED: R2 manifest source mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E07",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E08",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-QUICKSTART.md",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-LICENSE",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-LICENSE-MIT",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-LICENSE-APACHE",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-THIRD_PARTY_NOTICES.md",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E09-BUILD-MANIFEST.txt",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E10-../escape",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E10-qianqian-v0.1.0-windows-x86_64/extra.exe",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E10-qianqian-v0.1.0-windows-x86_64/fixtures.wav",
+      "stderr": "POLICY_RED: R4 exact package file set mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E10-qianqian-v0.1.0-windows-x86_64/qianqian.exe",
+      "stderr": "POLICY_RED: R4 duplicate ZIP paths\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E10-symlink",
+      "stderr": "POLICY_RED: R4 symlink ZIP member\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E11",
+      "stderr": "POLICY_RED: R5 payload hash/size mismatch: qianqian.exe\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E12",
+      "stderr": "POLICY_RED: R5 ZIP checksum mismatch\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 5,
+      "expected": 5,
+      "id": "E12-missing-.sha256",
+      "stderr": "EVIDENCE_MISSING: required external sidecar absent: .sha256\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 5,
+      "expected": 5,
+      "id": "E12-missing-.provenance.json",
+      "stderr": "EVIDENCE_MISSING: required external sidecar absent: .provenance.json\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E13",
+      "stderr": "POLICY_RED: R4 non-system DLL import: unshipped.dll\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "-shared",
+        "dll.c",
+        "-o",
+        "api-ms-win-qianqian-unshipped-l1-1-0.dll",
+        "-Wl,--out-implib,libspoof.a"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "x86_64-w64-mingw32-gcc",
+        "bad.c",
+        "-L.",
+        "-lspoof",
+        "-o",
+        "spoof.exe"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "objdump",
+        "-p",
+        "spoof.exe"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/pe",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "\nspoof.exe:     file format pei-x86-64\n\nCharacteristics 0x26\n\texecutable\n\tline numbers stripped\n\tlarge address aware\n\nTime/Date\t\tFri Oct 30 20:30:17 2026\nMagic\t\t\t020b\t(PE32+)\nMajorLinkerVersion\t2\nMinorLinkerVersion\t45\nSizeOfCode\t\t0000000000001800\nSizeOfInitializedData\t0000000000001c00\nSizeOfUninitializedData\t0000000000000200\nAddressOfEntryPoint\t0000000000001420\nBaseOfCode\t\t0000000000001000\nImageBase\t\t0000000140000000\nSectionAlignment\t00001000\nFileAlignment\t\t00000200\nMajorOSystemVersion\t4\nMinorOSystemVersion\t0\nMajorImageVersion\t0\nMinorImageVersion\t0\nMajorSubsystemVersion\t5\nMinorSubsystemVersion\t2\nWin32Version\t\t00000000\nSizeOfImage\t\t00023000\nSizeOfHeaders\t\t00000600\nCheckSum\t\t0002033e\nSubsystem\t\t00000003\t(Windows CUI)\nDllCharacteristics\t00000160\n\t\t\t\t\tHIGH_ENTROPY_VA\n\t\t\t\t\tDYNAMIC_BASE\n\t\t\t\t\tNX_COMPAT\nSizeOfStackReserve\t0000000000200000\nSizeOfStackCommit\t0000000000001000\nSizeOfHeapReserve\t0000000000100000\nSizeOfHeapCommit\t0000000000001000\nLoaderFlags\t\t00000000\nNumberOfRvaAndSizes\t00000010\n\nThe Data Directory\nEntry 0 0000000000000000 00000000 Export Directory [.edata (or where ever we found it)]\nEntry 1 0000000000008000 0000055c Import Directory [parts of .idata]\nEntry 2 0000000000000000 00000000 Resource Directory [.rsrc]\nEntry 3 0000000000005000 0000021c Exception Directory [.pdata]\nEntry 4 0000000000000000 00000000 Security Directory\nEntry 5 000000000000a000 0000006c Base Relocation Directory [.reloc]\nEntry 6 0000000000000000 00000000 Debug Directory\nEntry 7 0000000000000000 00000000 Description Directory\nEntry 8 0000000000000000 00000000 Special Directory\nEntry 9 0000000000004020 00000028 Thread Storage Directory [.tls]\nEntry a 0000000000000000 00000000 Load Configuration Directory\nEntry b 0000000000000000 00000000 Bound Import Directory\nEntry c 0000000000008178 00000128 Import Address Table Directory\nEntry d 0000000000000000 00000000 Delay Import Directory\nEntry e 0000000000000000 00000000 CLR Runtime Header\nEntry f 0000000000000000 00000000 Reserved\n\nThere is an import table in .idata at 0x140008000\n\nThe Import Tables (interpreted .idata section contents)\n vma:            Hint    Time      Forward  DLL       First\n                 Table   Stamp     Chain    Name      Thunk\n 00008000\t00008050 00000000 00000000 00008490 00008178\n\n\tDLL Name: api-ms-win-qianqian-unshipped-l1-1-0.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t00008178  <none>  0000  foreign\n\n 00008014\t00008060 00000000 00000000 000084e4 00008188\n\n\tDLL Name: KERNEL32.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t00008188  <none>  0127  DeleteCriticalSection\n\t00008190  <none>  014d  EnterCriticalSection\n\t00008198  <none>  0288  GetLastError\n\t000081a0  <none>  0396  InitializeCriticalSection\n\t000081a8  <none>  03f4  LeaveCriticalSection\n\t000081b0  <none>  0599  SetUnhandledExceptionFilter\n\t000081b8  <none>  05a9  Sleep\n\t000081c0  <none>  05cd  TlsGetValue\n\t000081c8  <none>  05fd  VirtualProtect\n\t000081d0  <none>  05ff  VirtualQuery\n\n 00008028\t000080b8 00000000 00000000 00008550 000081e0\n\n\tDLL Name: msvcrt.dll\n\tvma:     Ordinal  Hint  Member-Name  Bound-To\n\t000081e0  <none>  0059  __C_specific_handler\n\t000081e8  <none>  007f  __getmainargs\n\t000081f0  <none>  0080  __initenv\n\t000081f8  <none>  0081  __iob_func\n\t00008200  <none>  00a0  __set_app_type\n\t00008208  <none>  00a2  __setusermatherr\n\t00008210  <none>  00bf  _amsg_exit\n\t00008218  <none>  00d2  _cexit\n\t00008220  <none>  00e0  _commode\n\t00008228  <none>  012c  _fmode\n\t00008230  <none>  017b  _initterm\n\t00008238  <none>  03f8  abort\n\t00008240  <none>  03ff  atexit\n\t00008248  <none>  0409  calloc\n\t00008250  <none>  0416  exit\n\t00008258  <none>  0429  fprintf\n\t00008260  <none>  0430  free\n\t00008268  <none>  046a  malloc\n\t00008270  <none>  0473  memcpy\n\t00008278  <none>  0491  signal\n\t00008280  <none>  04a6  strlen\n\t00008288  <none>  04a9  strncmp\n\t00008290  <none>  04c8  vfprintf\n\n 0000803c\t00000000 00000000 00000000 00000000 00000000\n\nThe Function Table (interpreted .pdata section contents)\nvma:\t\t\tBeginAddress\t EndAddress\t  UnwindData\n 0000000140005000:\t0000000140001000 0000000140001001 0000000140006000\n 000000014000500c:\t0000000140001010 00000001400013ea 0000000140006004\n 0000000140005018:\t00000001400013f0 0000000140001412 000000014000601c\n 0000000140005024:\t0000000140001420 0000000140001442 0000000140006040\n 0000000140005030:\t0000000140001450 0000000140001455 0000000140006064\n 000000014000503c:\t0000000140001460 000000014000146c 0000000140006068\n 0000000140005048:\t0000000140001470 0000000140001471 000000014000606c\n 0000000140005054:\t0000000140001480 000000014000149c 0000000140006070\n 0000000140005060:\t00000001400014b0 00000001400014f3 000000014000607c\n 000000014000506c:\t0000000140001500 0000000140001582 0000000140006088\n 0000000140005078:\t0000000140001590 00000001400015af 0000000140006098\n 0000000140005084:\t00000001400015b0 00000001400015b3 000000014000609c\n 0000000140005090:\t00000001400015c0 00000001400015d5 00000001400060a0\n 000000014000509c:\t00000001400015e0 000000014000165c 00000001400060a4\n 00000001400050a8:\t0000000140001660 0000000140001663 00000001400060b4\n 00000001400050b4:\t0000000140001670 0000000140001768 00000001400060b8\n 00000001400050c0:\t0000000140001770 00000001400017ce 00000001400060d4\n 00000001400050cc:\t00000001400017d0 0000000140001932 00000001400060e4\n 00000001400050d8:\t0000000140001940 0000000140001cd0 00000001400060f4\n 00000001400050e4:\t0000000140001cd0 0000000140001d0a 000000014000610c\n 00000001400050f0:\t0000000140001d10 0000000140001d1c 0000000140006118\n 00000001400050fc:\t0000000140001d20 0000000140001edd 000000014000611c\n 0000000140005108:\t0000000140001ee0 0000000140001f5d 0000000140006128\n 0000000140005114:\t0000000140001f60 0000000140001fe8 000000014000613c\n 0000000140005120:\t0000000140001ff0 0000000140002089 0000000140006148\n 000000014000512c:\t0000000140002090 0000000140002192 0000000140006154\n 0000000140005138:\t00000001400021a0 00000001400021a3 0000000140006160\n 0000000140005144:\t00000001400021b0 00000001400021dc 0000000140006164\n 0000000140005150:\t00000001400021e0 0000000140002230 0000000140006168\n 000000014000515c:\t0000000140002230 00000001400022d8 000000014000616c\n 0000000140005168:\t00000001400022e0 0000000140002360 0000000140006180\n 0000000140005174:\t0000000140002360 0000000140002397 0000000140006184\n 0000000140005180:\t00000001400023a0 000000014000241b 0000000140006188\n 000000014000518c:\t0000000140002420 0000000140002456 000000014000618c\n 0000000140005198:\t0000000140002460 00000001400024e9 0000000140006190\n 00000001400051a4:\t00000001400024f0 00000001400025a6 0000000140006194\n 00000001400051b0:\t00000001400025f0 0000000140002631 0000000140006198\n 00000001400051bc:\t0000000140002640 000000014000264b 00000001400061a8\n 00000001400051c8:\t0000000140002650 000000014000265b 00000001400061ac\n 00000001400051d4:\t0000000140002660 000000014000266b 00000001400061b0\n 00000001400051e0:\t0000000140002670 0000000140002678 00000001400061b4\n 00000001400051ec:\t0000000140002680 000000014000268b 00000001400061b8\n 00000001400051f8:\t0000000140002690 00000001400026a6 00000001400061bc\n 0000000140005204:\t00000001400026b0 00000001400026d6 00000001400061c0\n 0000000140005210:\t00000001400027d0 00000001400027d5 00000001400061cc\n\nDump of .xdata\n 0000000140006000 (rva: 00006000): 0000000140001000 - 0000000140001001\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006004 (rva: 00006004): 0000000140001010 - 00000001400013ea\n\tVersion: 1, Flags: none\n\tNbr codes: 10, Prologue size: 0x15, Frame offset: 0x5, Frame reg: rbp\n\t  pc+0x15: FPReg: rbp = rsp + 0x50 (info = 0x0)\n\t  pc+0x10: alloc small area: rsp = rsp - 0x58\n\t  pc+0x0c: push rbx\n\t  pc+0x0b: push rsi\n\t  pc+0x0a: push rdi\n\t  pc+0x09: push r12\n\t  pc+0x07: push r13\n\t  pc+0x05: push r14\n\t  pc+0x03: push r15\n\t  pc+0x01: push rbp\n 000000014000601c (rva: 0000601c): 00000001400013f0 - 0000000140001412\n\tVersion: 1, Flags: UNW_FLAG_EHANDLER\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n\tHandler: 00000001400026e0.\n\tUser data:\n\t  000: 01 00 00 00 f8 13 00 00 0b 14 00 00 20 1d 00 00\n\t  010: 0b 14 00 00\n 0000000140006040 (rva: 00006040): 0000000140001420 - 0000000140001442\n\tVersion: 1, Flags: UNW_FLAG_EHANDLER\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n\tHandler: 00000001400026e0.\n\tUser data:\n\t  000: 01 00 00 00 28 14 00 00 3b 14 00 00 20 1d 00 00\n\t  010: 3b 14 00 00\n 0000000140006064 (rva: 00006064): 0000000140001450 - 0000000140001455\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006068 (rva: 00006068): 0000000140001460 - 000000014000146c\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000606c (rva: 0000606c): 0000000140001470 - 0000000140001471\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006070 (rva: 00006070): 0000000140001480 - 000000014000149c\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 000000014000607c (rva: 0000607c): 00000001400014b0 - 00000001400014f3\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006088 (rva: 00006088): 0000000140001500 - 0000000140001582\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 0000000140006098 (rva: 00006098): 0000000140001590 - 00000001400015af\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000609c (rva: 0000609c): 00000001400015b0 - 00000001400015b3\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060a0 (rva: 000060a0): 00000001400015c0 - 00000001400015d5\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060a4 (rva: 000060a4): 00000001400015e0 - 000000014000165c\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060b4 (rva: 000060b4): 0000000140001660 - 0000000140001663\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400060b8 (rva: 000060b8): 0000000140001670 - 0000000140001768\n\tVersion: 1, Flags: none\n\tNbr codes: 11, Prologue size: 0x19, Frame offset: 0x4, Frame reg: rbp\n\t  pc+0x19: save xmm8 at rsp + 0x60\n\t  pc+0x14: save xmm7 at rsp + 0x50\n\t  pc+0x10: save xmm6 at rsp + 0x40\n\t  pc+0x0c: FPReg: rbp = rsp + 0x40 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x70\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060d4 (rva: 000060d4): 0000000140001770 - 00000001400017ce\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x3, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x30 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x30\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400060e4 (rva: 000060e4): 00000001400017d0 - 0000000140001932\n\tVersion: 1, Flags: none\n\tNbr codes: 6, Prologue size: 0x0d, Frame offset: 0x5, Frame reg: rbp\n\t  pc+0x0d: FPReg: rbp = rsp + 0x50 (info = 0x0)\n\t  pc+0x08: alloc small area: rsp = rsp - 0x58\n\t  pc+0x04: push rbx\n\t  pc+0x03: push rsi\n\t  pc+0x02: push rdi\n\t  pc+0x01: push rbp\n 00000001400060f4 (rva: 000060f4): 0000000140001940 - 0000000140001cd0\n\tVersion: 1, Flags: none\n\tNbr codes: 10, Prologue size: 0x15, Frame offset: 0x4, Frame reg: rbp\n\t  pc+0x15: FPReg: rbp = rsp + 0x40 (info = 0x0)\n\t  pc+0x10: alloc small area: rsp = rsp - 0x48\n\t  pc+0x0c: push rbx\n\t  pc+0x0b: push rsi\n\t  pc+0x0a: push rdi\n\t  pc+0x09: push r12\n\t  pc+0x07: push r13\n\t  pc+0x05: push r14\n\t  pc+0x03: push r15\n\t  pc+0x01: push rbp\n 000000014000610c (rva: 0000610c): 0000000140001cd0 - 0000000140001d0a\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x50\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006118 (rva: 00006118): 0000000140001d10 - 0000000140001d1c\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000611c (rva: 0000611c): 0000000140001d20 - 0000000140001edd\n\tVersion: 1, Flags: none\n\tNbr codes: 4, Prologue size: 0x0b, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0b: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x06: alloc small area: rsp = rsp - 0x28\n\t  pc+0x02: push rbx\n\t  pc+0x01: push rbp\n 0000000140006128 (rva: 00006128): 0000000140001ee0 - 0000000140001f5d\n\tVersion: 1, Flags: none\n\tNbr codes: 7, Prologue size: 0x0f, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0f: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x0a: alloc small area: rsp = rsp - 0x20\n\t  pc+0x06: push rbx\n\t  pc+0x05: push rsi\n\t  pc+0x04: push rdi\n\t  pc+0x03: push r12\n\t  pc+0x01: push rbp\n 000000014000613c (rva: 0000613c): 0000000140001f60 - 0000000140001fe8\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x30\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006148 (rva: 00006148): 0000000140001ff0 - 0000000140002089\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x20\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006154 (rva: 00006154): 0000000140002090 - 0000000140002192\n\tVersion: 1, Flags: none\n\tNbr codes: 3, Prologue size: 0x08, Frame offset: 0x0, Frame reg: rbp\n\t  pc+0x08: alloc small area: rsp = rsp - 0x30\n\t  pc+0x04: FPReg: rbp = rsp + 0x0 (info = 0x0)\n\t  pc+0x01: push rbp\n 0000000140006160 (rva: 00006160): 00000001400021a0 - 00000001400021a3\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006164 (rva: 00006164): 00000001400021b0 - 00000001400021dc\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006168 (rva: 00006168): 00000001400021e0 - 0000000140002230\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000616c (rva: 0000616c): 0000000140002230 - 00000001400022d8\n\tVersion: 1, Flags: none\n\tNbr codes: 7, Prologue size: 0x0f, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0f: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x0a: alloc small area: rsp = rsp - 0x20\n\t  pc+0x06: push rbx\n\t  pc+0x05: push rsi\n\t  pc+0x04: push rdi\n\t  pc+0x03: push r12\n\t  pc+0x01: push rbp\n 0000000140006180 (rva: 00006180): 00000001400022e0 - 0000000140002360\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006184 (rva: 00006184): 0000000140002360 - 0000000140002397\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006188 (rva: 00006188): 00000001400023a0 - 000000014000241b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 000000014000618c (rva: 0000618c): 0000000140002420 - 0000000140002456\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006190 (rva: 00006190): 0000000140002460 - 00000001400024e9\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006194 (rva: 00006194): 00000001400024f0 - 00000001400025a6\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 0000000140006198 (rva: 00006198): 00000001400025f0 - 0000000140002631\n\tVersion: 1, Flags: none\n\tNbr codes: 5, Prologue size: 0x0c, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0c: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x07: alloc small area: rsp = rsp - 0x20\n\t  pc+0x03: push rbx\n\t  pc+0x02: push rsi\n\t  pc+0x01: push rbp\n 00000001400061a8 (rva: 000061a8): 0000000140002640 - 000000014000264b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061ac (rva: 000061ac): 0000000140002650 - 000000014000265b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b0 (rva: 000061b0): 0000000140002660 - 000000014000266b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b4 (rva: 000061b4): 0000000140002670 - 0000000140002678\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061b8 (rva: 000061b8): 0000000140002680 - 000000014000268b\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061bc (rva: 000061bc): 0000000140002690 - 00000001400026a6\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n 00000001400061c0 (rva: 000061c0): 00000001400026b0 - 00000001400026d6\n\tVersion: 1, Flags: none\n\tNbr codes: 4, Prologue size: 0x0b, Frame offset: 0x2, Frame reg: rbp\n\t  pc+0x0b: FPReg: rbp = rsp + 0x20 (info = 0x0)\n\t  pc+0x06: alloc small area: rsp = rsp - 0x28\n\t  pc+0x02: push rbx\n\t  pc+0x01: push rbp\n 00000001400061cc (rva: 000061cc): 00000001400027d0 - 00000001400027d5\n\tVersion: 1, Flags: none\n\tNbr codes: 0, Prologue size: 0x00, Frame offset: 0x0, Frame reg: none\n\n\nPE File Base Relocations (interpreted .reloc section contents)\n\nVirtual Address: 00003000 Chunk size 28 (0x1c) Number of fixups 10\n\treloc    0 offset    0 [3000] DIR64\n\treloc    1 offset   50 [3050] DIR64\n\treloc    2 offset   60 [3060] DIR64\n\treloc    3 offset   70 [3070] DIR64\n\treloc    4 offset   80 [3080] DIR64\n\treloc    5 offset   90 [3090] DIR64\n\treloc    6 offset   98 [3098] DIR64\n\treloc    7 offset   a0 [30a0] DIR64\n\treloc    8 offset   b0 [30b0] DIR64\n\treloc    9 offset    0 [3000] ABSOLUTE\n\nVirtual Address: 00004000 Chunk size 80 (0x50) Number of fixups 36\n\treloc    0 offset    0 [4000] DIR64\n\treloc    1 offset   20 [4020] DIR64\n\treloc    2 offset   28 [4028] DIR64\n\treloc    3 offset   30 [4030] DIR64\n\treloc    4 offset   38 [4038] DIR64\n\treloc    5 offset  330 [4330] DIR64\n\treloc    6 offset  340 [4340] DIR64\n\treloc    7 offset  350 [4350] DIR64\n\treloc    8 offset  360 [4360] DIR64\n\treloc    9 offset  370 [4370] DIR64\n\treloc   10 offset  380 [4380] DIR64\n\treloc   11 offset  390 [4390] DIR64\n\treloc   12 offset  3a0 [43a0] DIR64\n\treloc   13 offset  3b0 [43b0] DIR64\n\treloc   14 offset  3c0 [43c0] DIR64\n\treloc   15 offset  3d0 [43d0] DIR64\n\treloc   16 offset  3e0 [43e0] DIR64\n\treloc   17 offset  3f0 [43f0] DIR64\n\treloc   18 offset  400 [4400] DIR64\n\treloc   19 offset  410 [4410] DIR64\n\treloc   20 offset  420 [4420] DIR64\n\treloc   21 offset  430 [4430] DIR64\n\treloc   22 offset  440 [4440] DIR64\n\treloc   23 offset  450 [4450] DIR64\n\treloc   24 offset  460 [4460] DIR64\n\treloc   25 offset  470 [4470] DIR64\n\treloc   26 offset  480 [4480] DIR64\n\treloc   27 offset  490 [4490] DIR64\n\treloc   28 offset  4a0 [44a0] DIR64\n\treloc   29 offset  4b0 [44b0] DIR64\n\treloc   30 offset  4c0 [44c0] DIR64\n\treloc   31 offset  4d0 [44d0] DIR64\n\treloc   32 offset  4e0 [44e0] DIR64\n\treloc   33 offset  918 [4918] DIR64\n\treloc   34 offset  960 [4960] DIR64\n\treloc   35 offset  968 [4968] DIR64\n\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E13-api-set-spoof",
+      "stderr": "POLICY_RED: R4 non-system DLL import: api-ms-win-qianqian-unshipped-l1-1-0.dll\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 3,
+      "expected": 3,
+      "id": "E15-missing-tool",
+      "stderr": "TOOLING_FAIL: FileNotFoundError: [Errno 2] No such file or directory: 'git'\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 3,
+      "expected": 3,
+      "id": "E15-zip",
+      "stderr": "TOOLING_FAIL: BadZipFile: File is not a zip file\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 3,
+      "expected": 3,
+      "id": "E15-json",
+      "stderr": "TOOLING_FAIL: JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "publish-policy",
+        "--event",
+        "workflow_dispatch",
+        "--ref",
+        "refs/tags/qianqian-v0.1.0",
+        "--tag",
+        "qianqian-v0.1.0"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E16",
+      "stderr": "POLICY_RED: R7 publication requires actual tag push\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "publish-policy",
+        "--event",
+        "push",
+        "--ref",
+        "refs/tags/qianqian-v0.1.0",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--existing"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E16",
+      "stderr": "POLICY_RED: R7 existing/historical release cannot be replaced\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "publish-policy",
+        "--event",
+        "push",
+        "--ref",
+        "refs/tags/qianqian-v9.9.9",
+        "--tag",
+        "qianqian-v9.9.9",
+        "--existing"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E16-existing-nonhistorical",
+      "stderr": "POLICY_RED: R7 existing/historical release cannot be replaced\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "publish-policy",
+        "--event",
+        "push",
+        "--ref",
+        "refs/tags/qianqian-v9.9.9",
+        "--tag",
+        "qianqian-v9.9.9"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "E16-new-policy-only-no-publication",
+      "stderr": "",
+      "stdout": "PASS: publish-policy\n"
+    },
+    {
+      "command": [
+        "bash",
+        "/home/hoo/Source/qianqian/tools/release-qianqian.sh",
+        "publish"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E16-local-publish",
+      "stderr": "POLICY_RED: unsupported operation; local/dry-run publication forbidden\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/publish-qianqian.py",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 2,
+      "expected": 2,
+      "id": "E16-real-publisher",
+      "stderr": "POLICY_RED: R7 publication requires actual tag push\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "verify",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "f24783bde82fb13912db2dbb9f99408944ab93e3",
+        "--mode",
+        "dry-run",
+        "--zip",
+        "/tmp/release-controls-y0sivfxf/qianqian-v0.1.0-windows-x86_64.zip"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "E17",
+      "stderr": "",
+      "stdout": "PASS: verify\n"
+    },
+    {
+      "command": [
+        "git",
+        "add",
+        "."
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "-c",
+        "user.name=Control",
+        "-c",
+        "user.email=c@invalid",
+        "commit",
+        "-qm",
+        "private edit"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "",
+      "stderr": "",
+      "stdout": "8c71fe27a248f90749e45695620c3c9f8046330c\n"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/hoo/Source/qianqian/tools/check_release.py",
+        "source",
+        "--repo",
+        "/tmp/release-controls-y0sivfxf/repo",
+        "--tag",
+        "qianqian-v0.1.0",
+        "--source",
+        "8c71fe27a248f90749e45695620c3c9f8046330c",
+        "--mode",
+        "dry-run"
+      ],
+      "cwd": "/tmp/release-controls-y0sivfxf/repo",
+      "exit_code": 0,
+      "expected": 0,
+      "id": "E18",
+      "stderr": "",
+      "stdout": "PASS: source\n"
+    }
+  ],
+  "head": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500"
+}

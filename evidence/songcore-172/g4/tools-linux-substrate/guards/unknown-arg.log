@@ -1,0 +1,35 @@
+package-linux: unknown argument: --bogus
+
+Usage:
+  ops/package-linux.sh --version <X.Y.Z[-suffix]> --source-commit <40-hex> \
+                       --work-root <build root> --out-dir <dir> \
+                       [--artifact-static <path>] [--artifact-shared <path>] \
+                       [--closure-manifest <path>] [--pinned-zip <path>] \
+                       [--consumer-example <path>] [--build-receipt <path>]
+
+  --version          REQUIRED, no default. The concrete next release number
+                     is owner-reserved (contract section 14 Q1); this entry
+                     never picks one, creates no tag and publishes nothing.
+  --source-commit    REQUIRED full 40-hex commit all inputs must come from.
+  --work-root        REQUIRED build root that ops/build-linux.sh produced (a
+                     checkout at --source-commit holding
+                     native/build/artifacts/{libsongcore.a,shared/libsongcore.so}
+                     and native/build/ffmpeg-xmake/manifest.json).
+  --out-dir          REQUIRED output directory (stage tree, container,
+                     sidecars, receipts).
+  --artifact-static  default <work-root>/native/build/artifacts/libsongcore.a
+  --artifact-shared  default <work-root>/native/build/artifacts/shared/libsongcore.so
+  --closure-manifest default <work-root>/native/build/ffmpeg-xmake/manifest.json
+  --pinned-zip       default <work-root>/native/build/downloads/ffmpeg-n9.0.1.zip
+                     (where scripts/fetch-ffmpeg writes the pinned zip)
+  --consumer-example default <work-root>/evidence/songcore-172/linux/verify/
+                     package/external-consumer-example.c (the tracked S3
+                     template)
+  --build-receipt    optional ops/build-linux.sh summary.json. When supplied,
+                     the packaged artifact bytes are BOUND to --source-commit
+                     (receipt head + both artifact sha256 are re-verified).
+                     When omitted the package still builds, but the manifest
+                     notes and package-summary.json state that the artifact
+                     provenance is unattested.
+
+Version: caller-supplied only. No tag, no GitHub Release, no publication.

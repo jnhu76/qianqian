@@ -1,0 +1,26 @@
+head=bf23516b5851174dc63fb5058997fa5478751713
+branch=songcore-172/pr-a-build-fixes
+diff_index_clean=YES
+status_porcelain_lines=1
+status_untracked_only=0
+== closure reusable preconditions (build-linux.sh stage2) ==
+file=native/ffmpeg/pin.json PRESENT
+file=native/build/ffmpeg-xmake/manifest.json PRESENT
+file=native/build/ffmpeg-src/.qianqian-verified PRESENT
+file=native/build/ffmpeg-xmake/oracle/ffbuild/config.mak PRESENT
+file=native/build/ffmpeg-xmake/oracle/config_components.h PRESENT
+file=native/ffmpeg/targets/linux-x86_64.json PRESENT
+file=native/ffmpeg/profiles/codec-base.json PRESENT
+verified_marker=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa|d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+pin_commit=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+pin_sha=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+linux_a_sha=409ef3da505f94d559a5fb5cb042fccd225d52238a00bd50722dd5f2669dd0f3 bytes=4067628
+linux_so_sha=5e9c56972bc063e0020750d562225dcb8a3ac3c10df3957688bb86ebd9a12843
+== sizes ==
+615M	/home/hoo/qianqian-172-linux
+171M	/home/hoo/qianqian-172-linux/native/build
+272M	/home/hoo/q172rc
+124M	/home/hoo/q172d2-verify/closure
+== is bf23516 an ancestor of main(69ba1ce)? (WSL repo) ==
+pin_is_ancestor_of_HEAD=NO
+commits_between=5

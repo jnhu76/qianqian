@@ -1,0 +1,13 @@
+RC=0
++ git clone --no-local file:///nonexistent/src /home/hoo/q172-g4-audit3/qianqian-172-linux
+/mnt/c/Users/fred1/source/qianqian/ops/build-linux.sh: line 80: /home/hoo/q172-g4-audit3/qianqian-172-linux/ops/build-evidence/20261030T123754Z/clone-worktree-path.log: No such file or directory
++ log 'stage1: worktree-path clone failed, falling back to owning repository'
++ printf '[build-linux] %s\n' 'stage1: worktree-path clone failed, falling back to owning repository'
+[build-linux] stage1: worktree-path clone failed, falling back to owning repository
++ cp -f /home/hoo/q172-g4-audit3/qianqian-172-linux/ops/build-evidence/20261030T123754Z/clone-worktree-path.log /home/hoo/q172-g4-audit3/qianqian-172-linux/ops/build-evidence/20261030T123754Z/clone-worktree-path-failed.log
+cp: cannot stat '/home/hoo/q172-g4-audit3/qianqian-172-linux/ops/build-evidence/20261030T123754Z/clone-worktree-path.log': No such file or directory
+++ on_err
+++ local rc=1
+++ printf '{"verdict":"FAIL","failed_stage":"%s","exit":%d}\n' clone 1
+{"verdict":"FAIL","failed_stage":"clone","exit":1}
+++ exit 1

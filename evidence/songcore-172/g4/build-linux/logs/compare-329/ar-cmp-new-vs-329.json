@@ -1,0 +1,75 @@
+{
+  "archive_a": "/home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a",
+  "archive_b": "/home/hoo/qq329/lin-r1/src/native/build/artifacts/libsongcore.a",
+  "members_a": 282,
+  "members_b": 282,
+  "member_order_identical": true,
+  "member_occurrences_identical": 278,
+  "differing_occurrences": 4,
+  "header_differing_occurrences": 0,
+  "header_diff_sample": [],
+  "diffs": [
+    {
+      "index": 3,
+      "name_a": "version.c.o",
+      "name_b": "version.c.o",
+      "size_a": 2688,
+      "size_b": 2688,
+      "sha_a": "e9bd4245ec3bca774dba0dda392ebcd35e9cb02851fd191f0aa8a71c946cc8d0",
+      "sha_b": "00b4aa3f2a85834d6f07bebba239098be837f5e4dcb2cef9e1c889f06d676704",
+      "strings_only_in_a": [
+        "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+      ],
+      "strings_only_in_b": [
+        "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+      ]
+    },
+    {
+      "index": 17,
+      "name_a": "version.c.o",
+      "name_b": "version.c.o",
+      "size_a": 2928,
+      "size_b": 2928,
+      "sha_a": "83d582ff945aad345c8034a3ea63c2bd6444230a3578ff6c422025dd1aca214d",
+      "sha_b": "8a3b7056b716fafc4427fe46c5eeeebec3e7e9b1d514542621b983a3cc92c220",
+      "strings_only_in_a": [
+        "qianqian-v0.1.0-315-gbf23516",
+        "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+      ],
+      "strings_only_in_b": [
+        "qianqian-v0.1.0-316-gb49b18c",
+        "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+      ]
+    },
+    {
+      "index": 110,
+      "name_a": "version.c.o",
+      "name_b": "version.c.o",
+      "size_a": 2680,
+      "size_b": 2680,
+      "sha_a": "eb821728a8f8dd6f65772e3d77f0c2db2f5a0b148c95d4595057dd03b1ef6187",
+      "sha_b": "1af815258f6a63d0ea5694a1717f25ade8373cea36ae35522cf2beabc928df65",
+      "strings_only_in_a": [
+        "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+      ],
+      "strings_only_in_b": [
+        "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+      ]
+    },
+    {
+      "index": 181,
+      "name_a": "version.c.o",
+      "name_b": "version.c.o",
+      "size_a": 2672,
+      "size_b": 2672,
+      "sha_a": "1d438d9bcd2635c9032ed1560e15db8807e05cb38f6b1773645026ba493e4ab9",
+      "sha_b": "1af6f90b5a0c85f751302ba142179e9d305e1670cff7bd69d5d3c944f65a7b34",
+      "strings_only_in_a": [
+        "FFmpeg version qianqian-v0.1.0-315-gbf23516"
+      ],
+      "strings_only_in_b": [
+        "FFmpeg version qianqian-v0.1.0-316-gb49b18c"
+      ]
+    }
+  ]
+}

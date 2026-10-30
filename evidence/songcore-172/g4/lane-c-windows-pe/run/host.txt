@@ -1,0 +1,12 @@
+runner=Git Bash (native Windows process, MINGW64/MSYS)
+host_hostname=WuJie
+host_uname=MINGW64_NT-10.0-26300 WuJie 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+host_windows_ver=Microsoft Windows [°æ±¾ 10.0.26300.9818]
+host_windows_caption=Microsoft Windows 11 ×¨Òµ°æ
+host_windows_version=10.0.26300
+host_windows_build=26300
+host_windows_arch=AMD64
+host_exe_path_windows=C:\Users\fred1\lane-c-win-pe\pe-consumer.exe
+host_exe_sha256=3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d
+host_media_dir=C:\Users\fred1\lane-c-win-pe\media
+host_run_date_utc=2026-10-30T13:19:59Z

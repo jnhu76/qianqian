@@ -1,0 +1,7 @@
+[package-linux] version 0.2.0-rc.1 (caller-supplied; not a release)
+[package-linux] source  69ba1ce05a2772f5aa077c6ece3365c40f6e0500 @ /home/hoo/g4-172/linux-root
+[package-linux] stage1: binutils audits
+[package-linux] stage2: license texts from the pinned source zip (O1) + component texts (B4)
+[package-linux] stage3: staging the section 7 tree
+FAIL: receipt static sha256 '0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308' != packaged 409ef3da505f94d559a5fb5cb042fccd225d52238a00bd50722dd5f2669dd0f3; receipt shared sha256 '085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98' != packaged 5e9c56972bc063e0020750d562225dcb8a3ac3c10df3957688bb86ebd9a12843
+package-linux: FAIL: build receipt /home/hoo/g4-172/evidence/build-linux/20261030T125315Z/summary.json does not bind these artifact bytes to 69ba1ce05a2772f5aa077c6ece3365c40f6e0500

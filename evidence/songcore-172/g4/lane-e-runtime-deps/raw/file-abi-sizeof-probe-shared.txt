@@ -1,0 +1,1 @@
+/home/hoo/lane-e-runtime/work/shared/abi-sizeof-probe-shared: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=e49e0a32e9205ecd6f82efcf0f927f49ee49a65b, for GNU/Linux 3.2.0, not stripped

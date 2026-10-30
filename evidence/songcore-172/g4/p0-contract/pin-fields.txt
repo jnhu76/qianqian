@@ -1,0 +1,7 @@
+ffmpeg_tag=n9.0.1
+ffmpeg_commit_sha=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+ffmpeg_version=9.0.1
+source_url=https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip
+source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+has_verification_block=True
+pin_keys=ffmpeg_commit_sha,ffmpeg_tag,ffmpeg_version,source_sha256,source_url,verification

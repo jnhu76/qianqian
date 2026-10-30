@@ -1,0 +1,23 @@
+{
+    "script":  "ops/package-rc.ps1",
+    "started":  "20261030-203220",
+    "version":  "0.1.0",
+    "version_status":  "provisional (contract section 14 Q1 owner-reserved)",
+    "package_root":  "songcore-v0.1.0-windows-x86_64",
+    "project":  "C:\\Users\\fred1\\source\\qianqian",
+    "artifact":  "C:\\Users\\fred1\\source\\qianqian\\native\\build\\artifacts\\libsongcore.a",
+    "out_dir":  "C:\\Users\\fred1\\source\\qianqian\\evidence\\songcore-172\\g4\\p0-entries\\package-rc-out\\ver-0.1.0",
+    "source":  {
+
+               },
+    "audits":  {
+
+               },
+    "checks":  {
+                   "preflight":  "FAIL: refusing version \u00270.1.0\u0027: songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag."
+               },
+    "container":  {
+
+                  },
+    "ok":  false
+}

@@ -1,0 +1,1195 @@
+{
+  "reference_json_sha256": "8113ff6e07b32db03de0f73c4c6cf39179b347913de6002a6ab2d4e4274026f8",
+  "reference_schema": "songcore-equivalence-reference/1",
+  "fixtures": [
+    {
+      "id": "mp3-cbr-id3v23",
+      "fixture_file": "mp3-cbr-id3v23.mp3",
+      "fixture_sha256_expected": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
+      "fixture_sha256_actual": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
+      "frames_expected": 176400,
+      "pcm_sha256_expected": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "codec_expected": "mp3",
+      "sample_rate_expected": 44100,
+      "channels_expected": 2,
+      "links": {
+        "static": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "mp3",
+            "container": "mp3",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 0,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 992653,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1985306,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2977959,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 0,
+              "landing_us": 3787755,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 10465,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        },
+        "shared": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "mp3",
+            "container": "mp3",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 0,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 992653,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1985306,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2977959,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 0,
+              "landing_us": 3787755,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 10465,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+          ],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        }
+      },
+      "fixture_sha256_match": true,
+      "static_vs_shared_equal": true
+    },
+    {
+      "id": "flac-16-44-stereo",
+      "fixture_file": "flac-16-44-stereo.flac",
+      "fixture_sha256_expected": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "fixture_sha256_actual": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "frames_expected": 176400,
+      "pcm_sha256_expected": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "codec_expected": "flac",
+      "sample_rate_expected": 44100,
+      "channels_expected": 2,
+      "links": {
+        "static": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "flac",
+            "container": "flac",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 16,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 940408,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1985306,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2925714,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 41472,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 87552,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 129024,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 110,
+              "landing_us": -1,
+              "gated": 0
+            },
+            {
+              "stage": "drain_seek",
+              "attempt": 1,
+              "target_us": 2000000,
+              "status": 0,
+              "landing_us": 1985306,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 88848,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        },
+        "shared": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "flac",
+            "container": "flac",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 16,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 940408,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1985306,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2925714,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 41472,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 87552,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 129024,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 110,
+              "landing_us": -1,
+              "gated": 0
+            },
+            {
+              "stage": "drain_seek",
+              "attempt": 1,
+              "target_us": 2000000,
+              "status": 0,
+              "landing_us": 1985306,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 88848,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+          ],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        }
+      },
+      "fixture_sha256_match": true,
+      "static_vs_shared_equal": true
+    },
+    {
+      "id": "alac-16-44-stereo",
+      "fixture_file": "alac-16-44-stereo.m4a",
+      "fixture_sha256_expected": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3",
+      "fixture_sha256_actual": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3",
+      "frames_expected": 176400,
+      "pcm_sha256_expected": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "codec_expected": "alac",
+      "sample_rate_expected": 44100,
+      "channels_expected": 2,
+      "links": {
+        "static": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "alac",
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 24,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 928798,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1950476,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2972154,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 40960,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 86016,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 131072,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 0,
+              "landing_us": 3715193,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 12560,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        },
+        "shared": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "alac",
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 4000000,
+            "bits_per_sample": 24,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 176400,
+          "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 928798,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 2000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1950476,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2972154,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 40960,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 86016,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 131072,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 3800000,
+              "status": 0,
+              "landing_us": 3715193,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 12560,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+          ],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        }
+      },
+      "fixture_sha256_match": true,
+      "static_vs_shared_equal": true
+    },
+    {
+      "id": "alac-long",
+      "fixture_file": "alac-long.m4a",
+      "fixture_sha256_expected": "2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c",
+      "fixture_sha256_actual": "2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c",
+      "frames_expected": 264600,
+      "pcm_sha256_expected": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "codec_expected": "alac",
+      "sample_rate_expected": 44100,
+      "channels_expected": 2,
+      "links": {
+        "static": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "alac",
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 6000000,
+            "bits_per_sample": 24,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 264600,
+          "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1500000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1486077,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2972154,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 4500000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 4458231,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 65536,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 131072,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 196608,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 5800000,
+              "status": 0,
+              "landing_us": 5758549,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 10648,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        },
+        "shared": {
+          "present": true,
+          "exit_verdict": {
+            "stage": "verdict",
+            "ok": 1,
+            "gated_failures": 0
+          },
+          "probe": {
+            "stage": "probe",
+            "status": 0,
+            "codec": "alac",
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "sample_rate": 44100,
+            "channels": 2,
+            "channel_mask": "0x0000000000000003",
+            "duration_us": 6000000,
+            "bits_per_sample": 24,
+            "audio_stream_count": 1,
+            "selected_audio_index": 0,
+            "ok": 1
+          },
+          "frames_actual": 264600,
+          "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+          "frames_match": true,
+          "pcm_sha256_match": true,
+          "codec_match": true,
+          "sample_rate_match": true,
+          "channels_match": true,
+          "seek_results": [
+            {
+              "stage": "seek",
+              "pct": 25,
+              "target_us": 1500000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 1486077,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 50,
+              "target_us": 3000000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 2972154,
+              "landing_not_after_target": 1
+            },
+            {
+              "stage": "seek",
+              "pct": 75,
+              "target_us": 4500000,
+              "status": 0,
+              "status_class": 0,
+              "landing_us": 4458231,
+              "landing_not_after_target": 1
+            }
+          ],
+          "seek_next_reads": [
+            {
+              "stage": "seek_next_read",
+              "pct": 25,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 50,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            },
+            {
+              "stage": "seek_next_read",
+              "pct": 75,
+              "status": 0,
+              "produced": 4096,
+              "at_landing": 1
+            }
+          ],
+          "seek_lossless_landing_checks": [
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 25,
+              "reported_frame_idx": 65536,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 50,
+              "reported_frame_idx": 131072,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            },
+            {
+              "stage": "seek_lossless_landing_check",
+              "pct": 75,
+              "reported_frame_idx": 196608,
+              "compared_frames": 4096,
+              "mismatched_frames": 0,
+              "exact_match": 1,
+              "true_landing_delta_frames": -9223372036854775808
+            }
+          ],
+          "eof_repeat": {
+            "stage": "eof_repeat",
+            "status": 1,
+            "produced": 0,
+            "is_error": 0,
+            "ok": 1
+          },
+          "drain_seek_attempts": [
+            {
+              "stage": "drain_seek",
+              "attempt": 0,
+              "target_us": 5800000,
+              "status": 0,
+              "landing_us": 5758549,
+              "gated": 0
+            }
+          ],
+          "drain": {
+            "stage": "drain",
+            "terminal": "SONG_EOF",
+            "status": 1,
+            "produced_at_eof": 0,
+            "frames_after_seek": 10648,
+            "is_error": 0,
+            "terminal_distinguishable_from_error": 1
+          },
+          "loaded_songcore_paths": [
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+            "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+          ],
+          "all_seeks_ok": true,
+          "all_seeks_landing_known": true,
+          "all_seek_next_reads_produced": true,
+          "eof_repeat_ok": true,
+          "drain_eof_ok": true,
+          "gate_ok": true
+        }
+      },
+      "fixture_sha256_match": true,
+      "static_vs_shared_equal": true
+    }
+  ],
+  "ok": true
+}

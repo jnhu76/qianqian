@@ -1,0 +1,45 @@
+linux_extract_rc=0
+===== extracted tree: linux =====
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/COPYING.GPLv2
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/COPYING.GPLv3
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/COPYING.LGPLv2.1
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/COPYING.LGPLv3
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/LICENSE-APACHE
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/LICENSE-MIT
+songcore-v0.0.0-preflight-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt
+songcore-v0.0.0-preflight-linux-x86_64/README.md
+songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h
+songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a
+songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+songcore-v0.0.0-preflight-linux-x86_64/metadata/checksums.txt
+songcore-v0.0.0-preflight-linux-x86_64/metadata/external-consumer-example.c
+songcore-v0.0.0-preflight-linux-x86_64/metadata/manifest.json
+songcore-v0.0.0-preflight-linux-x86_64/metadata/symbols.txt
+file_count=15
+--- sha256sum -c ---
+CHECKSUMS_OK
+===== WSL stage vs evidence extract (linux) =====
+LINUX_STAGE_IDENTICAL
+===== windows: packager stage vs evidence extract =====
+WIN_STAGE_IDENTICAL
+win_file_count=14
+win_lib_listing:
+lib
+lib/libsongcore.a
+WIN_NO_LIB_SHARED (expected)
+--- sha256sum -c ---
+CHECKSUMS_OK
+===== stage tree sizes =====
+3456259	/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/win/extract/songcore-v0.0.0-preflight-windows-x86_64
+6496823	/mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/package/linux/extract/songcore-v0.0.0-preflight-linux-x86_64
+===== V6 evidence pointer files (windows manifest) =====
+present identity.txt
+present member-order.verdict
+present member-diff.verdict
+present differing-members.txt
+present rootcause-strings.txt
+present archive-path-scan.txt
+present debug-info-sample.txt
+present songcore-c-object.txt
+present undefined-imports.txt
+present closure-identity.txt

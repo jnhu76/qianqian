@@ -1,0 +1,40 @@
+== native/build listing ==
+total 48
+drwxr-xr-x   7 hoo hoo  4096 Oct 30 20:43 .
+drwxr-xr-x  10 hoo hoo  4096 Oct 30 20:31 ..
+drwxr-xr-x 178 hoo hoo  4096 Oct 30 20:31 .build_cache
+drwxr-xr-x   5 hoo hoo  4096 Oct 30 20:42 .deps
+drwxr-xr-x   3 hoo hoo  4096 Oct 30 20:31 .gens
+drwxr-xr-x   5 hoo hoo  4096 Oct 30 20:42 .objs
+drwxr-xr-x   3 hoo hoo  4096 Oct 30 20:43 artifacts
+lrwxrwxrwx   1 hoo hoo    52 Oct 30 20:31 ffmpeg-src -> /home/hoo/qianqian-172-linux/native/build/ffmpeg-src
+lrwxrwxrwx   1 hoo hoo    54 Oct 30 20:30 ffmpeg-xmake -> /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake
+-rw-r--r--   1 hoo hoo  7493 Oct 30 15:02 ffmpeg.lua
+-rw-r--r--   1 hoo hoo 10001 Oct 30 15:02 songcore.lua
+== candidate closure dirs ==
+--- /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake ---
+total 668
+drwxr-xr-x  3 hoo hoo   4096 Oct 29 03:59 .
+drwxr-xr-x 10 hoo hoo   4096 Oct 29 04:29 ..
+-rw-r--r--  1 hoo hoo 406023 Oct 29 03:59 manifest.json
+drwxr-xr-x 11 hoo hoo   4096 Oct 29 03:58 oracle
+-rw-r--r--  1 hoo hoo 259234 Oct 29 03:59 oracle-build.log
+/home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake/manifest.json 406023
+--- /home/hoo/q172d2-verify/closure ---
+total 16
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 02:46 .
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 02:46 ..
+drwxr-xr-x 17 hoo hoo 4096 Oct 29 02:41 ffmpeg-src
+drwxr-xr-x  3 hoo hoo 4096 Oct 29 02:42 ffmpeg-xmake
+/home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json 419517
+--- /home/hoo/q172rc/closure ---
+total 16
+drwxr-xr-x  4 hoo hoo 4096 Oct 30 20:30 .
+drwxr-xr-x  4 hoo hoo 4096 Oct 29 04:20 ..
+drwxr-xr-x 17 hoo hoo 4096 Oct 29 02:41 ffmpeg-src
+drwxr-xr-x  3 hoo hoo 4096 Oct 29 02:42 ffmpeg-xmake
+/home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json 419517
+
+----
+script=find-closure.sh
+exit_code=0

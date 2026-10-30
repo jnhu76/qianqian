@@ -1,0 +1,22 @@
+== '-O2 abi-complete' binary: defined symbols (expect only main) ==
+0000000000001130 t __do_global_dtors_aux
+000000000000117c T _fini
+0000000000001000 T _init
+0000000000001090 T _start
+00000000000010c0 t deregister_tm_clones
+0000000000001170 t frame_dummy
+0000000000001060 T main
+00000000000010f0 t register_tm_clones
+
+== '-O2 abi-complete' binary: undefined symbols ==
+                 w _ITM_deregisterTMCloneTable
+                 w _ITM_registerTMCloneTable
+                 w __cxa_finalize@GLIBC_2.2.5
+                 w __gmon_start__
+                 U __libc_start_main@GLIBC_2.34
+                 U __printf_chk@GLIBC_2.3.4
+
+== sizes (bytes): -O2 probe vs minimal consumer ==
+15976 static/abi-complete-libs
+2446248 static/minimal-libs
+2450640 static/external-consumer-static

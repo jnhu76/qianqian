@@ -1,0 +1,70 @@
+
+########## F1 package receipt identity fields ##########
+exit=0
+version="0.2.0-rc.1"
+version_status="provisional (contract section 14 Q1 owner-reserved)"
+container={"previous_zip_sha256": "339c798d56f7de6a7e5f888f56e2fde83d75df0790364eea985edd5830f78400", "rebuilt": true, "zip": "C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package\\songcore-v0.2.0-rc.1-windows-x86_64.zip", "zip_sha256": "7b4d0615d25af464739373a0a3565f77f3208ce9c263f59e578d443801536415", "zip_bytes": 1448965, "entry_count": 14, "sha256sums_sidecar": "C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package\\SHA256SUMS"}
+out_dir="C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\package"
+package_root="songcore-v0.2.0-rc.1-windows-x86_64"
+artifact="C:\\Users\\fred1\\source\\qianqian-172\\native\\build\\artifacts\\libsongcore.a"
+artifact_sha256="1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402"
+artifact_bytes=3309710
+source={"commit": "6c5268777cd2ab79faa4980f69c7e0c8c2cc33c3", "native_tracked_clean": true, "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"}
+project="C:\\Users\\fred1\\source\\qianqian-172"
+script="ops/package-rc.ps1"
+
+########## F2 staged RC package tree ##########
+exit=0
+total 1560
+drwxr-xr-x  4 hoo hoo    4096 Oct 30 15:02 .
+drwxr-xr-x 15 hoo hoo    4096 Oct 30 15:02 ..
+-rw-r--r--  1 hoo hoo     106 Oct 30 15:02 SHA256SUMS
+-rw-r--r--  1 hoo hoo    3660 Oct 30 15:02 package-summary.json
+-rw-r--r--  1 hoo hoo  101921 Oct 30 15:02 pr-b2-lefthook.log
+drwxr-xr-x  2 hoo hoo    4096 Oct 30 15:02 repro
+-rw-r--r--  1 hoo hoo 1448965 Oct 30 15:02 songcore-v0.2.0-rc.1-windows-x86_64.zip
+drwxr-xr-x  3 hoo hoo    4096 Oct 30 15:02 stage
+-rw-r--r--  1 hoo hoo    1207 Oct 30 15:02 stage-audit.log
+-rw-r--r--  1 hoo hoo    4300 Oct 30 15:02 stage-audit.sh
+-rw-r--r--  1 hoo hoo     159 Oct 30 15:02 test-release-direct-run.log
+-rw-r--r--  1 hoo hoo     323 Oct 30 15:02 v-checks.json
+
+########## F3 staged schema-2 manifest identity fields ##########
+manifest=/home/hoo/Source/qianqian/evidence/songcore-172/package/stage/songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json
+a9021122b2b8993ccbd8783f324ff96ea4d8c152860cc8b2f4fdea92e8cfb548  /home/hoo/Source/qianqian/evidence/songcore-172/package/stage/songcore-v0.2.0-rc.1-windows-x86_64/metadata/manifest.json
+exit=0
+schema_version=2 songcore_version=0.2.0-rc.1 songcore_abi=1
+abi_header_sha256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+target='windows-x86_64' (type str)
+toolchain='mingw-w64' (type str)
+target_identity.id=windows-x86_64 triple=x86_64-pc-windows-gnu recipe_sha256=3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+target_identity.toolchain={"family": "mingw-w64", "identity": "x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts"}
+pin={"ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa", "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746", "ffmpeg_tag": "n9.0.1", "pin_sha256": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85"}
+ffmpeg_commit=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 ffmpeg_profile_sha256=57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+carried_duplicates_equal=True
+tools={"ar": "GNU ar (GNU Binutils) 2.45.90.20260125", "cc": "x86_64-w64-mingw32-gcc (GCC) 13-win32", "xmake": "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"}
+sdk_ndk='not applicable this round -- windows-x86_64: mingw-w64 cross, no MSVC/SDK (target recipe toolchain identity, contract section 8)'
+runtime_dependencies={"ffmpeg_runtime": "none -- the closure ships in object form inside the archive (contract section 9)", "static": {"bcrypt": "REQUIRED -- audited: nm undefined imports BCryptCloseAlgorithmProvider,BCryptGenRandom,BCryptOpenAlgorithmProvider (contract section 9)", "link_line": "gcc -O2 -Iinclude consumer.c -Llib -lsongcore -lbcrypt -o consumer.exe (nothing else observed required for the static archive)", "mingw_w64_runtime": "REQUIRED -- msvcrt-family CRT + Win32 system imports; system-DLL allowlist base tools/check_release.py SYSTEM_DLLS (bcrypt, bcryptprimitives, msvcrt, ...)"}}
+files_count=12
+public_symbols=song_audio_stream_count,song_audio_stream_info,song_close,song_get_artwork_count,song_get_artwork_item,song_get_metadata,song_get_metadata_count,song_get_metadata_entry,song_last_error,song_open,song_probe,song_read_pcm,song_seek,song_select_stream,songcore_abi_version
+reproducibility={"byte": "NOT_ESTABLISHED", "evidence": "evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, member-order.verdict, member-diff.verdict, differing-members.txt, rootcause-strings.txt, archive-path-scan.txt, debug-info-sample.txt, songcore-c-object.txt, undefined-imports.txt, closure-identity.txt)", "recipe": "NOT_ESTABLISHED", "semantic_abi": "NOT_ESTABLISHED"}
+package_root_dirname=songcore-v0.2.0-rc.1-windows-x86_64
+
+########## F4 §2 equality chain, measured values side by side ##########
+xmake set_version        = 0.1.0
+xmake set_project        = qianqian-native
+RC manifest songcore_version = 
+RC package dir name      = songcore-v0.2.0-rc.1-windows-x86_64
+git tag list (songcore)  = songcore-v0.1.0 
+
+########## F5 contract §2 tag-form vs the RC version string ##########
+96:tag form            songcore-vMAJOR.MINOR.PATCH — decimal components,
+exit=0
+
+########## F6 checksums/files set arithmetic measured on the staged package ##########
+pkg=/home/hoo/Source/qianqian/evidence/songcore-172/package/stage/songcore-v0.2.0-rc.1-windows-x86_64
+packaged_files=13
+checksums_entries=13
+files_entries=12
+exit=0
+########## DONE ##########

@@ -1,0 +1,41 @@
+== closure manifest sha256 ==
+d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525  /home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake/manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json
+0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14  /home/hoo/q172rc/closure/ffmpeg-xmake/manifest.json
+closure_sha_exit=0
+== closure manifest compact summary ==
+/home/hoo/qianqian-172-linux/native/build/ffmpeg-xmake/manifest.json
+  target.id              linux-x86_64
+  target.recipe_sha256   79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d
+  profile                codec-base 57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+  ffmpeg_commit_sha      bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+  ffmpeg_source_sha256   d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+  configure_args         37
+  units (truncated)      279
+/home/hoo/q172d2-verify/closure/ffmpeg-xmake/manifest.json
+  target.id              windows-x86_64
+  target.recipe_sha256   3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+  profile                codec-base 57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa
+  ffmpeg_commit_sha      bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+  ffmpeg_source_sha256   d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+  configure_args         39
+  units (truncated)      279
+closure_parse_exit=0
+== ffmpeg-src trees present ==
+/home/hoo/q172d2-verify/closure/ffmpeg-src
+/home/hoo/q172rc/closure/ffmpeg-src
+/home/hoo/qianqian-172-linux/native/build/ffmpeg-src
+== COPYING files inside extracted ffmpeg-src trees ==
+8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  /home/hoo/q172rc/closure/ffmpeg-src/COPYING.GPLv2
+8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  /home/hoo/q172rc/closure/ffmpeg-src/COPYING.GPLv3
+246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30  /home/hoo/q172rc/closure/ffmpeg-src/COPYING.LGPLv2.1
+da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768  /home/hoo/q172rc/closure/ffmpeg-src/COPYING.LGPLv3
+8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  /home/hoo/qianqian-172-linux/native/build/ffmpeg-src/COPYING.GPLv2
+8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  /home/hoo/qianqian-172-linux/native/build/ffmpeg-src/COPYING.GPLv3
+246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30  /home/hoo/qianqian-172-linux/native/build/ffmpeg-src/COPYING.LGPLv2.1
+da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768  /home/hoo/qianqian-172-linux/native/build/ffmpeg-src/COPYING.LGPLv3
+src_copying_exit=0
+
+----
+script=closure-provenance.sh
+exit_code=0

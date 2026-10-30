@@ -1,0 +1,3 @@
+minimal-libs highest GLIBC: GLIBC_2.43
+external-consumer-static highest GLIBC: GLIBC_2.43
+abi-O0-libs highest GLIBC: GLIBC_2.43

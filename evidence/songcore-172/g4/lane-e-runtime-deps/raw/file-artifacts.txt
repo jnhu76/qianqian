@@ -1,0 +1,2 @@
+/home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=4f375f6be18a38854c40ff356031dad9e6b34db6, stripped
+/home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a:         current ar archive

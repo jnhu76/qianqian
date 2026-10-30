@@ -1,0 +1,26 @@
+member[3] name=version.c.o size=2688 differing_bytes=7 version_occurrences_a=1 version_occurrences_b=1 all_diffs_inside_version_literals=True
+  diff_range=977..986
+  bytes_a=b'5-gbf23516'
+  bytes_b=b'6-gb49b18c'
+  literal_a[0]=b'qianqian-v0.1.0-315-gbf23516\x00\x00GC'
+  literal_b[0]=b'qianqian-v0.1.0-316-gb49b18c\x00\x00GC'
+member[17] name=version.c.o size=2928 differing_bytes=14 version_occurrences_a=2 version_occurrences_b=2 all_diffs_inside_version_literals=True
+  diff_range=142..1026
+  bytes_a=b'5-gbf23516\x00\x00\x00\x00\x00\x00\x00\x00--prefix=install --disable-everything --disable-programs --disable-doc --disable-debug --disable-autodetect --disable-x86asm --disable-network --disable-protocols --disable-devices --disable-avdevice --disable-avfilter --disable-swscale --enable-avformat --enable-avcodec --enable-swresample --enable-demuxer=aac --enable-demuxer=flac --enable-demuxer=mov --enable-demuxer=mp3 --enable-demuxer=ogg --enable-demuxer=wav --enable-decoder=aac --enable-decoder=alac --enable-decoder=flac --enable-decoder=mp3float --enable-decoder=opus --enable-decoder=pcm_f32le --enable-decoder=pcm_f64le --enable-decoder=pcm_s16le --enable-decoder=pcm_s24le --enable-decoder=pcm_s32le --enable-decoder=pcm_u8 --enable-decoder=vorbis --enable-parser=mpegaudio --target-os=linux --arch=x86_64\x00\x00\x00\x00libavutil license: LGPL version 2.1 or later\x00\x00\x00\x00FFmpeg version qianqian-v0.1.0-315-gbf23516'
+  bytes_b=b'6-gb49b18c\x00\x00\x00\x00\x00\x00\x00\x00--prefix=install --disable-everything --disable-programs --disable-doc --disable-debug --disable-autodetect --disable-x86asm --disable-network --disable-protocols --disable-devices --disable-avdevice --disable-avfilter --disable-swscale --enable-avformat --enable-avcodec --enable-swresample --enable-demuxer=aac --enable-demuxer=flac --enable-demuxer=mov --enable-demuxer=mp3 --enable-demuxer=ogg --enable-demuxer=wav --enable-decoder=aac --enable-decoder=alac --enable-decoder=flac --enable-decoder=mp3float --enable-decoder=opus --enable-decoder=pcm_f32le --enable-decoder=pcm_f64le --enable-decoder=pcm_s16le --enable-decoder=pcm_s24le --enable-decoder=pcm_s32le --enable-decoder=pcm_u8 --enable-decoder=vorbis --enable-parser=mpegaudio --target-os=linux --arch=x86_64\x00\x00\x00\x00libavutil license: LGPL version 2.1 or later\x00\x00\x00\x00FFmpeg version qianqian-v0.1.0-316-gb49b18c'
+  literal_a[0]=b'qianqian-v0.1.0-315-gbf23516\x00\x00\x00\x00'
+  literal_b[0]=b'qianqian-v0.1.0-316-gb49b18c\x00\x00\x00\x00'
+  literal_a[1]=b'qianqian-v0.1.0-315-gbf23516\x00\x00GC'
+  literal_b[1]=b'qianqian-v0.1.0-316-gb49b18c\x00\x00GC'
+member[110] name=version.c.o size=2680 differing_bytes=7 version_occurrences_a=1 version_occurrences_b=1 all_diffs_inside_version_literals=True
+  diff_range=969..978
+  bytes_a=b'5-gbf23516'
+  bytes_b=b'6-gb49b18c'
+  literal_a[0]=b'qianqian-v0.1.0-315-gbf23516\x00\x00GC'
+  literal_b[0]=b'qianqian-v0.1.0-316-gb49b18c\x00\x00GC'
+member[181] name=version.c.o size=2672 differing_bytes=7 version_occurrences_a=1 version_occurrences_b=1 all_diffs_inside_version_literals=True
+  diff_range=969..978
+  bytes_a=b'5-gbf23516'
+  bytes_b=b'6-gb49b18c'
+  literal_a[0]=b'qianqian-v0.1.0-315-gbf23516\x00\x00GC'
+  literal_b[0]=b'qianqian-v0.1.0-316-gb49b18c\x00\x00GC'

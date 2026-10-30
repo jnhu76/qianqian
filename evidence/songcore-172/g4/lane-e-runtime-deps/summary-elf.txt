@@ -1,0 +1,64 @@
+artifact_sha256:
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/linux-root/src/native/build/artifacts/shared/libsongcore.so
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a
+
+ar_members: 280
+glibc_versions_required:
+GLIBC_2.2.5
+GLIBC_2.3.2
+GLIBC_2.3.4
+GLIBC_2.4
+GLIBC_2.6
+GLIBC_2.7
+GLIBC_2.14
+GLIBC_2.17
+GLIBC_2.27
+GLIBC_2.28
+GLIBC_2.29
+GLIBC_2.34
+GLIBC_2.35
+GLIBC_2.43
+glibc_highest_required: GLIBC_2.43
+
+needed_libs:
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+
+dynamic_sym_version_tags:
+GLIBC_2.2.5
+GLIBC_2.3.2
+GLIBC_2.3.4
+GLIBC_2.4
+GLIBC_2.6
+GLIBC_2.7
+GLIBC_2.14
+GLIBC_2.17
+GLIBC_2.27
+GLIBC_2.28
+GLIBC_2.29
+GLIBC_2.34
+GLIBC_2.35
+GLIBC_2.43
+
+exported_song_symbols: 15
+song_audio_stream_count
+song_audio_stream_info
+song_close
+song_get_artwork_count
+song_get_artwork_item
+song_get_metadata
+song_get_metadata_count
+song_get_metadata_entry
+song_last_error
+song_open
+song_probe
+song_read_pcm
+song_seek
+song_select_stream
+songcore_abi_version
+
+ldd_isolated:
+	linux-vdso.so.1 (0x00007a2d6ef54000)
+	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007a2d6ee1b000)
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007a2d6e600000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007a2d6ef56000)

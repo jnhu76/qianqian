@@ -1,0 +1,28 @@
+consumer_argv1=media/mp3-cbr-id3v23.mp3
+host_os=windows_pe
+abi_version=1
+bcrypt_runtime: loadlibrary=ok module=00007ffb527f0000 open_provider=00007ffb527f7630 gen_random=00007ffb527f6f60 close_provider=00007ffb527f5700
+bcrypt_runtime: open_rng=0x00000000 gen_random=0xc000000d close=0x00000000 sample32_sha256=66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925
+bcrypt_runtime_probe_rc=-3
+bcrypt_iat_counter: state=1 orig=00007ffb527f6f60
+media_path=media/mp3-cbr-id3v23.mp3 media_size=65323
+stage=open status=0
+stage=probe status=0 codec=mp3 container=mp3 rate=44100 channels=2 channel_mask=0x0000000000000003 bits=0 duration_us=4000000 streams=1 selected=0
+stage=audio_stream_count status=0 count=1
+stream[0] status=0 stream_index=0 rate=44100 channels=2 mask=0x0000000000000003 bits=0 duration_us=4000000 codec=mp3 default=0
+stage=metadata status=0 title=千千测试 CBR artist=Qianqian Lab album=Corpus Alpha genre=(absent) date=(absent) track_number=0 has_track=0
+stage=metadata_count status=0 count=5
+meta[0] status=0 scope=0 key=title value=千千测试 CBR
+meta[1] status=0 scope=0 key=artist value=Qianqian Lab
+meta[2] status=0 scope=0 key=album value=Corpus Alpha
+meta[3] status=0 scope=0 key=encoder value=Lavf62.3.100
+meta[4] status=0 scope=1 key=encoder value=Lavc62.11
+stage=artwork_count status=0 count=0
+stage=decode status=0 frames=176400 pcm_sha256=7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926 terminal=SONG_EOF bytes_hashed=1411200 block_frames=4096
+bcrypt_genrandom_iat_calls_open_to_decode_eof=0
+stage=seek status=0 target_us=2000000 landing_us=1985306
+stage=post_seek_decode status=0 frames=89953 pcm_sha256=097b7a54afb6e988ea04158986e46d42fa4328b0225694e8acb5ae6d931d3187 terminal=SONG_EOF
+stage=last_error status=0 has_message=0
+stage=close status=ok
+bcrypt_genrandom_iat_calls_total=0
+RESULT=PASS

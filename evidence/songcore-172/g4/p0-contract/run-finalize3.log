@@ -1,0 +1,14 @@
+== B1 sha256sum -c evidence-sha256.txt (stable set) ==
+exit=0
+50
+== B2 stage.json evidence_paths exist and hashes match ==
+paths=51 shas=50
+missing=0 mismatch=0
+stage_json_self_listed=False
+exit=0
+== B3 final manifest ==
+exit=0
+d3bc89bceaf3cf2f4b1ffd7239bc02ddd9235b9368169fd4fe0cdf172180793b  stage.json
+exit=0
+final_files=56 final_lines=56
+== DONE ==

@@ -1,0 +1,45 @@
+=== stage exe (built in WSL against the packaged archive) ===
+src  : /home/hoo/lane-c-pe/out/pe-consumer.exe
+dest : /mnt/c/Users/fred1/lane-c-win-pe/pe-consumer.exe
+### EXIT[cp-exe]=0
+=== stage media fixtures (Windows-readable copies) ===
+### EXIT[cp-mp3-cbr-id3v23.mp3]=0
+### EXIT[cp-flac-16-44-stereo.flac]=0
+### EXIT[cp-alac-16-44-stereo.m4a]=0
+### EXIT[cp-alac-long.m4a]=0
+=== sha256 of the staged tree (what Windows will execute) ===
+3ec3c672bd8d2f0d0d92604ca1a1d07a76b479c2c2e306f6b3ef09eca4cbc60d  /mnt/c/Users/fred1/lane-c-win-pe/pe-consumer.exe
+### EXIT[sha-exe]=0
+feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058  /mnt/c/Users/fred1/lane-c-win-pe/media/mp3-cbr-id3v23.mp3
+### EXIT[sha-mp3-cbr-id3v23.mp3]=0
+d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2  /mnt/c/Users/fred1/lane-c-win-pe/media/flac-16-44-stereo.flac
+### EXIT[sha-flac-16-44-stereo.flac]=0
+0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3  /mnt/c/Users/fred1/lane-c-win-pe/media/alac-16-44-stereo.m4a
+### EXIT[sha-alac-16-44-stereo.m4a]=0
+2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c  /mnt/c/Users/fred1/lane-c-win-pe/media/alac-long.m4a
+### EXIT[sha-alac-long.m4a]=0
+=== cross-check: build-side and staged exe are byte-identical ===
+### EXIT[cmp-exe]=0
+=== cross-check: staged fixtures equal the committed reference fixtures ===
+### EXIT[cmp-mp3-cbr-id3v23.mp3]=0
+### EXIT[cmp-flac-16-44-stereo.flac]=0
+### EXIT[cmp-alac-16-44-stereo.m4a]=0
+### EXIT[cmp-alac-long.m4a]=0
+=== Windows-visible listing ===
+/mnt/c/Users/fred1/lane-c-win-pe:
+total 2812
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:17 .
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:15 ..
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:17 media
+-rwxrwxrwx 1 hoo hoo 2876435 Oct 30 21:19 pe-consumer.exe
+drwxrwxrwx 1 hoo hoo     512 Oct 30 21:19 run
+
+/mnt/c/Users/fred1/lane-c-win-pe/media:
+total 1664
+drwxrwxrwx 1 hoo hoo    512 Oct 30 21:17 .
+drwxrwxrwx 1 hoo hoo    512 Oct 30 21:17 ..
+-rwxrwxrwx 1 hoo hoo 594196 Oct 30 21:19 alac-16-44-stereo.m4a
+-rwxrwxrwx 1 hoo hoo 890903 Oct 30 21:19 alac-long.m4a
+-rwxrwxrwx 1 hoo hoo 146237 Oct 30 21:19 flac-16-44-stereo.flac
+-rwxrwxrwx 1 hoo hoo  65323 Oct 30 21:19 mp3-cbr-id3v23.mp3
+STAGE_RESULT=PASS

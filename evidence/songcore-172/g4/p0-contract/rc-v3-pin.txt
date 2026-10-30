@@ -1,0 +1,11 @@
+manifest.ffmpeg_commit      =bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+manifest.pin.ffmpeg_commit_sha=bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+pin.json.ffmpeg_commit_sha  =bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
+manifest.ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+manifest.pin.ffmpeg_source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+pin.json.source_sha256      =d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+V3_chain_1=True
+V3_chain_2=True
+V3_tag=True
+V3_pin_sha=True
+V3_profile_sha=True

@@ -1,0 +1,53 @@
+extracted_sha=69ba1ce05a2772f5aa077c6ece3365c40f6e0500
+55eab2432bf2f1959fe13b3f97282895b5918983925f175cad521b0ae5c05ad6  /home/hoo/d1-win-src/native/src/songcore_ffmpeg.c
+manifest: 0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14
+manifest_target= {'arch': 'x86_64', 'cross_prefix': 'x86_64-w64-mingw32-', 'id': 'windows-x86_64', 'platform': 'windows', 'recipe_sha256': '3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d', 'target_os': 'mingw32'}
+configure_exit=0
+build_exit=0
+total 6448
+drwxr-xr-x 2 hoo hoo    4096 Oct 30 20:33 .
+drwxr-xr-x 7 hoo hoo    4096 Oct 30 20:33 ..
+-rw-r--r-- 1 hoo hoo 3283570 Oct 30 20:33 libqianqian_av.a
+-rw-r--r-- 1 hoo hoo 3309294 Oct 30 20:33 libsongcore.a
+89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97  /home/hoo/d1-win-src/native/build/artifacts/libsongcore.a
+== disassembly of song_open: windows artifact ==
+00000000000020c0 <song_open>:
+    20c0:	57                   	push   %rdi
+    20c1:	56                   	push   %rsi
+    20c2:	53                   	push   %rbx
+    20c3:	48 83 ec 50          	sub    $0x50,%rsp
+    20c7:	48 89 cb             	mov    %rcx,%rbx
+    20ca:	48 89 d7             	mov    %rdx,%rdi
+    20cd:	48 85 c9             	test   %rcx,%rcx
+    20d0:	0f 84 3a 01 00 00    	je     2210 <song_open+0x150>
+    20d6:	48 85 d2             	test   %rdx,%rdx
+    20d9:	0f 84 31 01 00 00    	je     2210 <song_open+0x150>
+    20df:	48 83 79 08 00       	cmpq   $0x0,0x8(%rcx)
+    20e4:	0f 84 26 01 00 00    	je     2210 <song_open+0x150>
+    20ea:	48 83 79 10 00       	cmpq   $0x0,0x10(%rcx)
+    20ef:	0f 84 1b 01 00 00    	je     2210 <song_open+0x150>
+    20f5:	48 83 79 18 00       	cmpq   $0x0,0x18(%rcx)
+    20fa:	0f 84 10 01 00 00    	je     2210 <song_open+0x150>
+    2100:	48 c7 02 00 00 00 00 	movq   $0x0,(%rdx)
+    2107:	48 8d 0d 98 00 00 00 	lea    0x98(%rip),%rcx        # 21a6 <song_open+0xe6>
+    210e:	e8 00 00 00 00       	call   2113 <song_open+0x53>
+    2113:	48 85 c0             	test   %rax,%rax
+    2116:	74 0b                	je     2123 <song_open+0x63>
+    2118:	80 38 30             	cmpb   $0x30,(%rax)
+    211b:	75 12                	jne    212f <song_open+0x6f>
+    211d:	80 78 01 00          	cmpb   $0x0,0x1(%rax)
+    2121:	75 0c                	jne    212f <song_open+0x6f>
+    2123:	48 8d 0d d6 de ff ff 	lea    -0x212a(%rip),%rcx        # 0 <songcore_discard_av_log>
+    212a:	e8 00 00 00 00       	call   212f <song_open+0x6f>
+    212f:	ba d8 02 00 00       	mov    $0x2d8,%edx
+    2134:	b9 01 00 00 00       	mov    $0x1,%ecx
+    2139:	e8 00 00 00 00       	call   213e <song_open+0x7e>
+    213e:	48 89 c6             	mov    %rax,%rsi
+    2141:	48 85 c0             	test   %rax,%rax
+    2144:	0f 84 1e 01 00 00    	je     2268 <song_open+0x1a8>
+    214a:	f3 0f 6f 03          	movdqu (%rbx),%xmm0
+    214e:	f3 0f 6f 4b 10       	movdqu 0x10(%rbx),%xmm1
+    2153:	b9 00 80 00 00       	mov    $0x8000,%ecx
+    2158:	c7 40 78 00 00 00 00 	movl   $0x0,0x78(%rax)
+    215f:	0f 11 00             	movups %xmm0,(%rax)
+    2162:	0f 11 48 10          	movups %xmm1,0x10(%rax)

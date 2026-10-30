@@ -1,0 +1,80 @@
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3000000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3500000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3500000,"status":0,"landing_us":3448163}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3700000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3700000,"status":0,"landing_us":3657143}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3750000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3750000,"status":0,"landing_us":3657143}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3761000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3761000,"status":0,"landing_us":3657143}
+{"op":"last_error","status":0,"native_code":0,"message":""}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3762000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3762000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3765000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3765000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3770000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3770000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3800000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:3950000 e
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":3950000,"status":110,"landing_us":-1}
+{"op":"last_error","status":0,"native_code":-1,"message":"container seek failed"}
+{"op":"close"}
+[exit] 0

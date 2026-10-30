@@ -1,0 +1,320 @@
+=== stage07 2026-10-30T13:25:16Z ===
+PKG=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64
+gcc: gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+host: Linux 6.18.54.1-microsoft-standard-WSL2 x86_64, glibc: ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43
+31492cd96f7a186eddd5bc7744070f0ce4f7e55f9f9f903df28997e5d99b24dd  /home/hoo/g4-172/consume-linux/src/consume_corpus.c
+36051218c2ef9db62d40b1a1b7d81a04be650dc5bbbf6535f37c46c79f71bd56  /home/hoo/g4-172/consume-linux/src/external-consumer-example.c
+2cf110d187128571364e8fc51416d766f654eeee18a6abe2a0b08e980399d356  /home/hoo/g4-172/consume-linux/src/op_probe.c
+c483307d5260a0c26e5437cb9cf46cc9bda4f325600705ec20da699c30423880  /home/hoo/g4-172/consume-linux/src/robustness_probe.c
+4ce339849de57e7ecdc77b9be1445f193887826e2642f06e9884b29482792c8a  /home/hoo/g4-172/consume-linux/src/seek_probe.c
+cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include/songcore.h
+0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a
+085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98  /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/external-consumer-example.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consumer-example-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/external-consumer-example.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/consume_corpus.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -Wl,-rpath,/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -o /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/op_probe.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/op-probe-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/robustness_probe.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/robustness-probe-static
+[exit] 0
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/robustness_probe.c -L/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared -lsongcore -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/robustness-probe-shared
+[exit] 0
+--- artifact sha256 ---
+9eb3ba16c0c210c4c24c417317c740edfbebe9b520a813bf11c41f1e9b7ab2d4  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared
+3fdae80500e6a0e737c95a69a57bd08b3d9e6478cab6a7d5844dd4f406dc029a  /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath
+8ed1b02e27400488755eae37ccada0c52dc0404954c42615f879d0fd6b28c3bd  /home/hoo/g4-172/consume-linux/bin/consume-corpus-static
+653fe400349d895fab7c5b3d14e24db860e3b5b9621894989605d61d5f25c5c2  /home/hoo/g4-172/consume-linux/bin/consumer-example-shared
+50e8dd9787238ee0a2dc809649a7504c3a511e098b226b2d527314a0151942db  /home/hoo/g4-172/consume-linux/bin/consumer-example-static
+5c8bbb52e0d1a5534b28fef94be7a788c18d0c12e867f2492523577fdaeaa60b  /home/hoo/g4-172/consume-linux/bin/op-probe-static
+b089ed699fc41c461ce4984369ef84ad843ce9f28d11e493ae1ed8da450beb22  /home/hoo/g4-172/consume-linux/bin/robustness-probe-shared
+84376e60bfeac805075bf796f6e628bf31465a82beb69d114af4e44a417df230  /home/hoo/g4-172/consume-linux/bin/robustness-probe-static
+4187d6887837b2a07b8356c2b00d2981db771165346d7aa8f5f40896f29caf52  /home/hoo/g4-172/consume-linux/bin/seek-probe-static
+--- bad fixtures ---
+total 136
+-rw-r--r-- 1 hoo hoo     0 Oct 30 21:25 empty.bin
+-rw-r--r-- 1 hoo hoo 87742 Oct 30 21:25 flac-truncated.flac
+-rw-r--r-- 1 hoo hoo  4588 Oct 30 21:25 garbage.mp3
+-rw-r--r-- 1 hoo hoo 40000 Oct 30 21:25 mp3-truncated.mp3
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /home/hoo/g4-172/consume-linux/fixtures/bad/empty.bin
+1e4c27b9a420dd16099ae6b1d486c7149a3a7e46e43ee6269648c7ef032a36f3  /home/hoo/g4-172/consume-linux/fixtures/bad/flac-truncated.flac
+f9541e382d0ae5b77c7fc761589da378a6678f78c051055f07fa9f523be440a9  /home/hoo/g4-172/consume-linux/fixtures/bad/garbage.mp3
+829aae98c1bc93daf038530eda552c3190b86b8ba4e9cd9d9697c84b52d6cd5a  /home/hoo/g4-172/consume-linux/fixtures/bad/mp3-truncated.mp3
+
+$ /home/hoo/g4-172/consume-linux/bin/robustness-probe-static empty /home/hoo/g4-172/consume-linux/fixtures/bad/empty.bin garbage /home/hoo/g4-172/consume-linux/fixtures/bad/garbage.mp3 flac-trunc /home/hoo/g4-172/consume-linux/fixtures/bad/flac-truncated.flac mp3-trunc /home/hoo/g4-172/consume-linux/fixtures/bad/mp3-truncated.mp3
+{"label":"empty","open_status":104,"probe_status":102,"terminal":"none","terminal_status":0,"produced_at_terminal":0,"frames_before_terminal":0,"fail_closed":1}
+{"label":"garbage","open_status":104,"probe_status":102,"terminal":"none","terminal_status":0,"produced_at_terminal":0,"frames_before_terminal":0,"fail_closed":1}
+{"label":"flac-trunc","open_status":0,"probe_status":0,"terminal":"ERROR","terminal_status":108,"produced_at_terminal":0,"frames_before_terminal":101376,"fail_closed":1}
+{"label":"mp3-trunc","open_status":0,"probe_status":0,"terminal":"SONG_EOF","terminal_status":1,"produced_at_terminal":0,"frames_before_terminal":108335,"fail_closed":1}
+{"cases":4,"violations":0,"verdict":"PASS"}
+[exit] 0
+
+=== [shared] robustness-probe (LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared) ===
+{"label":"empty","open_status":104,"probe_status":102,"terminal":"none","terminal_status":0,"produced_at_terminal":0,"frames_before_terminal":0,"fail_closed":1}
+{"label":"garbage","open_status":104,"probe_status":102,"terminal":"none","terminal_status":0,"produced_at_terminal":0,"frames_before_terminal":0,"fail_closed":1}
+{"label":"flac-trunc","open_status":0,"probe_status":0,"terminal":"ERROR","terminal_status":108,"produced_at_terminal":0,"frames_before_terminal":101376,"fail_closed":1}
+{"label":"mp3-trunc","open_status":0,"probe_status":0,"terminal":"SONG_EOF","terminal_status":1,"produced_at_terminal":0,"frames_before_terminal":108335,"fail_closed":1}
+{"cases":4,"violations":0,"verdict":"PASS"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac m s:1000000 r:4096 m s:2000000 r:4096 m s:3000000 r:4096 m d m
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4,"probe_status":0,"rate":44100,"channels":2,"codec":"flac","container":"flac","selected_audio_index":0,"audio_stream_count":1,"duration_us":4000000}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":940408}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4,"probe_status":0,"rate":44100,"channels":2,"codec":"flac","container":"flac","selected_audio_index":0,"audio_stream_count":1,"duration_us":4000000}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4,"probe_status":0,"rate":44100,"channels":2,"codec":"flac","container":"flac","selected_audio_index":0,"audio_stream_count":1,"duration_us":4000000}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4,"probe_status":0,"rate":44100,"channels":2,"codec":"flac","container":"flac","selected_audio_index":0,"audio_stream_count":1,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":43280,"calls":12}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4,"probe_status":0,"rate":44100,"channels":2,"codec":"flac","container":"flac","selected_audio_index":0,"audio_stream_count":1,"duration_us":4000000}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3  [exit] 0
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3  [exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac  [exit] 0
+probe: codec=flac container=flac rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=Flac Sixteen Fortyfour artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac  [exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a  [exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 176400 frames to EOF
+seek: landing_us=1950476 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a  [exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/consumer-example-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a  [exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=6000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 264600 frames to EOF
+seek: landing_us=2972154 (target 3000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ /home/hoo/g4-172/consume-linux/bin/consume-corpus-static /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a  [exit] 0
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3  [exit] 0
+probe: codec=mp3 container=mp3 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=千千测试 CBR artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3  [exit] 0
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac  [exit] 0
+probe: codec=flac container=flac rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=0
+metadata: title=Flac Sixteen Fortyfour artist=Qianqian Lab
+decode: 176400 frames to EOF
+seek: landing_us=1985306 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac  [exit] 0
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a  [exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=4000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 176400 frames to EOF
+seek: landing_us=1950476 (target 2000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a  [exit] 0
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consumer-example-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a  [exit] 0
+probe: codec=alac container=mov,mp4,m4a,3gp,3g2,mj2 rate=44100 channels=2 duration_us=6000000 streams=1 selected=0
+stream[0]: stream_index=0 rate=44100 channels=2 default=1
+metadata: title=(absent) artist=(absent)
+decode: 264600 frames to EOF
+seek: landing_us=2972154 (target 3000000)
+eof: clean SONG_EOF terminal
+external-consumer-example: PASS
+
+$ LD_LIBRARY_PATH=/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared /home/hoo/g4-172/consume-linux/fixtures/alac-long.m4a  [exit] 0
+
+$ env -u LD_LIBRARY_PATH /home/hoo/g4-172/consume-linux/bin/consume-corpus-shared-rpath <flac>  [exit] 0
+
+$ python3 /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/scripts/05-compare.py /home/hoo/g4-172/consume-linux /mnt/c/Users/fred1/source/qianqian/evidence/songcore-172/g4/consume-linux/out/comparison.json
+{
+  "mp3-cbr-id3v23": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "flac-16-44-stereo": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "alac-16-44-stereo": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 176400,
+      "pcm_sha256_actual": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  },
+  "alac-long": {
+    "fixture_sha256_match": true,
+    "static": {
+      "frames_actual": 264600,
+      "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": []
+    },
+    "shared": {
+      "frames_actual": 264600,
+      "pcm_sha256_actual": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "frames_match": true,
+      "pcm_sha256_match": true,
+      "all_seeks_ok": true,
+      "all_seek_next_reads_produced": true,
+      "eof_repeat_ok": true,
+      "drain_eof_ok": true,
+      "gate_ok": true,
+      "loaded_songcore_paths": [
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so",
+        "/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/shared/libsongcore.so"
+      ]
+    },
+    "static_vs_shared_equal": true
+  }
+}
+[exit] 0

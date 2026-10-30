@@ -1,0 +1,8 @@
+total 24
+drwxr-xr-x 1 fred1 197609     0 Oct 30 20:34 .
+drwxr-xr-x 1 fred1 197609     0 Oct 30 20:34 ..
+-rw-r--r-- 1 fred1 197609  7666 Oct 30 20:34 ffmpeg.lua
+-rw-r--r-- 1 fred1 197609 10228 Oct 30 20:34 songcore.lua
+native/build/ffmpeg.lua
+native/build/songcore.lua
+native/.gitignore:1:/build/*	native/build/ffmpeg-xmake/manifest.json

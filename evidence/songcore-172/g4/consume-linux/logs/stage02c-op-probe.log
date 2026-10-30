@@ -1,0 +1,112 @@
+
+$ gcc -O2 -I/home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/include /home/hoo/g4-172/consume-linux/src/op_probe.c /home/hoo/g4-172/laneB-stage/linux/songcore-v0.0.0-preflight-linux-x86_64/lib/libsongcore.a -lm -lpthread -o /home/hoo/g4-172/consume-linux/bin/op-probe-static
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac d s:1000000 r:4096 s:2000000 r:4096 s:3000000 r:4096 s:3800000 r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":940408}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":110,"landing_us":-1}
+{"op":"read","capacity":4096,"status":0,"produced":512}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":0,"calls":1}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac s:1000000 r:4096 s:2000000 r:4096 s:3000000 r:4096 s:3800000 r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":940408}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":6416,"calls":3}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac s:3800000 r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":6416,"calls":3}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac s:3000000 r:4096 s:3800000 r:4096
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac s:3800000 r:4096 s:3800000 r:4096 s:3800000 r:4096
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac s:3800000 r:4096 s:3000000 r:4096 s:3800000 r:4096
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3761633}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac m s:3000000 r:4096 m d m
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/flac-16-44-stereo.flac","codec":"flac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2925714}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":43280,"calls":12}
+{"op":"metadata","status":0,"has_title":1,"title":"Flac Sixteen Fortyfour","count":4}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3 d s:1000000 r:4096 s:2000000 r:4096 s:3000000 r:4096 s:3800000 r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/mp3-cbr-id3v23.mp3","codec":"mp3","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":992653}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1985306}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2977959}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3787755}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":6369,"calls":3}
+{"op":"close"}
+[exit] 0
+
+$ /home/hoo/g4-172/consume-linux/bin/op-probe-static /home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a d s:1000000 r:4096 s:2000000 r:4096 s:3000000 r:4096 s:3800000 r:4096 d
+{"file":"/home/hoo/g4-172/consume-linux/fixtures/alac-16-44-stereo.m4a","codec":"alac","rate":44100,"channels":2,"duration_us":4000000}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":176400,"calls":45}
+{"op":"seek","target_us":1000000,"status":0,"landing_us":928798}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":2000000,"status":0,"landing_us":1950476}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3000000,"status":0,"landing_us":2972154}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"seek","target_us":3800000,"status":0,"landing_us":3715193}
+{"op":"read","capacity":4096,"status":0,"produced":4096}
+{"op":"drain","terminal":"SONG_EOF","status":1,"frames":8464,"calls":4}
+{"op":"close"}
+[exit] 0

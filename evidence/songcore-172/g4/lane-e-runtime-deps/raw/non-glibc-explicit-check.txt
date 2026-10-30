@@ -1,0 +1,18 @@
+== explicit non-GLIBC namespace probe ==
+grep_rc=1 (1 = none of these namespaces present)
+
+== distinct version namespaces in dynsym tags ==
+GLIBC
+
+== versioned dynamic symbols: count ==
+109
+
+== SONAME/RPATH bytes (0 = absent) ==
+0
+
+== undefined dynamic symbols WITHOUT a version tag ==
+
+_ITM_deregisterTMCloneTable
+_ITM_registerTMCloneTable
+__gmon_start__
+(end)

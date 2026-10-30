@@ -1,0 +1,52 @@
+=== windows ===
+=== linux ===
+windows LAYOUT_member_hygiene        PASS  duplicates=none traversal=none backslash=none symlink=none (14 members)
+windows LAYOUT_single_root           PASS  top-level entries under the container: ['songcore-v0.0.0-preflight-windows-x86_64'] (expected exactly [songcore-v0.0.0-preflight-windows-x86_64])
+windows LAYOUT_file_count            PASS  packaged files: 14 -> ['LICENSES/COPYING.GPLv2', 'LICENSES/COPYING.GPLv3', 'LICENSES/COPYING.LGPLv2.1', 'LICENSES/COPYING.LGPLv3', 'LICENSES/LICENSE-APACHE', 'LICENSES/LICENSE-MIT', 'LICENSES/THIRD_PARTY_NOTICES.txt', 'README.md', 'include/songcore.h', 'lib/libsongcore.a', 'metadata/checksums.txt', 'metadata/external-consumer-example.c', 'metadata/manifest.json', 'metadata/symbols.txt']
+windows V1_checksums_set             PASS  checksums.txt entries (13) == packaged files (14) minus checksums.txt -> equal
+windows V1_files_set                 PASS  files{} keys (12) == checksums set (13) minus manifest.json -> equal
+windows V1_no_self_hash              PASS  checksums self-hash=no, files{{}} has checksums=no manifest=no
+windows V1_checksums_rehash          PASS  every checksums.txt entry re-hashes to the packaged bytes (bad=none)
+windows V1_files_rehash              PASS  every files{} entry re-hashes to the packaged bytes with the recorded size (bad=none)
+windows V1_no_duplicate_checksums    PASS  duplicate checksums.txt entries: none
+windows V2_header_sha                PASS  packaged=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 manifest=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 source@69ba1ce05a27=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 frozen=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+windows V3_pin_closure               PASS  pin.*/closure.*/profile/recipe agree with the committed inputs and the imported closure; pin_sha=224ad3d5f70b recipe_sha=3ba0a9e686d1 profile_sha=57fb70ed2c29 closure_sha=0d0f7af9a6bf mismatches=none
+windows V3_pinned_zip                PASS  pinned zip /home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 vs pin.source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+windows ARTIFACT_static_identity     PASS  packaged lib/libsongcore.a sha256=89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97 bytes=3309294 vs input=89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97/3309294 and manifest=89d0428db2152da60f233290c082ecfb33b5590628ab9c40b97e8354afc65e97/3309294
+windows LAYOUT_shared_form           PASS  lib/shared/libsongcore.so present=False (expected False)
+windows LAYOUT_no_fictitious_shared  PASS  paths under lib/shared/ or shared-library members in the windows package: none; lib/shared dir: none
+windows ARTIFACT_member_census       PASS  objdump -f 280/280 members match 'file format pe-x86-64'; ar t count=280; manifest.archive_members=280
+windows V4_symbols_static            PASS  manifest.public_symbols(15) == symbols.txt(15) == contract §3 set(15); static global defined song* = 15 (missing=none); static local/internal song* = ['songcore_discard_av_log'] (contract §3: a static archive necessarily also defines non-ABI internal symbols)
+windows V5_license                   PASS  forbidden configure args=none; gpl/version3/nonfree=False/False/False external_libs=[]; COPYING files bound=4 bad=none
+windows V5_notices_present           PASS  THIRD_PARTY_NOTICES.txt present and covered by checksums.txt
+windows V6_reproducibility_preflight PASS  levels recipe/semantic_abi/byte = NOT_ESTABLISHED/NOT_ESTABLISHED/NOT_ESTABLISHED; no positive level claimed -> preflight only, NOT a RELEASE claim; evidence field='evidence/songcore-172/package/repro/ (T1-T3 two-root receipt from ops/build-rc.ps1 run 20261029-062848: identity.txt, me'
+windows V7_tools_target_identity     PASS  tools={cc:'x86_64-w64-mingw32-gcc (GCC) 13-win32', ar:'GNU ar (GNU Binutils) 2.45.90.20260125', xmake:'xmake v2.9.7+20250101, A cross-platform build utility based on Lua'}; sdk_ndk states disposition=True; target_identity.toolchain=mingw-w64/x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts vs recipe=mingw-w64/x86_64-w64-mingw32-gcc cross toolchain; no MSVC/SDK; derivable on Linux or Windows hosts
+windows VERSION_identity             FAIL  manifest.songcore_version='0.0.0-preflight', package dir='songcore-v0.0.0-preflight-windows-x86_64', native/xmake.lua set_version='0.1.0' (contract §2 equality; tag leg has no local existence)
+linux   LAYOUT_no_loose_files        PASS  file members at the container top level (outside the versioned root): none; top-level directory members: ['songcore-v0.0.0-preflight-linux-x86_64']
+linux   LAYOUT_member_hygiene        PASS  duplicates=none traversal=none backslash=none symlink=none (21 members)
+linux   LAYOUT_single_root           PASS  top-level entries under the container: ['songcore-v0.0.0-preflight-linux-x86_64'] (expected exactly [songcore-v0.0.0-preflight-linux-x86_64])
+linux   LAYOUT_file_count            PASS  packaged files: 15 -> ['LICENSES/COPYING.GPLv2', 'LICENSES/COPYING.GPLv3', 'LICENSES/COPYING.LGPLv2.1', 'LICENSES/COPYING.LGPLv3', 'LICENSES/LICENSE-APACHE', 'LICENSES/LICENSE-MIT', 'LICENSES/THIRD_PARTY_NOTICES.txt', 'README.md', 'include/songcore.h', 'lib/libsongcore.a', 'lib/shared/libsongcore.so', 'metadata/checksums.txt', 'metadata/external-consumer-example.c', 'metadata/manifest.json', 'metadata/symbols.txt']
+linux   V1_checksums_set             PASS  checksums.txt entries (14) == packaged files (15) minus checksums.txt -> equal
+linux   V1_files_set                 PASS  files{} keys (13) == checksums set (14) minus manifest.json -> equal
+linux   V1_no_self_hash              PASS  checksums self-hash=no, files{{}} has checksums=no manifest=no
+linux   V1_checksums_rehash          PASS  every checksums.txt entry re-hashes to the packaged bytes (bad=none)
+linux   V1_files_rehash              PASS  every files{} entry re-hashes to the packaged bytes with the recorded size (bad=none)
+linux   V1_no_duplicate_checksums    PASS  duplicate checksums.txt entries: none
+linux   V2_header_sha                PASS  packaged=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 manifest=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 source@69ba1ce05a27=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536 frozen=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+linux   V3_pin_closure               PASS  pin.*/closure.*/profile/recipe agree with the committed inputs and the imported closure; pin_sha=224ad3d5f70b recipe_sha=79c307e73142 profile_sha=57fb70ed2c29 closure_sha=d037e8b472d2 mismatches=none
+linux   V3_pinned_zip                PASS  pinned zip /home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746 vs pin.source_sha256=d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
+linux   ARTIFACT_static_identity     PASS  packaged lib/libsongcore.a sha256=0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308 bytes=4066980 vs input=0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308/4066980 and manifest=0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308/4066980
+linux   LAYOUT_shared_form           PASS  lib/shared/libsongcore.so present=True (expected True)
+linux   ARTIFACT_shared_identity     PASS  packaged lib/shared/libsongcore.so sha256=085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98 bytes=2288536 vs input=085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98/2288536 manifest.shared_sha256=085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98
+linux   ARTIFACT_member_census       PASS  objdump -f 280/280 members match 'file format elf64-x86-64'; ar t count=280; manifest.archive_members=280
+linux   V4_symbols_static            PASS  manifest.public_symbols(15) == symbols.txt(15) == contract §3 set(15); static global defined song* = 15 (missing=none); static local/internal song* = ['songcore_discard_av_log'] (contract §3: a static archive necessarily also defines non-ABI internal symbols)
+linux   V4_symbols_shared            PASS  shared exported dynamic symbols: 15 song* (== contract set: True), non-song exports: none
+linux   V4_shared_needed             PASS  NEEDED=['libm.so.6', 'libc.so.6'] (no FFmpeg closure library)
+linux   V4_glibc_floor               PASS  glibc symbol-version floor=GLIBC_2.43
+linux   V5_license                   PASS  forbidden configure args=none; gpl/version3/nonfree=False/False/False external_libs=[]; COPYING files bound=4 bad=none
+linux   V5_notices_present           PASS  THIRD_PARTY_NOTICES.txt present and covered by checksums.txt
+linux   V6_reproducibility_preflight PASS  levels recipe/semantic_abi/byte = NOT_ESTABLISHED/NOT_ESTABLISHED/NOT_ESTABLISHED; no positive level claimed -> preflight only, NOT a RELEASE claim; evidence field='none this pack: ops/package-linux.sh performs no two-root rebuild, so no reproducibility receipt exists and every level '
+linux   V7_tools_target_identity     PASS  tools={cc:'cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0', ar:'GNU ar (GNU Binutils for Ubuntu) 2.46', xmake:'xmake v2.9.7+20250101, A cross-platform build utility based on Lua'}; sdk_ndk states disposition=True; target_identity.toolchain=host-native/system gcc/clang; no SDK or cross prefix vs recipe=host-native/system gcc/clang; no SDK or cross prefix
+linux   VERSION_identity             FAIL  manifest.songcore_version='0.0.0-preflight', package dir='songcore-v0.0.0-preflight-linux-x86_64', native/xmake.lua set_version='0.1.0' (contract §2 equality; tag leg has no local existence)
+
+TOTAL=48 PASS=46 FAIL=2

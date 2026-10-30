@@ -1,0 +1,13 @@
+format_lines=280
+pe_x86_64=280
+non_pe_format_lines=0
+in_archive_lines=1
+
+=== closed manifest identity (Windows worktree consumption path)
+target.id        = windows-x86_64
+target.platform  = windows
+target.arch      = x86_64
+recipe_sha256    = 3ba0a9e686d169f0e00ba46ade11a8f8658f204537713eabe200633ad5f8492d
+units            = 279
+manifest_sha256  = 0d0f7af9a6bf102be92cece254319f8b12261dd822feefa2f3125ca9ed0aed14
+bytes            = 419517

@@ -1,0 +1,56 @@
+{
+  "entry": "ops/build-linux.sh",
+  "campaign": "songcore-172/S3 linux-x86_64 reference rebuild",
+  "run_stamp": "20261030T125315Z",
+  "branch": "main",
+  "head": "69ba1ce05a2772f5aa077c6ece3365c40f6e0500",
+  "tree": "30d8c823b90845947341d978f77196dd8778a707",
+  "source_repo": "/home/hoo/g4-172/wt-tools",
+  "work_root": "/home/hoo/g4-172/linux-root",
+  "clone": "reuse",
+  "closure": "reuse",
+  "target_recipe": "native/ffmpeg/targets/linux-x86_64.json",
+  "artifact_policy": {
+    "static": true,
+    "shared": true,
+    "wasm": false
+  },
+  "ffmpeg": {
+    "tag": "n9.0.1",
+    "commit": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+    "manifest_sha256": "d037e8b472d247cf457b1af204546c5feb66798f9f44aec3f96b54663cba5525",
+    "closure_translation_units": 279
+  },
+  "artifacts": {
+    "static": {
+      "path": "/home/hoo/g4-172/linux-root/native/build/artifacts/libsongcore.a",
+      "bytes": 4066980,
+      "sha256": "0d38f4b5a8bd812ba262ca2dc26c32f2d1a596511222d930e685db25d7361308"
+    },
+    "shared": {
+      "path": "/home/hoo/g4-172/linux-root/native/build/artifacts/shared/libsongcore.so",
+      "bytes": 2288536,
+      "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98"
+    }
+  },
+  "static_members": 280,
+  "static_elf64_members": 280,
+  "shared_needed": [
+    "libm.so.6",
+    "libc.so.6"
+  ],
+  "abi_symbols": 15,
+  "checks": {
+    "clone_head_pinned": "PASS",
+    "closure_identity": "PASS",
+    "build_static": "PASS",
+    "build_shared": "PASS",
+    "elf_identity": "PASS",
+    "archive_members_all_elf64_x86_64": "PASS",
+    "abi_export_set_equals_songcore_h": "PASS",
+    "shared_no_libav_needed": "PASS",
+    "sha256_recorded": "PASS"
+  },
+  "verdict": "PASS"
+}

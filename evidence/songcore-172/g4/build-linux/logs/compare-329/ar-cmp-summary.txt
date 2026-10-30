@@ -1,0 +1,19 @@
+archive_a=/home/hoo/g4-172/linux-root/src/native/build/artifacts/libsongcore.a
+archive_b=/home/hoo/qq329/lin-r1/src/native/build/artifacts/libsongcore.a
+members=282/282
+member_order_identical=True
+occurrences_identical=278
+differing_occurrences=4
+header_differing_occurrences=0
+DIFF[3] version.c.o size=2688/2688 sha_a=e9bd4245ec3bca77 sha_b=00b4aa3f2a85834d
+  only_in_a=FFmpeg version qianqian-v0.1.0-315-gbf23516
+  only_in_b=FFmpeg version qianqian-v0.1.0-316-gb49b18c
+DIFF[17] version.c.o size=2928/2928 sha_a=83d582ff945aad34 sha_b=8a3b7056b716fafc
+  only_in_a=qianqian-v0.1.0-315-gbf23516 | FFmpeg version qianqian-v0.1.0-315-gbf23516
+  only_in_b=qianqian-v0.1.0-316-gb49b18c | FFmpeg version qianqian-v0.1.0-316-gb49b18c
+DIFF[110] version.c.o size=2680/2680 sha_a=eb821728a8f8dd6f sha_b=1af815258f6a63d0
+  only_in_a=FFmpeg version qianqian-v0.1.0-315-gbf23516
+  only_in_b=FFmpeg version qianqian-v0.1.0-316-gb49b18c
+DIFF[181] version.c.o size=2672/2672 sha_a=1d438d9bcd2635c9 sha_b=1af6f90b5a0c85f7
+  only_in_a=FFmpeg version qianqian-v0.1.0-315-gbf23516
+  only_in_b=FFmpeg version qianqian-v0.1.0-316-gb49b18c
