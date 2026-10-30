@@ -44,12 +44,20 @@ fix-witness/             compile_commands.json census per build root proving
                          <target>-<root>-<stamp>.txt plus
                          .fix-patch-lines.txt / .summary.json /
                          .leak-census.txt sidecars
-build-receipts/          one build receipt per root: exact source head/tree,
-                         toolchain, clone/closure provenance, artifact sha256.
-                         Winner roots are <target>-<root>.summary.json;
-                         per-arm receipts are
-                         <target>-<root>-<stamp>.summary.json and
-                         <target>-<root>-<stamp>.leak-census.txt
+build-receipts/          per-root and per-arm build receipts: exact source
+                         head/tree, toolchain, clone/closure provenance,
+                         artifact sha256. Pairing:
+                         - six winner roots: <target>-<root>.summary.json
+                           (the four R1/R2 roots also archive their
+                           winner-arm census as
+                           <target>-<root>-w-r{1,2}-macromap.leak-census.txt;
+                           the two L1-route roots archive no census)
+                         - non-ctr arms (E0 / filemap / macromap / winner):
+                           <target>-<root>-<stamp>.summary.json plus the
+                           same-basename .leak-census.txt
+                         - ctr arms: <target>-<root>-<stamp>.summary.json;
+                           the paired census is
+                           fix-witness/<target>-<root>-<stamp>.leak-census.txt
 drivers/                 byte-identical copies of the three campaign scripts
                          (build, compare, comparator) that produced the
                          builds and comparisons; origin recorded in
@@ -112,7 +120,10 @@ summary or artifact record — its build log records an xmake error generating
    different metric — see "Occurrence accounting and comparator naming
    (v1)") — including member order,
    per-occurrence sha256, an archive header-field audit (zeroed date/uid/gid)
-   and an embedded-path leak census over all members of both archives.
+   and an embedded-path leak census over the comparator's content-bearing
+   rows (224/282 on linux, 185/282 on windows — folded long-name members and
+   the two metadata entries carry no member content; see "Occurrence
+   accounting and comparator naming (v1)").
    Results: `cmp/`.
 
 3. **Fix witness**: after each build, the replayed compile database is
@@ -166,34 +177,50 @@ that was run.
 |---|---|---|
 | compared R1 archive (retained `mapto="."` product; see Design) | static `7b506922…`, shared `085425e5…` | static `d8c8e688…` |
 | rebuilt R2 archive (`mapto=src`) | static `ebc799f9…`, shared `57529d23…` | static `29c29943…` |
-| R2 leak census (`<root>/src`, `/home/hoo`, `C:\`, `/mnt/`) | 0 on static and shared | 0 on static |
+| R2 build-receipt leak census (`<root>/src`, `/home/hoo`, `C:\`, `/mnt/`) | 0 on static and shared | 0 on static |
 | member occurrences identical / differing (of 282) | 273 / 9 | 273 / 9 |
 | `filemap-ctr` vs `macromap-ctr` R2 sha256 | equal (both `ebc799f9…` static) | equal (both `29c29943…` static) |
 
 For contrast, the E0 controls (both roots built without any flag) record
-9 differing member occurrences and absolute-root hits under both census
-definitions:
+9 differing member occurrences and absolute-root hits under both censuses.
+The two censuses are not interchangeable: the verdict census cannot see
+folded long-name members because they carry no member content, so it covers
+224/282 rows on linux and 185/282 on windows.
 
-- **verdict census** (`cmp/controls/<target>-e0-verdict.json`; the
-  comparator's occurrence count over extracted member bodies): 5 hits of the
-  full R1-root prefix in the linux static archive and 1 in the windows
-  static archive.
 - **build-receipt census**
-  (`build-receipts/<target>-<root>-<stamp>.leak-census.txt`; a
-  whole-artifact scan for `<root>/src`, `/home/hoo`, `C:\`, `/mnt/`):
-  9 occurrences of `<root>/src` in the linux static archive, 3 in the linux
-  shared archive, and 9 in the windows static archive.
+  (`build-receipts/linux-lin-r1-a1-none.leak-census.txt`,
+  `build-receipts/linux-linux-root-two-e0-r2-none.leak-census.txt`,
+  `build-receipts/windows-win-r1-e0-r1-none.leak-census.txt`,
+  `build-receipts/windows-windows-root-two-e0-r2-none.leak-census.txt`;
+  `b329-build.sh`'s whole-artifact scan, patterns `<root>/src`,
+  `/home/hoo`, `C:\`, `/mnt/`; covers all 280 members): E0 linux static
+  9 occurrences of `<root>/src` per root, linux shared 3 per root, windows
+  static 9 per root.
+- **verdict census** (`cmp/controls/<target>-e0-verdict.json`;
+  `b329-arcmp.py` `leak_scan`, patterns full root label, `/home/`, `C:\`,
+  `/mnt/`, `/tmp/`; content-bearing rows only): E0 linux static 5
+  full-root-prefix hits per side, windows static 1 per side; each side also
+  records 1 `/tmp/` hit (`file_open.c.o`, a source-level literal unrelated
+  to this fix).
 
-The winner arms record 0 under both censuses on both targets (verdict
-`leak_r1`/`leak_r2`; `build-receipts/*-w-r*.leak-census.txt`).
+The count gap (linux 4, windows 8) is folded-member territory: the E0
+static comparison lists 4 `<symbol-table-ext>` DIFF rows on linux and 7 on
+windows (`grep '^DIFF <symbol-table-ext>' cmp/controls/<target>-e0-static-cmp.txt`),
+and the remaining gap is path literals inside folded member bodies, which
+the verdict census never scans.
+
+The winner arms record 0 build-root hits under both censuses on both targets
+(verdict `leak_r1`/`leak_r2`; `build-receipts/*-w-r*.leak-census.txt`); the
+verdict census still records the 1 `/tmp/` source literal per side.
 
 ### Reading: measured vs inferred
 
 Measured: no flag → the two roots' archives differ (9 member occurrences)
 and carry absolute build-root strings; each root maps its own compiled
 FFmpeg source root to target `.` → byte-identical archives; target `.`
-(retained R1) vs `src` (rebuilt R2) → 9 differing member occurrences while
-both archives carry **zero** absolute-root hits.
+(retained R1) vs `src` (rebuilt R2) → 9 differing member occurrences while both archives carry
+**zero** build-root hits under the available censuses (R1: winner verdict
+census; R2: build-receipt census).
 
 Inference (not directly measured): the 9 differences of the ctr arms can
 only come from the replacement text itself — the members whose
@@ -217,7 +244,8 @@ receipts are the only surviving per-arm evidence.
 - The per-byte attribution of the ctr differences is inference as stated
   above; only the counts (273 identical / 9 differing, order identical,
   9 comparator duplicate-name entries — see "Occurrence accounting and
-  comparator naming (v1)") and the zero leak census are measured.
+  comparator naming (v1)") and the zero build-root verdict census are
+  measured.
 
 ## Occurrence accounting and comparator naming (v1)
 
@@ -241,8 +269,14 @@ archive revision.
    resolution (lines 78–83), so a `/offset` reference never reaches the
    long-name table. Their bytes are still compared occurrence by occurrence
    (the synthetic name is occurrence-indexed too) and `ORDER_IDENTICAL=yes`
-   guarantees the pairing, so no verdict depends on the label; only
-   name-level readability is affected.
+   guarantees the pairing, so no verdict or digest depends on the label.
+   The defect has two consequences: the names are unreadable, and the
+   verdict census cannot scan these members at all (no content field), so
+   its coverage is 224/282 rows on linux and 185/282 on windows. The
+   archived `static-cmp.txt` files repeat the v1 tool's own section header
+   `leak census (all members, both archives)`; that header is inaccurate for
+   the same reason — `leak_scan` skips every member without a content field
+   (the archived cmp files are left unmodified).
 3. **Duplicate-name accounting.** By resolved name the archives contain
    9 duplicate names and 13 extra occurrences: `version.c.o` ×4,
    `utils.c.o` ×3, `options.c.o` ×3, and `pcm`, `mpegaudiodsp`, `iamf`,
@@ -251,12 +285,17 @@ archive revision.
    The comparator's `DUPLICATE_NAMES=9` is a different metric: 8 real
    duplicate names visible as names in the v1 TSV plus the one synthetic
    long-name group. `mpegaudiodsp.c.o` (16 characters) contributes its
-   occurrences to the synthetic group, so it is not visible as a duplicate
-   name in the v1 TSV. Under either metric every occurrence is compared and
-   no object is skipped.
+   occurrences to the synthetic group, so the archived v1 TSV shows only the
+   folded group. This name-level conclusion comes from a campaign-host
+   live-archive re-check (`ar t <archive> | sort | uniq -c | awk '$1>1'`),
+   not from the archived TSV. Under either metric every occurrence is
+   compared and no object is skipped.
 4. **v1 label defect status.** The branch ordering above is recorded as a
-   known label-level defect of the campaign comparator. Fixing it is left to
-   a later change; it changes no verdict, digest, count or boundary in this
+   known defect of the campaign comparator with two consequences: unreadable
+   names and incomplete verdict-census coverage (224/282 linux, 185/282
+   windows). Verdicts and digests are unaffected because folded members are
+   still compared occurrence by occurrence (step 2). Fixing the label
+   ordering is left to a later change; it changes no boundary in this
    archive.
 
 ## Driver provenance

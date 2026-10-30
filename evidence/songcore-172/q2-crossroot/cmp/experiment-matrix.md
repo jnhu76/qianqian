@@ -27,7 +27,9 @@ Variant names are archived verbatim: the linux `filemap-b` / `macromap-b` /
 "static sha R1==R2" is full-archive sha256 equality across the two roots;
 `differing occ` is static member-occurrence count that differs (of 282).
 The `leak census R1` column is the embedded-path census summary string from
-the verdict (occurrences of each prefix across all members of archive 1);
+the verdict (occurrences of each prefix across the content-bearing rows of
+archive 1 — 224/282 rows on linux, 185/282 on windows; see the README
+section "Occurrence accounting and comparator naming (v1)");
 on a `*-ctr` row, R1 is the retained `mapto="."` product (the filemap arm's
 for `filemap-ctr`, the winner arm's for `macromap-ctr`; these products are
 byte-identical). Occurrence and duplicate-name accounting (282 rows =
@@ -53,23 +55,32 @@ naming (v1)".
 Per-row reading:
 
 - `e0` rows: cross-root bytes differ (9 of 282 occurrences) and the archives
-  carry absolute build-root literals. Two censuses with different scopes
-  agree:
-  - verdict census (`cmp/controls/<target>-e0-verdict.json`; comparator
-    occurrence count over extracted member bodies): 5 hits of the full R1
-    root prefix in linux static, 1 in windows static.
+  carry absolute build-root literals. The two censuses are not equivalent:
+  the verdict census cannot scan folded long-name members (no content
+  field), so it covers 224/282 rows on linux and 185/282 on windows.
   - build-receipt census
-    (`build-receipts/<target>-<root>-<stamp>.leak-census.txt`;
-    whole-artifact scan): 9 occurrences of `<root>/src` in linux static,
-    3 in linux shared, 9 in windows static.
-  The winner `w-r*` build-receipt censuses are all 0.
+    (`build-receipts/linux-lin-r1-a1-none.leak-census.txt` and the
+    `*-e0-*.leak-census.txt` files; whole-artifact scan): 9 occurrences of
+    `<root>/src` per root in linux static, 3 per root in linux shared,
+    9 per root in windows static.
+  - verdict census (`cmp/controls/<target>-e0-verdict.json`; content-bearing
+    rows only): 5 full-root-prefix hits per side in linux static, 1 per side
+    in windows static; 1 `/tmp/` hit per side (`file_open.c.o`, source
+    literal).
+  The count gap (linux 4, windows 8) is folded-member territory: 4
+  `<symbol-table-ext>` DIFF rows on linux and 7 on windows, plus path
+  literals inside folded bodies (`grep '^DIFF <symbol-table-ext>'
+  cmp/controls/<target>-e0-static-cmp.txt`). The winner `w-r*` build-receipt
+  censuses are all 0 build-root hits; the winner verdict censuses also record
+  the 1 `/tmp/` literal per side.
 - `filemap` / `macromap` / `winner` rows: 282/282 occurrences identical,
-  member order identical, zero root-path hits on both sides — each root maps
+  member order identical, zero build-root hits on both sides — each root maps
   its own compiled FFmpeg source root to the same target `.`.
-- `*-ctr` rows: 273/282 identical and 9 differing while the leak census is
-  **0 on both sides**. The R1 archive is a retained `mapto="."` product (the
-  filemap arm's for `filemap-ctr`, the winner arm's for `macromap-ctr`), not
-  an independent rebuild; the surviving difference is attributable to the
-  different replacement target string (`.` vs `src`) by inference — the
-  differing literals were not archived because the ctr R2 products were
-  overwritten by later arms (README "Counterfactual arm semantics").
+- `*-ctr` rows: 273/282 identical and 9 differing while the verdict leak
+  census records **0 build-root hits on both sides**. The R1 archive is a
+  retained `mapto="."` product (the filemap arm's for `filemap-ctr`, the
+  winner arm's for `macromap-ctr`), not an independent rebuild; the
+  surviving difference is attributable to the different replacement target
+  string (`.` vs `src`) by inference — the differing literals were not
+  archived because the ctr R2 products were overwritten by later arms
+  (README "Counterfactual arm semantics").

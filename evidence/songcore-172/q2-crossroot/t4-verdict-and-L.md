@@ -15,11 +15,18 @@ two roots' static archives differ on both targets —
 `all_identical=false`, 273/282 member occurrences identical, 9 differing
 (archive symbol-table occurrences plus FFmpeg object members; the differing
 list is in the archived `*-e0-static-cmp.txt`) — and absolute build-root
-literals are present in the archives (verdict census per archive of
-extracted member bodies: 5 hits of the full R1-root prefix on linux, 1 on
-windows, symmetric on R2; the build-receipt whole-artifact census records
-9 occurrences of `<root>/src` in linux static, 3 in linux shared and 9 in
-windows static — see README "Counterfactual arm semantics").
+literals are present in the archives. The build-receipt whole-artifact
+census (all 280 members:
+`build-receipts/linux-lin-r1-a1-none.leak-census.txt`, `*-e0-*.leak-census.txt`)
+records 9 occurrences of `<root>/src` per root in linux static, 3 per root
+in linux shared and 9 per root in windows static. The verdict census
+(`cmp/controls/<target>-e0-verdict.json`; only content-bearing rows —
+224/282 on linux, 185/282 on windows) records 5 full-root-prefix hits per
+side in linux static and 1 per side in windows static, plus 1 `/tmp/`
+source literal per side. The gap is folded-member territory: 4
+`<symbol-table-ext>` DIFF rows on linux and 7 on windows, plus path literals
+inside folded bodies (see README "Counterfactual arm semantics" and
+"Occurrence accounting and comparator naming (v1)").
 
 One flag at a time, on the actually replayed FFmpeg translation units
 (matrix: `cmp/experiment-matrix.md`; full verdicts: `cmp/all-verdicts/`):
@@ -28,17 +35,17 @@ One flag at a time, on the actually replayed FFmpeg translation units
 |---|---|---|---|
 | E0: no map (control) | differs (9 occ) | differs (9 occ) | root literals are the cause of cross-root difference |
 | `-ffile-prefix-map=<ffmpeg srcroot>=.` | identical | identical | wider flag also suffices; NOT adopted |
-| counterfactual: each root maps its own compiled FFmpeg src root; R1 target `.` (retained `mapto="."` product) vs R2 target `src` (rebuilt) (`filemap-ctr` / `macromap-ctr`) | differs (9 occ; 0 root-path hits) | differs (9 occ; 0 root-path hits) | cross-root identity also requires the same replacement target string |
+| counterfactual: each root maps its own compiled FFmpeg src root; R1 target `.` (retained `mapto="."` product) vs R2 target `src` (rebuilt) (`filemap-ctr` / `macromap-ctr`) | differs (9 occ; 0 build-root hits) | differs (9 occ; 0 build-root hits) | cross-root identity also requires the same replacement target string |
 | `-fmacro-prefix-map=<ffmpeg srcroot>=.` | identical | identical | adopted single candidate |
 
 The `*-ctr` row is not a symmetric two-root rebuild: R1 is the retained
 `mapto="."` product (the filemap arm's archive for `filemap-ctr`, the winner
 arm's for `macromap-ctr`; byte-identical) and only R2 is rebuilt
-(`mapto="src"`). Its 9 differing occurrences and its zero root-path census
-on both sides are measured; attributing the surviving bytes to the
-replacement target string is inference, because the ctr R2 products were
-overwritten by later arms before archiving and the differing literals were
-not captured (README "Counterfactual arm semantics").
+(`mapto="src"`). Its 9 differing occurrences and its zero build-root
+verdict census on both sides are measured; attributing the surviving bytes
+to the replacement target string is inference, because the ctr R2 products
+were overwritten by later arms before archiving and the differing literals
+were not captured (README "Counterfactual arm semantics").
 
 Flag delivery (witness census, `fix-witness/`): each of the six per-root
 winning witnesses records `compile_commands_entries=281`,
@@ -55,8 +62,9 @@ change in `native/build/ffmpeg.lua` on this branch. Causality as measured:
 no map → differs (9 member occurrences) with absolute build-root literals
 present; each root mapping its own compiled FFmpeg src root to target `.` →
 byte-identical on both targets; target `.` (retained R1 archive) vs `src`
-(rebuilt R2) → differs (9 member occurrences) with zero absolute-root hits
-on either side. The counterfactual therefore isolates the replacement target
+(rebuilt R2) → differs (9 member occurrences) with zero build-root hits on
+either side (R1: winner verdict census; R2: build-receipt census). The
+counterfactual therefore isolates the replacement target
 string, not map coverage; its byte-level attribution is inference as noted
 above. No `strip` / `-g0` was needed or used; no flag stacking (the wider
 `-ffile-prefix-map` arm also measured identical and was not adopted).
