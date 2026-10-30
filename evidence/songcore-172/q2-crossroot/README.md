@@ -130,8 +130,8 @@ summary or artifact record — its build log records an xmake error generating
 
 The `filemap-ctr` / `macromap-ctr` rows of the matrix are **asymmetric by
 design**, and they do not test whether the prefix map covers the compiled
-FFmpeg source root. The earlier description ("map not covering the compiled
-FFmpeg src root") is withdrawn: it named a different experiment than the one
+FFmpeg source root. An earlier description of these arms as a map-coverage
+counterexample is withdrawn: it named a different experiment than the one
 that was run.
 
 ### Design as executed
