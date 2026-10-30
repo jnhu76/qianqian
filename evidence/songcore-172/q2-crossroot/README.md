@@ -48,10 +48,12 @@ build-receipts/          one build receipt per root: exact source head/tree,
                          toolchain, clone/closure provenance, artifact sha256.
                          Winner roots are <target>-<root>.summary.json;
                          per-arm receipts are
-                         <target>-<root>-<stamp>.summary.json
-drivers/                 byte-identical copies of the two campaign scripts
-                         that produced the builds and comparisons; origin
-                         recorded in "Driver provenance" below
+                         <target>-<root>-<stamp>.summary.json and
+                         <target>-<root>-<stamp>.leak-census.txt
+drivers/                 byte-identical copies of the three campaign scripts
+                         (build, compare, comparator) that produced the
+                         builds and comparisons; origin recorded in
+                         "Driver provenance" below
 gates/receipts/          six G1+G2 release-gate receipts (schema
                          songcore-release-gate-g1g2/1), one per build root
 gates/six-root-gate-summary.{json,md}
@@ -60,8 +62,8 @@ t4-verdict-and-L.md      the T4 single-candidate verdict and the L1/L2/L3
                          determination, grounded only in the files here
 ```
 
-Per-arm receipt stamps (the `<stamp>` part of the archived filenames; the
-trailing `.` of a build-root attempt stamp is dropped, and each JSON's
+Per-arm receipt stamps (the `<stamp>` part of the archived filenames; a
+trailing `-.` of a build-root attempt stamp is dropped, and each JSON's
 `attempt_stamp` field repeats the original):
 
 | arm | linux R1 / R2 | windows R1 / R2 |
@@ -104,8 +106,11 @@ summary or artifact record — its build log records an xmake error generating
 
 2. **Member-accurate cross-root comparison ("cmp")**: the two roots' shipped
    `libsongcore.a` archives are compared member by member with occurrence
-   indexing — duplicate member names (9 per archive) are compared by
-   occurrence index, never collapsed by basename — including member order,
+   indexing — duplicate member names are compared by occurrence index, never
+   collapsed by basename (resolved-name count: 9 duplicate names with 13
+   extra occurrences per archive; the comparator's `DUPLICATE_NAMES=9` is a
+   different metric — see "Occurrence accounting and comparator naming
+   (v1)") — including member order,
    per-occurrence sha256, an archive header-field audit (zeroed date/uid/gid)
    and an embedded-path leak census over all members of both archives.
    Results: `cmp/`.
@@ -138,7 +143,7 @@ that was run.
 
 | arm | R1 | R2 |
 |---|---|---|
-| `filemap-ctr` | not rebuilt — the comparison reuses the winner arm's `-ffile-prefix-map=<R1 ffmpeg srcroot>=.` archive | rebuilt with `-ffile-prefix-map=<R2 ffmpeg srcroot>=src` |
+| `filemap-ctr` | not rebuilt — reuses the retained `-ffile-prefix-map=<R1 ffmpeg srcroot>=.` product (the filemap arm's archive, byte-identical to the winner `-fmacro-prefix-map` archive) | rebuilt with `-ffile-prefix-map=<R2 ffmpeg srcroot>=src` |
 | `macromap-ctr` | not rebuilt — reuses the winner arm's `-fmacro-prefix-map=<R1 ffmpeg srcroot>=.` archive | rebuilt with `-fmacro-prefix-map=<R2 ffmpeg srcroot>=src` |
 
 - Each root maps its own compiled FFmpeg source root
@@ -159,16 +164,28 @@ that was run.
 
 | item | linux | windows |
 |---|---|---|
-| compared R1 archive (retained winner-arm product) | static `7b506922…`, shared `085425e5…` | static `d8c8e688…` |
+| compared R1 archive (retained `mapto="."` product; see Design) | static `7b506922…`, shared `085425e5…` | static `d8c8e688…` |
 | rebuilt R2 archive (`mapto=src`) | static `ebc799f9…`, shared `57529d23…` | static `29c29943…` |
 | R2 leak census (`<root>/src`, `/home/hoo`, `C:\`, `/mnt/`) | 0 on static and shared | 0 on static |
 | member occurrences identical / differing (of 282) | 273 / 9 | 273 / 9 |
 | `filemap-ctr` vs `macromap-ctr` R2 sha256 | equal (both `ebc799f9…` static) | equal (both `29c29943…` static) |
 
-For contrast, the E0 controls (`cmp/controls/`; both roots built without any
-flag) record, in the receipt leak census, 9 occurrences of `<root>/src` in
-the static archive and 3 in the linux shared archive, with 9 differing
-member occurrences; the winner arms record 0 and 0.
+For contrast, the E0 controls (both roots built without any flag) record
+9 differing member occurrences and absolute-root hits under both census
+definitions:
+
+- **verdict census** (`cmp/controls/<target>-e0-verdict.json`; the
+  comparator's occurrence count over extracted member bodies): 5 hits of the
+  full R1-root prefix in the linux static archive and 1 in the windows
+  static archive.
+- **build-receipt census**
+  (`build-receipts/<target>-<root>-<stamp>.leak-census.txt`; a
+  whole-artifact scan for `<root>/src`, `/home/hoo`, `C:\`, `/mnt/`):
+  9 occurrences of `<root>/src` in the linux static archive, 3 in the linux
+  shared archive, and 9 in the windows static archive.
+
+The winner arms record 0 under both censuses on both targets (verdict
+`leak_r1`/`leak_r2`; `build-receipts/*-w-r*.leak-census.txt`).
 
 ### Reading: measured vs inferred
 
@@ -195,21 +212,69 @@ receipts are the only surviving per-arm evidence.
 - A ctr row is not an independent two-root rebuild. Only the E0, `filemap`,
   `macromap` and `winner` arms rebuild both roots.
 - The ctr result does not weaken the winner claim: the winner arm varies
-  neither the root nor the target and still produces byte-identical
-  archives on both targets.
+  the root while holding the flag and its replacement target `.` fixed, and
+  still produces byte-identical archives on both targets.
 - The per-byte attribution of the ctr differences is inference as stated
   above; only the counts (273 identical / 9 differing, order identical,
-  9 duplicate-name members) and the zero leak census are measured.
+  9 comparator duplicate-name entries — see "Occurrence accounting and
+  comparator naming (v1)") and the zero leak census are measured.
+
+## Occurrence accounting and comparator naming (v1)
+
+The occurrence counts used throughout this archive (282 comparison rows,
+`DUPLICATE_NAMES=9`, `DIFFERING_OCCURRENCES`) are accounted for as follows.
+Every item below was re-checked against the winner archives during this
+archive revision.
+
+1. **282 comparison rows = 280 real ar members + 2 archive metadata
+   entries.** The two extra rows are `<symbol-table>` (the GNU symbol-table
+   member, raw header name `/`) and `<longnames>` (the GNU long-name table,
+   raw header name `//`). No object member is missing: `ar t` lists 280
+   members for each winner archive.
+2. **Names longer than 15 characters are folded into one synthetic label by
+   the v1 comparator.** 56 of the 280 members carry names longer than 15
+   characters on linux (95 on windows; check:
+   `ar t <archive> | awk 'length($0)>15' | wc -l`; examples
+   `songcore_ffmpeg.c.o`, `swresample_frame.c.o`). They appear in the v1 TSV
+   as `<symbol-table-ext>`. The cause is in `drivers/b329-arcmp.py`: the
+   `/`-initial-name branch (lines 62–67) runs before GNU long-name offset
+   resolution (lines 78–83), so a `/offset` reference never reaches the
+   long-name table. Their bytes are still compared occurrence by occurrence
+   (the synthetic name is occurrence-indexed too) and `ORDER_IDENTICAL=yes`
+   guarantees the pairing, so no verdict depends on the label; only
+   name-level readability is affected.
+3. **Duplicate-name accounting.** By resolved name the archives contain
+   9 duplicate names and 13 extra occurrences: `version.c.o` ×4,
+   `utils.c.o` ×3, `options.c.o` ×3, and `pcm`, `mpegaudiodsp`, `iamf`,
+   `flacdec`, `cpu`, `aacdec` each ×2 (windows uses `.obj`). The older
+   audit's "13 duplicate-name members" is this 13-extra-occurrence count.
+   The comparator's `DUPLICATE_NAMES=9` is a different metric: 8 real
+   duplicate names visible as names in the v1 TSV plus the one synthetic
+   long-name group. `mpegaudiodsp.c.o` (16 characters) contributes its
+   occurrences to the synthetic group, so it is not visible as a duplicate
+   name in the v1 TSV. Under either metric every occurrence is compared and
+   no object is skipped.
+4. **v1 label defect status.** The branch ordering above is recorded as a
+   known label-level defect of the campaign comparator. Fixing it is left to
+   a later change; it changes no verdict, digest, count or boundary in this
+   archive.
 
 ## Driver provenance
 
-`drivers/b329-build.sh` and `drivers/b329-cmp.sh` are byte-identical copies
-of the campaign scripts, taken from
-`/mnt/c/Users/fred1/AppData/Local/Temp/qq172wf/329/` on the campaign host
-(sha256 `58222872e316db92…` and `1d8a4bb2ce7b2c79…` respectively).
-`b329-cmp.sh` invokes the comparison tool `b329-arcmp.py` from the same
-directory; that tool is not archived here. The scripts are evidence of the
-executed procedure, not repository tooling; they are not run by any check.
+`drivers/b329-build.sh`, `drivers/b329-cmp.sh` and `drivers/b329-arcmp.py`
+are byte-identical copies of the campaign scripts, taken from
+`/mnt/c/Users/fred1/AppData/Local/Temp/qq172wf/329/` on the campaign host:
+
+| file | sha256 |
+|---|---|
+| `b329-build.sh` | `58222872e316db9239cf6aa04b46bbe7e872c6299b833471aedec1afd3fba951` |
+| `b329-cmp.sh` | `1d8a4bb2ce7b2c7998437cd88902bbb4bc7321d560d0925557d606c35c2629df` |
+| `b329-arcmp.py` | `be919210bf85a8613fdfe4d98427bff6ea08e5ebb46605f569090601b24bb7ba` |
+
+`b329-cmp.sh` invokes `b329-arcmp.py` by campaign-host absolute path; the
+archived copy preserves that invocation verbatim. The scripts are evidence of
+the executed procedure, not repository tooling; they are not run by any
+check.
 
 ## Boundaries (read before citing)
 

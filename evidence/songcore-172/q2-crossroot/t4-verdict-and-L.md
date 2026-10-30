@@ -15,8 +15,11 @@ two roots' static archives differ on both targets —
 `all_identical=false`, 273/282 member occurrences identical, 9 differing
 (archive symbol-table occurrences plus FFmpeg object members; the differing
 list is in the archived `*-e0-static-cmp.txt`) — and absolute build-root
-literals are present in the archives (leak census per archive: 5 hits of the
-R1 root on linux, 1 on windows, symmetric on R2).
+literals are present in the archives (verdict census per archive of
+extracted member bodies: 5 hits of the full R1-root prefix on linux, 1 on
+windows, symmetric on R2; the build-receipt whole-artifact census records
+9 occurrences of `<root>/src` in linux static, 3 in linux shared and 9 in
+windows static — see README "Counterfactual arm semantics").
 
 One flag at a time, on the actually replayed FFmpeg translation units
 (matrix: `cmp/experiment-matrix.md`; full verdicts: `cmp/all-verdicts/`):
@@ -25,16 +28,17 @@ One flag at a time, on the actually replayed FFmpeg translation units
 |---|---|---|---|
 | E0: no map (control) | differs (9 occ) | differs (9 occ) | root literals are the cause of cross-root difference |
 | `-ffile-prefix-map=<ffmpeg srcroot>=.` | identical | identical | wider flag also suffices; NOT adopted |
-| counterfactual: each root maps its own compiled FFmpeg src root; R1 target `.` (retained winner-arm archive) vs R2 target `src` (rebuilt) (`filemap-ctr` / `macromap-ctr`) | differs (9 occ; 0 root-path hits) | differs (9 occ; 0 root-path hits) | cross-root identity also requires the same replacement target string |
+| counterfactual: each root maps its own compiled FFmpeg src root; R1 target `.` (retained `mapto="."` product) vs R2 target `src` (rebuilt) (`filemap-ctr` / `macromap-ctr`) | differs (9 occ; 0 root-path hits) | differs (9 occ; 0 root-path hits) | cross-root identity also requires the same replacement target string |
 | `-fmacro-prefix-map=<ffmpeg srcroot>=.` | identical | identical | adopted single candidate |
 
 The `*-ctr` row is not a symmetric two-root rebuild: R1 is the retained
-winner-arm archive (`mapto=.`) and only R2 is rebuilt (`mapto=src`). Its
-9 differing occurrences and its zero root-path census on both sides are
-measured; attributing the surviving bytes to the replacement target string
-is inference, because the ctr R2 products were overwritten by later arms
-before archiving and the differing literals were not captured (README
-"Counterfactual arm semantics").
+`mapto="."` product (the filemap arm's archive for `filemap-ctr`, the winner
+arm's for `macromap-ctr`; byte-identical) and only R2 is rebuilt
+(`mapto="src"`). Its 9 differing occurrences and its zero root-path census
+on both sides are measured; attributing the surviving bytes to the
+replacement target string is inference, because the ctr R2 products were
+overwritten by later arms before archiving and the differing literals were
+not captured (README "Counterfactual arm semantics").
 
 Flag delivery (witness census, `fix-witness/`): each of the six per-root
 winning witnesses records `compile_commands_entries=281`,
@@ -58,12 +62,13 @@ above. No `strip` / `-g0` was needed or used; no flag stacking (the wider
 `-ffile-prefix-map` arm also measured identical and was not adopted).
 
 Winner detail (`cmp/linux-winner/`, `cmp/windows-winner/`): 282/282 member
-occurrences identical, member order identical, 9 duplicate-name members equal
-by occurrence index, `HEADER_ANOMALIES=0`; full-archive sha256 equal across
-roots — linux static `7b506922…` AND shared `085425e5…`; windows static
-`d8c8e688…` (static-only form). Residual: one identical `/tmp/` literal in
-`file_open.c.o` on both sides of both targets — a source-level literal, not a
-build-root leak (see README Boundaries).
+occurrences identical, member order identical, 9 comparator duplicate-name
+entries equal by occurrence index (see README "Occurrence accounting and
+comparator naming (v1)"), `HEADER_ANOMALIES=0`; full-archive sha256 equal
+across roots — linux static `7b506922…` AND shared `085425e5…`; windows
+static `d8c8e688…` (static-only form). Residual: one identical `/tmp/`
+literal in `file_open.c.o` on both sides of both targets — a source-level
+literal, not a build-root leak (see README Boundaries).
 
 ## L determination
 

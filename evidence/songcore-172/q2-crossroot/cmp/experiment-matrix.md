@@ -4,9 +4,10 @@ Generated from the archived `verdict.json` of every measured variant
 (`cmp/all-verdicts/<variant>.verdict.json`, copied byte-for-byte from the
 campaign evidence). Each row is one build-and-compare run of the two build
 roots for that target. The two `*-ctr` rows are **asymmetric by design**:
-R1 is not rebuilt there — the comparison reuses the winner arm's `mapto="."`
-archive — and only R2 is rebuilt, with `mapto="src"` (see the README section
-"Counterfactual arm semantics").
+R1 is not rebuilt there — the comparison reuses the retained `mapto="."`
+product (the filemap arm's archive for `filemap-ctr`, the winner arm's for
+`macromap-ctr`; byte-identical) — and only R2 is rebuilt, with `mapto="src"`
+(see the README section "Counterfactual arm semantics").
 
 Variant labels:
 
@@ -16,7 +17,7 @@ Variant labels:
   as the target, on both roots
 - `filemap-ctr` / `macromap-ctr`: counterfactual controls — each root's own
   compiled FFmpeg source root as the `from` prefix, target `.` in the
-  retained R1 winner-arm archive vs `src` in the rebuilt R2 archive
+  retained R1 `mapto="."` product vs `src` in the rebuilt R2 archive
 - `winner` / `winner-b`: the adopted single-flag fix
   (`-fmacro-prefix-map=<ffmpeg srcroot>=.`), both roots
 
@@ -27,7 +28,12 @@ Variant names are archived verbatim: the linux `filemap-b` / `macromap-b` /
 `differing occ` is static member-occurrence count that differs (of 282).
 The `leak census R1` column is the embedded-path census summary string from
 the verdict (occurrences of each prefix across all members of archive 1);
-on a `*-ctr` row, R1 is the retained winner-arm archive.
+on a `*-ctr` row, R1 is the retained `mapto="."` product (the filemap arm's
+for `filemap-ctr`, the winner arm's for `macromap-ctr`; these products are
+byte-identical). Occurrence and duplicate-name accounting (282 rows =
+280 members + 2 archive metadata entries; the `DUPLICATE_NAMES` metric) is
+documented in the README section "Occurrence accounting and comparator
+naming (v1)".
 
 | variant | target | all_identical | differing occ | static sha R1==R2 | shared identical | leak census R1 |
 |---|---|---|---|---|---|---|
@@ -47,16 +53,23 @@ on a `*-ctr` row, R1 is the retained winner-arm archive.
 Per-row reading:
 
 - `e0` rows: cross-root bytes differ (9 of 282 occurrences) and the archives
-  carry absolute build-root literals. The verdict census counts 5 hits of
-  the full R1 root prefix on linux static and 1 on windows static; the
-  receipt leak census counts 9 occurrences of `<root>/src` in the static
-  archive and 3 in the linux shared archive.
+  carry absolute build-root literals. Two censuses with different scopes
+  agree:
+  - verdict census (`cmp/controls/<target>-e0-verdict.json`; comparator
+    occurrence count over extracted member bodies): 5 hits of the full R1
+    root prefix in linux static, 1 in windows static.
+  - build-receipt census
+    (`build-receipts/<target>-<root>-<stamp>.leak-census.txt`;
+    whole-artifact scan): 9 occurrences of `<root>/src` in linux static,
+    3 in linux shared, 9 in windows static.
+  The winner `w-r*` build-receipt censuses are all 0.
 - `filemap` / `macromap` / `winner` rows: 282/282 occurrences identical,
   member order identical, zero root-path hits on both sides — each root maps
   its own compiled FFmpeg source root to the same target `.`.
 - `*-ctr` rows: 273/282 identical and 9 differing while the leak census is
-  **0 on both sides**. The R1 archive is the winner product, not an
-  independent rebuild; the surviving difference is attributable to the
+  **0 on both sides**. The R1 archive is a retained `mapto="."` product (the
+  filemap arm's for `filemap-ctr`, the winner arm's for `macromap-ctr`), not
+  an independent rebuild; the surviving difference is attributable to the
   different replacement target string (`.` vs `src`) by inference — the
   differing literals were not archived because the ctr R2 products were
   overwritten by later arms (README "Counterfactual arm semantics").
