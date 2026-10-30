@@ -39,9 +39,19 @@ cmp/all-verdicts/        verdict.json of all 12 measured variants
 cmp/experiment-matrix.md matrix generated from those 12 verdicts
 fix-witness/             compile_commands.json census per build root proving
                          which flags actually reached the replayed FFmpeg
-                         compile units; includes two no-map negative controls
+                         compile units; includes two no-map negative controls.
+                         The four counterfactual arms are archived as
+                         <target>-<root>-<stamp>.txt plus
+                         .fix-patch-lines.txt / .summary.json /
+                         .leak-census.txt sidecars
 build-receipts/          one build receipt per root: exact source head/tree,
-                         toolchain, clone/closure provenance, artifact sha256
+                         toolchain, clone/closure provenance, artifact sha256.
+                         Winner roots are <target>-<root>.summary.json;
+                         per-arm receipts are
+                         <target>-<root>-<stamp>.summary.json
+drivers/                 byte-identical copies of the two campaign scripts
+                         that produced the builds and comparisons; origin
+                         recorded in "Driver provenance" below
 gates/receipts/          six G1+G2 release-gate receipts (schema
                          songcore-release-gate-g1g2/1), one per build root
 gates/six-root-gate-summary.{json,md}
@@ -50,10 +60,34 @@ t4-verdict-and-L.md      the T4 single-candidate verdict and the L1/L2/L3
                          determination, grounded only in the files here
 ```
 
+Per-arm receipt stamps (the `<stamp>` part of the archived filenames; the
+trailing `.` of a build-root attempt stamp is dropped, and each JSON's
+`attempt_stamp` field repeats the original):
+
+| arm | linux R1 / R2 | windows R1 / R2 |
+|---|---|---|
+| E0 (no flag) | `a1-none-.` / `e0-r2-none-.` | `e0-r1-none-.` / `e0-r2-none-.` |
+| `filemap` | `f-r1-filemap-.` / `f-r2-filemap-.` | `f-r1b-filemap-.` / `f-r2-filemap-.` |
+| `macromap` | `m-r1-macromap-.` / `m-r2-macromap-.` | `m-r1-macromap-.` / `m-r2-macromap-.` |
+| `filemap-ctr` | — (R1 retained) / `fctr-r2-filemap-src` | — (R1 retained) / `fctr-r2-filemap-src` |
+| `macromap-ctr` | — (R1 retained) / `mctr-r2-macromap-src` | — (R1 retained) / `mctr-r2-macromap-src` |
+
+Two mapping notes: the linux E0 R1 receipt is stamped `a1-none-.` and its
+artifacts are the R1 archives compared by `cmp-linux-e0` (static sha256
+`916d113c…`). The windows `filemap` R1 attempt `f-r1-filemap-.` left no
+summary or artifact record — its build log records an xmake error generating
+`__cpp_qtpalette.c.c` — and the arm was completed as `f-r1b-filemap-.`
+(static sha256 `d8c8e688…`), whose summary is the one archived.
+
 ## Method
 
 1. **Two independent absolute build roots per target** (R1/R2), plus one
-   fresh-clone/fresh-closure route per target (L1 routes):
+   fresh-clone/fresh-closure route per target (L1 routes). The four
+   counterfactual (`*-ctr`) arms are the explicit exception: they are
+   asymmetric by design and only R2 is rebuilt — see "Counterfactual arm
+   semantics".
+
+   Roots:
 
    | root key (`gates/out2/` name) | target | build root | clone/closure |
    |---|---|---|---|
@@ -91,6 +125,91 @@ t4-verdict-and-L.md      the T4 single-candidate verdict and the L1/L2/L3
    `fixture_transport.windows_path` fields). Results: `gates/`.
 
 5. **T4 verdict and L1/L2/L3 determination**: see `t4-verdict-and-L.md`.
+
+## Counterfactual arm semantics
+
+The `filemap-ctr` / `macromap-ctr` rows of the matrix are **asymmetric by
+design**, and they do not test whether the prefix map covers the compiled
+FFmpeg source root. The earlier description ("map not covering the compiled
+FFmpeg src root") is withdrawn: it named a different experiment than the one
+that was run.
+
+### Design as executed
+
+| arm | R1 | R2 |
+|---|---|---|
+| `filemap-ctr` | not rebuilt — the comparison reuses the winner arm's `-ffile-prefix-map=<R1 ffmpeg srcroot>=.` archive | rebuilt with `-ffile-prefix-map=<R2 ffmpeg srcroot>=src` |
+| `macromap-ctr` | not rebuilt — reuses the winner arm's `-fmacro-prefix-map=<R1 ffmpeg srcroot>=.` archive | rebuilt with `-fmacro-prefix-map=<R2 ffmpeg srcroot>=src` |
+
+- Each root maps its own compiled FFmpeg source root
+  (`…/src/native/build/ffmpeg-src`) as the *from* prefix. Coverage of the
+  compiled root is therefore not the parameter under test.
+- The varied parameter is the replacement target string: `.` in the retained
+  R1 archive vs `src` in the rebuilt R2 archive.
+- Only the root-two receipts exist for these arms
+  (`fctr-r2-filemap-src`, `mctr-r2-macromap-src` under `linux-root-two` /
+  `windows-root-two`); neither `lin-r1` nor `win-r1` has a ctr receipt.
+- Flag delivery is witnessed in `fix-witness/*-fctr-r2-*` and
+  `*-mctr-r2-*`: `compile_commands_entries=281`,
+  `ffile_prefix_map_entries=279` (fctr) / `fmacro_prefix_map_entries=279`
+  (mctr), `ffmpeg_src_entries=560`; the added line is line 144 of the
+  build-root `native/build/ffmpeg.lua` (`.fix-patch-lines.txt` sidecars).
+
+### Measured values
+
+| item | linux | windows |
+|---|---|---|
+| compared R1 archive (retained winner-arm product) | static `7b506922…`, shared `085425e5…` | static `d8c8e688…` |
+| rebuilt R2 archive (`mapto=src`) | static `ebc799f9…`, shared `57529d23…` | static `29c29943…` |
+| R2 leak census (`<root>/src`, `/home/hoo`, `C:\`, `/mnt/`) | 0 on static and shared | 0 on static |
+| member occurrences identical / differing (of 282) | 273 / 9 | 273 / 9 |
+| `filemap-ctr` vs `macromap-ctr` R2 sha256 | equal (both `ebc799f9…` static) | equal (both `29c29943…` static) |
+
+For contrast, the E0 controls (`cmp/controls/`; both roots built without any
+flag) record, in the receipt leak census, 9 occurrences of `<root>/src` in
+the static archive and 3 in the linux shared archive, with 9 differing
+member occurrences; the winner arms record 0 and 0.
+
+### Reading: measured vs inferred
+
+Measured: no flag → the two roots' archives differ (9 member occurrences)
+and carry absolute build-root strings; each root maps its own compiled
+FFmpeg source root to target `.` → byte-identical archives; target `.`
+(retained R1) vs `src` (rebuilt R2) → 9 differing member occurrences while
+both archives carry **zero** absolute-root hits.
+
+Inference (not directly measured): the 9 differences of the ctr arms can
+only come from the replacement text itself — the members whose
+macro-expanded paths were rewritten now read `.` in R1 and `src` in R2.
+The rebuilds write into the same root-two build roots; the artifacts
+currently on disk there are the later winner products
+(`7b506922…` / `d8c8e688…`), so the ctr R2 bytes were overwritten and the
+differing literals were not captured. `fix-witness/` plus the archived
+receipts are the only surviving per-arm evidence.
+
+### Boundary
+
+- A ctr row measures the effect of the **replacement target string** on
+  cross-root byte identity; it is not evidence about map coverage and must
+  not be cited as "a map that does not cover the compiled root fails".
+- A ctr row is not an independent two-root rebuild. Only the E0, `filemap`,
+  `macromap` and `winner` arms rebuild both roots.
+- The ctr result does not weaken the winner claim: the winner arm varies
+  neither the root nor the target and still produces byte-identical
+  archives on both targets.
+- The per-byte attribution of the ctr differences is inference as stated
+  above; only the counts (273 identical / 9 differing, order identical,
+  9 duplicate-name members) and the zero leak census are measured.
+
+## Driver provenance
+
+`drivers/b329-build.sh` and `drivers/b329-cmp.sh` are byte-identical copies
+of the campaign scripts, taken from
+`/mnt/c/Users/fred1/AppData/Local/Temp/qq172wf/329/` on the campaign host
+(sha256 `58222872e316db92…` and `1d8a4bb2ce7b2c79…` respectively).
+`b329-cmp.sh` invokes the comparison tool `b329-arcmp.py` from the same
+directory; that tool is not archived here. The scripts are evidence of the
+executed procedure, not repository tooling; they are not run by any check.
 
 ## Boundaries (read before citing)
 

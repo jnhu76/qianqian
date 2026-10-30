@@ -25,22 +25,37 @@ One flag at a time, on the actually replayed FFmpeg translation units
 |---|---|---|---|
 | E0: no map (control) | differs (9 occ) | differs (9 occ) | root literals are the cause of cross-root difference |
 | `-ffile-prefix-map=<ffmpeg srcroot>=.` | identical | identical | wider flag also suffices; NOT adopted |
-| counterfactual: map NOT covering the compiled FFmpeg src root (`filemap-ctr` / `macromap-ctr`) | differs (9 occ) | differs (9 occ) | mapping must cover the root actually compiled |
+| counterfactual: each root maps its own compiled FFmpeg src root; R1 target `.` (retained winner-arm archive) vs R2 target `src` (rebuilt) (`filemap-ctr` / `macromap-ctr`) | differs (9 occ; 0 root-path hits) | differs (9 occ; 0 root-path hits) | cross-root identity also requires the same replacement target string |
 | `-fmacro-prefix-map=<ffmpeg srcroot>=.` | identical | identical | adopted single candidate |
+
+The `*-ctr` row is not a symmetric two-root rebuild: R1 is the retained
+winner-arm archive (`mapto=.`) and only R2 is rebuilt (`mapto=src`). Its
+9 differing occurrences and its zero root-path census on both sides are
+measured; attributing the surviving bytes to the replacement target string
+is inference, because the ctr R2 products were overwritten by later arms
+before archiving and the differing literals were not captured (README
+"Counterfactual arm semantics").
 
 Flag delivery (witness census, `fix-witness/`): each of the six per-root
 winning witnesses records `compile_commands_entries=281`,
 `fmacro_prefix_map_entries=279`, `ffile_prefix_map_entries=0`,
 `ffmpeg_src_entries=560` — the flag demonstrably reaches the replayed FFmpeg
-compile units on every root, and the two no-map controls record 0/0.
+compile units on every root, and the two no-map controls record 0/0. The
+four ctr witnesses record the ctr flag on 279/281 entries
+(`ffile_prefix_map_entries=279` for `fctr-r2`, `fmacro_prefix_map_entries=279`
+for `mctr-r2`), so the counterfactual varied only the replacement target.
 
 **T4 verdict: GO for the single flag `-fmacro-prefix-map=<ffmpeg srcroot>=.`
 applied to the replayed FFmpeg translation units**, adopted as the one-line
-change in `native/build/ffmpeg.lua` on this branch. Causality is measured
-(no map → differs; map not covering the compiled root → differs; correct map
-→ byte-identical on both targets). No `strip` / `-g0` was needed or used; no
-flag stacking (the wider `-ffile-prefix-map` arm also measured identical and
-was not adopted).
+change in `native/build/ffmpeg.lua` on this branch. Causality as measured:
+no map → differs (9 member occurrences) with absolute build-root literals
+present; each root mapping its own compiled FFmpeg src root to target `.` →
+byte-identical on both targets; target `.` (retained R1 archive) vs `src`
+(rebuilt R2) → differs (9 member occurrences) with zero absolute-root hits
+on either side. The counterfactual therefore isolates the replacement target
+string, not map coverage; its byte-level attribution is inference as noted
+above. No `strip` / `-g0` was needed or used; no flag stacking (the wider
+`-ffile-prefix-map` arm also measured identical and was not adopted).
 
 Winner detail (`cmp/linux-winner/`, `cmp/windows-winner/`): 282/282 member
 occurrences identical, member order identical, 9 duplicate-name members equal

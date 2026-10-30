@@ -1,0 +1,2 @@
+build/artifacts/libsongcore.a {'/home/hoo/qq329/linux-root-two/src': 0, '/home/hoo': 0, 'C:\\': 0, '/mnt/': 0}
+build/artifacts/shared/libsongcore.so {'/home/hoo/qq329/linux-root-two/src': 0, '/home/hoo': 0, 'C:\\': 0, '/mnt/': 0}

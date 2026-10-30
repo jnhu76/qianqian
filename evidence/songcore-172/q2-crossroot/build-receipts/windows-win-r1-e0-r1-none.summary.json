@@ -1,0 +1,33 @@
+{
+  "entry": "b329-build.sh",
+  "campaign": "songcore-172 #329 Q2",
+  "target": "windows",
+  "root": "/home/hoo/qq329/win-r1",
+  "attempt_stamp": "e0-r1-none-.",
+  "fixmode": "none",
+  "mapto": ".",
+  "clone": "reuse",
+  "closure": "fresh",
+  "head": "b49b18cd68ae1a353cd3396efb3977b8590cc4d1",
+  "tree": "c868f35f8edf3eaac60c31e7d92fa518da30ed3d",
+  "toolchain": {
+    "uname": "Linux 6.18.54.1-microsoft-standard-WSL2",
+    "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+  },
+  "artifacts": {
+    "static": {
+      "path": "/home/hoo/qq329/win-r1/src/native/build/artifacts/libsongcore.a",
+      "bytes": 3309982,
+      "sha256": "a652706e6eb514a49fd259b8968eadb9ccf6a579059c91346e3aca8d69d717b1"
+    }
+  },
+  "static_members": 280,
+  "abi_symbols": 15,
+  "witness": "compile_commands_entries=281\nffile_prefix_map_entries=0\nfmacro_prefix_map_entries=0\nffmpeg_src_entries=560\nsample_flag_entries:\n",
+  "checks": {
+    "build": "PASS",
+    "member_formats": "PASS",
+    "abi_export_set": "PASS"
+  },
+  "verdict": "PASS"
+}

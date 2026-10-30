@@ -1,0 +1,38 @@
+{
+  "entry": "b329-build.sh",
+  "campaign": "songcore-172 #329 Q2",
+  "target": "linux",
+  "root": "/home/hoo/qq329/linux-root-two",
+  "attempt_stamp": "m-r2-macromap-.",
+  "fixmode": "macromap",
+  "mapto": ".",
+  "clone": "reuse",
+  "closure": "reuse",
+  "head": "b49b18cd68ae1a353cd3396efb3977b8590cc4d1",
+  "tree": "c868f35f8edf3eaac60c31e7d92fa518da30ed3d",
+  "toolchain": {
+    "uname": "Linux 6.18.54.1-microsoft-standard-WSL2",
+    "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+  },
+  "artifacts": {
+    "static": {
+      "path": "/home/hoo/qq329/linux-root-two/src/native/build/artifacts/libsongcore.a",
+      "bytes": 4066980,
+      "sha256": "7b5069223480e4ce63455120ab3e995d198cf110147980133c8fc4a55f78f04a"
+    },
+    "shared": {
+      "path": "/home/hoo/qq329/linux-root-two/src/native/build/artifacts/shared/libsongcore.so",
+      "bytes": 2288536,
+      "sha256": "085425e590b0d6d810192404162cef6f1f1f880f769e4afd12e4af5306078e98"
+    }
+  },
+  "static_members": 280,
+  "abi_symbols": 15,
+  "witness": "compile_commands_entries=281\nffile_prefix_map_entries=0\nfmacro_prefix_map_entries=279\nffmpeg_src_entries=560\nsample_flag_entries:\n  \"arguments\": [\"/usr/bin/gcc\", \"-c\", \"-m64\", \"-fvisibility=hidden\", \"-std=c11\", \"-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src\", \"-fmacro-prefix-map=/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src=.\", \"-DNDEBUG\", \"-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-xmake/oracle\", \"-Isrc/\", \"-D_ISOC11_SOURCE\", \"-D_FILE_OFFSET_BITS=64\", \"-D_LARGEFILE_SOURCE\", \"-D_POSI\n  \"arguments\": [\"/usr/bin/gcc\", \"-c\", \"-m64\", \"-fvisibility=hidden\", \"-std=c11\", \"-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src\", \"-fmacro-prefix-map=/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-src=.\", \"-DNDEBUG\", \"-I/home/hoo/qq329/linux-root-two/src/native/build/ffmpeg-xmake/oracle\", \"-Isrc/\", \"-D_ISOC11_SOURCE\", \"-D_FILE_OFFSET_BITS=64\", \"-D_LARGEFILE_SOURCE\", \"-D_POSI\n",
+  "checks": {
+    "build": "PASS",
+    "member_formats": "PASS",
+    "abi_export_set": "PASS"
+  },
+  "verdict": "PASS"
+}
