@@ -2,6 +2,7 @@
   "schema_version": 1,
   "status": "OWNER_BLOCKED",
   "authority_ref": null,
+  "authority_record_path": null,
   "authority_record_sha256": null,
   "semantic_version": null,
   "component_tag": null,

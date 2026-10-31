@@ -73,15 +73,20 @@ def main() -> int:
             expect_red("M8-production-entry",result,"missing build receipt")
     with tempfile.TemporaryDirectory(prefix="songcore-version-") as td:
         root=Path(td); xmake=root/"xmake.lua"; xmake.write_text('set_version("0.1.0")\n',encoding="utf-8")
+        approval={"schema_version":1,"decision":"Q1","approved_by":"jnhu76",
+          "authority_ref":"https://github.com/jnhu76/qianqian/issues/333#issuecomment-123",
+          "semantic_version":"0.1.1","component_version_mode":"independent"}
+        approval_path=root/"approval.json"; approval_path.write_text(json.dumps(approval),encoding="utf-8")
         decision={"schema_version":1,"status":"APPROVED",
           "authority_ref":"https://github.com/jnhu76/qianqian/issues/333#issuecomment-123",
-          "authority_record_sha256":"1"*64,"semantic_version":"0.1.1",
+          "authority_record_path":"approval.json",
+          "authority_record_sha256":sha256(approval_path),"semantic_version":"0.1.1",
           "component_tag":"songcore-v0.1.1","manifest_version":"0.1.1",
           "linux_package_root":"songcore-v0.1.1-linux-x86_64",
           "windows_package_root":"songcore-v0.1.1-windows-x86_64",
           "component_version_mode":"independent","component_version":"0.1.1",
           "xmake_project_version":"0.1.0"}
-        path=root/"decision.json"
+        path=root/"docs"/"release"/"decision.json"; path.parent.mkdir(parents=True)
         def version_run(d, version="0.1.1"):
             path.write_text(json.dumps(d),encoding="utf-8")
             return subprocess.run([sys.executable,str(VERIFY_VERSION),"--decision",str(path),
@@ -93,6 +98,8 @@ def main() -> int:
         expect_red("VERSION-BLOCKED",version_run(blocked),"OWNER_BLOCKED")
         no_authority=dict(decision,authority_ref=None)
         expect_red("VERSION-AUTHORITY",version_run(no_authority),"authority_ref")
+        bad_digest=dict(decision,authority_record_sha256="0"*64)
+        expect_red("VERSION-AUTHORITY-DIGEST",version_run(bad_digest),"digest mismatch")
         mismatch=dict(decision,windows_package_root="songcore-v9.9.9-windows-x86_64")
         expect_red("VERSION-MAPPING",version_run(mismatch),"windows_package_root")
         xmake_lie=dict(decision,xmake_project_version="9.9.9")
