@@ -1,0 +1,133 @@
+name: SongCore release substrate
+
+on:
+  pull_request:
+    paths:
+      - "ops/**"
+      - "native/include/songcore.h"
+      - "native/build/**"
+      - "native/ffmpeg/targets/**"
+      - "native/ffmpeg/profiles/**"
+      - "native/ffmpeg/pin.json"
+      - "LICENSE-MIT"
+      - "LICENSE-APACHE"
+      - "docs/release/songcore-release-contract.md"
+      - "docs/release/songcore-version-decision.json"
+      - "evidence/songcore-172/linux/verify/package/external-consumer-example.c"
+      - "tools/verify_songcore_build_receipt.py"
+      - "tools/verify_songcore_version_identity.py"
+      - "tools/render_songcore_notices.py"
+      - "tools/test_songcore_release_substrate.py"
+      - "tools/docs-verify.cmd"
+      - ".github/workflows/songcore-release-substrate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ops/**"
+      - "native/include/songcore.h"
+      - "native/build/**"
+      - "native/ffmpeg/targets/**"
+      - "native/ffmpeg/profiles/**"
+      - "native/ffmpeg/pin.json"
+      - "LICENSE-MIT"
+      - "LICENSE-APACHE"
+      - "docs/release/songcore-release-contract.md"
+      - "docs/release/songcore-version-decision.json"
+      - "evidence/songcore-172/linux/verify/package/external-consumer-example.c"
+      - "tools/verify_songcore_build_receipt.py"
+      - "tools/verify_songcore_version_identity.py"
+      - "tools/render_songcore_notices.py"
+      - "tools/test_songcore_release_substrate.py"
+      - "tools/docs-verify.cmd"
+      - ".github/workflows/songcore-release-substrate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-negative-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: bash -n ops/build-linux.sh ops/package-linux.sh
+      - name: M1-M10 provenance mutations
+        run: python3 tools/test_songcore_release_substrate.py
+  windows-parser:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell release entries
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/build-rc.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/package-rc.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/run-csuite.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/run-binding-gate.ps1", [ref]$null, [ref]$errors)
+          if ($errors.Count -ne 0) { $errors | Format-List; exit 1 }
+      - name: Cross-platform receipt mutations
+        run: python tools/test_songcore_release_substrate.py
+      - name: Windows packager requires build receipt
+        shell: pwsh
+        run: |
+          $stdout = Join-Path $env:RUNNER_TEMP "package-negative.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "package-negative.stderr.log"
+          $process = Start-Process pwsh -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+            -ArgumentList @(
+              "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+              "-File", "./ops/package-rc.ps1", "-ProjectRoot", $PWD.Path,
+              "-Version", "1.2.3", "-BuildReceipt", "missing.json"
+            )
+          $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+          $log | Write-Host
+          if ($process.ExitCode -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
+          if ($log -notmatch "build receipt missing") {
+            throw "package-rc failed before exercising the missing BuildReceipt path"
+          }
+      - name: Windows packager enforces the version grammar
+        shell: pwsh
+        run: |
+          foreach ($case in @(
+              @{ Version = "1.2.3-rc.1"; Expect = "not the authorized MAJOR.MINOR.PATCH" },
+              @{ Version = "01.2.3";     Expect = "not the authorized MAJOR.MINOR.PATCH" },
+              @{ Version = "0.1.0";      Expect = "immutable history" })) {
+            $stdout = Join-Path $env:RUNNER_TEMP "package-version.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "package-version.stderr.log"
+            $process = Start-Process pwsh -Wait -PassThru -NoNewWindow `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+              -ArgumentList @(
+                "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-File", "./ops/package-rc.ps1", "-ProjectRoot", $PWD.Path,
+                "-Version", $case.Version, "-BuildReceipt", "missing.json"
+              )
+            $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+            $log | Write-Host
+            if ($process.ExitCode -eq 0) { throw "package-rc accepted version $($case.Version)" }
+            if ($log -notmatch [regex]::Escape($case.Expect)) {
+              throw "package-rc did not reject version $($case.Version) on the version-grammar path"
+            }
+          }
+      - name: Docs wrapper negative controls
+        shell: pwsh
+        run: |
+          $usage = Start-Process cmd.exe -Wait -PassThru -NoNewWindow `
+            -ArgumentList @("/d", "/c", "tools\docs-verify.cmd")
+          if ($usage.ExitCode -ne 2) {
+            throw "docs-verify missing-argument exit was $($usage.ExitCode), expected 2"
+          }
+
+          $stdout = Join-Path $env:RUNNER_TEMP "docs-negative.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "docs-negative.stderr.log"
+          $missing = Start-Process cmd.exe -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+            -ArgumentList @("/d", "/c", "tools\docs-verify.cmd `"$($PWD.Path)`"")
+          $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+          $log | Write-Host
+          if ($missing.ExitCode -ne 3) {
+            throw "docs-verify missing-dependency exit was $($missing.ExitCode), expected 3"
+          }
+          if ($log -notmatch "dependencies missing") {
+            throw "docs-verify did not exercise the missing-dependency path"
+          }

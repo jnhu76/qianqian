@@ -33,6 +33,7 @@
 #   powershell -ExecutionPolicy Bypass -File ops\run-binding-gate.ps1
 param(
     [string]$ProjectRoot = "",
+    [Parameter(Mandatory=$true)][string]$BuildReceipt,
     [string]$Cargo = "cargo",
     [string]$ReceiptDir = ""
 )
@@ -46,7 +47,10 @@ if ($ReceiptDir -eq "") { $ReceiptDir = Join-Path $ProjectRoot "evidence\songcor
 $ArtifactPath = Join-Path $ProjectRoot "native\build\artifacts\libsongcore.a"
 $HeaderPath = Join-Path $ProjectRoot "native\include\songcore.h"
 $CrateDir = Join-Path $ProjectRoot "crates\qianqian-decode-songcore"
-$ExpectedArtifactSha256 = "1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402"
+$build = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
+if ($build.script -ne "ops/build-rc.ps1" -or -not $build.ok) { Write-Host "ABORT exit=10 invalid build receipt"; exit 10 }
+$ExpectedArtifactSha256 = $build.artifacts.libsongcore_a_sha256
+if ($build.source.commit -ne (& git -C $ProjectRoot rev-parse HEAD)) { Write-Host "ABORT exit=11 build receipt source mismatch"; exit 11 }
 $ExpectedHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"

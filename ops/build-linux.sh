@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
-# ops/build-linux.sh — #172 S3 replayable entry: Linux x86_64 SongCore reference
-# rebuild under the same release contract as the windows-x86_64 route.
+# ops/build-linux.sh — replayable Linux x86_64 SongCore build entry under the
+# release contract docs/release/songcore-release-contract.md (§6 artifact
+# kinds, §11 gates).
 #
-# Runs entirely inside WSL (ext4). Contract, fail-closed end to end:
-#   stage1  source tree: reuse $HOME/qianqian-172-linux when it is exactly the
-#           pinned branch/commit with a clean tracked tree; else (re)clone it.
+# THE SOURCE PIN IS EXPLICIT. This entry has no built-in branch or commit
+# default. The pre-G4 version hardcoded BRANCH=songcore-172/pr-a-build-fixes
+# and PINNED_HEAD=bf23516b5851174dc63fb5058997fa5478751713 — a pin that is not
+# an ancestor of main — and every run re-derived that stale tree, so a "PASS"
+# could come from a cache no-op that built nothing at the requested commit.
+# Both constants are gone; a run without --source-commit/--source-branch/
+# --work-root refuses to start.
+#
+# Fail-closed end to end:
+#   stage1  source tree: reuse $WORK_ROOT when it is exactly the pinned
+#           branch/commit with a clean tracked tree; else clone $SOURCE_REPO
+#           and REFUSE (never silently check out something else) when the
+#           branch tip differs from --source-commit. An existing work root
+#           that is not at the pin is never deleted without --force-reclone.
 #   stage2  FFmpeg closure: reuse the imported closure only when the manifest,
 #           the pinned verified source stamp and the oracle config all exist
 #           AND the manifest identity matches this host and the current
@@ -21,32 +33,94 @@
 #           NEEDED audit of the shared form, sha256 of every artifact and
 #           provenance input.
 #   stage5  machine-readable JSON summary on stdout (< 64KB); detailed logs in
-#           ops/build-evidence/<stamp>/.
+#           <evidence-root>/build-linux/<UTC stamp>/.
+#
+# Usage:
+#   ops/build-linux.sh --source-commit <40-hex sha> \
+#                      --source-branch <branch> \
+#                      --work-root <directory> \
+#                      [--source-repo <git repository>] \
+#                      [--evidence-root <directory>] \
+#                      [--force-reclone]
+#
+#   --source-commit  full 40-hex commit to build (abbreviated shas refused).
+#   --source-branch  branch the work root must be on. The pin is the pair;
+#                    a branch tip that is not --source-commit aborts.
+#   --work-root      clone + artifact destination
+#                    (artifacts land in <work-root>/native/build/artifacts).
+#   --source-repo    repository to clone from. Default: the repository that
+#                    owns this script.
+#   --evidence-root  evidence destination. Default $HOME/qianqian-s3-evidence.
+#                    It MUST be outside --work-root (a fresh clone deletes and
+#                    re-creates the work root; the pre-G4 entry wrote evidence
+#                    inside the clone and lost it on exactly that path).
+#   --force-reclone  replace an existing work root that is not at the pin.
+#
+# Environment knobs:
+#   QIANQIAN_FETCH_PROXY https proxy used by scripts/fetch-ffmpeg if needed
 #
 # Exit code: 0 only if every stage passed. Failures emit a FAIL summary and
 # propagate the real nonzero exit. Nothing is swallowed.
-#
-# Environment knobs:
-#   QIANQIAN_S3_SOURCE   clone source path (default the campaign worktree)
-#   QIANQIAN_S3_MAIN     owning-repository fallback path
-#   QIANQIAN_FETCH_PROXY https proxy used by scripts/fetch-ffmpeg if needed
 #
 # Re-entrant: a rerun reuses the existing clone and the already-imported
 # closure (validated, not trusted); xmake rebuilds incrementally.
 set -Eeuo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
-REPO_SRC=${QIANQIAN_S3_SOURCE:-/mnt/c/Users/fred1/source/qianqian-172}
-REPO_MAIN=${QIANQIAN_S3_MAIN:-/mnt/c/Users/fred1/source/qianqian}
-BRANCH=songcore-172/pr-a-build-fixes
-PINNED_HEAD=bf23516b5851174dc63fb5058997fa5478751713
-DST=$HOME/qianqian-172-linux
-EVROOT=$DST/ops/build-evidence
+usage() {
+  sed -n '/^# Usage:/,/^# Exit code:/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+SOURCE_COMMIT=""
+SOURCE_BRANCH=""
+WORK_ROOT=""
+SOURCE_REPO=""
+EVIDENCE_ROOT=""
+FORCE_RECLONE=0
+
+die() { printf 'FATAL: %s\n' "$*" >&2; exit 1; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source-commit) [ $# -ge 2 ] || die "--source-commit needs a value"; SOURCE_COMMIT=$2; shift 2 ;;
+    --source-branch) [ $# -ge 2 ] || die "--source-branch needs a value"; SOURCE_BRANCH=$2; shift 2 ;;
+    --work-root)     [ $# -ge 2 ] || die "--work-root needs a value";     WORK_ROOT=$2; shift 2 ;;
+    --source-repo)   [ $# -ge 2 ] || die "--source-repo needs a value";   SOURCE_REPO=$2; shift 2 ;;
+    --evidence-root) [ $# -ge 2 ] || die "--evidence-root needs a value"; EVIDENCE_ROOT=$2; shift 2 ;;
+    --force-reclone) FORCE_RECLONE=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'FATAL: unknown argument: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$SOURCE_COMMIT" ] || die "missing --source-commit (there is no built-in pin)"
+[ -n "$SOURCE_BRANCH" ] || die "missing --source-branch (there is no built-in branch)"
+[ -n "$WORK_ROOT" ]     || die "missing --work-root (there is no built-in build destination)"
+case "$SOURCE_COMMIT" in
+  *[!0-9a-f]*|'') die "--source-commit '$SOURCE_COMMIT' is not a lowercase hex sha" ;;
+esac
+[ ${#SOURCE_COMMIT} -eq 40 ] || die "--source-commit must be the full 40-hex sha (got '$SOURCE_COMMIT'); an abbreviated pin is refused"
+[ "$SOURCE_BRANCH" != "HEAD" ] || die "--source-branch must name a branch"
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [ -z "$SOURCE_REPO" ]; then
+  SOURCE_REPO=$(git -C "$SCRIPT_DIR/.." rev-parse --show-toplevel 2>/dev/null) \
+    || die "cannot derive --source-repo from $SCRIPT_DIR; pass --source-repo explicitly"
+fi
+[ -d "$SOURCE_REPO/.git" ] || [ -f "$SOURCE_REPO/.git" ] || die "--source-repo $SOURCE_REPO is not a git repository"
+git -C "$SOURCE_REPO" cat-file -e "${SOURCE_COMMIT}^{commit}" 2>/dev/null \
+  || die "--source-commit $SOURCE_COMMIT does not exist in $SOURCE_REPO"
+
+EVIDENCE_ROOT=${EVIDENCE_ROOT:-$HOME/qianqian-s3-evidence}
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-EV=$EVROOT/$STAMP
+EV=$EVIDENCE_ROOT/build-linux/$STAMP
+case "$(realpath -m "$EV")/" in
+  "$(realpath -m "$WORK_ROOT")"/*)
+    die "evidence dir $EV is inside the work root $WORK_ROOT; a fresh clone would delete it (pass --evidence-root outside the work root)" ;;
+esac
+mkdir -p "$EV"
 FACTS=$EV/facts.env
 STAGE=init
-mkdir -p "$EV"
 
 fact() { printf '%s=%s\n' "$1" "$2" >> "$FACTS"; }
 log()  { printf '[build-linux] %s\n' "$*"; }
@@ -58,64 +132,71 @@ on_err() {
 }
 trap on_err ERR
 
+log "pin: branch=$SOURCE_BRANCH commit=$SOURCE_COMMIT work-root=$WORK_ROOT"
+log "source repo: $SOURCE_REPO"
+log "evidence:    $EV"
+
 # ---------------------------------------------------------------- stage 1
 STAGE=clone
 : > "$FACTS"
 fact run_stamp "$STAMP"
-fact branch "$BRANCH"
-fact pinned_head "$PINNED_HEAD"
+fact branch "$SOURCE_BRANCH"
+fact pinned_head "$SOURCE_COMMIT"
+fact work_root "$WORK_ROOT"
+fact source_repo "$SOURCE_REPO"
 
 reuse_clone() {
-  [ -d "$DST/.git" ] || return 1
-  ( cd "$DST"
-    [ "$(git rev-parse HEAD)" = "$PINNED_HEAD" ] || return 1
-    [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || return 1
+  [ -d "$WORK_ROOT/.git" ] || return 1
+  ( cd "$WORK_ROOT"
+    [ "$(git rev-parse HEAD)" = "$SOURCE_COMMIT" ] || return 1
+    [ "$(git rev-parse --abbrev-ref HEAD)" = "$SOURCE_BRANCH" ] || return 1
     git diff-index --quiet HEAD -- ) || return 1
   return 0
 }
 
 do_clone() {
-  log "stage1: cloning fresh"
-  rm -rf "$DST"
-  if git clone --no-local "file://$REPO_SRC" "$DST" >"$EV/clone-worktree-path.log" 2>&1; then
-    { echo "clone-source-path=$REPO_SRC"
-      echo "note=the worktree's .git gitfile carries a Windows-absolute gitdir; repo discovery from that path resolves to the owning repository (same object store and refs)."
-    } > "$EV/clone-source.txt"
-  else
-    log "stage1: worktree-path clone failed, falling back to owning repository"
-    cp -f "$EV/clone-worktree-path.log" "$EV/clone-worktree-path-failed.log"
-    rm -rf "$DST"
-    git clone --no-local "file://$REPO_MAIN" "$DST" >"$EV/clone.log" 2>&1
-    { echo "clone-source-path=$REPO_MAIN"
-      echo "note=clone from the worktree path failed on Linux git (Windows-absolute gitdir gitfile); owning repository used (same object store and refs). See clone-worktree-path-failed.log."
-    } > "$EV/clone-source.txt"
+  log "stage1: cloning $SOURCE_REPO branch $SOURCE_BRANCH (expect $SOURCE_COMMIT)"
+  if [ -d "$WORK_ROOT" ] && [ -n "$(ls -A "$WORK_ROOT" 2>/dev/null)" ]; then
+    [ "$FORCE_RECLONE" = 1 ] || die "work root $WORK_ROOT exists but is not at $SOURCE_BRANCH@$SOURCE_COMMIT; refusing to delete it (pass --force-reclone to replace it)"
   fi
-  cd "$DST"
-  git checkout -q -B "$BRANCH" "origin/$BRANCH"
-  [ "$(git rev-parse HEAD)" = "$PINNED_HEAD" ] || {
-    echo "FATAL: clone HEAD $(git rev-parse HEAD) != $PINNED_HEAD"; exit 1; }
-  git diff-index --quiet HEAD -- || { echo "FATAL: fresh clone dirty"; exit 1; }
-  git fsck --full --no-dangling >"$EV/clone-fsck.txt" 2>&1
+  rm -rf "$WORK_ROOT"
+  mkdir -p "$(dirname "$WORK_ROOT")"
+  git clone --no-local "file://$SOURCE_REPO" "$WORK_ROOT" >"$EV/clone.log" 2>&1 || {
+    tail -5 "$EV/clone.log" >&2; die "git clone from $SOURCE_REPO failed (see $EV/clone.log)"; }
+  cd "$WORK_ROOT"
+  git rev-parse --verify --quiet "origin/$SOURCE_BRANCH^{commit}" >/dev/null \
+    || die "branch $SOURCE_BRANCH does not exist in $SOURCE_REPO"
+  git checkout -q -B "$SOURCE_BRANCH" "origin/$SOURCE_BRANCH"
+  local head
+  head=$(git rev-parse HEAD)
+  [ "$head" = "$SOURCE_COMMIT" ] \
+    || die "pin mismatch: origin/$SOURCE_BRANCH is at $head, --source-commit is $SOURCE_COMMIT; refusing to build a different commit"
+  git diff-index --quiet HEAD -- || die "fresh clone has tracked modifications"
+  git fsck --full --no-dangling >"$EV/clone-fsck.txt" 2>&1 || die "git fsck failed"
   { git archive HEAD | sha256sum | awk '{print "git_archive_sha256="$1}'
     git rev-parse 'HEAD^{tree}'
   } > "$EV/clone-tree-verify.txt"
 }
 
 if reuse_clone; then
-  cd "$DST"
-  log "stage1: reusing clone at $(git rev-parse HEAD)"
+  cd "$WORK_ROOT"
+  log "stage1: reusing work root at $(git rev-parse HEAD)"
   fact clone reuse
 else
   do_clone
-  log "stage1: cloned $PINNED_HEAD"
+  log "stage1: cloned $SOURCE_COMMIT"
   fact clone fresh
 fi
-fact head "$(cd "$DST" && git rev-parse HEAD)"
-fact tree "$(cd "$DST" && git rev-parse 'HEAD^{tree}')"
+fact head "$(cd "$WORK_ROOT" && git rev-parse HEAD)"
+fact tree "$(cd "$WORK_ROOT" && git rev-parse 'HEAD^{tree}')"
+[ "$(cd "$WORK_ROOT" && git rev-parse HEAD)" = "$SOURCE_COMMIT" ] \
+  || die "work root HEAD is not --source-commit"
+[ "$(cd "$WORK_ROOT" && git rev-parse --abbrev-ref HEAD)" = "$SOURCE_BRANCH" ] \
+  || die "work root branch is not --source-branch"
 
 # ---------------------------------------------------------------- stage 2
 STAGE=closure
-cd "$DST/native"
+cd "$WORK_ROOT/native"
 PIN=ffmpeg/pin.json
 MAN=build/ffmpeg-xmake/manifest.json
 PROFILE=ffmpeg/profiles/codec-base.json
@@ -128,11 +209,13 @@ closure_reusable() {
   [ -f build/ffmpeg-src/.qianqian-verified ] || return 1
   grep -q "^${PIN_COMMIT}|${PIN_SHA}$" build/ffmpeg-src/.qianqian-verified || return 1
   [ -f build/ffmpeg-xmake/oracle/ffbuild/config.mak ] || return 1
-  python3 - "$MAN" "$RECIPE" <<'PY' || return 1
+  python3 - "$MAN" "$RECIPE" "$PROFILE" "$PIN" <<'PY' || return 1
 import json, sys, hashlib, platform
 man = json.load(open(sys.argv[1]))
 rec = json.load(open(sys.argv[2]))
 rec_sha = hashlib.sha256(open(sys.argv[2], 'rb').read()).hexdigest()
+profile_sha = hashlib.sha256(open(sys.argv[3], 'rb').read()).hexdigest()
+pin = json.load(open(sys.argv[4]))
 t, tt, tl = man.get("target", {}), rec.get("ffmpeg", {}), man.get("toolchain", {})
 ok = (man.get("schema") == 2
       and t.get("id") == "linux-x86_64"
@@ -140,6 +223,10 @@ ok = (man.get("schema") == 2
       and t.get("arch") == rec.get("arch")
       and t.get("target_os") == tt.get("target_os")
       and t.get("recipe_sha256") == rec_sha
+      and man.get("profile_sha256") == profile_sha
+      and man.get("ffmpeg_tag") == pin.get("ffmpeg_tag")
+      and man.get("ffmpeg_commit_sha") == pin.get("ffmpeg_commit_sha")
+      and man.get("ffmpeg_source_sha256") == pin.get("source_sha256")
       and tl.get("system") == platform.system().lower()
       and tl.get("machine") == platform.machine().lower())
 sys.exit(0 if ok else 1)
@@ -182,12 +269,18 @@ print('target', json.dumps(m['target'], sort_keys=True)); print('toolchain', jso
 
 # ---------------------------------------------------------------- stage 3
 STAGE=build
+export PATH="$HOME/.local/bin:$PATH"
 xmake f -p linux -a x86_64 -m release -y >"$EV/xmake-config.log" 2>&1
+xmake clean -a >"$EV/xmake-clean.log" 2>&1
 xmake build songcore >"$EV/xmake-build.log" 2>&1
 xmake build songcore_static >"$EV/xmake-build-static-explicit.log" 2>&1
 xmake build songcore_shared >"$EV/xmake-build-shared-explicit.log" 2>&1
 log "stage3: xmake build songcore OK (static+shared per recipe)"
 fact build ok
+COMPILE_ACTIONS=$(cat "$EV"/xmake-build*.log | grep -Eic 'compiling|linking|archiving' || true)
+fact compile_actions "$COMPILE_ACTIONS"
+[ "$COMPILE_ACTIONS" -gt 0 ] || die "xmake reported zero compile/link/archive actions after xmake clean -a"
+fact build_cache_reuse false
 
 # ---------------------------------------------------------------- stage 4
 STAGE=verify
@@ -234,12 +327,12 @@ diff "$EV/abi-expected.txt" "$EV/abi-exported-a.txt" > "$EV/abi-diff-a.txt" || {
 fact abi_symbols "$(wc -l < "$EV/abi-expected.txt")"
 
 # sha256 identity of artifacts and provenance inputs
-sha256sum "$ART_A" "$ART_SO" "$MAN" "$PIN" "$PROFILE" "$RECIPE" src/songcore_ffmpeg.c ../ops/build-linux.sh > "$EV/artifacts-sha256.txt"
+sha256sum "$ART_A" "$ART_SO" "$MAN" "$PIN" "$PROFILE" "$RECIPE" include/songcore.h src/songcore_ffmpeg.c ../ops/build-linux.sh > "$EV/artifacts-sha256.txt"
 {
   echo "# closure provenance $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "target=linux-x86_64"
-  echo "head=$(cd "$DST" && git rev-parse HEAD)"
-  echo "tree=$(cd "$DST" && git rev-parse 'HEAD^{tree}')"
+  echo "head=$(cd "$WORK_ROOT" && git rev-parse HEAD)"
+  echo "tree=$(cd "$WORK_ROOT" && git rev-parse 'HEAD^{tree}')"
   echo "os=$(uname -sr)"
   echo "gcc=$(gcc --version | head -1)"
   echo "xmake=$(xmake --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
@@ -250,9 +343,9 @@ sha256sum "$ART_A" "$ART_SO" "$MAN" "$PIN" "$PROFILE" "$RECIPE" src/songcore_ffm
 } > "$EV/closure-provenance.txt"
 
 # machine-readable summary (< 64KB) built from the recorded evidence
-python3 - "$EV" "$DST" > /tmp/s3-summary.json <<'PY'
+python3 - "$EV" "$WORK_ROOT" "$SOURCE_BRANCH" "$SOURCE_COMMIT" > "$EV/summary.raw.json" <<'PY'
 import json, os, sys, re
-ev, dst = sys.argv[1], sys.argv[2]
+ev, dst, branch, commit = sys.argv[1:5]
 d = {}
 for line in open(os.path.join(ev, "facts.env")):
     k, _, v = line.strip().partition("=")
@@ -270,11 +363,12 @@ summary = {
     "entry": "ops/build-linux.sh",
     "campaign": "songcore-172/S3 linux-x86_64 reference rebuild",
     "run_stamp": d["run_stamp"],
-    "branch": d["branch"], "head": d["head"], "tree": d["tree"],
+    "branch": branch, "head": commit, "tree": d["tree"],
+    "source_repo": d["source_repo"], "work_root": d["work_root"],
     "clone": d["clone"], "closure": d["closure"],
     "target_recipe": "native/ffmpeg/targets/linux-x86_64.json",
     "artifact_policy": {"static": True, "shared": True, "wasm": False},
-    "ffmpeg": {"tag": "n9.0.1", "commit": d["ffmpeg_commit"],
+    "ffmpeg": {"tag": re.findall(r"ffmpeg_tag (\S+)", open(os.path.join(ev, "manifest-identity.txt")).read())[0], "commit": d["ffmpeg_commit"],
                "source_sha256": d["ffmpeg_source_sha256"],
                "manifest_sha256": d["manifest_sha256"],
                "closure_translation_units": units},
@@ -290,13 +384,27 @@ summary = {
                "abi_export_set_equals_songcore_h": "PASS",
                "shared_no_libav_needed": "PASS", "sha256_recorded": "PASS"},
     "verdict": "PASS",
+    "schema_version": 1,
+    "qualification": "RELEASE_QUALIFIED",
+    "source": {"commit": commit, "tree_oid": d["tree"]},
+    "target": {"id": "linux-x86_64"},
+    "toolchain": {"identity": "gcc=" + os.popen("gcc --version").readline().strip() + ";xmake=" + re.sub(r"\x1b\[[0-9;]*m", "", os.popen("xmake --version 2>/dev/null").readline().strip())},
+    "inputs": {
+        "header": {"sha256": sha["include/songcore.h"]},
+        "recipe": {"sha256": d["recipe_sha256"]},
+        "profile": {"sha256": d["profile_sha256"]},
+        "pin": {"sha256": d["pin_json_sha256"]},
+        "closure": {"sha256": d["manifest_sha256"]},
+    },
+    "execution": {"compile_actions": int(d["compile_actions"]),
+                  "cache_reuse": d["build_cache_reuse"] == "true"},
 }
 out = json.dumps(summary, indent=2)
 assert len(out) < 65536
 print(out)
 PY
-cat /tmp/s3-summary.json
-cp /tmp/s3-summary.json "$EV/summary.json"
+cat "$EV/summary.raw.json"
+mv -f "$EV/summary.raw.json" "$EV/summary.json"
 log "stage5: PASS — evidence in $EV"
 fact verdict PASS
 exit 0

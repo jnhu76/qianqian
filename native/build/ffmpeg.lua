@@ -86,6 +86,14 @@ local manifest_target_problem = function (manifest_path, target, json)
             get_config("av_manifest"), mt.platform or "?", mt.arch or "?",
             expect, recipe.platform, recipe.arch)
     end
+    local recipe_sha256 = hash.sha256(recipe_file)
+    if not mt.recipe_sha256 or mt.recipe_sha256 ~= recipe_sha256 then
+        return format(
+            "manifest target recipe is stale: %s records recipe_sha256 '%s' " ..
+            "but ffmpeg/targets/%s.json is '%s'. Re-derive the closure with:\n  xmake ffmpeg-import",
+            get_config("av_manifest"), mt.recipe_sha256 or "<missing>", expect,
+            recipe_sha256)
+    end
     local ff = recipe.ffmpeg or {}
     local rederive = " Re-derive the closure with:\n  xmake ffmpeg-import"
     if ff.target_os and mt.target_os ~= ff.target_os then
