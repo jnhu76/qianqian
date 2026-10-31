@@ -81,9 +81,24 @@ jobs:
             throw "package-rc failed before exercising the missing BuildReceipt path"
           }
       - name: Docs wrapper negative controls
-        shell: cmd
+        shell: pwsh
         run: |
-          call tools\docs-verify.cmd
-          if not "%ERRORLEVEL%"=="2" exit /b 1
-          call tools\docs-verify.cmd "%CD%"
-          if not "%ERRORLEVEL%"=="3" exit /b 1
+          $usage = Start-Process cmd.exe -Wait -PassThru -NoNewWindow `
+            -ArgumentList @("/d", "/c", "tools\docs-verify.cmd")
+          if ($usage.ExitCode -ne 2) {
+            throw "docs-verify missing-argument exit was $($usage.ExitCode), expected 2"
+          }
+
+          $stdout = Join-Path $env:RUNNER_TEMP "docs-negative.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "docs-negative.stderr.log"
+          $missing = Start-Process cmd.exe -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+            -ArgumentList @("/d", "/c", "tools\docs-verify.cmd `"$($PWD.Path)`"")
+          $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+          $log | Write-Host
+          if ($missing.ExitCode -ne 3) {
+            throw "docs-verify missing-dependency exit was $($missing.ExitCode), expected 3"
+          }
+          if ($log -notmatch "dependencies missing") {
+            throw "docs-verify did not exercise the missing-dependency path"
+          }
