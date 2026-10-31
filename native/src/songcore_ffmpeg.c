@@ -1108,9 +1108,12 @@ song_status song_get_artwork_item(song_handle *h, uint32_t index,
 
 song_status song_read_pcm(song_handle *h, float *dst, uint64_t frame_capacity,
                           uint64_t *out_frames_produced) {
+    /* The header promises *out_frames_produced == 0 on every typed error of
+     * this call (and on SONG_EOF), so clear it before any failure return when
+     * the caller supplied a valid pointer. */
+    if (out_frames_produced) *out_frames_produced = 0;
     if (!h) return SONG_ERR_INVALID_ARGUMENT;
     if (!dst || !out_frames_produced) return fail_arg(h);
-    *out_frames_produced = 0;
     if (frame_capacity == 0) return fail_arg(h);
     if (!h->probed || !h->dec) return fail_not_open(h);
     if (h->fatal_error != SONG_OK)

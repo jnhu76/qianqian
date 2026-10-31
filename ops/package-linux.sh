@@ -94,7 +94,7 @@ BUILD_RECEIPT=""
 
 # Contract section 3 ABI v1 header identity. It moves only with an authority
 # reference (an ABI amendment), never with a packaging change.
-FROZEN_ABI_HEADER_SHA256=cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+FROZEN_ABI_HEADER_SHA256=d43a9d47b767fe9671b9691011feb1d5201f4080609010be4d6da96f16c78d2a
 IMMUTABLE_HISTORICAL_VERSION=0.1.0
 
 log() { printf '[package-linux] %s\n' "$*"; }

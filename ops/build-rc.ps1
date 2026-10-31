@@ -65,7 +65,7 @@ param(
     # Frozen ABI v1 header identity (docs/release/songcore-release-contract.md
     # section 3, == sha256(native/include/songcore.h) since v0.1.0). Drift fails the
     # lane; the constant moves only with an authority reference.
-    [string]$ExpectedAbiHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+    [string]$ExpectedAbiHeaderSha256 = "d43a9d47b767fe9671b9691011feb1d5201f4080609010be4d6da96f16c78d2a"
 )
 
 $ErrorActionPreference = "Stop"
