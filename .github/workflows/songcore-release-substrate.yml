@@ -65,11 +65,21 @@ jobs:
       - name: Windows packager requires build receipt
         shell: pwsh
         run: |
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./ops/package-rc.ps1 `
-            -ProjectRoot $PWD -Version 1.2.3 -BuildReceipt missing.json 2>&1 |
-            Out-String | Write-Host
-          $packageExit = $LASTEXITCODE
-          if ($packageExit -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
+          $stdout = Join-Path $env:RUNNER_TEMP "package-negative.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "package-negative.stderr.log"
+          $process = Start-Process pwsh -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+            -ArgumentList @(
+              "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+              "-File", "./ops/package-rc.ps1", "-ProjectRoot", $PWD.Path,
+              "-Version", "1.2.3", "-BuildReceipt", "missing.json"
+            )
+          $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+          $log | Write-Host
+          if ($process.ExitCode -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
+          if ($log -notmatch "build receipt missing") {
+            throw "package-rc failed before exercising the missing BuildReceipt path"
+          }
       - name: Docs wrapper negative controls
         shell: cmd
         run: |
