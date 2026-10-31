@@ -81,6 +81,7 @@ def main() -> int:
     linux=(ROOT/"ops/package-linux.sh").read_text(encoding="utf-8")
     windows=(ROOT/"ops/package-rc.ps1").read_text(encoding="utf-8")
     build_linux=(ROOT/"ops/build-linux.sh").read_text(encoding="utf-8")
+    build_windows=(ROOT/"ops/build-rc.ps1").read_text(encoding="utf-8")
     ffmpeg=(ROOT/"native/build/ffmpeg.lua").read_text(encoding="utf-8")
     required={
       "linux receipt required":"--build-receipt is required for release-qualified packaging",
@@ -100,6 +101,10 @@ def main() -> int:
       "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows}
     for name,needle in required.items():
         if needle not in haystacks[name]: raise AssertionError(f"production guard missing: {name}")
+    clean = 'xmake clean -a > "$EV/clean.log" 2>&1'
+    configure = 'xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1'
+    if build_windows.index(clean) > build_windows.index(configure):
+        raise AssertionError("Windows build config is erased by a later xmake clean -a")
     print("PASS: SongCore release substrate negative controls M1-M10"); return 0
 
 if __name__ == "__main__": raise SystemExit(main())

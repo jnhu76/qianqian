@@ -376,8 +376,8 @@ ROOT="$QR_ROOT"
 W="$ROOT/win"
 cd "$W/native"
 
-xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1
 xmake clean -a > "$EV/clean.log" 2>&1
+xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1
 xmake build songcore > "$EV/build.log" 2>&1
 
 test -f build/artifacts/libsongcore.a || { echo "FAIL: libsongcore.a missing after build"; exit 12; }
