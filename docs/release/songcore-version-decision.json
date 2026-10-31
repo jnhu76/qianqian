@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "OWNER_BLOCKED",
+  "authority_ref": null,
+  "semantic_version": null,
+  "component_tag": null,
+  "manifest_version": null,
+  "linux_package_root": null,
+  "windows_package_root": null,
+  "component_version_mode": null,
+  "component_version": null,
+  "xmake_project_version": "0.1.0"
+}

@@ -75,6 +75,7 @@ def main() -> int:
     text=workflow.read_text(encoding="utf-8")
     for trigger in ("ops/**","native/ffmpeg/targets/**","native/ffmpeg/profiles/**","native/ffmpeg/pin.json",
                     "LICENSE-MIT","LICENSE-APACHE","docs/release/songcore-release-contract.md",
+                    "docs/release/songcore-version-decision.json",
                     "evidence/songcore-172/linux/verify/package/external-consumer-example.c",
                     "tools/verify_songcore_build_receipt.py","tools/test_songcore_release_substrate.py","tools/docs-verify.cmd"):
         if trigger not in text: raise AssertionError(f"workflow trigger missing: {trigger}")
@@ -94,17 +95,23 @@ def main() -> int:
       "xmake recipe binding":"mt.recipe_sha256 ~= recipe_sha256",
       "linux shared verifier":"verify_songcore_build_receipt.py\" \\",
       "windows shared verifier":"verify_songcore_build_receipt.py\")",
+      "linux owner version gate":"Q1 version identity is OWNER_BLOCKED",
+      "windows owner version gate":"Q1 version identity is OWNER_BLOCKED",
     }
     haystacks={"linux receipt required":linux,"linux strict version":linux,"windows receipt required":windows,
       "windows strict version":windows,"linux cache profile":build_linux,"linux compile evidence":build_linux,
       "linux receipt header identity":build_linux,
-      "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows}
+      "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows,
+      "linux owner version gate":linux,"windows owner version gate":windows}
     for name,needle in required.items():
         if needle not in haystacks[name]: raise AssertionError(f"production guard missing: {name}")
     clean = 'xmake clean -a > "$EV/clean.log" 2>&1'
     configure = 'xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1'
     if build_windows.index(clean) > build_windows.index(configure):
         raise AssertionError("Windows build config is erased by a later xmake clean -a")
+    decision=json.loads((ROOT/"docs/release/songcore-version-decision.json").read_text(encoding="utf-8"))
+    if decision.get("status") != "OWNER_BLOCKED" or decision.get("semantic_version") is not None:
+        raise AssertionError("Q1 placeholder must fail closed until an Owner-approved version is committed")
     print("PASS: SongCore release substrate negative controls M1-M10"); return 0
 
 if __name__ == "__main__": raise SystemExit(main())
