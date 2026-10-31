@@ -1,3 +1,0 @@
-CASE cc.midstream-read PASS
-CASE cc.reopen-identity PASS
-MODE closecheck CASES=2 FAILED=0 RESULT=PASS

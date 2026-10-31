@@ -106,7 +106,7 @@ change.
    for the repository's complete pre-push gate.
 
 Follow-up reviewed at 2026-10-28 00:29 Asia/Shanghai. At that read,
-`raw/pre-push.log` still ended GATE_EXIT=1: plugin-boundary could not resolve
+the Windows `pre-push.log` (not retained) still ended GATE_EXIT=1: plugin-boundary could not resolve
 `public-api` from the configured replacement registry in offline mode.
 Subsequent checks were skipped by that failed gate. This is an environment
 block, not a new diagnostics product failure, and is **not a gate PASS**.

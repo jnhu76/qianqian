@@ -109,7 +109,7 @@ linker=x86_64-w64-mingw32-gcc）——与 #324/本通道 C 套件同一环境族
 | 变体 | 裸命令 @ root | 结果 |
 |---|---|---|
 | 现状（crate 排除） | exit 101 resolution | 失败 receipt `gate-round1-ROOT-REPRO.log` |
-| 临时 membership（已完全还原，git 状态实测 clean） | exit 101，msvc LNK2019×12 | `gate-MEMBERSHIP-msvc-NEGATIVE.log`——**membership 单独不是修法**，且会使当前已绿的 shipper lefthook `cargo test --workspace`（host msvc、无 mingw PATH，`pr-b-lefthook.log` ✔️ rust-test 238s）转红 |
+| 临时 membership（已完全还原，git 状态实测 clean） | exit 101，msvc LNK2019×12 | `gate-MEMBERSHIP-msvc-NEGATIVE.log`——**membership 单独不是修法**，且会使当前已绿的 shipper lefthook `cargo test --workspace`（host msvc、无 mingw PATH，`pr-b-lefthook.log`（未保留）✔️ rust-test 238s）转红 |
 | membership + gnu env（CARGO_BUILD_TARGET+PATH/AR） | exit 0，35/35 | `gate-MEMBERSHIP-gnuenv-POSITIVE.log`（实验后清单已还原） |
 | **规范入口（零仓库改动）**：`ops/run-binding-gate.ps1` | exit 0，35/35 | 两轮绿：`gate-20261029-061452.log`、`gate-20261029-061511.log` |
 

@@ -1,3 +1,0 @@
-CASE gb.typed-open-no-handle PASS
-INFO garbage empty.bin status=104
-MODE garbage CASES=1 FAILED=0 RESULT=PASS

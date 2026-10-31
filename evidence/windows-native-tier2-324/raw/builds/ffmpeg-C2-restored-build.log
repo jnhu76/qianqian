@@ -1,9 +1,0 @@
-# cmd: cargo test --manifest-path C:/Users/fred1/source/qianqian-324\crates/qianqian-decode-songcore/Cargo.toml --target x86_64-pc-windows-gnu --test native_ffmpeg_bridge_controls --no-run --message-format=json
-warning: `C:\Users\fred1\.cargo\config` is deprecated in favor of `config.toml`
-  |
-  = help: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
-   Compiling qianqian-diagnostics v0.1.0 (C:\Users\fred1\source\qianqian-324\crates\qianqian-diagnostics)
-   Compiling qianqian-decode-songcore v0.1.0 (C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.66s
-
-# EXIT=0 WALL=1.74s EXE=C:\Users\fred1\source\qianqian-324\crates\qianqian-decode-songcore\target\x86_64-pc-windows-gnu\debug\deps\native_ffmpeg_bridge_controls-8e404dff5ff5b6c7.exe

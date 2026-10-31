@@ -137,8 +137,9 @@ fix tree             3af2f48 + #322 review fixes; the product-tree delta from
                      61d834a is the analyst registration and comments only
 harness              evidence/analyst-join-321/harness/analyst_join_e2e_tests.rs
 overlay              evidence/analyst-join-321/overlay/000-harness.patch
-negative control     evidence/analyst-join-321/overlay/001-...patch
-raw receipts         evidence/analyst-join-321/raw/ (sha256 in raw/README.md)
+negative control     evidence/analyst-join-321/overlay/001-negative-control-registration-after-panic.patch
+raw receipts         not retained (2026-11-01 evidence diet); the witness
+                     lines quoted in this report are the recorded result
 replay               evidence/analyst-join-321/replay.sh
 rustc                1.97.1
 ```

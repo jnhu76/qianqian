@@ -84,7 +84,7 @@ oracle 复验。
 - recipe 未启用任何形态（或无匹配 recipe）的会话落到
   `songcore_artifact_gate` fail-closed 终点，`before_build` 给出精确原因
   （raise 不能放 dep-解析钩子——它也会在普通 `xmake f` 期间运行；实测
-  见 `evidence/songcore-172/xmake-semantics/` 的 sem 矩阵与
+  见 `evidence/songcore-172/semantics/` 的 sem 矩阵与
   `evidence/songcore-172/semantics/` 输出）。
 
 **证据**（WSL xmake v2.9.7，Ubuntu 26.04 宿主，mingw cross
@@ -102,7 +102,7 @@ oracle 复验。
 - 完整 Windows 路线回放：`ops/verify-build.ps1`（preflight → WSL closure
   import/复用 → mingw 构建 → 产物校验 → fail-closed 反向控件，输出机器
   可读 JSON summary）。回放记录
-  `evidence/songcore-172/build/verify/20261029-*/summary.json`（6 次，
+  6 次 `build/verify` 运行的 summary（原始 JSON 已按 2026-11-01 证据精简移除，
   其中 1 次为修枝期间的真实 FAIL 记录，随后复跑全 ok）。
 
 ## 脚本级门禁结果（fail-closed，未过）
@@ -229,11 +229,12 @@ journal）。这是战役编排流程缺陷，已列为改进项：后续阶段�
 - D1：`evidence/songcore-172/d1-counterfactual/`（README + run.sh + results/
   下 40 个逐例结果文件，含双 host RED/GREEN 全矩阵）
 - D2 构建/回放：`evidence/songcore-172/build/`（red/green 路线脚本与日志、
-  verify/ 六次 summary.json）、`evidence/songcore-172/xmake-semantics/`
+  verify/ 六次 summary 的结论）、`evidence/songcore-172/semantics/`
   （sem 矩阵）、`evidence/songcore-172/semantics/`
 - link contract：`evidence/songcore-172/link-contract.md` +
   `evidence/songcore-172/audit/`
-- 门禁证据：`evidence/songcore-172/pr-a-lefthook.log`（attempt 4 终态）+
+- 门禁证据（日志已按 2026-11-01 证据精简移除，结论见
+  `evidence/songcore-172/RESULTS.md`）：`pr-a-lefthook.log`（attempt 4 终态）+
   attempt 1–4 原始日志 + `pr-a-release-controls-direct-run{1,2}-*.log`
   （traceback）+ `pr-a-host-gcc-object-format-proof-win-pe.o`（格式实证）
 - 一次性回放工具：`ops/verify-build.ps1`

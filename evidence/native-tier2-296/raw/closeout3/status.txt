@@ -1,7 +1,0 @@
-# ffmpeg-bridge × C1–C4 status (Linux x86_64 native, artifact libsongcore.a a0a3baf8…)
-C1 BLOCKED_SINK         PASS   producer completed (2.9 ms) with real stderr lock held; attempted=4 accepted=2 rejected=2; shutdown abandoned (undelivered=2)
-C2 STOPPED_CONSUMER     PASS   drainer stopped in export (beta seed 1/1); producer completed; shutdown abandoned (undelivered=3), never drained
-C3 CAPACITY_EXHAUSTION  PASS   fill: 2 accepted + 1 rejected; target: 4 attempted / 0 accepted / 4 rejected; outstanding stayed 2; no block
-C4 WRITE_FAILURE        PASS   /dev/full canary Err; copied_out 2 = exported 0 + export_failed 2; self_diagnostics=1; drained, identity holds
-COUNTERFACTUALS         C1 exact RED (producer wait) / C2 exact RED (false drain) / C3 exact RED (lost reject counter) / C4 exact RED (failure counted delivered)
-Windows native          NOT_RUN (#172 S2 artifact absent; windows-x86_64 provisional)

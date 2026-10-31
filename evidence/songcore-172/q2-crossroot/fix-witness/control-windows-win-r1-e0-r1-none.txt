@@ -1,5 +1,0 @@
-compile_commands_entries=281
-ffile_prefix_map_entries=0
-fmacro_prefix_map_entries=0
-ffmpeg_src_entries=560
-sample_flag_entries:

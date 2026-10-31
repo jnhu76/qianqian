@@ -100,9 +100,10 @@ artifact 内嵌构建宿主绝对路径对真发布构成阻塞且未在 shippin
   `8177f975/8ceb4b9e/246041b6/da7eabb7`——与包内 checksums.txt、
   manifest.license.license_files 逐一相等（边界如实注记：我复验的是
   stamp 断言 zip 身份的提取树，盘上未在 maxdepth 2 内找到原始 zip 本体；
-  打包器每次运行先复核 zip==pin 的记录见 stage-audit.log 首行）。
+  打包器每次运行先复核 zip==pin 的记录见 stage-audit.log 首行；该日志已按
+  2026-11-01 证据精简移除，结论保留）。
 - O2/B3：THIRD_PARTY_NOTICES.txt 在包、入 checksums/files（本评审 13/13
-  rehash 已覆盖）；stage-audit.log 记录其取自 sha-verified v0.1.0 资产
+  rehash 已覆盖）；stage-audit.log（未保留）记录其取自 sha-verified v0.1.0 资产
   （018e0cbd… == 契约 S-V010 冻结值）；NOTICES 全文亲读。
 - O3：README "Relink obligations" 节亲读——明示重链接输入
   （pin.json + profile + target recipe + closure manifest + xmake 配置）

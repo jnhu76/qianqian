@@ -1,2 +1,0 @@
-build/artifacts/libsongcore.a:         current ar archive
-build/artifacts/shared/libsongcore.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=25fe091c8f0010e651c2251cea32d3c4af388122, stripped

@@ -140,7 +140,8 @@ av* DLL。干净 PATH（仅 `C:\Windows\System32`）运行复测 exit 0
 `ops/verify-external.ps1`（战场分支提交）：解压→包内校验→写嵌入式
 consumer→生成/指定媒体→README 契约编译→运行六步序列→导入表白名单
 审计，全程 fail-closed，stdout 输出 JSON 摘要，日志落
-`evidence/songcore-172/external-accept/<stamp>-external-log.txt`。
+`evidence/songcore-172/external-accept/<stamp>-external-log.txt`（该目录为
+`ops/verify-external.ps1` 的本地输出，2026-11-01 后 git-ignored）。
 
 实测：
 

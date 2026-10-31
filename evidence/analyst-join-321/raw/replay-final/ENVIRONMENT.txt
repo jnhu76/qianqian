@@ -1,6 +1,0 @@
-utc=2026-10-28T06:14:40Z
-repo=/home/hoo/Source/qianqian/.worktrees/analyst-join
-baseline_rev=61d834ad63bd5b0195496cf9de3a77395dd12a71
-fix_rev=86bd991a057ee0b06d19b97764dc0512ed815b96
-rustc=rustc 1.97.1 (8bab26f4f 2026-07-14)
-host=Linux WuJie 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux

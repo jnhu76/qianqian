@@ -1,9 +1,0 @@
-aacdec.c.o SAME
-cpu.c.o SAME
-flacdec.c.o SAME
-iamf.c.o SAME
-mpegaudiodsp.c.o SAME
-options.c.o SAME
-pcm.c.o SAME
-utils.c.o SAME
-version.c.o SAME

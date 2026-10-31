@@ -75,6 +75,7 @@
   （`build/rc/20261029-062848/summary.json` 实读）。
 - S3 侧：构建/配置/fetch 日志 `/mnt/c` 计数全为 0
   （`grep -c "/mnt/c" linux/build/20261028T200502Z/{xmake-build,xmake-config,fetch-ffmpeg}.log`
+  ——该目录为本地复跑输出，2026-11-01 后 git-ignored
   → 0/0/0）；构建树 `/home/hoo/qianqian-172-linux`；s3-verify cargo 以
   `CARGO_HOME=/home/hoo/.cargo-s3` + cwd 全程 /home/hoo（s3-verify §2）。
 - 唯一的 /mnt/c 触碰均为**读**：clone 源（`file:///mnt/c/...`，

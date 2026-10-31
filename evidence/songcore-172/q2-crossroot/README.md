@@ -24,55 +24,29 @@ it defines no architecture semantics and grants no release authority.
   FFmpeg translation units from the absolute FFmpeg source root to `.`, so
   shipped archive members stop carrying the build root.
 
-## Layout
+## Retained layout
 
 ```text
-cmp/linux-winner/        R1↔R2 archive comparison for the linux target:
-                         static-1.tsv / static-2.tsv (per-member occurrence
-                         table), static-cmp.txt (comparison report),
-                         verdict.json (machine verdict)
-cmp/windows-winner/      same for the windows target (static-only form)
-cmp/controls/            E0 no-map negative controls (both targets):
-                         cross-root bytes DIFFER and absolute build-root
-                         literals are present in the archives
-cmp/all-verdicts/        verdict.json of all 12 measured variants
-cmp/experiment-matrix.md matrix generated from those 12 verdicts
-fix-witness/             compile_commands.json census per build root proving
-                         which flags actually reached the replayed FFmpeg
-                         compile units; includes two no-map negative controls.
-                         The four counterfactual arms are archived as
-                         <target>-<root>-<stamp>.txt plus
-                         .fix-patch-lines.txt / .summary.json /
-                         .leak-census.txt sidecars
-build-receipts/          per-root and per-arm build receipts: exact source
-                         head/tree, toolchain, clone/closure provenance,
-                         artifact sha256. Pairing:
-                         - six winner roots: <target>-<root>.summary.json
-                           (the four R1/R2 roots also archive their
-                           winner-arm census as
-                           <target>-<root>-w-r{1,2}-macromap.leak-census.txt;
-                           the two L1-route roots archive no census)
-                         - non-ctr arms (E0 / filemap / macromap / winner):
-                           <target>-<root>-<stamp>.summary.json plus the
-                           same-basename .leak-census.txt
-                         - ctr arms: <target>-<root>-<stamp>.summary.json;
-                           the paired census is
-                           fix-witness/<target>-<root>-<stamp>.leak-census.txt
-drivers/                 byte-identical copies of the three campaign scripts
-                         (build, compare, comparator) that produced the
-                         builds and comparisons; origin recorded in
-                         "Driver provenance" below
-gates/receipts/          six G1+G2 release-gate receipts (schema
-                         songcore-release-gate-g1g2/1), one per build root
-gates/six-root-gate-summary.{json,md}
-                         aggregation generated from those six receipts
-t4-verdict-and-L.md      the T4 single-candidate verdict and the L1/L2/L3
-                         determination, grounded only in the files here
+README.md, t4-verdict-and-L.md, cmp/experiment-matrix.md
+                                 the result documents: T4 single-candidate
+                                 verdict, the L1/L2/L3 determination, and the
+                                 one-flag-at-a-time matrix
+cmp/all-verdicts/*.verdict.json  machine verdict of all 12 measured variants —
+                                 the structured result table behind the matrix
+gates/six-root-gate-summary.md   the six-root G1+G2 aggregation
 ```
+
+Removed by the 2026-11-01 evidence diet (bytes recoverable from Git history
+before `fae5173`): `cmp/{linux-winner,windows-winner,controls}/`, `fix-witness/`,
+`build-receipts/`, `drivers/` and `gates/receipts/`. The measurements those
+archives supported are stated inline in this file and in
+[`../RESULTS.md`](../RESULTS.md) §3.8.
 
 Per-arm receipt stamps (the `<stamp>` part of the archived filenames; a
 trailing `-.` of a build-root attempt stamp is dropped, and each JSON's
-`attempt_stamp` field repeats the original):
+`attempt_stamp` field repeats the original). The receipt files themselves were
+removed by the 2026-11-01 diet; this table keeps the stamp vocabulary used in
+the retained verdicts and in the text below:
 
 | arm | linux R1 / R2 | windows R1 / R2 |
 |---|---|---|
@@ -264,7 +238,8 @@ archive revision.
    characters on linux (95 on windows; check:
    `ar t <archive> | awk 'length($0)>15' | wc -l`; examples
    `songcore_ffmpeg.c.o`, `swresample_frame.c.o`). They appear in the v1 TSV
-   as `<symbol-table-ext>`. The cause is in `drivers/b329-arcmp.py`: the
+   as `<symbol-table-ext>`. The cause is in the campaign comparator
+   (`b329-arcmp.py`, not retained): the
    `/`-initial-name branch (lines 62–67) runs before GNU long-name offset
    resolution (lines 78–83), so a `/offset` reference never reaches the
    long-name table. Their bytes are still compared occurrence by occurrence
@@ -300,7 +275,7 @@ archive revision.
 
 ## Driver provenance
 
-`drivers/b329-build.sh`, `drivers/b329-cmp.sh` and `drivers/b329-arcmp.py`
+`b329-build.sh`, `b329-cmp.sh` and `b329-arcmp.py` (not retained)
 are byte-identical copies of the campaign scripts, taken from
 `/mnt/c/Users/fred1/AppData/Local/Temp/qq172wf/329/` on the campaign host:
 

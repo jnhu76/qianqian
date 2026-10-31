@@ -1,3 +1,0 @@
-consumer link line: gcc -O2 -std=c11 -Wall -Wextra -I <native/include> <consumer.c> <libsongcore.a> -lbcrypt
-consumer compile OK -> C:\Users\fred1\source\qianqian-172\evidence\songcore-172\suite-results\20261029-051431\csuite_consumer.exe
-layout probe compile OK -> C:\Users\fred1\source\qianqian-172\evidence\songcore-172\suite-results\20261029-051431\layout_probe.exe
