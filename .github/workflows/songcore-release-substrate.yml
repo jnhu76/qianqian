@@ -65,8 +65,11 @@ jobs:
       - name: Windows packager requires build receipt
         shell: pwsh
         run: |
-          & ./ops/package-rc.ps1 -ProjectRoot $PWD -Version 1.2.3 -BuildReceipt missing.json 2>&1 | Out-String | Write-Host
-          if ($LASTEXITCODE -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./ops/package-rc.ps1 `
+            -ProjectRoot $PWD -Version 1.2.3 -BuildReceipt missing.json 2>&1 |
+            Out-String | Write-Host
+          $packageExit = $LASTEXITCODE
+          if ($packageExit -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
       - name: Docs wrapper negative controls
         shell: cmd
         run: |
