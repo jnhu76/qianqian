@@ -172,31 +172,10 @@ if (-not (Test-Path $BuildReceipt)) { Fail "provenance" "build receipt missing: 
 
 $versionDecisionPath = Join-Path $ProjectRoot "docs\release\songcore-version-decision.json"
 if (-not (Test-Path $versionDecisionPath)) { Fail "version_identity" "version identity decision missing" }
-$versionDecision = Get-Content $versionDecisionPath -Raw | ConvertFrom-Json
-if ($versionDecision.schema_version -ne 1 -or $versionDecision.status -ne "APPROVED") {
-    Fail "version_identity" "Q1 version identity is OWNER_BLOCKED"
-}
-if (-not ($versionDecision.authority_ref -is [string]) -or [string]::IsNullOrWhiteSpace($versionDecision.authority_ref)) {
-    Fail "version_identity" "approved version decision lacks authority_ref"
-}
-$expectedTag = "songcore-v$Version"
-$expectedLinuxRoot = "$expectedTag-linux-x86_64"
-$expectedWindowsRoot = "$expectedTag-windows-x86_64"
-if ($versionDecision.semantic_version -ne $Version -or
-    $versionDecision.manifest_version -ne $Version -or
-    $versionDecision.component_version -ne $Version -or
-    $versionDecision.component_tag -ne $expectedTag -or
-    $versionDecision.linux_package_root -ne $expectedLinuxRoot -or
-    $versionDecision.windows_package_root -ne $expectedWindowsRoot) {
-    Fail "version_identity" "approved normalized version mapping does not match requested version"
-}
-if ($versionDecision.component_version_mode -notin @("independent", "project-coupled")) {
-    Fail "version_identity" "component_version_mode is not approved"
-}
-if ($versionDecision.component_version_mode -eq "project-coupled" -and
-    $versionDecision.xmake_project_version -ne $Version) {
-    Fail "version_identity" "project-coupled identity does not match xmake project version"
-}
+$versionVerifier = Join-Path $ProjectRoot "tools\verify_songcore_version_identity.py"
+$versionOutput = & python $versionVerifier --decision $versionDecisionPath --version $Version `
+    --target windows-x86_64 --xmake (Join-Path $ProjectRoot "native\xmake.lua") 2>&1
+if ($LASTEXITCODE -ne 0) { Fail "version_identity" ($versionOutput -join "; ") }
 if (-not (Test-Path $ArtifactPath)) {
     Fail "preflight" "artifact missing: $ArtifactPath (run ops/build-rc.ps1 first)"
 }

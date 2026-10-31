@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFY = ROOT / "tools" / "verify_songcore_build_receipt.py"
+VERIFY_VERSION = ROOT / "tools" / "verify_songcore_version_identity.py"
 
 def sha256(path: Path) -> str: return hashlib.sha256(path.read_bytes()).hexdigest()
 def write(path: Path, data: bytes) -> None:
@@ -70,6 +71,34 @@ def main() -> int:
                 "--source-commit",commit,"--work-root",str(repo),"--out-dir",str(repo/"out"),
                 "--build-receipt",str(repo/"missing.json")],text=True,capture_output=True,check=False)
             expect_red("M8-production-entry",result,"missing build receipt")
+    with tempfile.TemporaryDirectory(prefix="songcore-version-") as td:
+        root=Path(td); xmake=root/"xmake.lua"; xmake.write_text('set_version("0.1.0")\n',encoding="utf-8")
+        decision={"schema_version":1,"status":"APPROVED",
+          "authority_ref":"https://github.com/jnhu76/qianqian/issues/333#issuecomment-123",
+          "authority_record_sha256":"1"*64,"semantic_version":"0.1.1",
+          "component_tag":"songcore-v0.1.1","manifest_version":"0.1.1",
+          "linux_package_root":"songcore-v0.1.1-linux-x86_64",
+          "windows_package_root":"songcore-v0.1.1-windows-x86_64",
+          "component_version_mode":"independent","component_version":"0.1.1",
+          "xmake_project_version":"0.1.0"}
+        path=root/"decision.json"
+        def version_run(d, version="0.1.1"):
+            path.write_text(json.dumps(d),encoding="utf-8")
+            return subprocess.run([sys.executable,str(VERIFY_VERSION),"--decision",str(path),
+              "--version",version,"--target","linux-x86_64","--xmake",str(xmake)],
+              text=True,capture_output=True,check=False)
+        green=version_run(decision)
+        if green.returncode != 0: raise AssertionError("approved independent version fixture did not GREEN: "+green.stderr)
+        blocked=dict(decision,status="OWNER_BLOCKED",semantic_version=None)
+        expect_red("VERSION-BLOCKED",version_run(blocked),"OWNER_BLOCKED")
+        no_authority=dict(decision,authority_ref=None)
+        expect_red("VERSION-AUTHORITY",version_run(no_authority),"authority_ref")
+        mismatch=dict(decision,windows_package_root="songcore-v9.9.9-windows-x86_64")
+        expect_red("VERSION-MAPPING",version_run(mismatch),"windows_package_root")
+        xmake_lie=dict(decision,xmake_project_version="9.9.9")
+        expect_red("VERSION-XMAKE",version_run(xmake_lie),"native/xmake.lua")
+        coupled=dict(decision,component_version_mode="project-coupled")
+        expect_red("VERSION-COUPLING",version_run(coupled),"project-coupled")
     workflow=ROOT/".github/workflows/songcore-release-substrate.yml"
     if not workflow.is_file(): raise AssertionError("ops release substrate workflow missing")
     text=workflow.read_text(encoding="utf-8")
@@ -77,13 +106,15 @@ def main() -> int:
                     "LICENSE-MIT","LICENSE-APACHE","docs/release/songcore-release-contract.md",
                     "docs/release/songcore-version-decision.json",
                     "evidence/songcore-172/linux/verify/package/external-consumer-example.c",
-                    "tools/verify_songcore_build_receipt.py","tools/test_songcore_release_substrate.py","tools/docs-verify.cmd"):
+                    "tools/verify_songcore_build_receipt.py","tools/verify_songcore_version_identity.py",
+                    "tools/test_songcore_release_substrate.py","tools/docs-verify.cmd"):
         if trigger not in text: raise AssertionError(f"workflow trigger missing: {trigger}")
     linux=(ROOT/"ops/package-linux.sh").read_text(encoding="utf-8")
     windows=(ROOT/"ops/package-rc.ps1").read_text(encoding="utf-8")
     build_linux=(ROOT/"ops/build-linux.sh").read_text(encoding="utf-8")
     build_windows=(ROOT/"ops/build-rc.ps1").read_text(encoding="utf-8")
     ffmpeg=(ROOT/"native/build/ffmpeg.lua").read_text(encoding="utf-8")
+    version_verifier=VERIFY_VERSION.read_text(encoding="utf-8")
     required={
       "linux receipt required":"--build-receipt is required for release-qualified packaging",
       "linux strict version":"suffixes are not authorized",
@@ -102,7 +133,7 @@ def main() -> int:
       "windows strict version":windows,"linux cache profile":build_linux,"linux compile evidence":build_linux,
       "linux receipt header identity":build_linux,
       "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows,
-      "linux owner version gate":linux,"windows owner version gate":windows}
+      "linux owner version gate":version_verifier,"windows owner version gate":version_verifier}
     for name,needle in required.items():
         if needle not in haystacks[name]: raise AssertionError(f"production guard missing: {name}")
     clean = 'xmake clean -a > "$EV/clean.log" 2>&1'
@@ -110,8 +141,8 @@ def main() -> int:
     if build_windows.index(clean) > build_windows.index(configure):
         raise AssertionError("Windows build config is erased by a later xmake clean -a")
     decision=json.loads((ROOT/"docs/release/songcore-version-decision.json").read_text(encoding="utf-8"))
-    if decision.get("status") != "OWNER_BLOCKED" or decision.get("semantic_version") is not None:
-        raise AssertionError("Q1 placeholder must fail closed until an Owner-approved version is committed")
+    if decision.get("status") not in ("OWNER_BLOCKED","APPROVED"):
+        raise AssertionError("unknown Q1 decision state")
     print("PASS: SongCore release substrate negative controls M1-M10"); return 0
 
 if __name__ == "__main__": raise SystemExit(main())

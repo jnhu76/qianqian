@@ -167,31 +167,10 @@ CONSUMER_EXAMPLE=${CONSUMER_EXAMPLE:-$WORK_ROOT/evidence/songcore-172/linux/veri
 
 VERSION_DECISION=$WORK_ROOT/docs/release/songcore-version-decision.json
 [ -f "$VERSION_DECISION" ] || die "version identity decision missing: $VERSION_DECISION"
-python3 - "$VERSION_DECISION" "$VERSION" <<'PY' || die "version identity is not approved for release-qualified packaging"
-import json, re, sys
-p, requested = sys.argv[1:]
-d = json.load(open(p, encoding="utf-8"))
-if d.get("schema_version") != 1 or d.get("status") != "APPROVED":
-    raise SystemExit("Q1 version identity is OWNER_BLOCKED")
-if not isinstance(d.get("authority_ref"), str) or not d["authority_ref"].strip():
-    raise SystemExit("approved version decision lacks authority_ref")
-v = d.get("semantic_version")
-if v != requested or not isinstance(v, str) or not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", v):
-    raise SystemExit("requested version does not equal the approved semantic_version")
-expected = {
-    "component_tag": f"songcore-v{v}", "manifest_version": v,
-    "linux_package_root": f"songcore-v{v}-linux-x86_64",
-    "windows_package_root": f"songcore-v{v}-windows-x86_64",
-    "component_version": v,
-}
-for key, value in expected.items():
-    if d.get(key) != value: raise SystemExit(f"version mapping mismatch: {key}")
-mode = d.get("component_version_mode")
-if mode not in ("independent", "project-coupled"):
-    raise SystemExit("component_version_mode is not approved")
-if mode == "project-coupled" and d.get("xmake_project_version") != v:
-    raise SystemExit("project-coupled version does not match xmake_project_version")
-PY
+python3 "$WORK_ROOT/tools/verify_songcore_version_identity.py" \
+  --decision "$VERSION_DECISION" --version "$VERSION" --target linux-x86_64 \
+  --xmake "$WORK_ROOT/native/xmake.lua" \
+  || die "version identity is not approved for release-qualified packaging"
 
 PIN=$WORK_ROOT/native/ffmpeg/pin.json
 RECIPE=$WORK_ROOT/native/ffmpeg/targets/linux-x86_64.json
