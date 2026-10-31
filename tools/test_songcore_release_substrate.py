@@ -89,12 +89,14 @@ def main() -> int:
       "windows strict version":"suffixes are not authorized by contract section 2",
       "linux cache profile":"man.get(\"profile_sha256\") == profile_sha",
       "linux compile evidence":"int(d[\"compile_actions\"])",
+      "linux receipt header identity":"include/songcore.h src/songcore_ffmpeg.c",
       "xmake recipe binding":"mt.recipe_sha256 ~= recipe_sha256",
       "linux shared verifier":"verify_songcore_build_receipt.py\" \\",
       "windows shared verifier":"verify_songcore_build_receipt.py\")",
     }
     haystacks={"linux receipt required":linux,"linux strict version":linux,"windows receipt required":windows,
       "windows strict version":windows,"linux cache profile":build_linux,"linux compile evidence":build_linux,
+      "linux receipt header identity":build_linux,
       "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows}
     for name,needle in required.items():
         if needle not in haystacks[name]: raise AssertionError(f"production guard missing: {name}")

@@ -327,7 +327,7 @@ diff "$EV/abi-expected.txt" "$EV/abi-exported-a.txt" > "$EV/abi-diff-a.txt" || {
 fact abi_symbols "$(wc -l < "$EV/abi-expected.txt")"
 
 # sha256 identity of artifacts and provenance inputs
-sha256sum "$ART_A" "$ART_SO" "$MAN" "$PIN" "$PROFILE" "$RECIPE" src/songcore_ffmpeg.c ../ops/build-linux.sh > "$EV/artifacts-sha256.txt"
+sha256sum "$ART_A" "$ART_SO" "$MAN" "$PIN" "$PROFILE" "$RECIPE" include/songcore.h src/songcore_ffmpeg.c ../ops/build-linux.sh > "$EV/artifacts-sha256.txt"
 {
   echo "# closure provenance $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "target=linux-x86_64"
