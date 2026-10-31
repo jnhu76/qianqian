@@ -76,6 +76,9 @@
 #
 # Exit code: 0 only when the container was written and re-verified.
 set -Eeuo pipefail
+# Mirror the build entry's tool search path: the receipt's toolchain identity
+# is produced there, so the packager must resolve the same tools.
+export PATH="$HOME/.local/bin:$PATH"
 
 ARGV=("$@")
 VERSION=""
@@ -98,6 +101,13 @@ log() { printf '[package-linux] %s\n' "$*"; }
 die() { printf 'package-linux: FAIL: %s\n' "$*" >&2; exit 1; }
 kv()  { grep -m1 "^$2=" "$1" | cut -d= -f2-; }
 sha_of() { sha256sum "$1" | awk '{print $1}'; }
+# Under `set -e -o pipefail` a `tool --version | head -1` pipeline fails when the
+# tool is absent (127, hidden by 2>/dev/null) or SIGPIPEs the writer. A missing
+# tool must degrade to an empty identity string, never a silent exit.
+ident() {
+  command -v "$1" >/dev/null 2>&1 || return 0
+  { "$1" --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g'; } || true
+}
 
 usage() {
   sed -n '/^# Usage:/,/^# Version:/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -169,7 +179,7 @@ for f in "$ART_STATIC" "$ART_SHARED" "$CLOSURE_MANIFEST" "$PINNED_ZIP" "$PIN" \
   [ -f "$f" ] || die "missing input: $f"
 done
 
-for t in git python3 sha256sum ar nm objdump readelf file tar gzip stat; do
+for t in git python3 sha256sum ar nm objdump readelf file tar gzip stat cc gcc; do
   command -v "$t" >/dev/null 2>&1 || die "missing required tool: $t"
 done
 
@@ -308,13 +318,11 @@ print("CLOSURE_UPSTREAM=%d" % man["closure"]["upstream_sources"])
 print("CLOSURE_GENERATED=%d" % man["closure"]["generated_sources"])
 PY
 
-CC_IDENT=$(cc --version | head -1)
-AR_IDENT=$(ar --version | head -1)
-if command -v xmake >/dev/null 2>&1; then
-  XMAKE_IDENT=$(xmake --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g')
-else
-  XMAKE_IDENT="not found on this packaging host (xmake is not a packaging input)"
-fi
+CC_IDENT=$(ident cc)
+GCC_IDENT=$(ident gcc)
+AR_IDENT=$(ident ar)
+XMAKE_VER=$(ident xmake)
+XMAKE_IDENT=${XMAKE_VER:-not found on this packaging host (xmake is not a packaging input)}
 
 # --------------------------------------- stage 2: LICENSES + notices + README
 log "stage2: license texts from the pinned source zip (O1) + component texts (B4)"
@@ -358,7 +366,9 @@ cp -f "$AUD/header-symbols.txt" "$STAGE/metadata/symbols.txt"
 # provenance input to the source commit/tree; packaging never trusts the
 # receipt's own self-description beyond that.
 SOURCE_TREE=$(git -C "$WORK_ROOT" rev-parse 'HEAD^{tree}')
-TOOLCHAIN_ID="gcc=$(gcc --version | head -1);xmake=$(xmake --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
+# Byte-identical to the identity ops/build-linux.sh writes into the receipt:
+# "gcc=<ver>;xmake=<ver>", with an absent xmake contributing an empty segment.
+TOOLCHAIN_ID="gcc=$GCC_IDENT;xmake=$XMAKE_VER"
 python3 "$WORK_ROOT/tools/verify_songcore_build_receipt.py" \
   --receipt "$BUILD_RECEIPT" --source-commit "$SOURCE_COMMIT" --source-tree "$SOURCE_TREE" \
   --artifact "$ART_STATIC" --artifact-shared "$ART_SHARED" --header "$HEADER" \
