@@ -20,6 +20,10 @@ def main() -> int:
     a = p.parse_args()
     pin = json.load(open(a.pin, encoding="utf-8"))
     title = "Third-party notices \u2014 SongCore v%s (%s)" % (a.version, a.target)
+    # Only the shared form's targets ship a libsongcore.so; saying otherwise
+    # would describe a file the recipient does not have.
+    shipped = ("libsongcore.a / libsongcore.so" if a.target.startswith("linux")
+               else "libsongcore.a")
     lines = [
         title,
         "=" * len(title),
@@ -34,8 +38,8 @@ def main() -> int:
         "  effective license: LGPL-2.1-or-later (FFmpeg default, all copylibs disabled)",
         "  external libraries that alter licensing: none",
         "",
-        "  The FFmpeg closure is statically linked inside libsongcore.a /",
-        "  libsongcore.so. Under LGPL-2.1-or-later static distribution, the object",
+        "  The FFmpeg closure is statically linked inside %s." % shipped,
+        "  Under LGPL-2.1-or-later static distribution, the object",
         "  files of the application may be provided together with the means",
         "  (source or relink instructions) to re-link a modified FFmpeg. This",
         "  package contains the complete FFmpeg license texts (LICENSES/COPYING.*)",

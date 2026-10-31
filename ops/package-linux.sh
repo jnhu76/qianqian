@@ -763,17 +763,24 @@ record("V5_license_args",
 # ---- V6: no reproducibility level beyond its receipt
 rep = manifest.get("reproducibility", {})
 levels = {"recipe": "RECIPE_RECONSTRUCTIBLE", "semantic_abi": "SEMANTIC_ABI_VERIFIED", "byte": "BYTE_REPRODUCIBLE"}
-v6_bad = []
-for field, positive in levels.items():
+v6_bad, positive = [], False
+for field, positive_value in levels.items():
     value = rep.get(field)
     if value == "NOT_ESTABLISHED":
         continue
-    if value != positive:
+    if value != positive_value:
         v6_bad.append("%s=%r" % (field, value))
-    elif not rep.get("evidence"):
-        v6_bad.append("%s claims %s without an evidence receipt" % (field, positive))
-record("V6_reproducibility", not v6_bad and bool(rep.get("evidence")),
-       "no reproducibility level is claimed beyond its receipt; values=%s" % {k: rep.get(k) for k in levels})
+        continue
+    positive = True
+    # A positive claim must name an existing receipt (contract section 8 V6).
+    named = [t for t in str(rep.get("evidence", "")).replace(",", " ").split()
+             if "/" in t or t.endswith(".json")]
+    if not any(os.path.exists(os.path.join(work_root, t)) for t in named):
+        v6_bad.append("%s claims %s without an existing evidence receipt" % (field, positive_value))
+record("V6_reproducibility", not v6_bad,
+       ("positive claims resolve to existing receipts" if positive
+        else "every level is NOT_ESTABLISHED") + "; values=%s"
+       % {k: rep.get(k) for k in levels})
 
 # ---- V7: tools{} and target identity
 ti = manifest.get("target_identity", {})
@@ -924,11 +931,13 @@ if sorted(files) != sorted(staged):
     sys.stderr.write("FAIL: container payload set != staged set\n"); sys.exit(59)
 
 # The container is what ships: re-hash every payload from the archive itself.
-# checksums.txt cannot cover itself (contract section 8 V1); every other member
-# is covered by files{} or, for manifest.json, by checksums.txt.
+# checksums.txt cannot cover itself (contract section 8 V1), so it is compared
+# against the staged file that shipped, not against an entry of its own.
 bad = []
 for rel, (h, size) in files.items():
     if rel == "metadata/checksums.txt":
+        if h != hashlib.sha256(open(os.path.join(stage, rel), "rb").read()).hexdigest():
+            bad.append(rel + " (staged bytes)")
         continue
     if rel in manifest["files"]:
         if manifest["files"][rel]["sha256"] != h or manifest["files"][rel]["bytes"] != size:

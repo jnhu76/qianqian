@@ -11,9 +11,9 @@
 #
 # Replayable flow (fail-closed; no container is written until every pre-zip
 # check passes):
-#   0. preflight: version form + immutability guard, git HEAD == -SourceCommit
-#      with no uncommitted tracked changes under native/ (R2 discipline), Q1
-#      version identity, frozen ABI header identity, build receipt, inputs.
+#   0. preflight: version form + immutability guard, tracked-clean tree at
+#      git HEAD (R2 discipline), Q1 version identity, frozen ABI header
+#      identity, build receipt, inputs.
 #   1. WSL audit stage (the pinned toolchain's binutils, the same route that
 #      built the artifact):
 #        - pinned FFmpeg zip sha256 == pin.json source_sha256, then the four
@@ -142,6 +142,9 @@ $summary = [ordered]@{
     ok = $false
 }
 function Save-Summary {
+    # Every Fail path must still produce its diagnostic and its receipt, so the
+    # output directory is created here rather than relying on preflight order.
+    New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     Write-LFText (Join-Path $OutDir "package-summary.json") ($summary | ConvertTo-Json -Depth 8)
 }
 function Fail([string]$step, [string]$detail) {
@@ -181,14 +184,19 @@ if (-not (Test-Path $ConsumerExample)) {
 $gitHead = & git -C $ProjectRoot rev-parse HEAD 2>&1
 if ($LASTEXITCODE -ne 0) { Fail "preflight" "git rev-parse failed: $gitHead" }
 $summary.source.commit = $gitHead
-# R2 discipline (method mirror of tools/check_release.py:83): the packaged
-# artifact must be attributable to the pinned source SHA.
-$dirty = & git -C $ProjectRoot status --porcelain -- native/ 2>&1
-$dirtyTracked = @($dirty | Where-Object { $_ -notmatch '^\?\?' })
+# R2 discipline (method mirror of tools/check_release.py): the packaged
+# artifact must be attributable to the pinned source SHA, and the manifest
+# claims source.status "clean" for the whole tracked tree — so the same
+# tracked-cleanliness the Linux entry enforces is required here too (untracked
+# files are not part of the claim and are ignored, as in package-linux.sh).
+$dirty = & git -C $ProjectRoot status --porcelain --untracked-files=no 2>&1
+if ($LASTEXITCODE -ne 0) { Fail "preflight" "git status failed: $dirty" }
+$dirtyTracked = @($dirty | Where-Object { $_ -ne "" })
 if ($dirtyTracked.Count -gt 0) {
-    Fail "preflight" "native/ has uncommitted tracked changes; the artifact would not be attributable to $gitHead"
+    Fail "preflight" ("tracked changes present, so the artifact and the Q1 decision would not be attributable to " +
+        $gitHead + ": " + ($dirtyTracked -join "; "))
 }
-$summary.source.native_tracked_clean = $true
+$summary.source.tracked_clean = $true
 
 $headerSha = Get-Sha256 (Join-Path $ProjectRoot "native\include\songcore.h")
 $summary.source.abi_header_sha256 = $headerSha
@@ -217,13 +225,19 @@ $closureSha = Get-Sha256 $closurePath
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $python) { Fail "provenance" "python is required for the shared build-receipt verifier" }
 $treeOid = & git -C $ProjectRoot rev-parse 'HEAD^{tree}'
+# The receipt's identity must equal the primitive fields it reports, so a
+# hand-edited identity string cannot pass by being fed back to the verifier.
+$expectedToolchain = "cc=" + $receipt.toolchain.cc + ";ar=" + $receipt.toolchain.ar + ";xmake=" + $receipt.toolchain.xmake
+if ($receipt.toolchain.identity -ne $expectedToolchain) {
+    Fail "provenance" "receipt toolchain.identity does not match its own cc/ar/xmake fields"
+}
 & $python (Join-Path $ProjectRoot "tools\verify_songcore_build_receipt.py") `
     --receipt $BuildReceipt --source-commit $gitHead --source-tree $treeOid `
     --artifact $ArtifactPath --header (Join-Path $ProjectRoot "native\include\songcore.h") `
     --recipe (Join-Path $ProjectRoot "native\ffmpeg\targets\windows-x86_64.json") `
     --profile (Join-Path $ProjectRoot "native\ffmpeg\profiles\codec-base.json") `
     --pin (Join-Path $ProjectRoot "native\ffmpeg\pin.json") --closure $closurePath `
-    --target windows-x86_64 --toolchain $receipt.toolchain.identity
+    --target windows-x86_64 --toolchain $expectedToolchain
 if ($LASTEXITCODE -ne 0) { Fail "provenance" "shared build-receipt verifier rejected the Windows build" }
 $summary.build_receipt_sha256 = Get-Sha256 $BuildReceipt
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -342,7 +356,7 @@ $env:QR_PINNED_ZIP    = $PinnedZip
 $env:QR_STAGE_WSL     = $stageWsl
 $env:QR_WORKTREE_WSL  = Convert-ToWslPath $ProjectRoot
 $env:QR_ARTIFACT_WSL  = Convert-ToWslPath $ArtifactPath
-$env:QR_NOTICES_VERSION = "v$Version"
+$env:QR_NOTICES_VERSION = $Version
 $env:QR_NOTICES_TARGET  = "windows-x86_64"
 $env:WSLENV           = "QR_PINNED_ZIP:QR_STAGE_WSL:QR_WORKTREE_WSL:QR_ARTIFACT_WSL:QR_NOTICES_VERSION:QR_NOTICES_TARGET"
 
@@ -604,7 +618,7 @@ foreach ($n in $CopyingNames) {
 }
 $manifest.license.license_files = $licenseFiles
 $summary.checks["O1_license_texts"] = "PASS (4 FFmpeg COPYING texts extracted from the pin-verified source zip; staged shas == extraction shas)"
-$summary.checks["O2_B3_notices"] = "PASS (THIRD_PARTY_NOTICES.txt extracted from the sha-verified v0.1.0 asset, then #330 P3 wording-refreshed: identity header + component-license paragraph; hashed in checksums.txt/files{} below)"
+$summary.checks["O2_B3_notices"] = "PASS (THIRD_PARTY_NOTICES.txt rendered from the verified pin by tools/render_songcore_notices.py; hashed in checksums.txt/files{} below)"
 $b4Ok = $true
 foreach ($pair in @(@("LICENSE-MIT", "LICENSES\LICENSE-MIT"), @("LICENSE-APACHE", "LICENSES\LICENSE-APACHE"))) {
     if ((Get-Sha256 (Join-Path $ProjectRoot $pair[0])) -ne (Get-Sha256 (Join-Path $stagePkg $pair[1]))) { $b4Ok = $false }

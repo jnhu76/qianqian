@@ -86,6 +86,29 @@ jobs:
           if ($log -notmatch "build receipt missing") {
             throw "package-rc failed before exercising the missing BuildReceipt path"
           }
+      - name: Windows packager enforces the version grammar
+        shell: pwsh
+        run: |
+          foreach ($case in @(
+              @{ Version = "1.2.3-rc.1"; Expect = "not the authorized MAJOR.MINOR.PATCH" },
+              @{ Version = "01.2.3";     Expect = "not the authorized MAJOR.MINOR.PATCH" },
+              @{ Version = "0.1.0";      Expect = "immutable history" })) {
+            $stdout = Join-Path $env:RUNNER_TEMP "package-version.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "package-version.stderr.log"
+            $process = Start-Process pwsh -Wait -PassThru -NoNewWindow `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+              -ArgumentList @(
+                "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-File", "./ops/package-rc.ps1", "-ProjectRoot", $PWD.Path,
+                "-Version", $case.Version, "-BuildReceipt", "missing.json"
+              )
+            $log = (Get-Content $stdout, $stderr -Raw) -join "`n"
+            $log | Write-Host
+            if ($process.ExitCode -eq 0) { throw "package-rc accepted version $($case.Version)" }
+            if ($log -notmatch [regex]::Escape($case.Expect)) {
+              throw "package-rc did not reject version $($case.Version) on the version-grammar path"
+            }
+          }
       - name: Docs wrapper negative controls
         shell: pwsh
         run: |
