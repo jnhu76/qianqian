@@ -61,10 +61,11 @@
 # (pinned zip / v0.1.0 tarball) survive argv (same note as ops/build-rc.ps1).
 param(
     [string]$ProjectRoot = "",
-    [string]$Version = "0.2.0-rc.1",
+    [Parameter(Mandatory=$true)][string]$Version,
     [string]$WslDistro = "Ubuntu-24.04",
     # The artifact the manifest binds; default is the build-lane consumption path.
     [string]$ArtifactPath = "",
+    [Parameter(Mandatory=$true)][string]$BuildReceipt,
     [string]$OutDir = "",
     # WSL paths: the pinned FFmpeg source zip (re-verified against pin.json
     # on every run) and the published songcore-v0.1.0 tarball (re-verified
@@ -164,9 +165,10 @@ function Fail([string]$step, [string]$detail) {
 if ($Version -eq $ImmutableHistorical) {
     Fail "preflight" "refusing version '0.1.0': songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag."
 }
-if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+([-+.0-9A-Za-z]+)?$') {
-    Fail "preflight" "version '$Version' is not a songcore-vMAJOR.MINOR.PATCH[-suffix] identity (contract section 2 VERSION_RULE form)."
+if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    Fail "preflight" "version '$Version' is not the authorized MAJOR.MINOR.PATCH identity; suffixes are not authorized by contract section 2."
 }
+if (-not (Test-Path $BuildReceipt)) { Fail "provenance" "build receipt missing: $BuildReceipt" }
 if (-not (Test-Path $ArtifactPath)) {
     Fail "preflight" "artifact missing: $ArtifactPath (run ops/build-rc.ps1 first)"
 }
@@ -210,6 +212,32 @@ $pinSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\pin.json")
 $recipeSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\targets\windows-x86_64.json")
 $profileSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\profiles\codec-base.json")
 $closureSha = Get-Sha256 $closurePath
+
+$receipt = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
+$receiptErrors = @()
+if ($receipt.script -ne "ops/build-rc.ps1" -or -not $receipt.ok) { $receiptErrors += "receipt is not a successful ops/build-rc.ps1 run" }
+if ($receipt.source.commit -ne $gitHead) { $receiptErrors += "source commit mismatch" }
+if ($receipt.artifacts.libsongcore_a_sha256 -ne $artifactSha) { $receiptErrors += "artifact sha256 mismatch" }
+if ([int64]$receipt.artifacts.libsongcore_a_size -ne $artifactBytes) { $receiptErrors += "artifact byte count mismatch" }
+if ($receipt.artifacts.abi_header_sha256 -ne $headerSha) { $receiptErrors += "header sha256 mismatch" }
+if ($receipt.source.recipe_sha256 -ne $recipeSha -or $receipt.ffmpeg_provenance.recipe_sha256 -ne $recipeSha) { $receiptErrors += "recipe sha256 mismatch" }
+if ($receipt.ffmpeg_provenance.profile_sha256 -ne $profileSha) { $receiptErrors += "profile sha256 mismatch" }
+if ($receipt.ffmpeg_provenance.closure_manifest_sha256 -ne $closureSha) { $receiptErrors += "closure sha256 mismatch" }
+if ($receipt.ffmpeg_provenance.commit -ne $pin.ffmpeg_commit_sha -or $receipt.ffmpeg_provenance.source_sha256 -ne $pin.source_sha256) { $receiptErrors += "pin identity mismatch" }
+if ($closure.target.recipe_sha256 -ne $recipeSha) { $receiptErrors += "closure recipe_sha256 mismatch" }
+if ($receiptErrors.Count -gt 0) { Fail "provenance" ($receiptErrors -join "; ") }
+$summary.build_receipt_sha256 = Get-Sha256 $BuildReceipt
+$python = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $python) { Fail "provenance" "python is required for the shared build-receipt verifier" }
+$treeOid = & git -C $ProjectRoot rev-parse 'HEAD^{tree}'
+& $python (Join-Path $ProjectRoot "tools\verify_songcore_build_receipt.py") `
+    --receipt $BuildReceipt --source-commit $gitHead --source-tree $treeOid `
+    --artifact $ArtifactPath --header (Join-Path $ProjectRoot "native\include\songcore.h") `
+    --recipe (Join-Path $ProjectRoot "native\ffmpeg\targets\windows-x86_64.json") `
+    --profile (Join-Path $ProjectRoot "native\ffmpeg\profiles\codec-base.json") `
+    --pin (Join-Path $ProjectRoot "native\ffmpeg\pin.json") --closure $closurePath `
+    --target windows-x86_64 --toolchain $receipt.toolchain.identity
+if ($LASTEXITCODE -ne 0) { Fail "provenance" "shared build-receipt verifier rejected the Windows build" }
 
 # --------------------------------------------- stage 1: WSL audit + licenses
 $stageRoot = Join-Path $OutDir "stage"
@@ -448,10 +476,9 @@ stream information, source-rate/source-layout Float32 interleaved PCM, seek,
 EOF). The ABI authority is include/songcore.h alone (ABI v1, frozen);
 packaging never modifies it.
 
-This is a release-candidate verification archive (#172), NOT a release: the
-concrete version number is provisional -- the next release tag is
-owner-reserved (contract section 14 Q1). songcore-v0.1.0 remains the
-immutable historical baseline.
+This is a release-substrate verification archive, NOT an RC or release. G4 is
+not approved; RC build is not authorized; no tag or Release was created. The
+next release tag remains owner-reserved (contract section 14 Q1).
 
 ## Contents
 
@@ -504,11 +531,11 @@ The archive contains the FFmpeg members in object form (effective license
 LGPL-2.1-or-later: the codec-base profile keeps gpl/version3/nonfree off and
 pulls no external lib* copylibs). The machine-verifiable rebuild inputs --
 native/ffmpeg/pin.json (tag->commit + zip sha256), the codec-base capability
-profile, the windows-x86_64 target recipe, the imported closure manifest
-(schema 2, units + flags), and the Xmake replay configuration -- are part of
-the source repository at the manifest's recorded commit; a licensee can
-recombine them to relink a modified FFmpeg closure without any undocumented
-step.
+profile, the windows-x86_64 target recipe and the Xmake import/replay tools are
+part of the source repository. The imported closure manifest is generated
+build output and is not in that commit. Until a clean pinned-source import plus
+relink recipe is independently executed, O3 remains FIX_REQUIRED; this archive
+does not claim an executable relink path.
 "@
 Write-LFText (Join-Path $stagePkg "README.md") $readme
 
@@ -540,7 +567,7 @@ $manifest = [ordered]@{
     sha256 = $stagedArtifactSha
     artifact_bytes = $artifactBytes
     archive_members = [int]$audit["MEMBER_COUNT"]
-    artifact_shared = $false
+    artifact_shared = $null
     shared_sha256 = $null
     public_symbols = $sortedExpected
     git_sha = $gitHead
@@ -555,9 +582,9 @@ $manifest = [ordered]@{
         recipe_sha256 = $recipeSha
     }
     tools = [ordered]@{
-        cc = "x86_64-w64-mingw32-gcc (GCC) 13-win32"
-        ar = "GNU ar (GNU Binutils) 2.45.90.20260125"
-        xmake = "xmake v2.9.7+20250101, A cross-platform build utility based on Lua"
+        cc = $receipt.toolchain.cc
+        ar = $receipt.toolchain.ar
+        xmake = $receipt.toolchain.xmake
     }
     sdk_ndk = "not applicable this round -- windows-x86_64: mingw-w64 cross, no MSVC/SDK (target recipe toolchain identity, contract section 8)"
     source = [ordered]@{ commit = $gitHead; status = "clean" }
@@ -612,9 +639,9 @@ $manifest = [ordered]@{
     }
     built_utc = $builtUtc
     packer = "release-substrate songcore-172 S2 windows package lane (ops/package-rc.ps1; pwsh $($PSVersionTable.PSVersion); WSL2 Ubuntu-24.04 audits: x86_64-w64-mingw32 binutils, xmake v2.9.7; artifact built by x86_64-w64-mingw32-gcc 13-win32)"
-    notes = ("songcore_version $Version is PROVISIONAL: the concrete next release number is owner-reserved " +
-             "(contract section 14 Q1); this is a release-candidate verification archive, not a release (contract " +
-             "section 11: a produced archive is not a release), and must never be published under the songcore-v* " +
+    notes = ("songcore_version $Version is caller-supplied: the concrete next release number is owner-reserved " +
+             "(contract section 14 Q1); this is a release-substrate verification archive, not an RC or release " +
+             "(G4 NOT_APPROVED; RC_BUILD NOT_AUTHORIZED), and must never be published under the songcore-v* " +
              "namespace without owner ratification. " +
              "files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; the set " +
              "arithmetic contract section 8 V1 states since the Issue #330 differential disposition). " +
@@ -687,7 +714,7 @@ $rtOk =
     ($rt.schema_version -eq 2) -and
     (@($rt.license.external_libs).Count -eq 0) -and
     ($null -eq $rt.shared_sha256) -and
-    ($rt.artifact_shared -eq $false) -and
+    ($null -eq $rt.artifact_shared) -and
     (@($rt.public_symbols).Count -eq 15) -and
     (@($rt.files.PSObject.Properties).Count -eq 12) -and
     (@($rt.license.license_files.PSObject.Properties).Count -eq 4) -and
@@ -722,7 +749,8 @@ $checks["V3_pin_carry_dups"] = (
     $manifest.ffmpeg_commit -eq $manifest.pin.ffmpeg_commit_sha -and $manifest.ffmpeg_commit -eq $pin.ffmpeg_commit_sha -and
     $manifest.ffmpeg_source_sha256 -eq $manifest.pin.ffmpeg_source_sha256 -and $manifest.ffmpeg_source_sha256 -eq $pin.source_sha256 -and
     $manifest.pin.pin_sha256 -eq $pinSha -and $manifest.closure.manifest_sha256 -eq $closureSha -and
-    $manifest.ffmpeg_profile_sha256 -eq $profileSha)
+    $manifest.ffmpeg_profile_sha256 -eq $profileSha -and
+    $closure.target.recipe_sha256 -eq $recipeSha)
 $checks["V4_symbols"] = ((($manifest.public_symbols | ForEach-Object { "$_" }) -join "`n") -eq (($sortedExpected | ForEach-Object { "$_" }) -join "`n"))
 $checks["V5_license_args"] = ($forbidden.Count -eq 0 -and -not $manifest.license.gpl_enabled -and
                               -not $manifest.license.version3_enabled -and -not $manifest.license.nonfree_enabled)

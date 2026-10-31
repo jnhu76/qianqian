@@ -1,0 +1,76 @@
+name: SongCore release substrate
+
+on:
+  pull_request:
+    paths:
+      - "ops/**"
+      - "native/include/songcore.h"
+      - "native/build/**"
+      - "native/ffmpeg/targets/**"
+      - "native/ffmpeg/profiles/**"
+      - "native/ffmpeg/pin.json"
+      - "LICENSE-MIT"
+      - "LICENSE-APACHE"
+      - "docs/release/songcore-release-contract.md"
+      - "evidence/songcore-172/linux/verify/package/external-consumer-example.c"
+      - "tools/verify_songcore_build_receipt.py"
+      - "tools/test_songcore_release_substrate.py"
+      - "tools/docs-verify.cmd"
+      - ".github/workflows/songcore-release-substrate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ops/**"
+      - "native/include/songcore.h"
+      - "native/build/**"
+      - "native/ffmpeg/targets/**"
+      - "native/ffmpeg/profiles/**"
+      - "native/ffmpeg/pin.json"
+      - "LICENSE-MIT"
+      - "LICENSE-APACHE"
+      - "docs/release/songcore-release-contract.md"
+      - "evidence/songcore-172/linux/verify/package/external-consumer-example.c"
+      - "tools/verify_songcore_build_receipt.py"
+      - "tools/test_songcore_release_substrate.py"
+      - "tools/docs-verify.cmd"
+      - ".github/workflows/songcore-release-substrate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-negative-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: bash -n ops/build-linux.sh ops/package-linux.sh
+      - name: M1-M10 provenance mutations
+        run: python3 tools/test_songcore_release_substrate.py
+  windows-parser:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell release entries
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/build-rc.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/package-rc.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/run-csuite.ps1", [ref]$null, [ref]$errors)
+          [void][System.Management.Automation.Language.Parser]::ParseFile("ops/run-binding-gate.ps1", [ref]$null, [ref]$errors)
+          if ($errors.Count -ne 0) { $errors | Format-List; exit 1 }
+      - name: Cross-platform receipt mutations
+        run: python tools/test_songcore_release_substrate.py
+      - name: Windows packager requires build receipt
+        shell: pwsh
+        run: |
+          & ./ops/package-rc.ps1 -ProjectRoot $PWD -Version 1.2.3 -BuildReceipt missing.json 2>&1 | Out-String | Write-Host
+          if ($LASTEXITCODE -eq 0) { throw "package-rc accepted a missing BuildReceipt" }
+      - name: Docs wrapper negative controls
+        shell: cmd
+        run: |
+          call tools\docs-verify.cmd
+          if not "%ERRORLEVEL%"=="2" exit /b 1
+          call tools\docs-verify.cmd "%CD%"
+          if not "%ERRORLEVEL%"=="3" exit /b 1

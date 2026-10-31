@@ -53,6 +53,7 @@
 # validation, never silently.
 param(
     [string]$ProjectRoot = "",
+    [Parameter(Mandatory=$true)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
     [string]$Distro = "Ubuntu-24.04",
     [string]$WslWorkRoot = "/home/hoo/q172rc",
     [string]$BuildDir = "",
@@ -166,6 +167,9 @@ if ($LASTEXITCODE -ne 0) { Fail "preflight" "git rev-parse failed: $gitHead" }
 $gitBranch = & git -C $ProjectRoot rev-parse --abbrev-ref HEAD 2>&1
 $summary.git_branch = $gitBranch
 $summary.source.commit = $gitHead
+if ($gitHead -ne $SourceCommit) {
+    Fail "preflight" "HEAD $gitHead does not equal requested -SourceCommit $SourceCommit"
+}
 
 # Pin the source SHA by refusing uncommitted tracked changes under native/
 # (the build input must be attributable to the SHA above; untracked files
@@ -340,7 +344,9 @@ else
     echo "FAIL: no complete imported FFmpeg closure available."
     echo "  The RC lane never downloads or re-imports FFmpeg."
     echo "  Pass -ClosureSource <wsl-path> pointing at a complete imported"
-    echo "  closure (ffmpeg-src/ + ffmpeg-xmake/{manifest.json,oracle}/), or"
+    echo "  closure (ffmpeg-src/ + ffmpeg-xmake/{manifest.json,oracle}/)."
+    echo "ops/verify-build.ps1 validates and consumes an existing imported closure;"
+    echo "it does not derive one, so closure derivation remains NOT_ESTABLISHED here."
     echo "  run the D2 import once (ops/verify-build.ps1) first."
     exit 11
 fi
@@ -371,6 +377,7 @@ W="$ROOT/win"
 cd "$W/native"
 
 xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1
+xmake clean -a > "$EV/clean.log" 2>&1
 xmake build songcore > "$EV/build.log" 2>&1
 
 test -f build/artifacts/libsongcore.a || { echo "FAIL: libsongcore.a missing after build"; exit 12; }
@@ -672,6 +679,23 @@ echo "R2_BUILD_OK"
 }
 
 # ------------------------------------------------------------------ finish
+$compileActions = (Select-String -Path (Join-Path $evDir "build.log") -Pattern "compiling|linking|archiving" | Measure-Object).Count
+if ($compileActions -le 0) { Fail "execution" "zero compile/link/archive actions after xmake clean -a" }
+$treeOid = & git -C $ProjectRoot rev-parse 'HEAD^{tree}'
+$summary.schema_version = 1
+$summary.qualification = "RELEASE_QUALIFIED"
+$summary.source["tree_oid"] = $treeOid
+$summary.target = [ordered]@{ id = "windows-x86_64" }
+$summary.toolchain["identity"] = ("cc=" + $summary.toolchain.cc + ";ar=" + $summary.toolchain.ar + ";xmake=" + $summary.toolchain.xmake)
+$summary.inputs = [ordered]@{
+    header = [ordered]@{ sha256 = $headerShaWin2 }
+    recipe = [ordered]@{ sha256 = $recipeSha }
+    profile = [ordered]@{ sha256 = $profileSha }
+    pin = [ordered]@{ sha256 = (Get-FileHash -Algorithm SHA256 (Join-Path $ProjectRoot "native\ffmpeg\pin.json")).Hash.ToLowerInvariant() }
+    closure = [ordered]@{ sha256 = $closureManifestSha }
+}
+$summary.artifacts["static"] = [ordered]@{ sha256 = $sha; bytes = [int64]$size }
+$summary.execution = [ordered]@{ compile_actions = $compileActions; cache_reuse = $false }
 $summary.ok = $true
 Save-Summary
 exit 0

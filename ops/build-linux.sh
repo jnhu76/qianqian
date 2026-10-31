@@ -209,11 +209,13 @@ closure_reusable() {
   [ -f build/ffmpeg-src/.qianqian-verified ] || return 1
   grep -q "^${PIN_COMMIT}|${PIN_SHA}$" build/ffmpeg-src/.qianqian-verified || return 1
   [ -f build/ffmpeg-xmake/oracle/ffbuild/config.mak ] || return 1
-  python3 - "$MAN" "$RECIPE" <<'PY' || return 1
+  python3 - "$MAN" "$RECIPE" "$PROFILE" "$PIN" <<'PY' || return 1
 import json, sys, hashlib, platform
 man = json.load(open(sys.argv[1]))
 rec = json.load(open(sys.argv[2]))
 rec_sha = hashlib.sha256(open(sys.argv[2], 'rb').read()).hexdigest()
+profile_sha = hashlib.sha256(open(sys.argv[3], 'rb').read()).hexdigest()
+pin = json.load(open(sys.argv[4]))
 t, tt, tl = man.get("target", {}), rec.get("ffmpeg", {}), man.get("toolchain", {})
 ok = (man.get("schema") == 2
       and t.get("id") == "linux-x86_64"
@@ -221,6 +223,10 @@ ok = (man.get("schema") == 2
       and t.get("arch") == rec.get("arch")
       and t.get("target_os") == tt.get("target_os")
       and t.get("recipe_sha256") == rec_sha
+      and man.get("profile_sha256") == profile_sha
+      and man.get("ffmpeg_tag") == pin.get("ffmpeg_tag")
+      and man.get("ffmpeg_commit_sha") == pin.get("ffmpeg_commit_sha")
+      and man.get("ffmpeg_source_sha256") == pin.get("source_sha256")
       and tl.get("system") == platform.system().lower()
       and tl.get("machine") == platform.machine().lower())
 sys.exit(0 if ok else 1)
@@ -265,11 +271,16 @@ print('target', json.dumps(m['target'], sort_keys=True)); print('toolchain', jso
 STAGE=build
 export PATH="$HOME/.local/bin:$PATH"
 xmake f -p linux -a x86_64 -m release -y >"$EV/xmake-config.log" 2>&1
+xmake clean -a >"$EV/xmake-clean.log" 2>&1
 xmake build songcore >"$EV/xmake-build.log" 2>&1
 xmake build songcore_static >"$EV/xmake-build-static-explicit.log" 2>&1
 xmake build songcore_shared >"$EV/xmake-build-shared-explicit.log" 2>&1
 log "stage3: xmake build songcore OK (static+shared per recipe)"
 fact build ok
+COMPILE_ACTIONS=$(cat "$EV"/xmake-build*.log | grep -Eic 'compiling|linking|archiving' || true)
+fact compile_actions "$COMPILE_ACTIONS"
+[ "$COMPILE_ACTIONS" -gt 0 ] || die "xmake reported zero compile/link/archive actions after xmake clean -a"
+fact build_cache_reuse false
 
 # ---------------------------------------------------------------- stage 4
 STAGE=verify
@@ -357,7 +368,7 @@ summary = {
     "clone": d["clone"], "closure": d["closure"],
     "target_recipe": "native/ffmpeg/targets/linux-x86_64.json",
     "artifact_policy": {"static": True, "shared": True, "wasm": False},
-    "ffmpeg": {"tag": "n9.0.1", "commit": d["ffmpeg_commit"],
+    "ffmpeg": {"tag": re.findall(r"ffmpeg_tag (\S+)", open(os.path.join(ev, "manifest-identity.txt")).read())[0], "commit": d["ffmpeg_commit"],
                "source_sha256": d["ffmpeg_source_sha256"],
                "manifest_sha256": d["manifest_sha256"],
                "closure_translation_units": units},
@@ -373,6 +384,20 @@ summary = {
                "abi_export_set_equals_songcore_h": "PASS",
                "shared_no_libav_needed": "PASS", "sha256_recorded": "PASS"},
     "verdict": "PASS",
+    "schema_version": 1,
+    "qualification": "RELEASE_QUALIFIED",
+    "source": {"commit": commit, "tree_oid": d["tree"]},
+    "target": {"id": "linux-x86_64"},
+    "toolchain": {"identity": "gcc=" + os.popen("gcc --version").readline().strip() + ";xmake=" + re.sub(r"\x1b\[[0-9;]*m", "", os.popen("xmake --version 2>/dev/null").readline().strip())},
+    "inputs": {
+        "header": {"sha256": sha["include/songcore.h"]},
+        "recipe": {"sha256": d["recipe_sha256"]},
+        "profile": {"sha256": d["profile_sha256"]},
+        "pin": {"sha256": d["pin_json_sha256"]},
+        "closure": {"sha256": d["manifest_sha256"]},
+    },
+    "execution": {"compile_actions": int(d["compile_actions"]),
+                  "cache_reuse": d["build_cache_reuse"] == "true"},
 }
 out = json.dumps(summary, indent=2)
 assert len(out) < 65536

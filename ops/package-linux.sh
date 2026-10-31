@@ -56,7 +56,7 @@
 #   6. write the SHA256SUMS sidecar and a package-summary.json receipt.
 #
 # Usage:
-#   ops/package-linux.sh --version <X.Y.Z[-suffix]> --source-commit <40-hex> \
+#   ops/package-linux.sh --version <X.Y.Z> --source-commit <40-hex> \
 #                        --work-root <build root> --out-dir <dir> \
 #                        [--artifact-static <path>] [--artifact-shared <path>] \
 #                        [--closure-manifest <path>] [--pinned-zip <path>] \
@@ -80,12 +80,8 @@
 #   --consumer-example default <work-root>/evidence/songcore-172/linux/verify/
 #                      package/external-consumer-example.c (the tracked S3
 #                      template)
-#   --build-receipt    optional ops/build-linux.sh summary.json. When supplied,
-#                      the packaged artifact bytes are BOUND to --source-commit
-#                      (receipt head + both artifact sha256 are re-verified).
-#                      When omitted the package still builds, but the manifest
-#                      notes and package-summary.json state that the artifact
-#                      provenance is unattested.
+#   --build-receipt    REQUIRED ops/build-linux.sh summary.json. Release-grade
+#                      packaging never accepts unattested artifact bytes.
 #
 # Version: caller-supplied only. No tag, no GitHub Release, no publication.
 #
@@ -138,10 +134,9 @@ done
 [ -n "$VERSION" ] || die "--version is required: this entry has no default version (the next release number is owner-reserved, contract section 14 Q1)"
 [ "$VERSION" != "$IMMUTABLE_HISTORICAL_VERSION" ] \
   || die "refusing version '$VERSION': songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+.0-9A-Za-z]+)?$ ]] \
-  || die "version '$VERSION' is not a songcore-vMAJOR.MINOR.PATCH[-suffix] identity (contract section 2 VERSION_RULE form)"
-CORE=${VERSION%%[-+]*}
-IFS=. read -r V_MAJOR V_MINOR V_PATCH <<<"$CORE"
+[[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+  || die "version '$VERSION' is not the authorized MAJOR.MINOR.PATCH identity (contract section 2; suffixes are not authorized)"
+IFS=. read -r V_MAJOR V_MINOR V_PATCH <<<"$VERSION"
 for c in "$V_MAJOR" "$V_MINOR" "$V_PATCH"; do
   [[ "$c" =~ ^(0|[1-9][0-9]*)$ ]] \
     || die "version '$VERSION' has a leading-zero or non-decimal component '$c' (contract section 2)"
@@ -152,6 +147,7 @@ done
   || die "--source-commit must be a full lowercase 40-hex sha (got '$SOURCE_COMMIT')"
 [ -n "$WORK_ROOT" ] || die "--work-root is required"
 [ -n "$OUT_DIR" ]   || die "--out-dir is required"
+[ -n "$BUILD_RECEIPT" ] || die "--build-receipt is required for release-qualified packaging"
 [ -d "$WORK_ROOT" ] || die "work root $WORK_ROOT does not exist"
 { [ -d "$WORK_ROOT/.git" ] || [ -f "$WORK_ROOT/.git" ]; } || die "work root $WORK_ROOT is not a git checkout"
 
@@ -167,6 +163,8 @@ CLOSURE_MANIFEST=${CLOSURE_MANIFEST:-$WORK_ROOT/native/build/ffmpeg-xmake/manife
 PINNED_ZIP=${PINNED_ZIP:-$WORK_ROOT/native/build/downloads/ffmpeg-n9.0.1.zip}
 CONSUMER_EXAMPLE=${CONSUMER_EXAMPLE:-$WORK_ROOT/evidence/songcore-172/linux/verify/package/external-consumer-example.c}
 
+[ -f "$BUILD_RECEIPT" ] || die "missing build receipt: $BUILD_RECEIPT"
+
 PIN=$WORK_ROOT/native/ffmpeg/pin.json
 RECIPE=$WORK_ROOT/native/ffmpeg/targets/linux-x86_64.json
 PROFILE=$WORK_ROOT/native/ffmpeg/profiles/codec-base.json
@@ -178,9 +176,6 @@ for f in "$ART_STATIC" "$ART_SHARED" "$CLOSURE_MANIFEST" "$PINNED_ZIP" "$PIN" \
          "$RECIPE" "$PROFILE" "$HEADER" "$LIC_MIT" "$LIC_APACHE" "$CONSUMER_EXAMPLE"; do
   [ -f "$f" ] || die "missing input: $f"
 done
-if [ -n "$BUILD_RECEIPT" ]; then
-  [ -f "$BUILD_RECEIPT" ] || die "missing build receipt: $BUILD_RECEIPT"
-fi
 
 for t in git python3 sha256sum ar nm objdump readelf file tar gzip comm; do
   command -v "$t" >/dev/null 2>&1 || die "missing required tool: $t"
@@ -442,27 +437,16 @@ cp -f "$AUD/header-symbols.txt" "$STAGE/metadata/symbols.txt"
 # must not stamp a stale artifact with the current commit's name).
 PROVENANCE_ATTESTED=false
 BUILD_RECEIPT_SHA=""
-if [ -n "$BUILD_RECEIPT" ]; then
-  python3 - "$BUILD_RECEIPT" "$SOURCE_COMMIT" "$ART_STATIC_SHA" "$ART_SHARED_SHA" <<'PY' \
-    || die "build receipt $BUILD_RECEIPT does not bind these artifact bytes to $SOURCE_COMMIT"
-import json, sys
-path, commit, static_sha, shared_sha = sys.argv[1:5]
-r = json.load(open(path, encoding="utf-8"))
-errs = []
-if r.get("entry") != "ops/build-linux.sh": errs.append("entry %r != ops/build-linux.sh" % r.get("entry"))
-if r.get("verdict") != "PASS": errs.append("verdict %r != PASS" % r.get("verdict"))
-if r.get("head") != commit: errs.append("receipt head %r != --source-commit %s" % (r.get("head"), commit))
-st = (r.get("artifacts") or {}).get("static") or {}
-sh = (r.get("artifacts") or {}).get("shared") or {}
-if st.get("sha256") != static_sha: errs.append("receipt static sha256 %r != packaged %s" % (st.get("sha256"), static_sha))
-if sh.get("sha256") != shared_sha: errs.append("receipt shared sha256 %r != packaged %s" % (sh.get("sha256"), shared_sha))
-if errs:
-    print("FAIL: " + "; ".join(errs), file=sys.stderr)
-    sys.exit(1)
-PY
-  PROVENANCE_ATTESTED=true
-  BUILD_RECEIPT_SHA=$(sha256sum "$BUILD_RECEIPT" | awk '{print $1}')
-fi
+SOURCE_TREE=$(git -C "$WORK_ROOT" rev-parse 'HEAD^{tree}')
+TOOLCHAIN_ID="gcc=$(gcc --version | head -1);xmake=$(xmake --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
+python3 "$WORK_ROOT/tools/verify_songcore_build_receipt.py" \
+  --receipt "$BUILD_RECEIPT" --source-commit "$SOURCE_COMMIT" --source-tree "$SOURCE_TREE" \
+  --artifact "$ART_STATIC" --artifact-shared "$ART_SHARED" --header "$HEADER" \
+  --recipe "$RECIPE" --profile "$PROFILE" --pin "$PIN" --closure "$CLOSURE_MANIFEST" \
+  --target linux-x86_64 --toolchain "$TOOLCHAIN_ID" \
+  || die "build receipt $BUILD_RECEIPT does not bind these artifact bytes and inputs to $SOURCE_COMMIT"
+PROVENANCE_ATTESTED=true
+BUILD_RECEIPT_SHA=$(sha256sum "$BUILD_RECEIPT" | awk '{print $1}')
 
 NEEDED_CSV=$(paste -sd' ' "$AUD/needed-libs.txt")
 python3 - "$STAGE/README.md" "$VERSION" "$SOURCE_COMMIT" "$MEMBER_COUNT" "$NEEDED_CSV" "$GLIBC_FLOOR" <<'PY' \
@@ -482,8 +466,8 @@ The version string is the one the packaging caller supplied. The concrete next
 release number is owner-reserved (contract section 14 Q1); packaging creates no
 tag, no GitHub Release and no other published asset.
 
-Support is claimed for `linux-x86_64` only. No other platform, architecture,
-distro family or runtime ABI beyond ABI v1 is claimed by this package.
+This archive makes no platform-support or release-readiness claim. G4 is not
+approved; RC build is not authorized; no tag or Release was created.
 
 ## Contents
 
@@ -545,10 +529,11 @@ The archive contains the FFmpeg members in object form (effective license
 LGPL-2.1-or-later: the codec-base profile keeps gpl/version3/nonfree off and
 pulls no external lib* copylibs). The machine-verifiable rebuild inputs --
 native/ffmpeg/pin.json (tag->commit + zip sha256), the codec-base capability
-profile, the linux-x86_64 target recipe, the imported closure manifest
-(schema 2, units + configure args) and the Xmake replay configuration -- live
-in the source repository at commit {commit}; a licensee can recombine them to
-relink a modified FFmpeg closure without any undocumented step.
+profile, the linux-x86_64 target recipe and the Xmake import/replay tools live
+in the source repository at commit {commit}. The imported closure manifest is
+generated build output and is not in that commit. Until a clean pinned-source
+import plus relink recipe is independently executed, O3 remains FIX_REQUIRED;
+this archive does not claim an executable relink path.
 """.format(version=version, commit=commit, members=members, needed=needed, floor=floor)
 open(path, "w", encoding="utf-8", newline="\n").write(text)
 PY

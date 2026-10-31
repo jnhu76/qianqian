@@ -49,7 +49,8 @@
 param(
     [string]$ProjectRoot = "",
     [string]$ArtifactPath = "",
-    [string]$ExpectedArtifactSha256 = "1f5f8cf8b3f3a6688a034dd35b06b2be8fa546e58b72d962e0b3b2af758fd402",
+    [Parameter(Mandatory=$true)][string]$BuildReceipt,
+    [string]$ExpectedArtifactSha256 = "",
     [string]$ExpectedHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
     [string]$Gcc = "",
     [string]$ResultsRoot = ""
@@ -60,6 +61,11 @@ $ErrorActionPreference = "Stop"
 if ($ProjectRoot -eq "") { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 if ($ArtifactPath -eq "") { $ArtifactPath = Join-Path $ProjectRoot "native\build\artifacts\libsongcore.a" }
+if (-not (Test-Path $BuildReceipt)) { Write-Host "ABORT exit=10 build receipt missing: $BuildReceipt"; exit 10 }
+$build = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
+if ($build.script -ne "ops/build-rc.ps1" -or -not $build.ok) { Write-Host "ABORT exit=11 invalid build receipt"; exit 11 }
+$ExpectedArtifactSha256 = $build.artifacts.libsongcore_a_sha256
+if ($build.source.commit -ne (& git -C $ProjectRoot rev-parse HEAD)) { Write-Host "ABORT exit=11 build receipt source mismatch"; exit 11 }
 if ($ResultsRoot -eq "") { $ResultsRoot = Join-Path $ProjectRoot "evidence\songcore-172\suite-results" }
 
 $HeaderPath = Join-Path $ProjectRoot "native\include\songcore.h"
