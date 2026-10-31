@@ -11,8 +11,8 @@ listed per section. Artifacts audited are the GREEN products of the D2 route:
 ## 1. What the merged static archive actually requires
 
 `nm -A --undefined-only` over the merged archive
-(`audit/win-undefined-by-member.txt`, 3150 rows; unique externals
-`audit/win-external-census.txt`, 1185 symbols) classifies into:
+(3150 by-member rows; unique externals `audit/win-external-census.txt`, 1185
+symbols) classifies into:
 
 | class | examples | provided by (windows-x86_64) |
 |---|---|---|
@@ -20,7 +20,8 @@ listed per section. Artifacts audited are the GREEN products of the D2 route:
 | Win32 API | `ReleaseSRWLockExclusive` | kernel32 — mingw default link spec |
 | **BCrypt\*** | `BCryptOpenAlgorithmProvider`, `BCryptGenRandom`, `BCryptCloseAlgorithmProvider` | **`-lbcrypt` — NOT in any default spec; must be explicit** |
 
-BCrypt ownership (measured, `audit/win-undefined-by-member.txt`):
+BCrypt ownership (measured; the by-member dump itself was removed by the
+2026-11-01 evidence diet, the three rows are the recorded result):
 
 ```
 libsongcore.a:random_seed.c.obj: U BCryptOpenAlgorithmProvider

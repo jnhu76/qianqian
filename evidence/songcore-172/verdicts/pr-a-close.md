@@ -47,7 +47,8 @@ differential（检查的平台假设 vs 本地门禁宿主），**非本 PR 两�
 | Windows（WinLibs gcc 16.2.0，`/c/Users/fred1/tools/mingw64/bin` 加入 PATH） | `gcc -c t.c -o t.o`；`od -A x -t x1 -N 4 t.o`；`objdump -f t.o` | magic `64 86`；`file format pe-x86-64` |
 | WSL Ubuntu-24.04（gcc 15.2.0，同一探针源码） | 同上（经 `wsl.exe -d Ubuntu-24.04 -- bash -lc`） | magic `7f 45 4c 46`；`file format elf64-x86-64`（`file`：ELF 64-bit LSB relocatable） |
 
-与既有物证一致：`evidence/songcore-172/pr-a-host-gcc-object-format-proof-win-pe.o`
+与既有物证一致（该 `pr-a-host-gcc-object-format-proof-win-pe.o` 已按 2026-11-01
+证据精简移除，结论与对象格式说明保留）：host gcc 产出 `pe-x86-64`
 （本人以 `od` + `file` 复验：x86-64 COFF object file，非 ELF）。
 
 ## 3. 门禁来源与分工（git log + 配置读取）
@@ -68,8 +69,9 @@ differential（检查的平台假设 vs 本地门禁宿主），**非本 PR 两�
 
 ## 4. 运行记录核验（前序留档逐条读取）
 
-- 完整门禁 `lefthook run pre-push --all-files`：`pr-a-lefthook.log` 与
-  `pr-a-lefthook.attempt4-xmake-but-fail.log` 经 `cmp` 逐字节相同。summary
+- 完整门禁 `lefthook run pre-push --all-files`：attempt 4 终态日志与现行
+  `pr-a-lefthook.log` 经 `cmp` 逐字节相同（两份日志已按 2026-11-01 证据精简
+  移除）。summary
   （log 尾部 summary 段）：commit-convention ✔ 0.53s、vocabulary ✔ 1.67s、
   plugin-boundary ✔ 34.08s、rust-fmt ✔ 1.24s、rust-clippy ✔ 4.45s、
   rust-test ✔ 170.15s、release-policy ✘ 3.95s、docs-verify skip（piped

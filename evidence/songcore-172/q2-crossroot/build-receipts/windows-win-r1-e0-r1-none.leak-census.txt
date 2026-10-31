@@ -1,1 +1,0 @@
-build/artifacts/libsongcore.a {'/home/hoo/qq329/win-r1/src': 9, '/home/hoo': 9, 'C:\\': 0, '/mnt/': 0}

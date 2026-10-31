@@ -1,3 +1,0 @@
-CASE lf.rust-vs-frozen-rust PASS
-CASE lf.rust-vs-frozen-c PASS
-MODE abi-layout-frozen CASES=2 FAILED=0 RESULT=PASS

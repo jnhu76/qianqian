@@ -33,3 +33,15 @@ research/wrk-scan/target/
 
 # Mimosa local workspace data
 .mimosa/
+
+# Research/agent process output is never versioned. Git receives only the
+# curated conclusion for a topic (evidence/<topic>/RESULTS.md or the topic's
+# retained result documents). Raw run logs, per-run receipts, intermediate
+# artifacts and agent workflow records stay local or outside the repository.
+.ao-output/
+evidence/**/raw/
+evidence/songcore-172/build/
+evidence/songcore-172/binding-parity/
+evidence/songcore-172/suite-results/
+evidence/songcore-172/external-accept/
+evidence/songcore-172/package/stage-audit.log

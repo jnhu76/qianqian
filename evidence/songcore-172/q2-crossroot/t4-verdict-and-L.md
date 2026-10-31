@@ -1,7 +1,12 @@
 # T4 verdict and L1/L2/L3 determination — SongCore #172 Q2 cross-root (#329)
 
-Every claim below is grounded in the files in this directory (paths relative
-to this file). This is campaign evidence, not release authority: #172 G4 and
+Every claim below is grounded in the measurements of this campaign. Paths
+relative to this file are retained where the file exists; `cmp/all-verdicts/`,
+`cmp/experiment-matrix.md` and `gates/six-root-gate-summary.md` are retained,
+while `build-receipts/`, `fix-witness/`, `cmp/controls/`, `cmp/*-winner/`,
+`gates/receipts/` and `drivers/` were removed by the 2026-11-01 evidence diet
+(bytes recoverable from Git history before `fae5173`). Their numbers are quoted
+inline below and summarized in [`../RESULTS.md`](../RESULTS.md) §3.8. This is campaign evidence, not release authority: #172 G4 and
 the release contract govern any release decision. Definitions used are the
 #329 owner authorization's: L1 = fresh clone AND freshly derived FFmpeg
 closure per target; L2 = genuine G2 on R2 for both targets (including native

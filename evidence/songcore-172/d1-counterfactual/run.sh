@@ -32,7 +32,7 @@
 #   e) cargo rerun-if-changed behavior across file content changes
 #
 # Usage: bash run.sh red|green     (Git Bash on Windows, or bash inside WSL)
-# Results: results/<os>-<phase>-*.txt (committed). Scratch is recreated per run
+# Results: results/<os>-<phase>-*.txt (local, git-ignored). Scratch is recreated per run
 # and removed on success.
 set -euo pipefail
 

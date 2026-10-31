@@ -3,8 +3,10 @@
 Truth class: execution evidence and routing, not architecture authority.
 Base: `98ff343467b66890a979edd54d21e14f0275c574` (current origin/main at fetch).
 Run: 2026-10-27 UTC through 2026-10-28 Asia/Shanghai. Native Windows 11
-build 26300, `x86_64-pc-windows-msvc`, rustc 1.96.0. Full environment and
-audio endpoint identities: [raw/environment.json](raw/environment.json).
+10.0.26300 x86_64, `x86_64-pc-windows-msvc`, rustc/cargo 1.96.0
+(ac68faa20, LLVM 22.1.2); default eRender endpoint "扬声器 (Realtek(R)
+Audio)", status OK, shared-mode. The raw environment JSON was removed by the
+2026-11-01 evidence diet; these identities are the recorded values.
 
 `PRODUCTION_BEHAVIOR_CHANGE=NONE`. Test-only observation/prefill seams and
 executable evidence only. No D11/D14/K0/ABI changes. Temporary production
@@ -16,8 +18,9 @@ PR #293 is merged at `fc81b68b9ebd1cf7624b217ad04872d12b3e0395`, head
 `d7d9f2e39bb3723c365c54a264df4e76c895a401`. PR #294 is merged at
 `798175f10d68204e5f89c788020e074d8643d9c4`, head
 `4c4cd69bbedffcdde7b21e31beba0ac623ed1f5c`. Both merge commits are ancestors
-of the base. Issue snapshots are retained under `raw/issue-*.json`; their
-historical body prose is not treated as current PR state.
+of the base. Issue/PR snapshots were consulted during the run and are not
+retained (2026-11-01 evidence diet); their historical body prose is not
+treated as current PR state.
 
 The current #290 accounting update is
 [comment 6446817440](https://github.com/jnhu76/qianqian/issues/290#issuecomment-6446817440).
@@ -83,8 +86,9 @@ obligations. A string containing "diagnostic" does not make it disposable.
 
 C1 = BLOCKED_SINK; C2 = STOPPED_CONSUMER; C3 = CAPACITY_EXHAUSTION;
 C4 = WRITE_FAILURE. PASS is scoped to the controlled boundary named below,
-not all device, scheduling or platform behavior. `raw/results.json` is the
-machine-readable cell ledger with exact log links.
+not all device, scheduling or platform behavior. The matrix below is the
+retained cell ledger; the per-cell logs were removed by the 2026-11-01
+evidence diet.
 
 | Outlet | C1 | C2 | C3 | C4 |
 |---|---|---|---|---|
@@ -181,7 +185,7 @@ in a native Linux LF checkout by `research/diagnostics-tier2/linux-gate.sh`.
 Its four arguments are the local repository, evidence checkout, a new
 validation directory and the verification commit. Node/npm, Python, Cargo,
 the pinned nightly and Lefthook must be on that environment's PATH.
-`COMMANDS.md` and `raw/linux-gate-environment.json` retain the exact setup.
+`COMMANDS.md` retains the exact setup.
 This gate is Linux regression evidence, not Windows or native decode proof.
 Native Windows workspace regression and the explicit 32 armed controls are
 recorded independently.
@@ -201,15 +205,15 @@ not a green workspace claim: WASAPI finished 26/28, with the existing
 `a_publication_moved_into_a_comment_is_rejected` failing. The baseline-only
 reproducer `baseline-oracle.ps1` extracts both oracle and source from main
 `98ff343` unchanged. Both cases pass with LF and both fail with CRLF on the
-same Windows compiler: `raw/baseline-oracle.json` and four raw runs retain
-the source/executable hashes. Their multi-line mutations were not applied
+same Windows compiler; the baseline-oracle source/executable hashes were
+recorded at the time and are not retained (2026-11-01 evidence diet). Their multi-line mutations were not applied
 to CRLF input. This is independent baseline evidence, not an inference from
 the changed diagnostic helper. Subsequent workspace suites after Cargo's
 early stop are not claimed executed. No existing oracle is rewritten here.
 
 ## Oracle repairs and falsification
 
-Initial OS-pipe probes are retained in `raw/initial/`: GetNamedPipeInfo
+Initial OS-pipe probes (not retained, 2026-11-01 evidence diet): GetNamedPipeInfo
 reported nominal 4096 bytes while PeekNamedPipe observed 8192. The original
 `available >= nominal` comparison therefore did not prove a full buffer or
 a pending syscall. Those original claimed C1 passes are **FAIL_ORACLE**, not
@@ -221,7 +225,7 @@ the empty facility correctly drained. This is **FAIL_ORACLE**, repaired by
 observing the detached writer itself. An initial exit-report stopped row
 controlled the wrong consumer and is withdrawn, not promoted to PASS.
 
-Initial panic counter mutations ran RED but hid assertion payloads either on the registered critical thread or through the test predecessor, so their exact signatures were unobservable. `raw/round1/` retains that non-qualifying receipt. The test predecessor and the specific full-pool rejection mismatch now print to healthy stdout; final mutation receipts require
+Initial panic counter mutations ran RED but hid assertion payloads either on the registered critical thread or through the test predecessor, so their exact signatures were unobservable; that non-qualifying round-1 receipt is not retained. The test predecessor and the specific full-pool rejection mismatch now print to healthy stdout; final mutation receipts require
 both RED and the named signature. Runner also rejects missing one-test
 execution, missing result markers, child failure and watchdog/harness errors.
 
@@ -229,8 +233,9 @@ Final expectations are 32 armed control executions, 48 classified cells, 23 exac
 
 The rerunnable mutation script is `research/diagnostics-tier2/mutations.ps1`.
 Each target file is backed up as bytes and restored in finally, with SHA256
-identity checked. `raw/mutations.json` records per-outlet signatures and
-results; each mutant has a separate build log and raw child log. Mutations
+identity checked. The mutation ledger recorded per-outlet signatures and
+results, with a separate build log and raw child log per mutant; those
+receipts are not retained (2026-11-01 evidence diet). Mutations
 exercise producer synchronous stderr, consumer waits, α rejection accounting,
 export-loss accounting, critical previous-hook chaining, joining the detached
 report writer and misreporting its Err as success. Mutant build errors do not
@@ -240,7 +245,7 @@ count as kills. These are verification interventions, not product fixes.
 
 Pin: `n9.0.1`, commit `bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa`.
 Fetched exact-commit [libavutil/log.c](https://github.com/FFmpeg/FFmpeg/blob/bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa/libavutil/log.c),
-retained as `raw/ffmpeg-log.c`, SHA256
+retained as `ffmpeg-log.c`, SHA256
 `0b0c949a1124bbfc0af710b7c6c63b7f767d5bd38857e41dd75c6b9c5199cfa5`.
 Lines 398–438 put the file mutex **inside av_log_default_callback**. Lines
 460–469 load the callback atomically and call it directly; av_vlog does not

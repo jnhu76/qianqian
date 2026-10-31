@@ -3,7 +3,9 @@
 Campaign: WINDOWS-ERROR-CONE-RUNTIME-1. Branch `evidence/windows-runtime-288`
 (from main `fc81b68`; PR #287 implementation `b86a9ce` confirmed ancestor).
 This ledger is the execution record; oracle design authority is the frozen
-`SCENARIO_MATRIX.md`; causal chains are `EXECUTION_DAGS.md`. Raw logs: `raw/`.
+`SCENARIO_MATRIX.md`; causal chains are `EXECUTION_DAGS.md`. Raw logs: `raw/`
+(local, git-ignored since 2026-11-01; the rows below are the recorded result,
+and `harness/run_sink_row.ps1` regenerates them).
 
 ## Environment identity (R0)
 

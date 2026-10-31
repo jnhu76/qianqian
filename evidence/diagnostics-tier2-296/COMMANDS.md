@@ -31,7 +31,8 @@ Choose a new destination directory for reproduction; the script refuses to
 overwrite an existing one. This run initially omitted the Lefthook PATH entry;
 that failed receipt is retained. The completed command is the unchanged
 `lefthook run pre-push --all-files` in the indicated LF checkout with the
-full PATH above. `raw/pre-push-linux.log` and `raw/linux-gate-environment.json`
+full PATH above. The gate writes its log and environment JSON under `raw/`
+(local and git-ignored since the 2026-11-01 evidence diet).
 own that gate result. Website/tooling fetches happen before the gate.
 
 Windows full-gate attempts are retained as failed environment/oracle
@@ -55,7 +56,8 @@ kept unread rather than copied into the archive; its lock-acquisition witness
 travels over healthy stdout.
 
 Each mutation logs its build, exact row signature, baseline target-file hash
-and result in `raw/mutations.json`. Restoration is byte-for-byte in finally.
+and result in `raw/mutations.json` (local, git-ignored). Restoration is
+byte-for-byte in finally.
 `results.ps1` rejects incomplete receipts and creates the 48-cell ledger plus
 a SHA256 manifest of the test/runner/source inputs. Normal production code
 restoration is independently visible in the final Git diff.
@@ -63,16 +65,17 @@ restoration is independently visible in the final Git diff.
 Pinned FFmpeg source acquisition:
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/FFmpeg/FFmpeg/bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa/libavutil/log.c -OutFile evidence/diagnostics-tier2-296/raw/ffmpeg-log.c
-Get-FileHash evidence/diagnostics-tier2-296/raw/ffmpeg-log.c
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/FFmpeg/FFmpeg/bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa/libavutil/log.c -OutFile evidence/diagnostics-tier2-296/ffmpeg-log.c
+Get-FileHash evidence/diagnostics-tier2-296/ffmpeg-log.c
 ```
 
 The source URL/commit and expected SHA256 are in REPORT.md. This source
 receipt is not a linked native binary identity or a callback runtime result.
 
 GitHub issue/PR snapshots were obtained through the connected GitHub API.
-`raw/pr-293.json` / `raw/pr-294.json` retain merged/head/merge identities;
-`raw/merge-identity.log` records ancestry exit values at the base. The #290
+The `#293` / `#294` merged/head/merge identities and the ancestry exit values
+at the base were read during the run and are not retained (2026-11-01
+evidence diet). The #290
 body refresh and accounting comment do not close the issue.
 
 This run adds no device-loss, audible-output, Miri, Loom, TLA+, ABI parity,

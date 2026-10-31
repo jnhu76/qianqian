@@ -1,8 +1,0 @@
-flac_picture.c.o r1_root_hits=1 r2_root_hits=1
-hdr_dynamic_metadata.c.o r1_root_hits=1 r2_root_hits=1
-iamf_parse.c.o r1_root_hits=2 r2_root_hits=2
-iamf_reader.c.o r1_root_hits=1 r2_root_hits=1
-lcevc.c.o r1_root_hits=1 r2_root_hits=1
-oggparseflac.c.o r1_root_hits=1 r2_root_hits=1
-oggparseogm.c.o r1_root_hits=1 r2_root_hits=1
-oggparsevorbis.c.o r1_root_hits=1 r2_root_hits=1

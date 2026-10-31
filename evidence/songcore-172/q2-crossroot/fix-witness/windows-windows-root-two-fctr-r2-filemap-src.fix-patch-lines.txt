@@ -1,1 +1,0 @@
-144:        target:add("cflags", "-ffile-prefix-map=" .. srcroot .. "=src", {force = true})

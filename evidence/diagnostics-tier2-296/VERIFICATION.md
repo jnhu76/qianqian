@@ -13,7 +13,8 @@ Base main: 98ff343467b66890a979edd54d21e14f0275c574.
 - Native Linux LF checkout: original complete `lefthook run pre-push --all-files`,
   all eight checks GREEN, GATE_EXIT=0, 187.41 seconds. This includes all plugin
   negative controls, formatting, workspace Clippy/tests, release-policy,
-  website verification and VitePress build. See raw/pre-push-linux.log.
+  website verification and VitePress build. The raw gate log is not retained
+  (2026-11-01 evidence diet); the summary above is the recorded result.
 - Windows whole-gate attempts remain failed receipts. The unsuccessful LF
   adaptation was withdrawn. No checker rule or negative control was skipped.
 - Independent review: REVIEW.md. Scoped delivery accepted; not GitHub review

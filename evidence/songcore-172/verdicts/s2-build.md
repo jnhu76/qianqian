@@ -102,7 +102,7 @@ TOOLCHAIN（构建侧，WSL 实测）
 ## 4. 本地 pre-push 门（诚实记录：6/7 绿 + 已知红）
 
 `lefthook run pre-push --all-files`（PATH：tools/bin + mingw64/bin；
-280.83s；日志 `evidence/songcore-172/pr-b-lefthook.log`）：
+280.83s；日志 pr-b-lefthook.log 未保留）：
 
 ```text
 ✔ commit-convention（校验 origin/main..HEAD 全部 4 提交，含本通道 2 个头）

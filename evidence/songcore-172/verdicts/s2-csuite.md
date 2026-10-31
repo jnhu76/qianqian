@@ -155,7 +155,7 @@ argcheck    NULL handle 四入口 → 100；未 probe 操作（count/read/seek/
    最终证据轮；两轮最终 stamp 均为修复后构建。
 3. **本地 pre-push 门 6/7 绿（与 S2 §4 相同的既有红）**：
    `lefthook run pre-push --all-files`（215.71s，日志
-   `evidence/songcore-172/suite-results/pr-c-lefthook.log`）：
+   `evidence/songcore-172/suite-results/pr-c-lefthook.log`，未保留）：
    commit-convention ✔（含本通道 6acb25c，首版 header 74>72 被
    fail-closed 拦截后 amend）、vocabulary ✔、plugin-boundary ✔、
    rust-fmt ✔、rust-clippy ✔、rust-test ✔ (172.26s)；

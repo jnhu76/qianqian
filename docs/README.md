@@ -45,7 +45,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Audio Observation Plane / visualizer PCM-consumer contract (#187) | `architecture/audio-observation-plane.md` — **implemented observation contract / EVIDENCE**; O0–O7 candidate completion, #187 owner merge/closure pending |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
-| External failure evidence | `../evidence/README.md` — opt-in only |
+| External failure corpus and research result records | `../evidence/README.md` — opt-in only; non-authoritative |
 
 ---
 

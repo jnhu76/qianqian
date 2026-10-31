@@ -1,7 +1,0 @@
-CASE a-mechanism: raw GNU coreutils sha256sum output for the same file
---- command 1: sha256sum with a Windows backslash path ---
-\d098500be1b51713c99b259be0c1da2e7403fe94d961e8b2654ad6edbef35f7b *C:\\Users\\fred1\\source\\qianqian-172\\evidence\\songcore-172\\d1-counterfactual\\scratch-green\\case-a-mechanism\\probe.txt
-exit code: 0
---- command 2: sha256sum with a POSIX relative path ---
-d098500be1b51713c99b259be0c1da2e7403fe94d961e8b2654ad6edbef35f7b *./probe.txt
-exit code: 0

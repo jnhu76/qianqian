@@ -1,4 +1,0 @@
-ffmpeg_tag n9.0.1
-closure_units 279
-target {"arch": "x86_64", "cross_prefix": null, "id": "linux-x86_64", "platform": "linux", "recipe_sha256": "79c307e731427bf1d94ab2ed43d7729c91d1d747a02392ee84170616467cdb6d", "target_os": "linux"}
-toolchain {"arch": "x86", "cc": "gcc", "cc_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)", "machine": "x86_64", "system": "linux", "target_os": null}

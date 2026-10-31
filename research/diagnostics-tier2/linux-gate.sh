@@ -28,7 +28,7 @@ cargo fetch --locked --manifest-path tools/audio-api-surface/Cargo.toml >"$raw/l
 npm ci --prefix website >"$raw/linux-website-install.log" 2>&1
 python3 - "$subject" "$destination" >"$raw/linux-gate-environment.json" <<'PY'
 import hashlib, json, pathlib, platform, subprocess, sys
-manifest=json.loads(pathlib.Path("evidence/diagnostics-tier2-296/raw/source-sha256.json").read_text())
+manifest=json.loads(pathlib.Path("evidence/diagnostics-tier2-296/source-sha256.json").read_text())
 def output(*cmd): return subprocess.check_output(cmd,text=True).strip()
 print(json.dumps({"subject_commit":sys.argv[1],"checkout":sys.argv[2],
  "platform":platform.platform(),"rustc":output("rustc","-vV"),

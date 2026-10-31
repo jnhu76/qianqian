@@ -1,8 +1,0 @@
-
-running 2 tests
-test cone_oracle_tests::o_cone_necessity_the_real_cone_settles_without_an_external_stop ... ok
-test cone_oracle_tests::o_cone_order_the_verdict_becomes_visible_only_after_the_edge_cut ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.26s
-
-

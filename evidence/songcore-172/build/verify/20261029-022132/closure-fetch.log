@@ -1,3 +1,0 @@
-tag recheck ok: n9.0.1 -> bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa
-zip sha256 ok: d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746
-extracted ffmpeg 9.0.1 at /home/hoo/q172d2-verify/win/native/build/ffmpeg-src
