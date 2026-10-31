@@ -345,9 +345,9 @@ else
     echo "  The RC lane never downloads or re-imports FFmpeg."
     echo "  Pass -ClosureSource <wsl-path> pointing at a complete imported"
     echo "  closure (ffmpeg-src/ + ffmpeg-xmake/{manifest.json,oracle}/)."
-    echo "ops/verify-build.ps1 validates and consumes an existing imported closure;"
-    echo "it does not derive one, so closure derivation remains NOT_ESTABLISHED here."
-    echo "  run the D2 import once (ops/verify-build.ps1) first."
+    echo "  This lane validates and consumes an existing imported closure; it"
+    echo "  never derives one, so closure derivation remains NOT_ESTABLISHED"
+    echo "  here. Derive it once with the FFmpeg import entry first."
     exit 11
 fi
 

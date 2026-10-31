@@ -1,5 +1,5 @@
-# package-rc.ps1 -- Windows release-lane RC packager for the SongCore
-# windows-x86_64 static artifact (#172 S2), per the frozen contract
+# package-rc.ps1 -- Windows package entry for the SongCore windows-x86_64
+# static artifact (#172 S2), per the frozen contract
 # docs/release/songcore-release-contract.md:
 #   section 7  PACKAGE_LAYOUT (v0.1.0-shaped tree, schema-2 additions only
 #              under metadata/ and LICENSES/; windows ships static-only,
@@ -11,30 +11,25 @@
 #
 # Replayable flow (fail-closed; no container is written until every pre-zip
 # check passes):
-#   0. preflight: pwsh 7+ required (ConvertTo-Json fidelity), git HEAD,
-#      native/ tracked-clean (R2 discipline, mirrors ops/build-rc.ps1),
-#      frozen ABI header identity, artifact present.
-#   1. WSL audit + license stage (the pinned toolchain's binutils, the same
-#      route that built the artifact):
+#   0. preflight: version form + immutability guard, git HEAD == -SourceCommit
+#      with no uncommitted tracked changes under native/ (R2 discipline), Q1
+#      version identity, frozen ABI header identity, build receipt, inputs.
+#   1. WSL audit stage (the pinned toolchain's binutils, the same route that
+#      built the artifact):
 #        - pinned FFmpeg zip sha256 == pin.json source_sha256, then the four
 #          FFmpeg COPYING.* texts are extracted FROM THE ZIP (O1: shipped
 #          license texts come from the verified pinned source, never
 #          hand-maintained copies);
-#        - songcore-v0.1.0 tarball sha256 == frozen S-V010 identity, then
-#          LICENSES/THIRD_PARTY_NOTICES.txt is extracted from it (S-V010
-#          origin, contract section 7);
 #        - R3 archive target identity: objdump -f all members pe-x86-64,
-#          0 elf (method mirror of tools/check_release.py:117-121);
+#          0 elf (method mirror of tools/check_release.py);
 #        - V4 symbol audit: nm ' T song' == 15, sorted list captured;
 #        - member count (ar t) and the undefined-import audit (nm ' U ',
 #          BCrypt* presence per contract section 9).
 #   2. stage the section 7 tree under <OutDir>/stage/<pkg-root>/.
 #   3. build metadata/manifest.json (schema 2) bound to the real staged
-#      bytes; write metadata/symbols.txt, metadata/checksums.txt (13
-#      entries: every packaged file except itself, v0.1.0 shape) and
-#      manifest files{} (the same set minus manifest.json itself --
-#      non-circular binding; this set arithmetic is what contract section 8
-#      V1 states since the Issue #330 differential disposition).
+#      bytes; write metadata/symbols.txt, metadata/checksums.txt (every
+#      packaged file except itself) and manifest files{} (the same set minus
+#      manifest.json itself -- non-circular binding, contract section 8 V1).
 #   4. V1-V7 + O1/O2 + B4 re-verification on the staged tree; any failure
 #      aborts with exit 1 and no container.
 #   5. write the .zip container (System.IO.Compression, forward-slash entry
@@ -45,37 +40,31 @@
 #   6. write SHA256SUMS sidecar next to the zip (<sha256>  <zip-name>),
 #      then a package-summary.json receipt.
 #
-# Version: the concrete next release number is owner-reserved (contract
-# section 14 Q1). Default 0.2.0-rc.1 is the S2 ask's provisional RC
-# identity, marked provisional in manifest notes; it is NOT a release and
-# must never be published under the songcore-v* namespace without owner
-# ratification. songcore-v0.1.0 is immutable history (section 2) and is
-# refused here.
+# Version: caller-supplied, no default. The concrete next release number is
+# owner-reserved (contract section 14 Q1); this entry never picks one, creates
+# no tag and publishes nothing. songcore-v0.1.0 is immutable history (section
+# 2) and is refused here.
 #
-# Usage (Windows PowerShell 5.1 or pwsh 7+; both verified by the in-run
-# manifest round-trip check):
-#   powershell -ExecutionPolicy Bypass -File ops\package-rc.ps1
-#   pwsh -File ops/package-rc.ps1
-#   pwsh -File ops/package-rc.ps1 -Force        # accepted (rerun rebuilds anyway)
-# Git Bash callers: prefix with MSYS_NO_PATHCONV=1 so WSL-side default paths
-# (pinned zip / v0.1.0 tarball) survive argv (same note as ops/build-rc.ps1).
+# Usage:
+#   pwsh -File ops/package-rc.ps1 -Version <X.Y.Z> -BuildReceipt <path>
+#                                 [-ProjectRoot <root>] [-OutDir <dir>]
+#                                 [-PinnedZip <wsl-path>] [-WslDistro <name>]
+# Git Bash callers: prefix with MSYS_NO_PATHCONV=1 so WSL-side paths survive
+# argv (same note as ops/build-rc.ps1).
 param(
     [string]$ProjectRoot = "",
     [Parameter(Mandatory=$true)][string]$Version,
+    [Parameter(Mandatory=$true)][string]$BuildReceipt,
     [string]$WslDistro = "Ubuntu-24.04",
     # The artifact the manifest binds; default is the build-lane consumption path.
     [string]$ArtifactPath = "",
-    [Parameter(Mandatory=$true)][string]$BuildReceipt,
     [string]$OutDir = "",
-    # WSL paths: the pinned FFmpeg source zip (re-verified against pin.json
-    # on every run) and the published songcore-v0.1.0 tarball (re-verified
-    # against the frozen S-V010 sha256 on every run).
-    [string]$PinnedZip = "/home/hoo/q172d2-verify/win/native/build/downloads/ffmpeg-n9.0.1.zip",
-    [string]$V010Tarball = "/home/hoo/s2pkg-v010/songcore-v0.1.0-linux-x86_64.tar.gz",
-    # The section 7 consumer-smoke example (campaign S3 lane authoring;
+    # WSL path of the pinned FFmpeg source zip (re-verified against pin.json on
+    # every run). Default: the work tree's fetch cache.
+    [string]$PinnedZip = "",
+    # The section 7 consumer-smoke example (tracked S3 lane authoring;
     # byte-reused, not forked).
-    [string]$ConsumerExample = "",
-    [switch]$Force
+    [string]$ConsumerExample = ""
 )
 $ErrorActionPreference = "Stop"
 
@@ -91,14 +80,12 @@ $ErrorActionPreference = "Stop"
 if ($ProjectRoot -eq "") { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 if ($ArtifactPath -eq "") { $ArtifactPath = Join-Path $ProjectRoot "native\build\artifacts\libsongcore.a" }
-if ($OutDir -eq "")       { $OutDir = Join-Path $ProjectRoot "evidence\songcore-172\package" }
+if ($OutDir -eq "")       { $OutDir = Join-Path $env:TEMP "songcore-package" }
 if ($ConsumerExample -eq "") { $ConsumerExample = Join-Path $ProjectRoot "evidence\songcore-172\linux\verify\package\external-consumer-example.c" }
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-# Frozen identities (docs/release/songcore-release-contract.md section 3 and
-# section 15 / S-V010). They move only with an authority reference.
+# Frozen identities (docs/release/songcore-release-contract.md section 3).
+# They move only with an authority reference.
 $ExpectedAbiHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
-$V010TarSha256           = "018e0cbdfd8d83b6967bbba8e899ae6dbcc2ccf690c5294bd48e2ef2699f6815"
 $ImmutableHistorical     = "0.1.0"   # songcore-v0.1.0 is frozen history (section 2)
 $SymbolList = @(
     "song_audio_stream_count", "song_audio_stream_info", "song_close",
@@ -133,6 +120,9 @@ function Convert-ToWslPath([string]$p) {
 function Get-Sha256([string]$path) {
     return (Get-FileHash -Algorithm SHA256 $path).Hash.ToLowerInvariant()
 }
+if ($PinnedZip -eq "") {
+    $PinnedZip = Convert-ToWslPath (Join-Path $ProjectRoot "native\build\downloads\ffmpeg-n9.0.1.zip")
+}
 
 $pkgRoot = "songcore-v$Version-windows-x86_64"
 $zipPath = Join-Path $OutDir "$pkgRoot.zip"
@@ -140,7 +130,7 @@ $summary = [ordered]@{
     script = "ops/package-rc.ps1"
     started = (Get-Date -Format "yyyyMMdd-HHmmss")
     version = $Version
-    version_status = "provisional (contract section 14 Q1 owner-reserved)"
+    version_status = "caller-supplied (contract section 14 Q1 owner-reserved); not a release"
     package_root = $pkgRoot
     project = $ProjectRoot
     artifact = $ArtifactPath
@@ -213,6 +203,7 @@ $summary.artifact_bytes = $artifactBytes
 
 $pin = Get-Content (Join-Path $ProjectRoot "native\ffmpeg\pin.json") -Raw | ConvertFrom-Json
 $recipe = Get-Content (Join-Path $ProjectRoot "native\ffmpeg\targets\windows-x86_64.json") -Raw | ConvertFrom-Json
+$receipt = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
 $closurePath = Join-Path $ProjectRoot "native\build\ffmpeg-xmake\manifest.json"
 $closure = Get-Content $closurePath -Raw | ConvertFrom-Json
 $pinSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\pin.json")
@@ -220,20 +211,9 @@ $recipeSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\targets\windows-x
 $profileSha = Get-Sha256 (Join-Path $ProjectRoot "native\ffmpeg\profiles\codec-base.json")
 $closureSha = Get-Sha256 $closurePath
 
-$receipt = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
-$receiptErrors = @()
-if ($receipt.script -ne "ops/build-rc.ps1" -or -not $receipt.ok) { $receiptErrors += "receipt is not a successful ops/build-rc.ps1 run" }
-if ($receipt.source.commit -ne $gitHead) { $receiptErrors += "source commit mismatch" }
-if ($receipt.artifacts.libsongcore_a_sha256 -ne $artifactSha) { $receiptErrors += "artifact sha256 mismatch" }
-if ([int64]$receipt.artifacts.libsongcore_a_size -ne $artifactBytes) { $receiptErrors += "artifact byte count mismatch" }
-if ($receipt.artifacts.abi_header_sha256 -ne $headerSha) { $receiptErrors += "header sha256 mismatch" }
-if ($receipt.source.recipe_sha256 -ne $recipeSha -or $receipt.ffmpeg_provenance.recipe_sha256 -ne $recipeSha) { $receiptErrors += "recipe sha256 mismatch" }
-if ($receipt.ffmpeg_provenance.profile_sha256 -ne $profileSha) { $receiptErrors += "profile sha256 mismatch" }
-if ($receipt.ffmpeg_provenance.closure_manifest_sha256 -ne $closureSha) { $receiptErrors += "closure sha256 mismatch" }
-if ($receipt.ffmpeg_provenance.commit -ne $pin.ffmpeg_commit_sha -or $receipt.ffmpeg_provenance.source_sha256 -ne $pin.source_sha256) { $receiptErrors += "pin identity mismatch" }
-if ($closure.target.recipe_sha256 -ne $recipeSha) { $receiptErrors += "closure recipe_sha256 mismatch" }
-if ($receiptErrors.Count -gt 0) { Fail "provenance" ($receiptErrors -join "; ") }
-$summary.build_receipt_sha256 = Get-Sha256 $BuildReceipt
+# The build receipt is verified by the shared verifier only: it binds the
+# receipt to this source commit/tree, to these exact artifact bytes and to
+# every provenance input, so packaging never re-implements those rules here.
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $python) { Fail "provenance" "python is required for the shared build-receipt verifier" }
 $treeOid = & git -C $ProjectRoot rev-parse 'HEAD^{tree}'
@@ -245,6 +225,8 @@ $treeOid = & git -C $ProjectRoot rev-parse 'HEAD^{tree}'
     --pin (Join-Path $ProjectRoot "native\ffmpeg\pin.json") --closure $closurePath `
     --target windows-x86_64 --toolchain $receipt.toolchain.identity
 if ($LASTEXITCODE -ne 0) { Fail "provenance" "shared build-receipt verifier rejected the Windows build" }
+$summary.build_receipt_sha256 = Get-Sha256 $BuildReceipt
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # --------------------------------------------- stage 1: WSL audit + licenses
 $stageRoot = Join-Path $OutDir "stage"
@@ -256,7 +238,6 @@ set -euo pipefail
 # stage-audit.sh -- WSL side of ops/package-rc.ps1. Emits KEY=VALUE lines on
 # stdout; any identity failure exits nonzero (fail-closed) with FAIL on stderr.
 ZIP="$QR_PINNED_ZIP"
-V010="$QR_V010_TAR"
 STAGE="$QR_STAGE_WSL"
 WT="$QR_WORKTREE_WSL"
 ARCHIVE="$QR_ARTIFACT_WSL"
@@ -303,63 +284,14 @@ for n in COPYING.GPLv2 COPYING.GPLv3 COPYING.LGPLv2.1 COPYING.LGPLv3; do
     echo "SHA_$n=$(sha256sum "$STAGE/LICENSES/$n" | awk '{print $1}')"
 done
 
-# THIRD_PARTY_NOTICES.txt origin: the published songcore-v0.1.0 asset,
-# re-verified against the frozen S-V010 sha256 on every run (contract
-# section 7 origin note + section 10 O2/B3).
-GOT_V010=$(sha256sum "$V010" | awk '{print $1}')
-if [ "$GOT_V010" != "$QR_V010_SHA" ]; then
-    echo "FAIL: songcore-v0.1.0 tarball sha mismatch: $GOT_V010 != $QR_V010_SHA" >&2
-    exit 23
-fi
-echo "V010_TAR_SHA256=$GOT_V010"
-V010_MEMBER="songcore-v0.1.0-linux-x86_64/LICENSES/THIRD_PARTY_NOTICES.txt"
-TMPD=$(mktemp -d)
-tar -xzf "$V010" -C "$TMPD" "$V010_MEMBER"
-mv "$TMPD/$V010_MEMBER" "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt"
-rm -rf "$TMPD"
-
-# P3 wording refresh (Issue #330; review-C F4 / P3-3): the v0.1.0-extracted
-# notices carry two stale statements — the v0.1.0/linux identity header and
-# the "carry no open-source license yet ... NOT granted by this package"
-# Qianqian paragraph, which contradicts the LICENSE-MIT/LICENSE-APACHE texts
-# shipped alongside in the same package (B4) and the repo-root dual license.
-# The historical RC container keeps the stale wording on purpose: archived
-# evidence is not rewritten (frozen zip sha256 7b4d0615d25af464739373a0a356
-# 5f77f3208ce9c263f59e578d443801536415 unchanged). Every pack from this
-# script forward gets the corrected identity header and component-license
-# paragraph below; the extracted FFmpeg section stays byte-identical to the
-# v0.1.0 asset. Fail-closed: if the v0.1.0-extracted shape ever drifts, the
-# run aborts (exit 24) instead of shipping a silent partial rewrite.
-python3 - "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" <<'PY'
-import os, sys
-path = sys.argv[1]
-lines = open(path, encoding="utf-8").read().split("\n")
-if not (len(lines) >= 3 and lines[0].startswith("Third-party notices")
-        and lines[1] and set(lines[1]) == {"="}):
-    sys.stderr.write("FAIL: notices identity header shape drifted\n")
-    sys.exit(24)
-q = [i for i, l in enumerate(lines) if l == "Qianqian"]
-if len(q) != 1:
-    sys.stderr.write("FAIL: expected exactly one Qianqian section, got %d\n" % len(q))
-    sys.exit(24)
-title = "Third-party notices \u2014 SongCore %s (%s)" % (
-    os.environ["QR_NOTICES_VERSION"], os.environ["QR_NOTICES_TARGET"])
-lines[0] = title
-lines[1] = "=" * len(title)
-paragraph = [
-    "Qianqian",
-    "  The Qianqian sources (songcore.h and the SongCore implementation) are",
-    "  dual-licensed: MIT or Apache-2.0, at the recipient's option. The",
-    "  complete license texts ship in this package as LICENSES/LICENSE-MIT",
-    "  and LICENSES/LICENSE-APACHE and are sha256-bound in",
-    "  metadata/checksums.txt. This is an engineering statement, not legal",
-    "  advice; each release's license block is owner-reviewed before",
-    "  publication (contract section 10).",
-]
-open(path, "w", encoding="utf-8", newline="\n").write(
-    "\n".join(lines[:q[0]] + paragraph) + "\n")
-PY
-echo "NOTICES_SHA256=$(sha256sum "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" | awk '{print $1}')"
+# THIRD_PARTY_NOTICES.txt: rendered from the verified pin by the SAME
+# renderer the Linux entry uses (contract section 10 O2 requires presence and
+# a checksum entry, not a historical-asset origin).
+python3 "$WT/tools/render_songcore_notices.py" \
+    --out "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" \
+    --version "$QR_NOTICES_VERSION" --target "$QR_NOTICES_TARGET" \
+    --pin "$WT/native/ffmpeg/pin.json" \
+    --profile-sha256 "$(sha256sum "$WT/native/ffmpeg/profiles/codec-base.json" | awk '{print $1}')"
 
 # R3 archive target identity (method mirror of tools/check_release.py:117).
 PE=$("$OD" -f "$ARCHIVE" 2>/dev/null | grep -c "file format pe-x86-64") || PE=0
@@ -407,14 +339,12 @@ if (Test-Path $stageRoot) { Remove-Item -Recurse -Force $stageRoot }
 New-Item -ItemType Directory -Force -Path $stagePkg | Out-Null
 
 $env:QR_PINNED_ZIP    = $PinnedZip
-$env:QR_V010_TAR      = $V010Tarball
-$env:QR_V010_SHA      = $V010TarSha256
 $env:QR_STAGE_WSL     = $stageWsl
 $env:QR_WORKTREE_WSL  = Convert-ToWslPath $ProjectRoot
 $env:QR_ARTIFACT_WSL  = Convert-ToWslPath $ArtifactPath
 $env:QR_NOTICES_VERSION = "v$Version"
 $env:QR_NOTICES_TARGET  = "windows-x86_64"
-$env:WSLENV           = "QR_PINNED_ZIP:QR_V010_TAR:QR_V010_SHA:QR_STAGE_WSL:QR_WORKTREE_WSL:QR_ARTIFACT_WSL:QR_NOTICES_VERSION:QR_NOTICES_TARGET"
+$env:WSLENV           = "QR_PINNED_ZIP:QR_STAGE_WSL:QR_WORKTREE_WSL:QR_ARTIFACT_WSL:QR_NOTICES_VERSION:QR_NOTICES_TARGET"
 
 $auditOut = & wsl.exe -d $WslDistro -- bash (Convert-ToWslPath $auditScript) 2>&1
 $auditRc = $LASTEXITCODE
@@ -429,12 +359,11 @@ foreach ($line in $auditOut) {
     $s = $line.ToString()
     if ($s -match '^([A-Z0-9_.]+)=(.*)$') { $audit[$Matches[1]] = $Matches[2] }
 }
-foreach ($k in @("ZIP_SHA256", "V010_TAR_SHA256", "NOTICES_SHA256", "PE_MEMBERS",
+foreach ($k in @("ZIP_SHA256", "NOTICES_SHA256", "PE_MEMBERS",
                  "ELF_MEMBERS", "SONG_SYMBOLS", "MEMBER_COUNT", "UNDEFINED_BCRYPT", "UNDEFINED_COUNT")) {
     if (-not $audit.ContainsKey($k)) { Fail "wsl_audit" "audit stage did not report $k" }
 }
 $summary.audits.pinned_zip_sha256 = $audit["ZIP_SHA256"]
-$summary.audits.v010_tarball_sha256 = $audit["V010_TAR_SHA256"]
 $summary.audits.third_party_notices_sha256 = $audit["NOTICES_SHA256"]
 $summary.audits.pe_members = $audit["PE_MEMBERS"]
 $summary.audits.elf_members = $audit["ELF_MEMBERS"]
@@ -494,8 +423,8 @@ next release tag remains owner-reserved (contract section 14 Q1).
                                         280 pe-x86-64 members, static-first policy)
     LICENSES/                           FFmpeg COPYING set (extracted from the
                                         sha256-verified pinned n9.0.1 source zip),
-                                        THIRD_PARTY_NOTICES.txt (published
-                                        songcore-v0.1.0 asset), MIT + Apache-2.0
+                                        THIRD_PARTY_NOTICES.txt (rendered from
+                                        the verified pin), MIT + Apache-2.0
                                         component texts (repo-root, B4)
     metadata/manifest.json              provenance, schema_version 2
     metadata/symbols.txt                the 15 ABI v1 exports
@@ -650,13 +579,10 @@ $manifest = [ordered]@{
              "(contract section 14 Q1); this is a release-substrate verification archive, not an RC or release " +
              "(G4 NOT_APPROVED; RC_BUILD NOT_AUTHORIZED), and must never be published under the songcore-v* " +
              "namespace without owner ratification. " +
-             "files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; the set " +
-             "arithmetic contract section 8 V1 states since the Issue #330 differential disposition). " +
-             "LICENSES/THIRD_PARTY_NOTICES.txt was extracted from the sha256-verified published songcore-v0.1.0 " +
-             "asset ($V010TarSha256) and then wording-refreshed per the Issue #330 P3 disposition: identity " +
-             "header updated to this package's version/target and the stale component-license paragraph " +
-             "replaced by the dual-license statement (LICENSE-MIT/LICENSE-APACHE ship alongside, B4); the " +
-             "FFmpeg section stays byte-identical to the v0.1.0 asset. " +
+             "files{} covers the checksums.txt set minus manifest.json itself (non-circular binding; contract " +
+             "section 8 V1). " +
+             "LICENSES/THIRD_PARTY_NOTICES.txt was rendered from the verified pin by " +
+             "tools/render_songcore_notices.py, the same renderer the Linux entry uses. " +
              "The FFmpeg COPYING texts were extracted from the pinned n9.0.1 source zip " +
              "re-verified against pin.json source_sha256 on this run (O1). " +
              "Machine license checks verify presence, hash identity and configure-arg provenance only; they cannot " +
@@ -786,8 +712,7 @@ $summary.checks["V1_V7_O1_B4"] = "PASS (all machine checks; see v-checks.json)"
 # ------------------------------------------------------- stage 5: container
 # Replayable by default: a rerun rebuilds the container from a freshly
 # staged and re-verified tree. The previous container's sha is recorded so
-# an overwrite is always visible in the receipt (-Force is accepted and
-# kept only as a compatibility no-op).
+# an overwrite is always visible in the receipt.
 if (Test-Path $zipPath) {
     $summary.container.previous_zip_sha256 = Get-Sha256 $zipPath
     $summary.container.rebuilt = $true

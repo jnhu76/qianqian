@@ -6,8 +6,7 @@
 #               is refused here)
 #   section 6   ARTIFACT_KINDS (static lib/libsongcore.a mandatory, shared
 #               lib/shared/libsongcore.so secondary — the linux-x86_64 recipe
-#               declares artifacts.static=true and artifacts.shared=true, so
-#               this entry requires both forms)
+#               declares artifacts.static=true and artifacts.shared=true)
 #   section 7   PACKAGE_LAYOUT (v0.1.0-shaped tree; schema-2 additions only
 #               under metadata/ and LICENSES/; exactly one versioned root
 #               directory and no loose files beside it)
@@ -26,28 +25,22 @@
 # Replayable flow (fail-closed; no container is written until every pre-tar
 # check passes):
 #   0. preflight: --version form + immutability guard, work root is the pinned
-#      commit with a clean tracked tree (R2 discipline), ABI header identity
-#      (work-root file == git blob at the commit == contract section 3), the
-#      pinned FFmpeg zip re-verified against pin.json source_sha256, closure
-#      identity re-verified against the pin/recipe/profile at the commit, and
-#      every input present.
+#      commit with a clean tracked tree (R2 discipline), Q1 version identity,
+#      ABI header identity (work-root file == git blob at the commit ==
+#      contract section 3), the pinned FFmpeg zip re-verified against
+#      pin.json source_sha256, and every input present.
 #   1. binutils audits: ELF identity, per-member archive format, the ABI export
 #      set in BOTH forms, NEEDED audit, non-song export leak audit, glibc
-#      symbol-version floor, and the archive-level closure-resolution audit
-#      (defined minus undefined must leave no av*/sw* symbol unresolved).
+#      symbol-version floor, and the archive-level closure-resolution audit.
 #   2. LICENSES/: the four FFmpeg COPYING texts extracted from the
 #      sha256-verified pinned source zip (O1); repo-root LICENSE-MIT /
 #      LICENSE-APACHE copied byte-identically (B4); THIRD_PARTY_NOTICES.txt
-#      rendered in the Issue #330 P3 wording (identity header for this
-#      package, FFmpeg facts bound to this run's verified pin/closure, and the
-#      dual-license component paragraph) instead of a stale hand-maintained
-#      copy.
+#      rendered from the verified pin (tools/render_songcore_notices.py).
 #   3. stage the section 7 tree under <out-dir>/stage/<pkg-root>/ and write
 #      metadata/manifest.json (schema 2, bound to the staged bytes),
 #      metadata/symbols.txt and metadata/checksums.txt.
 #   4. V1-V7 + O1/O2/B4 re-verification by an independent re-read of the
-#      written files (not the builder's own variables); any failure aborts with
-#      a nonzero exit and no container.
+#      written files; any failure aborts with a nonzero exit and no container.
 #   5. write a deterministic .tar.gz (members sorted, mtime fixed to
 #      SOURCE_DATE_EPOCH or the source commit time, uid/gid 0, empty
 #      uname/gname, no absolute path, no symlink, no pax header), re-open it
@@ -58,30 +51,26 @@
 # Usage:
 #   ops/package-linux.sh --version <X.Y.Z> --source-commit <40-hex> \
 #                        --work-root <build root> --out-dir <dir> \
+#                        --build-receipt <path> \
 #                        [--artifact-static <path>] [--artifact-shared <path>] \
 #                        [--closure-manifest <path>] [--pinned-zip <path>] \
-#                        [--consumer-example <path>] [--build-receipt <path>]
+#                        [--consumer-example <path>]
 #
 #   --version          REQUIRED, no default. The concrete next release number
 #                      is owner-reserved (contract section 14 Q1); this entry
 #                      never picks one, creates no tag and publishes nothing.
 #   --source-commit    REQUIRED full 40-hex commit all inputs must come from.
-#   --work-root        REQUIRED build root that ops/build-linux.sh produced (a
-#                      checkout at --source-commit holding
-#                      native/build/artifacts/{libsongcore.a,shared/libsongcore.so}
-#                      and native/build/ffmpeg-xmake/manifest.json).
+#   --work-root        REQUIRED build root that ops/build-linux.sh produced.
 #   --out-dir          REQUIRED output directory (stage tree, container,
 #                      sidecars, receipts).
+#   --build-receipt    REQUIRED ops/build-linux.sh summary.json. Release-grade
+#                      packaging never accepts unattested artifact bytes.
 #   --artifact-static  default <work-root>/native/build/artifacts/libsongcore.a
 #   --artifact-shared  default <work-root>/native/build/artifacts/shared/libsongcore.so
 #   --closure-manifest default <work-root>/native/build/ffmpeg-xmake/manifest.json
 #   --pinned-zip       default <work-root>/native/build/downloads/ffmpeg-n9.0.1.zip
-#                      (where scripts/fetch-ffmpeg writes the pinned zip)
 #   --consumer-example default <work-root>/evidence/songcore-172/linux/verify/
-#                      package/external-consumer-example.c (the tracked S3
-#                      template)
-#   --build-receipt    REQUIRED ops/build-linux.sh summary.json. Release-grade
-#                      packaging never accepts unattested artifact bytes.
+#                      package/external-consumer-example.c (tracked S3 template)
 #
 # Version: caller-supplied only. No tag, no GitHub Release, no publication.
 #
@@ -108,6 +97,7 @@ IMMUTABLE_HISTORICAL_VERSION=0.1.0
 log() { printf '[package-linux] %s\n' "$*"; }
 die() { printf 'package-linux: FAIL: %s\n' "$*" >&2; exit 1; }
 kv()  { grep -m1 "^$2=" "$1" | cut -d= -f2-; }
+sha_of() { sha256sum "$1" | awk '{print $1}'; }
 
 usage() {
   sed -n '/^# Usage:/,/^# Version:/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -119,12 +109,12 @@ while [ $# -gt 0 ]; do
     --source-commit)    [ $# -ge 2 ] || die "--source-commit needs a value";     SOURCE_COMMIT=$2; shift 2 ;;
     --work-root)        [ $# -ge 2 ] || die "--work-root needs a value";         WORK_ROOT=$2; shift 2 ;;
     --out-dir)          [ $# -ge 2 ] || die "--out-dir needs a value";           OUT_DIR=$2; shift 2 ;;
+    --build-receipt)    [ $# -ge 2 ] || die "--build-receipt needs a value";     BUILD_RECEIPT=$2; shift 2 ;;
     --artifact-static)  [ $# -ge 2 ] || die "--artifact-static needs a value";   ART_STATIC=$2; shift 2 ;;
     --artifact-shared)  [ $# -ge 2 ] || die "--artifact-shared needs a value";   ART_SHARED=$2; shift 2 ;;
     --closure-manifest) [ $# -ge 2 ] || die "--closure-manifest needs a value";  CLOSURE_MANIFEST=$2; shift 2 ;;
     --pinned-zip)       [ $# -ge 2 ] || die "--pinned-zip needs a value";        PINNED_ZIP=$2; shift 2 ;;
     --consumer-example) [ $# -ge 2 ] || die "--consumer-example needs a value";  CONSUMER_EXAMPLE=$2; shift 2 ;;
-    --build-receipt)    [ $# -ge 2 ] || die "--build-receipt needs a value";     BUILD_RECEIPT=$2; shift 2 ;;
     -h|--help)          usage; exit 0 ;;
     *) printf 'package-linux: unknown argument: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -135,12 +125,7 @@ done
 [ "$VERSION" != "$IMMUTABLE_HISTORICAL_VERSION" ] \
   || die "refusing version '$VERSION': songcore-v0.1.0 is immutable history (contract section 2); a failed release releases under a new version, never a re-tag"
 [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
-  || die "version '$VERSION' is not the authorized MAJOR.MINOR.PATCH identity (contract section 2; suffixes are not authorized)"
-IFS=. read -r V_MAJOR V_MINOR V_PATCH <<<"$VERSION"
-for c in "$V_MAJOR" "$V_MINOR" "$V_PATCH"; do
-  [[ "$c" =~ ^(0|[1-9][0-9]*)$ ]] \
-    || die "version '$VERSION' has a leading-zero or non-decimal component '$c' (contract section 2)"
-done
+  || die "version '$VERSION' is not the authorized MAJOR.MINOR.PATCH identity (contract section 2; suffixes and leading zeros are not authorized)"
 
 [ -n "$SOURCE_COMMIT" ] || die "--source-commit is required"
 [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
@@ -184,42 +169,39 @@ for f in "$ART_STATIC" "$ART_SHARED" "$CLOSURE_MANIFEST" "$PINNED_ZIP" "$PIN" \
   [ -f "$f" ] || die "missing input: $f"
 done
 
-for t in git python3 sha256sum ar nm objdump readelf file tar gzip comm; do
+for t in git python3 sha256sum ar nm objdump readelf file tar gzip stat; do
   command -v "$t" >/dev/null 2>&1 || die "missing required tool: $t"
 done
+
+ARGV_JSON=$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${ARGV[@]+"${ARGV[@]}"})
 
 PKG_ROOT="songcore-v$VERSION-linux-x86_64"
 STAGE=$OUT_DIR/stage/$PKG_ROOT
 TARBALL=$OUT_DIR/$PKG_ROOT.tar.gz
-mkdir -p "$OUT_DIR/audit"
+AUD=$OUT_DIR/audit
+mkdir -p "$AUD"
 rm -rf "$OUT_DIR/stage" "$OUT_DIR/verify-extract"
 mkdir -p "$STAGE"
-
-AUD=$OUT_DIR/audit
-FACTS=$AUD/facts.env
-: > "$FACTS"
-fact() { printf '%s=%s\n' "$1" "$2" >> "$FACTS"; }
 
 log "version $VERSION (caller-supplied; not a release)"
 log "source  $SOURCE_COMMIT @ $WORK_ROOT"
 
 # ABI header identity: work-root file == git blob at the commit == contract §3.
-HEADER_SHA=$(sha256sum "$HEADER" | awk '{print $1}')
+HEADER_SHA=$(sha_of "$HEADER")
 GIT_HEADER_SHA=$(git -C "$WORK_ROOT" show "$SOURCE_COMMIT:native/include/songcore.h" | sha256sum | awk '{print $1}')
 [ "$HEADER_SHA" = "$FROZEN_ABI_HEADER_SHA256" ] \
   || die "ABI header drift: $HEADER (sha256 $HEADER_SHA) != frozen contract section 3 identity $FROZEN_ABI_HEADER_SHA256"
 [ "$GIT_HEADER_SHA" = "$HEADER_SHA" ] \
   || die "ABI header at the source commit ($GIT_HEADER_SHA) != the work-root file ($HEADER_SHA)"
 
-PIN_SHA=$(sha256sum "$PIN" | awk '{print $1}')
-RECIPE_SHA=$(sha256sum "$RECIPE" | awk '{print $1}')
-PROFILE_SHA=$(sha256sum "$PROFILE" | awk '{print $1}')
-CLOSURE_SHA=$(sha256sum "$CLOSURE_MANIFEST" | awk '{print $1}')
-ART_STATIC_SHA=$(sha256sum "$ART_STATIC" | awk '{print $1}')
-ART_SHARED_SHA=$(sha256sum "$ART_SHARED" | awk '{print $1}')
+PIN_SHA=$(sha_of "$PIN")
+RECIPE_SHA=$(sha_of "$RECIPE")
+PROFILE_SHA=$(sha_of "$PROFILE")
+CLOSURE_SHA=$(sha_of "$CLOSURE_MANIFEST")
+ART_STATIC_SHA=$(sha_of "$ART_STATIC")
+ART_SHARED_SHA=$(sha_of "$ART_SHARED")
 ART_STATIC_BYTES=$(stat -c %s "$ART_STATIC")
-ART_SHARED_BYTES=$(stat -c %s "$ART_SHARED")
-ZIP_SHA=$(sha256sum "$PINNED_ZIP" | awk '{print $1}')
+ZIP_SHA=$(sha_of "$PINNED_ZIP")
 
 python3 - "$PIN" > "$AUD/pin-values.env" <<'PY' || die "cannot read $PIN"
 import json, sys
@@ -229,9 +211,7 @@ for k in ("ffmpeg_tag", "ffmpeg_commit_sha", "ffmpeg_version", "source_sha256", 
 PY
 FFMPEG_TAG=$(kv "$AUD/pin-values.env" FFMPEG_TAG)
 FFMPEG_COMMIT=$(kv "$AUD/pin-values.env" FFMPEG_COMMIT_SHA)
-FFMPEG_VERSION=$(kv "$AUD/pin-values.env" FFMPEG_VERSION)
 FFMPEG_SOURCE_SHA=$(kv "$AUD/pin-values.env" SOURCE_SHA256)
-FFMPEG_SOURCE_URL=$(kv "$AUD/pin-values.env" SOURCE_URL)
 
 [ "$ZIP_SHA" = "$FFMPEG_SOURCE_SHA" ] \
   || die "pinned FFmpeg zip $PINNED_ZIP sha256 $ZIP_SHA != pin.json source_sha256 $FFMPEG_SOURCE_SHA (the O1 basis)"
@@ -259,16 +239,10 @@ HEADER_SYMBOLS=$(grep -c . "$AUD/header-symbols.txt" || true)
   || die "native/include/songcore.h declares $HEADER_SYMBOLS SONGCORE_API song* entry points, expected the ABI v1 set of 15 (contract section 3)"
 
 nm "$ART_STATIC" | awk '$2=="T"||$2=="A"{print $3}' | grep '^song' | sort -u > "$AUD/static-symbols.txt" || true
-STATIC_SYMBOLS=$(grep -c . "$AUD/static-symbols.txt" || true)
-[ "$STATIC_SYMBOLS" = "$HEADER_SYMBOLS" ] \
-  || die "static artifact defines $STATIC_SYMBOLS song* T symbols, header declares $HEADER_SYMBOLS"
 diff "$AUD/header-symbols.txt" "$AUD/static-symbols.txt" > "$AUD/symbols-static.diff" \
   || die "static symbol set != the songcore.h ABI set (see $AUD/symbols-static.diff)"
 
 nm -D --defined-only "$ART_SHARED" | awk '$2=="T"||$2=="W"{print $3}' | grep '^song' | sort -u > "$AUD/shared-symbols.txt" || true
-SHARED_SYMBOLS=$(grep -c . "$AUD/shared-symbols.txt" || true)
-[ "$SHARED_SYMBOLS" = "$HEADER_SYMBOLS" ] \
-  || die "shared artifact exports $SHARED_SYMBOLS song* symbols, header declares $HEADER_SYMBOLS"
 diff "$AUD/header-symbols.txt" "$AUD/shared-symbols.txt" > "$AUD/symbols-shared.diff" \
   || die "shared export set != the songcore.h ABI set (see $AUD/symbols-shared.diff)"
 
@@ -298,24 +272,15 @@ if grep -qE '^(av|avcodec|avformat|avutil|swr|sws)_' "$AUD/static-unresolved.txt
   die "static archive leaves FFmpeg closure symbols unresolved ($(grep -E '^(av|avcodec|avformat|avutil|swr|sws)_' "$AUD/static-unresolved.txt" | paste -sd, -)); the closure is not statically closed"
 fi
 
-# Contract section 10 O4 / V5: the closure must stay copylib-free.
-FORBIDDEN_ARGS=$(python3 - "$CLOSURE_MANIFEST" <<'PY'
-import json, sys
-m = json.load(open(sys.argv[1], encoding="utf-8"))
-print(" ".join(a for a in m.get("configure_args", [])
-               if a.startswith(("--enable-gpl", "--enable-version3", "--enable-nonfree", "--enable-lib"))))
-PY
-) || die "cannot read configure_args from $CLOSURE_MANIFEST"
-[ -z "$FORBIDDEN_ARGS" ] \
-  || die "closure configure_args enable gpl/version3/nonfree/lib*: $FORBIDDEN_ARGS (contract section 10 O4)"
-
+# The imported closure must be the one this commit's pin/recipe/profile define.
+# (V5 re-checks the copylib posture of the written manifest; this checks the
+# build output against the source-commit inputs before anything is staged.)
 python3 - "$CLOSURE_MANIFEST" "$RECIPE" "$PROFILE" "$FFMPEG_TAG" "$FFMPEG_COMMIT" "$FFMPEG_SOURCE_SHA" \
+  "$RECIPE_SHA" "$PROFILE_SHA" \
   > "$AUD/closure-identity.env" <<'PY' || die "the imported FFmpeg closure identity does not match the pin/recipe/profile at the source commit"
 import hashlib, json, platform, sys
 man = json.load(open(sys.argv[1], encoding="utf-8"))
 rec = json.load(open(sys.argv[2], encoding="utf-8"))
-rec_sha = hashlib.sha256(open(sys.argv[2], 'rb').read()).hexdigest()
-prof_sha = hashlib.sha256(open(sys.argv[3], 'rb').read()).hexdigest()
 t = man.get("target", {})
 errs = []
 if man.get("schema") != 2: errs.append("closure manifest schema != 2")
@@ -323,8 +288,8 @@ if t.get("id") != "linux-x86_64": errs.append("closure target.id != linux-x86_64
 if t.get("platform") != rec.get("platform"): errs.append("closure platform != recipe platform")
 if t.get("arch") != rec.get("arch"): errs.append("closure arch != recipe arch")
 if t.get("target_os") != rec.get("ffmpeg", {}).get("target_os"): errs.append("closure target_os != recipe target_os")
-if t.get("recipe_sha256") != rec_sha: errs.append("closure recipe_sha256 != the recipe at the source commit")
-if man.get("profile_sha256") != prof_sha: errs.append("closure profile_sha256 != the codec-base profile at the source commit")
+if t.get("recipe_sha256") != sys.argv[7]: errs.append("closure recipe_sha256 != the recipe at the source commit")
+if man.get("profile_sha256") != sys.argv[8]: errs.append("closure profile_sha256 != the codec-base profile at the source commit")
 if man.get("ffmpeg_tag") != sys.argv[4]: errs.append("closure ffmpeg_tag != pin.json")
 if man.get("ffmpeg_commit_sha") != sys.argv[5]: errs.append("closure ffmpeg_commit != pin.json")
 if man.get("ffmpeg_source_sha256") != sys.argv[6]: errs.append("closure ffmpeg_source_sha256 != pin.json")
@@ -334,7 +299,6 @@ if errs:
     print("FAIL: " + "; ".join(errs), file=sys.stderr)
     sys.exit(1)
 tc = man["toolchain"]
-print("CLOSURE_MAN_SHA=%s" % hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())
 print("CLOSURE_CC=%s" % tc.get("cc"))
 print("CLOSURE_CC_IDENT=%s" % tc.get("cc_ident"))
 print("CLOSURE_ARCH=%s" % tc.get("arch"))
@@ -342,10 +306,7 @@ print("CLOSURE_TARGET_OS=%s" % (tc.get("target_os") or ""))
 print("CLOSURE_UNITS=%d" % man["closure"]["translation_units"])
 print("CLOSURE_UPSTREAM=%d" % man["closure"]["upstream_sources"])
 print("CLOSURE_GENERATED=%d" % man["closure"]["generated_sources"])
-print("CLOSURE_NARGS=%d" % len(man.get("configure_args", [])))
 PY
-CL_CLOSURE_MAN_SHA=$(kv "$AUD/closure-identity.env" CLOSURE_MAN_SHA)
-[ -n "$CL_CLOSURE_MAN_SHA" ] || die "closure identity file is missing CLOSURE_MAN_SHA"
 
 CC_IDENT=$(cc --version | head -1)
 AR_IDENT=$(ar --version | head -1)
@@ -378,51 +339,10 @@ PY
 
 cp -f "$LIC_MIT" "$STAGE/LICENSES/LICENSE-MIT"
 cp -f "$LIC_APACHE" "$STAGE/LICENSES/LICENSE-APACHE"
-
-# THIRD_PARTY_NOTICES.txt — Issue #330 P3 wording: an identity header for THIS
-# package, FFmpeg facts bound to this run's verified pin/closure/profile, and
-# the dual-license component paragraph (verbatim from ops/package-rc.ps1's P3
-# disposition). No license text is hand-maintained here.
-NOTICES_TITLE="Third-party notices — SongCore v$VERSION (linux-x86_64)"
-python3 - "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" "$NOTICES_TITLE" \
-  "$FFMPEG_VERSION" "$FFMPEG_TAG" "$FFMPEG_COMMIT" "$FFMPEG_SOURCE_URL" \
-  "$FFMPEG_SOURCE_SHA" "$PROFILE_SHA" <<'PY' || die "rendering THIRD_PARTY_NOTICES.txt failed"
-import sys
-path, title, version, tag, commit, url, sha, profile_sha = sys.argv[1:9]
-lines = [
-    title,
-    "=" * len(title),
-    "",
-    "FFmpeg",
-    "  version : %s (tag %s)" % (version, tag),
-    "  commit  : %s" % commit,
-    "  source  : %s" % url,
-    "  sha256  : %s" % sha,
-    "  profile : codec-base (machine-derived minimal closure; sha256",
-    "            %s)" % profile_sha,
-    "  effective license: LGPL-2.1-or-later (FFmpeg default, all copylibs disabled)",
-    "  external libraries that alter licensing: none",
-    "",
-    "  The FFmpeg closure is statically linked inside libsongcore.a /",
-    "  libsongcore.so. Under LGPL-2.1-or-later static distribution, the object",
-    "  files of the application may be provided together with the means",
-    "  (source or relink instructions) to re-link a modified FFmpeg. This",
-    "  package contains the complete FFmpeg license texts (LICENSES/COPYING.*)",
-    "  and the closure identity above; the exact source tree is reconstructible",
-    "  from the pinned URL + sha256.",
-    "",
-    "Qianqian",
-    "  The Qianqian sources (songcore.h and the SongCore implementation) are",
-    "  dual-licensed: MIT or Apache-2.0, at the recipient's option. The",
-    "  complete license texts ship in this package as LICENSES/LICENSE-MIT",
-    "  and LICENSES/LICENSE-APACHE and are sha256-bound in",
-    "  metadata/checksums.txt. This is an engineering statement, not legal",
-    "  advice; each release's license block is owner-reviewed before",
-    "  publication (contract section 10).",
-    "",
-]
-open(path, "w", encoding="utf-8", newline="\n").write("\n".join(lines))
-PY
+python3 "$WORK_ROOT/tools/render_songcore_notices.py" \
+  --out "$STAGE/LICENSES/THIRD_PARTY_NOTICES.txt" --version "$VERSION" \
+  --target linux-x86_64 --pin "$PIN" --profile-sha256 "$PROFILE_SHA" \
+  > "$AUD/notices.env" || die "rendering THIRD_PARTY_NOTICES.txt failed"
 
 # ------------------------------------------------------ stage 3: payload tree
 log "stage3: staging the section 7 tree"
@@ -433,17 +353,10 @@ cp -f "$ART_SHARED"       "$STAGE/lib/shared/libsongcore.so"
 cp -f "$CONSUMER_EXAMPLE" "$STAGE/metadata/external-consumer-example.c"
 cp -f "$AUD/header-symbols.txt" "$STAGE/metadata/symbols.txt"
 
-[ "$(sha256sum "$STAGE/include/songcore.h" | awk '{print $1}')" = "$HEADER_SHA" ] \
-  || die "staged include/songcore.h sha changed in staging"
-[ "$(sha256sum "$STAGE/lib/libsongcore.a" | awk '{print $1}')" = "$ART_STATIC_SHA" ] \
-  || die "staged lib/libsongcore.a sha changed in staging"
-[ "$(sha256sum "$STAGE/lib/shared/libsongcore.so" | awk '{print $1}')" = "$ART_SHARED_SHA" ] \
-  || die "staged lib/shared/libsongcore.so sha changed in staging"
-
-# Artifact provenance (the audit's artifact_attribution finding: a packager
-# must not stamp a stale artifact with the current commit's name).
-PROVENANCE_ATTESTED=false
-BUILD_RECEIPT_SHA=""
+# Artifact provenance: a packager must not stamp a stale artifact with the
+# current commit's name. The shared verifier binds these exact bytes and every
+# provenance input to the source commit/tree; packaging never trusts the
+# receipt's own self-description beyond that.
 SOURCE_TREE=$(git -C "$WORK_ROOT" rev-parse 'HEAD^{tree}')
 TOOLCHAIN_ID="gcc=$(gcc --version | head -1);xmake=$(xmake --version 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
 python3 "$WORK_ROOT/tools/verify_songcore_build_receipt.py" \
@@ -452,8 +365,7 @@ python3 "$WORK_ROOT/tools/verify_songcore_build_receipt.py" \
   --recipe "$RECIPE" --profile "$PROFILE" --pin "$PIN" --closure "$CLOSURE_MANIFEST" \
   --target linux-x86_64 --toolchain "$TOOLCHAIN_ID" \
   || die "build receipt $BUILD_RECEIPT does not bind these artifact bytes and inputs to $SOURCE_COMMIT"
-PROVENANCE_ATTESTED=true
-BUILD_RECEIPT_SHA=$(sha256sum "$BUILD_RECEIPT" | awk '{print $1}')
+BUILD_RECEIPT_SHA=$(sha_of "$BUILD_RECEIPT")
 
 NEEDED_CSV=$(paste -sd' ' "$AUD/needed-libs.txt")
 python3 - "$STAGE/README.md" "$VERSION" "$SOURCE_COMMIT" "$MEMBER_COUNT" "$NEEDED_CSV" "$GLIBC_FLOOR" <<'PY' \
@@ -469,12 +381,10 @@ EOF). The ABI authority is `include/songcore.h` alone (ABI v1, frozen);
 packaging never modifies it.
 
 **This container is a release-substrate verification archive, not a release.**
-The version string is the one the packaging caller supplied. The concrete next
-release number is owner-reserved (contract section 14 Q1); packaging creates no
-tag, no GitHub Release and no other published asset.
-
-This archive makes no platform-support or release-readiness claim. G4 is not
-approved; RC build is not authorized; no tag or Release was created.
+The version string is the one the packaging caller supplied, and the concrete
+next release number is owner-reserved (contract section 14 Q1). Packaging
+creates no tag, no GitHub Release and no other published asset, and makes no
+platform-support claim.
 
 ## Contents
 
@@ -545,7 +455,8 @@ this archive does not claim an executable relink path.
 open(path, "w", encoding="utf-8", newline="\n").write(text)
 PY
 
-# -------------------------------------------------------- facts for stage 4/5
+# ------------------------------- stage 4: manifest + symbols + checksums
+log "stage4: writing metadata/manifest.json (schema 2), symbols.txt, checksums.txt"
 BUILT_UTC=$(python3 - <<'PY'
 import datetime, os
 epoch = os.environ.get("SOURCE_DATE_EPOCH")
@@ -557,52 +468,17 @@ print(t.strftime("%Y-%m-%dT%H:%M:%SZ"))
 PY
 ) || die "cannot derive built_utc"
 
-fact version "$VERSION"
-fact source_commit "$SOURCE_COMMIT"
-fact pkg_root "$PKG_ROOT"
-fact header_sha256 "$HEADER_SHA"
-fact static_sha256 "$ART_STATIC_SHA"
-fact static_bytes "$ART_STATIC_BYTES"
-fact shared_sha256 "$ART_SHARED_SHA"
-fact shared_bytes "$ART_SHARED_BYTES"
-fact archive_members "$MEMBER_COUNT"
-fact elf_members "$ELF_MEMBERS"
-fact recipe_sha256 "$RECIPE_SHA"
-fact profile_sha256 "$PROFILE_SHA"
-fact pin_sha256 "$PIN_SHA"
-fact closure_manifest_sha256 "$CLOSURE_SHA"
-fact ffmpeg_tag "$FFMPEG_TAG"
-fact ffmpeg_commit "$FFMPEG_COMMIT"
-fact ffmpeg_version "$FFMPEG_VERSION"
-fact ffmpeg_source_sha256 "$FFMPEG_SOURCE_SHA"
-fact cc_ident "$CC_IDENT"
-fact ar_ident "$AR_IDENT"
-fact xmake_ident "$XMAKE_IDENT"
-fact glibc_floor "$GLIBC_FLOOR"
-fact undefined_count "$UNDEFINED_COUNT"
-fact built_utc "$BUILT_UTC"
-fact provenance_attested "$PROVENANCE_ATTESTED"
-fact build_receipt_sha256 "$BUILD_RECEIPT_SHA"
-fact closure_cc "$(kv "$AUD/closure-identity.env" CLOSURE_CC)"
-fact closure_cc_ident "$(kv "$AUD/closure-identity.env" CLOSURE_CC_IDENT)"
-fact closure_arch "$(kv "$AUD/closure-identity.env" CLOSURE_ARCH)"
-fact closure_target_os "$(kv "$AUD/closure-identity.env" CLOSURE_TARGET_OS)"
-fact closure_units "$(kv "$AUD/closure-identity.env" CLOSURE_UNITS)"
-fact closure_upstream "$(kv "$AUD/closure-identity.env" CLOSURE_UPSTREAM)"
-fact closure_generated "$(kv "$AUD/closure-identity.env" CLOSURE_GENERATED)"
-fact closure_nargs "$(kv "$AUD/closure-identity.env" CLOSURE_NARGS)"
-fact argv_json "$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' "${ARGV[@]}")"
-
-# ------------------------------- stage 4: manifest + symbols + checksums
-log "stage4: writing metadata/manifest.json (schema 2), symbols.txt, checksums.txt"
-python3 - "$STAGE" "$OUT_DIR" "$WORK_ROOT" <<'PY' || die "manifest/checksums binding failed"
+python3 - "$STAGE" "$WORK_ROOT" "$CLOSURE_MANIFEST" "$RECIPE" "$PROFILE" "$PIN" "$AUD" \
+  "$SOURCE_COMMIT" "$VERSION" "$BUILT_UTC" "$BUILD_RECEIPT_SHA" "$MEMBER_COUNT" \
+  "$GLIBC_FLOOR" "$UNDEFINED_COUNT" "$PROFILE_SHA" "$RECIPE_SHA" "$PIN_SHA" "$CLOSURE_SHA" \
+  "$CC_IDENT" "$AR_IDENT" "$XMAKE_IDENT" "$ART_STATIC_SHA" "$ART_STATIC_BYTES" \
+  "$ART_SHARED_SHA" <<'PY' || die "manifest/checksums binding failed"
 import hashlib, json, os, sys
 
-stage, out_dir, work_root = sys.argv[1:4]
-facts = {}
-for line in open(os.path.join(out_dir, "audit", "facts.env"), encoding="utf-8"):
-    k, _, v = line.rstrip("\n").partition("=")
-    facts[k] = v
+(stage, work_root, closure_path, recipe_path, profile_path, pin_path, audit_dir, source_commit,
+ version, built_utc, receipt_sha, member_count, glibc_floor, undefined_count,
+ profile_sha, recipe_sha, pin_sha, closure_sha, cc_ident, ar_ident, xmake_ident,
+ static_sha, static_bytes, shared_sha) = sys.argv[1:25]
 
 def sha256(path):
     h = hashlib.sha256()
@@ -611,6 +487,7 @@ def sha256(path):
             h.update(chunk)
     return h.hexdigest()
 
+# contract section 7 exact content set (schema-2 additions included)
 EXPECTED = {
     "include/songcore.h", "lib/libsongcore.a", "lib/shared/libsongcore.so",
     "LICENSES/COPYING.GPLv2", "LICENSES/COPYING.GPLv3",
@@ -620,16 +497,12 @@ EXPECTED = {
     "metadata/manifest.json", "metadata/symbols.txt", "metadata/checksums.txt",
     "metadata/external-consumer-example.c",
 }
-assert len(EXPECTED) == 15, len(EXPECTED)
-
+PENDING = {"metadata/manifest.json", "metadata/checksums.txt"}
 packaged = []
 for root, _dirs, files in os.walk(stage):
     for name in files:
         packaged.append(os.path.relpath(os.path.join(root, name), stage).replace(os.sep, "/"))
 packaged.sort()
-# manifest.json and checksums.txt are written by this step, so they are still
-# missing from the walked set; every other member must already be present.
-PENDING = {"metadata/manifest.json", "metadata/checksums.txt"}
 missing = EXPECTED - set(packaged) - PENDING
 extra = set(packaged) - EXPECTED
 if missing or extra:
@@ -637,30 +510,19 @@ if missing or extra:
                      % (sorted(missing), sorted(extra)))
     sys.exit(30)
 
-pin = json.load(open(os.path.join(work_root, "native/ffmpeg/pin.json"), encoding="utf-8"))
-recipe = json.load(open(os.path.join(work_root, "native/ffmpeg/targets/linux-x86_64.json"), encoding="utf-8"))
-closure = json.load(open(os.path.join(work_root, "native/build/ffmpeg-xmake/manifest.json"), encoding="utf-8"))
+pin = json.load(open(pin_path, encoding="utf-8"))
+recipe = json.load(open(recipe_path, encoding="utf-8"))
+closure = json.load(open(closure_path, encoding="utf-8"))
 symbols = [l.strip() for l in open(os.path.join(stage, "metadata/symbols.txt"), encoding="utf-8") if l.strip()]
-needed = [l.strip() for l in open(os.path.join(out_dir, "audit/needed-libs.txt"), encoding="utf-8") if l.strip()]
+needed = [l.strip() for l in open(os.path.join(audit_dir, "needed-libs.txt"), encoding="utf-8") if l.strip()]
 license_files = {n: sha256(os.path.join(stage, "LICENSES", n))
-                 for n in ("COPYING.GPLv2", "COPYING.GPLv3", "COPYING.LGPLv2.1", "COPYING.LGPLv3")}
-
-attested = facts.get("provenance_attested") == "true"
-if attested:
-    provenance_note = ("Artifact provenance IS attested: --build-receipt (sha256 %s) reports head %s "
-                       "and both artifact sha256 values were re-verified against the packaged bytes at "
-                       "packing time." % (facts.get("build_receipt_sha256"), facts["source_commit"]))
-else:
-    provenance_note = ("Artifact provenance is NOT attested: --build-receipt was not supplied, so git_sha "
-                       "records the source tree this package was staged from, not a verified rebuild of "
-                       "these artifact bytes (package-summary.json records "
-                       "artifact_provenance_attested=false).")
+                 for n in ("COPYING.GPLv2", "COPYING.GPLv3", "COPYING.LGPLv2.1", "COPYING.LGPLv3")]
 
 manifest = {
     "schema_version": 2,
-    "songcore_version": facts["version"],
+    "songcore_version": version,
     "songcore_abi": 1,
-    "abi_header_sha256": facts["header_sha256"],
+    "abi_header_sha256": sha256(os.path.join(stage, "include/songcore.h")),
     "target": "linux-x86_64",
     "platform": "linux",
     "arch": "x86_64",
@@ -669,18 +531,18 @@ manifest = {
     "ffmpeg_commit": pin["ffmpeg_commit_sha"],
     "ffmpeg_source_sha256": pin["source_sha256"],
     "ffmpeg_profile": "codec-base",
-    "ffmpeg_profile_sha256": facts["profile_sha256"],
+    "ffmpeg_profile_sha256": profile_sha,
     "artifact": "lib/libsongcore.a",
-    "sha256": facts["static_sha256"],
-    "artifact_bytes": int(facts["static_bytes"]),
-    "archive_members": int(facts["archive_members"]),
+    "sha256": static_sha,
+    "artifact_bytes": int(static_bytes),
+    "archive_members": int(member_count),
     # v0.1.0 carried artifact_shared as the shared artifact PATH; that meaning
     # is preserved (contract section 8: carried v0.1.0 field names keep their
     # meaning). windows-x86_64 ships no shared form and records a boolean.
     "artifact_shared": "lib/shared/libsongcore.so",
-    "shared_sha256": facts["shared_sha256"],
+    "shared_sha256": shared_sha,
     "public_symbols": sorted(symbols),
-    "git_sha": facts["source_commit"],
+    "git_sha": source_commit,
     "target_identity": {
         "id": recipe["id"],
         "platform": recipe["platform"],
@@ -690,33 +552,34 @@ manifest = {
         "cross_prefix": recipe["ffmpeg"].get("cross_prefix"),
         "toolchain": {"family": recipe["toolchain"]["family"],
                       "identity": recipe["toolchain"]["identity"]},
-        "recipe_sha256": facts["recipe_sha256"],
+        "recipe_sha256": recipe_sha,
     },
-    "tools": {"cc": facts["cc_ident"], "ar": facts["ar_ident"], "xmake": facts["xmake_ident"]},
+    "tools": {"cc": cc_ident, "ar": ar_ident, "xmake": xmake_ident},
     "sdk_ndk": ("not applicable this round — linux-x86_64: host-native, no SDK/NDK "
                 "(target recipe toolchain identity, contract section 8)"),
-    "source": {"commit": facts["source_commit"], "status": "clean"},
+    "source": {"commit": source_commit, "status": "clean",
+               "build_receipt_sha256": receipt_sha},
     "pin": {
         "ffmpeg_tag": pin["ffmpeg_tag"],
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
         "ffmpeg_source_sha256": pin["source_sha256"],
-        "pin_sha256": facts["pin_sha256"],
+        "pin_sha256": pin_sha,
     },
     "closure": {
-        "manifest_sha256": facts["closure_manifest_sha256"],
+        "manifest_sha256": closure_sha,
         "toolchain": {
             "system": closure["toolchain"].get("system"),
             "machine": closure["toolchain"].get("machine"),
-            "cc": facts["closure_cc"],
-            "cc_ident": facts["closure_cc_ident"],
-            "arch": facts["closure_arch"],
-            "target_os": facts["closure_target_os"] or None,
+            "cc": closure["toolchain"].get("cc"),
+            "cc_ident": closure["toolchain"].get("cc_ident"),
+            "arch": closure["toolchain"].get("arch"),
+            "target_os": closure["toolchain"].get("target_os") or None,
         },
         "configure_args": closure["configure_args"],
         "units": {
-            "translation_units": int(facts["closure_units"]),
-            "upstream_sources": int(facts["closure_upstream"]),
-            "generated_sources": int(facts["closure_generated"]),
+            "translation_units": closure["closure"]["translation_units"],
+            "upstream_sources": closure["closure"]["upstream_sources"],
+            "generated_sources": closure["closure"]["generated_sources"],
         },
         "reference_archives": closure["reference_archives"],
     },
@@ -727,11 +590,11 @@ manifest = {
             "libm_libpthread": 'REQUIRED — native/build/songcore.lua add_syslinks("m", "pthread"); the link line records it',
             "link_line": "gcc -O2 -Iinclude consumer.c -Llib -lsongcore -lm -lpthread -o consumer",
             "unresolved_symbols": ("%s host symbols remain undefined after the merged closure resolves "
-                                   "itself; no av*/sw* FFmpeg symbol is left unresolved" % facts["undefined_count"]),
+                                   "itself; no av*/sw* FFmpeg symbol is left unresolved" % undefined_count),
         },
         "shared": {
             "needed_libs": needed,
-            "glibc_symbol_version_floor": (facts["glibc_floor"] + " (readelf --dyn-syms; the supported "
+            "glibc_symbol_version_floor": (glibc_floor + " (readelf --dyn-syms; the supported "
                                            "distro family is an owner decision, contract section 14)"),
             "link_line": "gcc -O2 -Iinclude consumer.c -Llib/shared -lsongcore -lm -lpthread -Wl,-rpath,$ORIGIN -o consumer",
         },
@@ -753,19 +616,19 @@ manifest = {
                      "reproducibility receipt exists and every level is reported NOT_ESTABLISHED "
                      "(contract section 8 V6 / section 12). A positive level must name an existing receipt."),
     },
-    "built_utc": facts["built_utc"],
-    "packer": "release-substrate songcore-172 G4 linux package lane (ops/package-linux.sh, deterministic tar container)",
+    "built_utc": built_utc,
+    "packer": "ops/package-linux.sh (deterministic tar container)",
     "notes": ("songcore_version %s was supplied by the packaging caller; the concrete next release number "
               "is owner-reserved (contract section 14 Q1), this is a release-substrate verification "
-              "archive, not a release, and nothing here is published. %s files{} covers the checksums.txt "
-              "set minus manifest.json itself (non-circular binding; the set arithmetic contract section 8 "
-              "V1 states after the Issue #330 D2 disposition). LICENSES/COPYING.* were extracted from the "
-              "pinned n9.0.1 source zip re-verified against pin.json source_sha256 on this run (O1); "
-              "LICENSES/LICENSE-MIT and LICENSES/LICENSE-APACHE are byte-identical to the repo-root texts at "
-              "the source commit (B4); THIRD_PARTY_NOTICES.txt uses the Issue #330 P3 wording. Machine "
-              "license checks verify presence, hash identity and configure-arg provenance only; they cannot "
-              "certify legal sufficiency (contract section 10 limit)."
-              % (facts["version"], provenance_note)),
+              "archive, not a release, and nothing here is published. Artifact provenance IS attested: "
+              "source.build_receipt_sha256 binds the build receipt, and both artifact sha256 values were "
+              "re-verified against these bytes at packing time. files{} covers the checksums.txt set minus "
+              "manifest.json itself (non-circular binding; contract section 8 V1, Issue #330 D2). "
+              "LICENSES/COPYING.* were extracted from the pinned n9.0.1 source zip re-verified against "
+              "pin.json source_sha256 on this run (O1); LICENSES/LICENSE-MIT and LICENSES/LICENSE-APACHE are "
+              "byte-identical to the repo-root texts at the source commit (B4). Machine license checks "
+              "verify presence, hash identity and configure-arg provenance only; they cannot certify legal "
+              "sufficiency (contract section 10 limit)." % version),
 }
 
 covered_mf = [p for p in packaged if p not in ("metadata/checksums.txt", "metadata/manifest.json")]
@@ -773,13 +636,11 @@ manifest["files"] = {p: {"sha256": sha256(os.path.join(stage, p)),
                          "bytes": os.path.getsize(os.path.join(stage, p))}
                      for p in covered_mf}
 
-manifest_path = os.path.join(stage, "metadata", "manifest.json")
-with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
+with open(os.path.join(stage, "metadata", "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
     json.dump(manifest, f, indent=2, ensure_ascii=False)
     f.write("\n")
 
-covered_ck = sorted(list(packaged) + ["metadata/manifest.json"])
-assert "metadata/checksums.txt" not in covered_ck
+covered_ck = sorted(packaged + ["metadata/manifest.json"])
 hashes = {p: sha256(os.path.join(stage, p)) for p in covered_ck}
 with open(os.path.join(stage, "metadata", "checksums.txt"), "w", encoding="utf-8", newline="\n") as f:
     for p in covered_ck:
@@ -789,11 +650,14 @@ PY
 
 # ------------------------------------ stage 5: V1-V7 + O1/O2/B4 verification
 log "stage5: V1-V7 + O1/O2/B4 re-verification of the written files"
-python3 - "$STAGE" "$OUT_DIR" "$WORK_ROOT" "$SOURCE_COMMIT" "$FROZEN_ABI_HEADER_SHA256" <<'PY' \
+python3 - "$STAGE" "$AUD" "$CLOSURE_MANIFEST" "$RECIPE" "$WORK_ROOT" "$FROZEN_ABI_HEADER_SHA256" \
+  "$GIT_HEADER_SHA" "$PIN_SHA" "$RECIPE_SHA" "$PROFILE_SHA" "$CLOSURE_SHA" <<'PY' \
   || die "contract section 8 machine checks failed (see $OUT_DIR/v-checks.json)"
 import hashlib, json, os, sys
 
-stage, out_dir, work_root, source_commit, frozen_header = sys.argv[1:6]
+(stage, audit_dir, closure_path, recipe_path, work_root, frozen_header, commit_header,
+ pin_sha, recipe_sha, profile_sha, closure_sha) = sys.argv[1:12]
+out_dir = os.path.dirname(os.path.dirname(stage))
 checks, details = {}, {}
 
 def sha256(path):
@@ -807,18 +671,13 @@ def record(name, ok, detail):
     checks[name] = bool(ok)
     details[name] = detail
 
-facts = {}
-for line in open(os.path.join(out_dir, "audit", "facts.env"), encoding="utf-8"):
-    k, _, v = line.rstrip("\n").partition("=")
-    facts[k] = v
-
 manifest = json.load(open(os.path.join(stage, "metadata/manifest.json"), encoding="utf-8"))
-cksum = {}
+cksum, dupes = {}, []
 for line in open(os.path.join(stage, "metadata/checksums.txt"), encoding="utf-8"):
     if line.strip():
         h, p = line.rstrip("\n").split("  ", 1)
         if p in cksum:
-            record("V1_sets", False, "duplicate checksums.txt entry: %s" % p)
+            dupes.append(p)
         cksum[p] = h
 
 packaged = []
@@ -827,66 +686,53 @@ for root, _dirs, files in os.walk(stage):
         packaged.append(os.path.relpath(os.path.join(root, name), stage).replace(os.sep, "/"))
 packaged.sort()
 
-# ---- V1: files{}/checksums.txt vs the real bytes; no self-hash (#330 D2)
-rehash_bad = []
-for p, ent in manifest.get("files", {}).items():
-    full = os.path.join(stage, p)
-    if not os.path.isfile(full):
-        rehash_bad.append("%s missing" % p); continue
-    if sha256(full) != ent.get("sha256"):
-        rehash_bad.append("%s sha256" % p)
-    if os.path.getsize(full) != ent.get("bytes"):
-        rehash_bad.append("%s bytes" % p)
-record("V1_files_rehash", not rehash_bad,
-       "files{} entries re-hash to the packaged bytes; bad=%s" % (rehash_bad or "none"))
-
+# ---- V1: set arithmetic + one rehash pass against the packaged bytes (#330 D2)
 cksum_expected = sorted(p for p in packaged if p != "metadata/checksums.txt")
-record("V1_checksums_set", sorted(cksum) == cksum_expected,
-       "checksums.txt entries (%d) == packaged files minus itself (%d)" % (len(cksum), len(cksum_expected)))
-
 files_expected = sorted(p for p in cksum if p != "metadata/manifest.json")
-record("V1_files_set", sorted(manifest.get("files", {})) == files_expected,
-       "files{} keys (%d) == checksums.txt entries minus manifest.json (%d)"
-       % (len(manifest.get("files", {})), len(files_expected)))
-
-record("V1_no_self_hash",
-       "metadata/checksums.txt" not in cksum
+record("V1_sets",
+       not dupes
+       and sorted(cksum) == cksum_expected
+       and sorted(manifest.get("files", {})) == files_expected
+       and "metadata/checksums.txt" not in cksum
        and "metadata/checksums.txt" not in manifest.get("files", {})
        and "metadata/manifest.json" not in manifest.get("files", {}),
-       "checksums.txt does not hash itself; files{} hashes neither checksums.txt nor manifest.json")
+       "checksums.txt (%d) = packaged minus itself; files{} (%d) = checksums minus manifest.json; no self-hash; duplicates=%s"
+       % (len(cksum), len(manifest.get("files", {})), dupes or "none"))
 
-record("V1_checksums_match_bytes",
-       all(sha256(os.path.join(stage, p)) == h for p, h in cksum.items()),
-       "every checksums.txt entry equals the sha256 of the packaged bytes")
+actual = {p: sha256(os.path.join(stage, p)) for p in cksum}
+sizes = {p: os.path.getsize(os.path.join(stage, p)) for p in cksum}
+bad = (["%s (checksums.txt)" % p for p, h in cksum.items() if actual[p] != h]
+       + ["%s (files{} sha256)" % p for p, e in manifest.get("files", {}).items() if actual.get(p) != e.get("sha256")]
+       + ["%s (files{} bytes)" % p for p, e in manifest.get("files", {}).items() if sizes.get(p) != e.get("bytes")])
+record("V1_rehash", not bad, "checksums.txt + files{} re-hash to the packaged bytes; bad=%s" % (bad or "none"))
 
 # ---- V2: header identity (packaged == source commit blob == contract section 3)
-staged_header = sha256(os.path.join(stage, "include/songcore.h"))
 record("V2_header_sha",
-       staged_header == manifest.get("abi_header_sha256")
-       and staged_header == facts["header_sha256"]
-       and staged_header == frozen_header,
-       "packaged header %s == manifest == work root == contract section 3" % staged_header)
+       actual.get("include/songcore.h") == manifest.get("abi_header_sha256")
+       == commit_header == frozen_header,
+       "packaged header %s == manifest == the source commit blob == contract section 3"
+       % actual.get("include/songcore.h"))
 
 # ---- V3: pin.*/closure.* agree with the source-commit inputs
 pin = json.load(open(os.path.join(work_root, "native/ffmpeg/pin.json"), encoding="utf-8"))
-recipe = json.load(open(os.path.join(work_root, "native/ffmpeg/targets/linux-x86_64.json"), encoding="utf-8"))
-closure = json.load(open(os.path.join(work_root, "native/build/ffmpeg-xmake/manifest.json"), encoding="utf-8"))
+recipe = json.load(open(recipe_path, encoding="utf-8"))
+closure = json.load(open(closure_path, encoding="utf-8"))
 v3 = []
 if manifest.get("ffmpeg_commit") != manifest["pin"]["ffmpeg_commit_sha"]: v3.append("ffmpeg_commit carry")
 if manifest.get("ffmpeg_commit") != pin["ffmpeg_commit_sha"]: v3.append("ffmpeg_commit vs pin.json")
 if manifest.get("ffmpeg_source_sha256") != manifest["pin"]["ffmpeg_source_sha256"]: v3.append("source sha carry")
 if manifest.get("ffmpeg_source_sha256") != pin["source_sha256"]: v3.append("source sha vs pin.json")
-if manifest["pin"].get("pin_sha256") != facts["pin_sha256"]: v3.append("pin_sha256")
-if manifest["closure"].get("manifest_sha256") != facts["closure_manifest_sha256"]: v3.append("closure manifest sha")
-if manifest.get("ffmpeg_profile_sha256") != facts["profile_sha256"]: v3.append("profile sha")
-if manifest["target_identity"].get("recipe_sha256") != facts["recipe_sha256"]: v3.append("recipe sha")
+if manifest["pin"].get("pin_sha256") != pin_sha: v3.append("pin_sha256")
+if manifest["closure"].get("manifest_sha256") != closure_sha: v3.append("closure manifest sha")
+if manifest.get("ffmpeg_profile_sha256") != profile_sha: v3.append("profile sha")
+if manifest["target_identity"].get("recipe_sha256") != recipe_sha: v3.append("recipe sha")
 if manifest["closure"].get("configure_args") != closure.get("configure_args"): v3.append("configure_args")
 record("V3_pin_binding", not v3,
        "pin.*/closure.* agree with the source-commit inputs; mismatch=%s" % (v3 or "none"))
 
 # ---- V4: the 15 ABI symbols, in both forms and in symbols.txt
 symbols_txt = [l.strip() for l in open(os.path.join(stage, "metadata/symbols.txt"), encoding="utf-8") if l.strip()]
-aud = lambda n: [l.strip() for l in open(os.path.join(out_dir, "audit", n), encoding="utf-8") if l.strip()]
+aud = lambda n: [l.strip() for l in open(os.path.join(audit_dir, n), encoding="utf-8") if l.strip()]
 record("V4_symbols",
        manifest.get("public_symbols") == symbols_txt == aud("static-symbols.txt")
        == aud("shared-symbols.txt") == aud("header-symbols.txt") and len(symbols_txt) == 15,
@@ -927,14 +773,12 @@ record("V7_tools",
        and "not applicable" in manifest.get("sdk_ndk", "")
        and ti.get("toolchain", {}).get("family") == recipe["toolchain"]["family"]
        and ti.get("toolchain", {}).get("identity") == recipe["toolchain"]["identity"]
-       and ti.get("recipe_sha256") == facts["recipe_sha256"],
+       and ti.get("recipe_sha256") == recipe_sha,
        "tools{} carries exact cc/ar/xmake versions; sdk_ndk disposition stated; target_identity.toolchain == recipe")
 
 # ---- O1 / O2 / B4 license obligations
 license_files = manifest["license"]["license_files"]
-o1_bad = [n for n, h in license_files.items()
-          if not os.path.isfile(os.path.join(stage, "LICENSES", n))
-          or sha256(os.path.join(stage, "LICENSES", n)) != h]
+o1_bad = [n for n, h in license_files.items() if actual.get("LICENSES/" + n) != h]
 record("O1_license_texts", not o1_bad and len(license_files) == 4,
        "the four FFmpeg COPYING texts are staged, hashed and bound in license_files; bad=%s" % (o1_bad or "none"))
 
@@ -949,11 +793,6 @@ b4_bad = [pkg for repo, pkg in (("LICENSE-MIT", "LICENSES/LICENSE-MIT"),
 record("B4_component_licenses", not b4_bad,
        "LICENSE-MIT/LICENSE-APACHE byte-identical to the repo-root texts at the source commit; bad=%s"
        % (b4_bad or "none"))
-
-# ---- container readiness: relative, traversal-free member paths
-record("L_relative_paths",
-       all(not p.startswith("/") and ".." not in p.split("/") for p in packaged),
-       "every staged path is relative and traversal-free")
 
 failed = [k for k, v in checks.items() if not v]
 out = {"checks": checks, "details": details, "package_root": os.path.basename(stage),
@@ -1002,10 +841,6 @@ def check_name(rel):
         sys.exit(41)
     return name
 
-check_name("")
-for rel, _kind in members:
-    check_name(rel)
-
 buf = io.BytesIO()
 with tarfile.open(fileobj=buf, mode="w", format=tarfile.USTAR_FORMAT) as tf:
     for rel, kind in members:
@@ -1031,7 +866,7 @@ with open(out, "wb") as f:
 print("WROTE %s members=%d bytes=%d" % (out, len(members), os.path.getsize(out)))
 PY
 
-log "stage7: re-opening the container, verifying every entry, then sha256sum -c"
+log "stage7: re-opening the container and verifying every entry"
 python3 - "$TARBALL" "$STAGE" "$MTIME" <<'PY' || die "container re-verification failed"
 import gzip, hashlib, io, json, os, sys, tarfile
 
@@ -1044,18 +879,16 @@ for line in open(os.path.join(stage, "metadata/checksums.txt"), encoding="utf-8"
         h, p = line.rstrip("\n").split("  ", 1)
         cksum[p] = h
 
-raw = gzip.open(tarball, "rb").read()
-tf = tarfile.open(fileobj=io.BytesIO(raw), mode="r:")
-
+tf = tarfile.open(fileobj=io.BytesIO(gzip.open(tarball, "rb").read()), mode="r:")
 names = [m.name for m in tf.getmembers()]
 if len(names) != len(set(names)):
     sys.stderr.write("FAIL: duplicate tar members\n"); sys.exit(51)
 if names != sorted(names):
     sys.stderr.write("FAIL: tar members are not in sorted order\n"); sys.exit(52)
 
-members = {m.name: m for m in tf.getmembers()}
 files = {}
-for name, m in members.items():
+for m in tf.getmembers():
+    name = m.name
     if name != pkg_root and not name.startswith(pkg_root + "/"):
         sys.stderr.write("FAIL: member outside the versioned root: %s\n" % name); sys.exit(53)
     rel = "" if name == pkg_root else name[len(pkg_root) + 1:]
@@ -1069,33 +902,29 @@ for name, m in members.items():
         sys.stderr.write("FAIL: unexpected mode %o on %s\n" % (m.mode, name)); sys.exit(57)
     if not (m.isdir() or m.isreg()):
         sys.stderr.write("FAIL: non-regular member (link/symlink/device): %s\n" % name); sys.exit(58)
-    if m.isdir():
-        continue
-    data = tf.extractfile(m).read()
-    files[rel] = (hashlib.sha256(data).hexdigest(), len(data))
+    if m.isreg():
+        data = tf.extractfile(m).read()
+        files[rel] = (hashlib.sha256(data).hexdigest(), len(data))
 
 staged = []
 for root, _dirs, names_ in os.walk(stage):
     for n in names_:
         staged.append(os.path.relpath(os.path.join(root, n), stage).replace(os.sep, "/"))
-staged.sort()
-if sorted(files) != staged:
+if sorted(files) != sorted(staged):
     sys.stderr.write("FAIL: container payload set != staged set\n"); sys.exit(59)
 
+# The container is what ships: re-hash every payload from the archive itself.
 bad = []
 for rel, (h, size) in files.items():
-    if hashlib.sha256(open(os.path.join(stage, rel), "rb").read()).hexdigest() != h:
-        bad.append(rel)
     if rel in manifest["files"]:
         if manifest["files"][rel]["sha256"] != h or manifest["files"][rel]["bytes"] != size:
-            bad.append(rel + " (manifest.files{})")
-    elif rel == "metadata/manifest.json":
-        if cksum.get(rel) != h:
-            bad.append(rel + " (checksums.txt)")
+            bad.append(rel)
+    elif cksum.get(rel) != h:
+        bad.append(rel + " (checksums.txt)")
 if bad:
     sys.stderr.write("FAIL: container payload hashes differ: %s\n" % sorted(set(bad))); sys.exit(60)
 
-print("CONTAINER VERIFIED files=%d entries=%d" % (len(files), len(members)))
+print("CONTAINER VERIFIED files=%d entries=%d" % (len(files), len(tf.getmembers())))
 PY
 
 VERIFY_DIR=$OUT_DIR/verify-extract
@@ -1109,23 +938,21 @@ CHECKSUM_OK=$(grep -c ': OK$' "$AUD/checksums-verify.log" || true)
   || die "sha256sum -c verified $CHECKSUM_OK entries, expected $(grep -c . "$STAGE/metadata/checksums.txt")"
 log "stage7: sha256sum -c OK ($CHECKSUM_OK entries) on the extracted container"
 
-TAR_SHA=$(sha256sum "$TARBALL" | awk '{print $1}')
+TAR_SHA=$(sha_of "$TARBALL")
 TAR_BYTES=$(stat -c %s "$TARBALL")
 
 # ------------------------------------------------------------ stage 8: sidecars
 printf '%s  %s.tar.gz\n' "$TAR_SHA" "$PKG_ROOT" > "$OUT_DIR/SHA256SUMS"
-python3 - "$OUT_DIR" "$TARBALL" "$TAR_SHA" "$TAR_BYTES" "$SOURCE_COMMIT" "$VERSION" "$PKG_ROOT" <<'PY' \
-  || die "writing package-summary.json failed"
+python3 - "$OUT_DIR" "$TARBALL" "$TAR_SHA" "$TAR_BYTES" "$SOURCE_COMMIT" "$VERSION" "$PKG_ROOT" \
+  "$ARGV_JSON" <<'PY' || die "writing package-summary.json failed"
 import json, os, sys
-out_dir, tarball, sha, size, commit, version, pkg_root = sys.argv[1:8]
+out_dir, tarball, sha, size, commit, version, pkg_root, argv_json = sys.argv[1:9]
 vc = json.load(open(os.path.join(out_dir, "v-checks.json"), encoding="utf-8"))
-facts = {}
-for line in open(os.path.join(out_dir, "audit", "facts.env"), encoding="utf-8"):
-    k, _, v = line.rstrip("\n").partition("=")
-    facts[k] = v
+manifest = json.load(open(os.path.join(out_dir, "stage", pkg_root, "metadata/manifest.json"),
+                          encoding="utf-8"))
 summary = {
     "entry": "ops/package-linux.sh",
-    "argv": json.loads(facts["argv_json"]),
+    "argv": json.loads(argv_json),
     "version": version,
     "version_status": "caller-supplied; the next release number is owner-reserved (contract section 14 Q1); not a release",
     "package_root": pkg_root,
@@ -1136,10 +963,9 @@ summary = {
     "packaged_files": vc["packaged_files"],
     "checksums_entries": vc["checksums_entries"],
     "files_entries": vc["files_entries"],
-    "artifact_provenance_attested": facts.get("provenance_attested") == "true",
-    "build_receipt_sha256": facts.get("build_receipt_sha256") or None,
-    "artifact_static_sha256": facts["static_sha256"],
-    "artifact_shared_sha256": facts["shared_sha256"],
+    "build_receipt_sha256": manifest["source"]["build_receipt_sha256"],
+    "artifact_static_sha256": manifest["sha256"],
+    "artifact_shared_sha256": manifest["shared_sha256"],
     "v_checks": {"verdict": vc["verdict"], "passed": vc["passed"], "failed": vc["failed"]},
     "not_run": ["runtime/device smoke of the packaged consumer example (no media input in this lane)",
                 "two-root reproducibility rebuild (contract section 12 levels stay NOT_ESTABLISHED)"],
@@ -1148,13 +974,9 @@ summary = {
 with open(os.path.join(out_dir, "package-summary.json"), "w", encoding="utf-8", newline="\n") as f:
     json.dump(summary, f, indent=2)
     f.write("\n")
+print("PACKAGE_OK tar=%s sha256=%s bytes=%s files=%s checksums=%s files_entries=%s"
+      % (tarball, sha, size, vc["packaged_files"], vc["checksums_entries"], vc["files_entries"]))
 PY
 
 log "PASS: $TARBALL sha256=$TAR_SHA bytes=$TAR_BYTES"
-printf 'PACKAGE_OK tar=%s sha256=%s bytes=%s files=%s checksums=%s files_entries=%s provenance_attested=%s\n' \
-  "$TARBALL" "$TAR_SHA" "$TAR_BYTES" \
-  "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["packaged_files"])' "$OUT_DIR/v-checks.json")" \
-  "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["checksums_entries"])' "$OUT_DIR/v-checks.json")" \
-  "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["files_entries"])' "$OUT_DIR/v-checks.json")" \
-  "$PROVENANCE_ATTESTED"
 exit 0

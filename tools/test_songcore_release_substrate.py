@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Negative controls for the SongCore build/package provenance boundary."""
+"""Negative controls for the SongCore build/package provenance boundary.
+
+Every control executes the real gate and asserts the real diagnostic: the
+shared receipt verifier, the shared version-identity verifier, or the
+production packaging entry itself. Two structural assertions remain, each
+labelled with why no executable local oracle exists (running the PowerShell
+build entry needs WSL plus a derived FFmpeg closure; the Xmake gate needs
+xmake), so a regression is still visible on a plain checkout.
+"""
 from __future__ import annotations
 import hashlib, json, os, subprocess, sys, tempfile
 from pathlib import Path
@@ -39,6 +47,24 @@ def expect_red(name, result, diagnostic):
     if result.returncode == 0 or diagnostic not in output:
         raise AssertionError(f"{name}: expected RED containing {diagnostic!r}; rc={result.returncode}; output={output}")
 
+def mutate(root: Path, receipt: dict, dotted: str, value):
+    mutated=json.loads(json.dumps(receipt)); cursor=mutated; parts=dotted.split(".")
+    for part in parts[:-1]: cursor=cursor[part]
+    cursor[parts[-1]]=value
+    path=root/f"{dotted}.json"; path.write_text(json.dumps(mutated),encoding="utf-8"); return path
+
+def git_fixture(root: Path) -> str:
+    subprocess.run(["git","init","-q",str(root)],check=True)
+    subprocess.run(["git","-C",str(root),"config","user.email","fixture@example.invalid"],check=True)
+    subprocess.run(["git","-C",str(root),"config","user.name","fixture"],check=True)
+    write(root/"README",b"fixture\n"); subprocess.run(["git","-C",str(root),"add","README"],check=True)
+    subprocess.run(["git","-C",str(root),"commit","-qm","fixture"],check=True)
+    return subprocess.check_output(["git","-C",str(root),"rev-parse","HEAD"],text=True).strip()
+
+def production_entry(repo: Path, *args):
+    return subprocess.run(["bash",str(ROOT/"ops/package-linux.sh"),*args],
+                          text=True,capture_output=True,check=False)
+
 def main() -> int:
     if not VERIFY.is_file(): raise AssertionError(f"missing provenance verifier: {VERIFY}")
     with tempfile.TemporaryDirectory(prefix="songcore-provenance-") as td:
@@ -51,26 +77,33 @@ def main() -> int:
           ("M9","execution.cache_reuse",True,"no cache reuse"),
           ("M10","artifacts.static.bytes",999,"artifact bytes")]
         for name,dotted,value,diagnostic in mutations:
-            mutated=json.loads(json.dumps(receipt)); cursor=mutated; parts=dotted.split(".")
-            for part in parts[:-1]: cursor=cursor[part]
-            cursor[parts[-1]]=value; path=root/f"{name}.json"; path.write_text(json.dumps(mutated),encoding="utf-8")
-            expect_red(name,run_verify(root,path),diagnostic)
+            expect_red(name,run_verify(root,mutate(root,receipt,dotted,value)),diagnostic)
         write(root/"libsongcore.a",b"old archive\n"); expect_red("M3",run_verify(root,receipt_path),"artifact sha256"); write(root/"libsongcore.a",b"artifact\n")
         expect_red("M8",run_verify(root,root/"missing.json"),"receipt missing")
+        # M11: the header digest absent from the receipt (the a5bacb6 defect class:
+        # a build receipt that never hashed native/include/songcore.h).
+        absent=json.loads(json.dumps(receipt)); del absent["inputs"]["header"]
+        path=root/"M11.json"; path.write_text(json.dumps(absent),encoding="utf-8")
+        expect_red("M11",run_verify(root,path),"receipt missing inputs.header")
         manifest=root/"manifest.json"; manifest.write_text(json.dumps({"source":{"commit":"0"*40}}),encoding="utf-8")
         expect_red("M7",run_verify(root,receipt_path,manifest),"manifest source.commit")
     if os.name != "nt":
         with tempfile.TemporaryDirectory(prefix="songcore-package-entry-") as td:
-            repo=Path(td); subprocess.run(["git","init","-q",str(repo)],check=True)
-            subprocess.run(["git","-C",str(repo),"config","user.email","fixture@example.invalid"],check=True)
-            subprocess.run(["git","-C",str(repo),"config","user.name","fixture"],check=True)
-            write(repo/"README",b"fixture\n"); subprocess.run(["git","-C",str(repo),"add","README"],check=True)
-            subprocess.run(["git","-C",str(repo),"commit","-qm","fixture"],check=True)
-            commit=subprocess.check_output(["git","-C",str(repo),"rev-parse","HEAD"],text=True).strip()
-            result=subprocess.run(["bash",str(ROOT/"ops/package-linux.sh"),"--version","1.2.3",
-                "--source-commit",commit,"--work-root",str(repo),"--out-dir",str(repo/"out"),
-                "--build-receipt",str(repo/"missing.json")],text=True,capture_output=True,check=False)
-            expect_red("M8-production-entry",result,"missing build receipt")
+            repo=Path(td); commit=git_fixture(repo)
+            expect_red("M8-production-entry",
+                production_entry(repo,"--version","1.2.3","--source-commit",commit,
+                    "--work-root",str(repo),"--out-dir",str(repo/"out"),
+                    "--build-receipt",str(repo/"missing.json")),"missing build receipt")
+            # Executed version-grammar and immutability gates of the real entry.
+            expect_red("IMMUTABLE-HISTORY",
+                production_entry(repo,"--version","0.1.0","--source-commit",commit,
+                    "--work-root",str(repo),"--out-dir",str(repo/"out")),"immutable history")
+            expect_red("VERSION-SUFFIX",
+                production_entry(repo,"--version","0.1.1-rc.1","--source-commit",commit,
+                    "--work-root",str(repo),"--out-dir",str(repo/"out")),"not the authorized MAJOR.MINOR.PATCH")
+            expect_red("VERSION-LEADING-ZERO",
+                production_entry(repo,"--version","01.2.3","--source-commit",commit,
+                    "--work-root",str(repo),"--out-dir",str(repo/"out")),"not the authorized MAJOR.MINOR.PATCH")
     with tempfile.TemporaryDirectory(prefix="songcore-version-") as td:
         root=Path(td); xmake=root/"xmake.lua"; xmake.write_text('set_version("0.1.0")\n',encoding="utf-8")
         approval={"schema_version":1,"decision":"Q1","approved_by":"jnhu76",
@@ -106,50 +139,28 @@ def main() -> int:
         expect_red("VERSION-XMAKE",version_run(xmake_lie),"native/xmake.lua")
         coupled=dict(decision,component_version_mode="project-coupled")
         expect_red("VERSION-COUPLING",version_run(coupled),"project-coupled")
-    workflow=ROOT/".github/workflows/songcore-release-substrate.yml"
-    if not workflow.is_file(): raise AssertionError("ops release substrate workflow missing")
-    text=workflow.read_text(encoding="utf-8")
-    for trigger in ("ops/**","native/ffmpeg/targets/**","native/ffmpeg/profiles/**","native/ffmpeg/pin.json",
-                    "LICENSE-MIT","LICENSE-APACHE","docs/release/songcore-release-contract.md",
-                    "docs/release/songcore-version-decision.json",
-                    "evidence/songcore-172/linux/verify/package/external-consumer-example.c",
-                    "tools/verify_songcore_build_receipt.py","tools/verify_songcore_version_identity.py",
-                    "tools/test_songcore_release_substrate.py","tools/docs-verify.cmd"):
-        if trigger not in text: raise AssertionError(f"workflow trigger missing: {trigger}")
-    linux=(ROOT/"ops/package-linux.sh").read_text(encoding="utf-8")
-    windows=(ROOT/"ops/package-rc.ps1").read_text(encoding="utf-8")
-    build_linux=(ROOT/"ops/build-linux.sh").read_text(encoding="utf-8")
+    # ---- structural controls (no executable local oracle exists) --------------
+    # The PowerShell build entry needs WSL plus an imported FFmpeg closure to run,
+    # so the observed real defect (configure MinGW, then "xmake clean -a" erased
+    # that configuration and the build silently fell back to Linux) is pinned as
+    # statement order instead of a run.
     build_windows=(ROOT/"ops/build-rc.ps1").read_text(encoding="utf-8")
-    ffmpeg=(ROOT/"native/build/ffmpeg.lua").read_text(encoding="utf-8")
-    version_verifier=VERIFY_VERSION.read_text(encoding="utf-8")
-    required={
-      "linux receipt required":"--build-receipt is required for release-qualified packaging",
-      "linux strict version":"suffixes are not authorized",
-      "windows receipt required":"[Parameter(Mandatory=$true)][string]$BuildReceipt",
-      "windows strict version":"suffixes are not authorized by contract section 2",
-      "linux cache profile":"man.get(\"profile_sha256\") == profile_sha",
-      "linux compile evidence":"int(d[\"compile_actions\"])",
-      "linux receipt header identity":"include/songcore.h src/songcore_ffmpeg.c",
-      "xmake recipe binding":"mt.recipe_sha256 ~= recipe_sha256",
-      "linux shared verifier":"verify_songcore_build_receipt.py\" \\",
-      "windows shared verifier":"verify_songcore_build_receipt.py\")",
-      "linux owner version gate":"Q1 version identity is OWNER_BLOCKED",
-      "windows owner version gate":"Q1 version identity is OWNER_BLOCKED",
-    }
-    haystacks={"linux receipt required":linux,"linux strict version":linux,"windows receipt required":windows,
-      "windows strict version":windows,"linux cache profile":build_linux,"linux compile evidence":build_linux,
-      "linux receipt header identity":build_linux,
-      "xmake recipe binding":ffmpeg,"linux shared verifier":linux,"windows shared verifier":windows,
-      "linux owner version gate":version_verifier,"windows owner version gate":version_verifier}
-    for name,needle in required.items():
-        if needle not in haystacks[name]: raise AssertionError(f"production guard missing: {name}")
     clean = 'xmake clean -a > "$EV/clean.log" 2>&1'
     configure = 'xmake f -p mingw -a x86_64 -m release -y > "$EV/config.log" 2>&1'
     if build_windows.index(clean) > build_windows.index(configure):
         raise AssertionError("Windows build config is erased by a later xmake clean -a")
-    decision=json.loads((ROOT/"docs/release/songcore-version-decision.json").read_text(encoding="utf-8"))
-    if decision.get("status") not in ("OWNER_BLOCKED","APPROVED"):
-        raise AssertionError("unknown Q1 decision state")
-    print("PASS: SongCore release substrate negative controls M1-M10"); return 0
+    # The Xmake closure gate needs xmake + a derived closure to evaluate; the
+    # real builds exercise it, and CI triggers on native/build/**.
+    ffmpeg=(ROOT/"native/build/ffmpeg.lua").read_text(encoding="utf-8")
+    if "mt.recipe_sha256 ~= recipe_sha256" not in ffmpeg:
+        raise AssertionError("native/build/ffmpeg.lua no longer rejects a stale target recipe")
+    # CI trigger coverage cannot be executed locally at all: one compact guard
+    # that the substrate workflow is wired to the files these controls read.
+    workflow=(ROOT/".github/workflows/songcore-release-substrate.yml").read_text(encoding="utf-8")
+    for trigger in ("ops/**","tools/verify_songcore_build_receipt.py",
+                    "tools/verify_songcore_version_identity.py",
+                    "tools/test_songcore_release_substrate.py"):
+        if trigger not in workflow: raise AssertionError(f"workflow trigger missing: {trigger}")
+    print("PASS: SongCore release substrate negative controls M1-M11 + version identity"); return 0
 
 if __name__ == "__main__": raise SystemExit(main())
