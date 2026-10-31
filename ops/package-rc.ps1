@@ -85,7 +85,7 @@ if ($ConsumerExample -eq "") { $ConsumerExample = Join-Path $ProjectRoot "eviden
 
 # Frozen identities (docs/release/songcore-release-contract.md section 3).
 # They move only with an authority reference.
-$ExpectedAbiHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+$ExpectedAbiHeaderSha256 = "d43a9d47b767fe9671b9691011feb1d5201f4080609010be4d6da96f16c78d2a"
 $ImmutableHistorical     = "0.1.0"   # songcore-v0.1.0 is frozen history (section 2)
 $SymbolList = @(
     "song_audio_stream_count", "song_audio_stream_info", "song_close",

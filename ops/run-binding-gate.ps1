@@ -51,7 +51,7 @@ $build = Get-Content $BuildReceipt -Raw | ConvertFrom-Json
 if ($build.script -ne "ops/build-rc.ps1" -or -not $build.ok) { Write-Host "ABORT exit=10 invalid build receipt"; exit 10 }
 $ExpectedArtifactSha256 = $build.artifacts.libsongcore_a_sha256
 if ($build.source.commit -ne (& git -C $ProjectRoot rev-parse HEAD)) { Write-Host "ABORT exit=11 build receipt source mismatch"; exit 11 }
-$ExpectedHeaderSha256 = "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+$ExpectedHeaderSha256 = "d43a9d47b767fe9671b9691011feb1d5201f4080609010be4d6da96f16c78d2a"
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 New-Item -ItemType Directory -Force -Path $ReceiptDir | Out-Null

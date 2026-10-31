@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "decision": "Q1",
+  "approved_by": "jnhu76",
+  "authority_ref": "https://github.com/jnhu76/qianqian/issues/333#issuecomment-6546753298",
+  "semantic_version": "0.1.1",
+  "component_version_mode": "project-coupled",
+  "recorded": "2026-11-01",
+  "note": "Owner G4 decision record for the next songcore-v* release candidate. Approves Q1 0.1.1 project-coupled, Q3 windows-x86_64 static-only, Q4 measured GLIBC_2.43 floor with no older-compatibility claim, Q5 manual no-overwrite publication bound to the source SHA, D1 correction of the song_open error documentation, D3 clear out_frames_produced before error returns. It does not itself authorise a tag or a GitHub Release: the final G4 approval still binds to the frozen SHA and the built artifacts."
+}

@@ -213,10 +213,17 @@ typedef struct song_stream_info {
  * refers to the SAME logical song / selected stream.
  * ---------------------------------------------------------------------- */
 
-/* Open a handle over host IO. All three callbacks are required. Errors:
- * SONG_ERR_UNSUPPORTED_CONTAINER / SONG_ERR_IO / SONG_ERR_OUT_OF_MEMORY;
- * *out_handle is then untouched. No diagnostic is available for song_open
- * failures (no handle exists). */
+/* Open a handle over host IO. All three callbacks are required.
+ *
+ * Argument guard: if io, out_handle or any of the three callbacks is NULL the
+ * call returns SONG_ERR_INVALID_ARGUMENT and *out_handle is untouched (the
+ * pointer cannot be written safely).
+ *
+ * After that guard the call may still fail with SONG_ERR_UNSUPPORTED_CONTAINER,
+ * SONG_ERR_IO or SONG_ERR_OUT_OF_MEMORY; in every such case *out_handle is set
+ * to NULL, so a caller never receives a stale handle.
+ *
+ * No diagnostic is available for song_open failures (no handle exists). */
 SONGCORE_API song_status song_open(const song_io *io, song_handle **out_handle);
 
 /* Parse the container, enumerate decodable audio streams, select the

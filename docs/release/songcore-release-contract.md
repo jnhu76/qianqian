@@ -39,6 +39,16 @@ REVISION 2    reviewer round 2 (2026-10-29) applied: G4 now enumerates
               is actually enforced at the release gate; §3 shared-form
               rule reworded to "…and nothing else is exported…" and the
               stray closing paren removed.
+REVISION 3    Owner D1/D3 ruling (2026-11-01,
+              #333 issuecomment-6546753298) applied: §3 header identity
+              updated to d43a9d47…8d2a after the approved correction of the
+              song_open error documentation. SONG_ABI_VERSION and the
+              15-symbol export surface are unchanged, so this is a
+              documentation amendment, not an ABI change; the header inside
+              the immutable v0.1.0 assets is untouched. The same ruling
+              recorded Q1 0.1.1 project-coupled, Q3 windows-x86_64
+              static-only, Q4 measured GLIBC_2.43 floor and Q5 manual
+              no-overwrite publication.
 SUBJECT       the SongCore component release contract: component identity,
               versioning, ABI version, supported targets, capability
               profile, artifact kinds, package layout, provenance schema,
@@ -132,11 +142,13 @@ releases under a new version, never a re-tag (method from S-REL R7).
 
 ```text
 SONGCORE_ABI_VERSION   1u            (S-HDR:62)
-header sha256          cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
-                       (sha256sum run this session on the working-tree file;
-                       byte-identical to the hash shipped inside the v0.1.0
-                       tarball manifest and to evidence S-325 ARTIFACT.md §2 —
-                       the ABI header has not changed since v0.1.0)
+header sha256          d43a9d47b767fe9671b9691011feb1d5201f4080609010be4d6da96f16c78d2a
+                       (sha256sum on the D1-amended header, see REVISION 3;
+                       SONG_ABI_VERSION and the 15-symbol export surface are
+                       unchanged from v0.1.0 — only the song_open error
+                       documentation was corrected. The header shipped in the
+                       v0.1.0 artifacts stays valid history, but its digest is
+                       not this identity)
 export surface         exactly 15 symbols: songcore_abi_version,
                        song_open, song_probe, song_audio_stream_count,
                        song_audio_stream_info, song_select_stream,
