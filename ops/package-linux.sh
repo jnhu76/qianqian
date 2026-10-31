@@ -526,7 +526,7 @@ closure = json.load(open(closure_path, encoding="utf-8"))
 symbols = [l.strip() for l in open(os.path.join(stage, "metadata/symbols.txt"), encoding="utf-8") if l.strip()]
 needed = [l.strip() for l in open(os.path.join(audit_dir, "needed-libs.txt"), encoding="utf-8") if l.strip()]
 license_files = {n: sha256(os.path.join(stage, "LICENSES", n))
-                 for n in ("COPYING.GPLv2", "COPYING.GPLv3", "COPYING.LGPLv2.1", "COPYING.LGPLv3")]
+                 for n in ("COPYING.GPLv2", "COPYING.GPLv3", "COPYING.LGPLv2.1", "COPYING.LGPLv3")}
 
 manifest = {
     "schema_version": 2,
@@ -924,8 +924,12 @@ if sorted(files) != sorted(staged):
     sys.stderr.write("FAIL: container payload set != staged set\n"); sys.exit(59)
 
 # The container is what ships: re-hash every payload from the archive itself.
+# checksums.txt cannot cover itself (contract section 8 V1); every other member
+# is covered by files{} or, for manifest.json, by checksums.txt.
 bad = []
 for rel, (h, size) in files.items():
+    if rel == "metadata/checksums.txt":
+        continue
     if rel in manifest["files"]:
         if manifest["files"][rel]["sha256"] != h or manifest["files"][rel]["bytes"] != size:
             bad.append(rel)
